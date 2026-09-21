@@ -5,8 +5,9 @@
 //
 // Dùng upsert (có thì cập nhật, chưa có thì thêm) nên chạy lại nhiều lần vẫn an toàn.
 // Role 1, 3, 6: bit đã chốt trong tài liệu.
-// Role 2, 4, 5: TẠM THEO ĐỀ XUẤT — tài liệu chỉ mô tả bằng lời, danh sách bit dưới đây chờ nhóm chốt.
-// Khi nhóm chốt khác, sửa mảng bit tương ứng rồi chạy lại seed.
+// Role 2, 4, 5: tài liệu chỉ mô tả bằng lời, bit được chốt theo mô tả role (mục 5.1), chức năng
+// từng bit (mục 3.1) và sơ đồ use case trong tài liệu 02. Người dùng cụ thể cần thêm quyền thì cấp
+// qua users.extra_permissions, không sửa role.
 // =============================================================================
 import { PrismaClient } from '@prisma/client';
 
@@ -84,7 +85,7 @@ const ROLES = [
     dataScope: 'ALL',
   },
   {
-    // TẠM — chờ nhóm chốt. 24 bit: Product chỉ xem; toàn bộ Inventory, Order, Employee;
+    // 24 bit: Product chỉ xem (products không có store_id nên STORE không giới hạn được); toàn bộ Inventory, Order, Employee;
     // báo cáo cơ bản + hiệu suất nhân viên; xem khách hàng; duyệt hoàn tiền.
     id: 2,
     name: 'store_manager',
@@ -104,7 +105,7 @@ const ROLES = [
     dataScope: 'STORE',
   },
   {
-    // TẠM — chờ nhóm chốt. 10 bit tài liệu nêu + bit 12 (xem đơn online để biết đơn cần đóng gói).
+    // 11 bit: 10 bit tài liệu nêu + bit 12 (xem đơn online để biết đơn cần đóng gói).
     id: 4,
     name: 'warehouse_staff',
     displayName: 'Nhân viên kho',
@@ -113,7 +114,7 @@ const ROLES = [
     dataScope: 'STORE',
   },
   {
-    // TẠM — chờ nhóm chốt. 8 bit: đối soát, hóa đơn GTGT, duyệt & thanh toán NCC, báo cáo tài chính.
+    // 8 bit: đối soát, hóa đơn GTGT, duyệt & thanh toán NCC, báo cáo tài chính.
     id: 5,
     name: 'accountant',
     displayName: 'Kế toán',
