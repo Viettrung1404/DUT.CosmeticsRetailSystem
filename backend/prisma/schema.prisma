@@ -352,7 +352,8 @@ model Inventory {
   productVariantId  String    @map("product_variant_id") @db.Uuid
   quantity          Int       @default(0)
   reservedQuantity  Int       @default(0) @map("reserved_quantity")
-  availableQuantity Int?      @default(0) @map("available_quantity")
+  // Cột GENERATED (quantity - reserved_quantity), tạo trong migration add_db_constraints. Chỉ đọc, không ghi.
+  availableQuantity Int?      @default(dbgenerated()) @map("available_quantity")
   minQuantity       Int       @default(5) @map("min_quantity")
   maxQuantity       Int?      @map("max_quantity")
   lastRestockAt     DateTime? @map("last_restock_at") @db.Timestamptz
@@ -448,7 +449,8 @@ model InventoryTransferItem {
   quantityRequested Int      @map("quantity_requested")
   quantityShipped   Int      @default(0) @map("quantity_shipped")
   quantityReceived  Int      @default(0) @map("quantity_received")
-  lossQuantity      Int?     @default(0) @map("loss_quantity")
+  // Cột GENERATED (quantity_shipped - quantity_received), tạo trong migration add_db_constraints. Chỉ đọc, không ghi.
+  lossQuantity      Int?     @default(dbgenerated()) @map("loss_quantity")
   lossReason        String?  @map("loss_reason") @db.Text
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -487,7 +489,8 @@ model StocktakeItem {
   batchId          String?  @map("batch_id") @db.Uuid
   systemQuantity   Int      @map("system_quantity")
   actualQuantity   Int      @map("actual_quantity")
-  varianceQuantity Int?     @default(0) @map("variance_quantity")
+  // Cột GENERATED (actual_quantity - system_quantity), tạo trong migration add_db_constraints. Chỉ đọc, không ghi.
+  varianceQuantity Int?     @default(dbgenerated()) @map("variance_quantity")
   unitCost         Decimal  @map("unit_cost") @db.Decimal(12, 2)
   varianceReason   String?  @map("variance_reason") @db.VarChar(50)
   note             String?  @db.Text
@@ -578,6 +581,7 @@ model Order {
   @@index([customerId, createdAt])
   @@index([storeId, status])
   @@index([posSessionId])
+  @@index([shippingAddress], type: Gin, map: "idx_orders_shipping_address")
   @@map("orders")
 }
 
@@ -642,6 +646,7 @@ model Shipment {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, status])
+  @@index([carrierMetadata], type: Gin, map: "idx_shipments_carrier_metadata")
   @@map("shipments")
 }
 
@@ -1290,6 +1295,7 @@ model Setting {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  @@index([value], type: Gin, map: "idx_settings_value")
   @@map("settings")
 }
 
