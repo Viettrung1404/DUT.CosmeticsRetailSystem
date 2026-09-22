@@ -1,14 +1,4 @@
-// =============================================================================
-// SEED DỮ LIỆU BẮT BUỘC — Đợt 1
-// Nguồn: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (bảng 53 quyền) và mục 5.1 (roles).
-// Chạy: npx prisma db seed
-//
-// Dùng upsert (có thì cập nhật, chưa có thì thêm) nên chạy lại nhiều lần vẫn an toàn.
-// Role 1, 3, 6: bit đã chốt trong tài liệu.
-// Role 2, 4, 5: tài liệu chỉ mô tả bằng lời, bit được chốt theo mô tả role (mục 5.1), chức năng
-// từng bit (mục 3.1) và sơ đồ use case trong tài liệu 02. Người dùng cụ thể cần thêm quyền thì cấp
-// qua users.extra_permissions, không sửa role.
-// =============================================================================
+// Nguồn dữ liệu: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (53 quyền) và mục 5.1 (6 vai trò)
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -70,8 +60,7 @@ const PERMISSIONS: [number, string, string, string][] = [
   [52, 'INVOICE_MANAGE', 'Phát hành, tra cứu & hủy hóa đơn điện tử VAT', 'payment'],
 ];
 
-// Gộp danh sách bit thành một số bitmask BigInt. Phải dùng BigInt (hậu tố n):
-// số thường của JavaScript chỉ chính xác tới 2^53, và toán tử << chỉ chạy trên 32 bit.
+// Dùng BigInt vì số thường của JavaScript chỉ chính xác tới 2^53
 const mask = (bits: number[]): bigint =>
   bits.reduce((acc, bit) => acc | (1n << BigInt(bit)), 0n);
 
@@ -85,15 +74,13 @@ const ROLES = [
     dataScope: 'ALL',
   },
   {
-    // 24 bit: Product chỉ xem (products không có store_id nên STORE không giới hạn được); toàn bộ Inventory, Order, Employee;
-    // báo cáo cơ bản + hiệu suất nhân viên; xem khách hàng; duyệt hoàn tiền.
     id: 2,
     name: 'store_manager',
     displayName: 'Cửa hàng trưởng',
     description: 'Quản lý vận hành, kho, đơn hàng và nhân sự của chi nhánh được giao',
     permissions: mask([
       0, 6, 7, 8, 9, 10, 48, 49, 11, 12, 13, 14, 15, 50, 51, 25, 26, 27, 28, 29, 35, 17, 37, 20,
-    ]), // = 4.222.297.490.784.193
+    ]),
     dataScope: 'STORE',
   },
   {
@@ -101,25 +88,23 @@ const ROLES = [
     name: 'sales_staff',
     displayName: 'Nhân viên bán hàng',
     description: 'Bán hàng tại quầy POS, thu tiền, tra cứu khách hàng',
-    permissions: mask([0, 11, 13, 16, 20, 21]), // = 3.221.505 theo tài liệu
+    permissions: mask([0, 11, 13, 16, 20, 21]),
     dataScope: 'STORE',
   },
   {
-    // 11 bit: 10 bit tài liệu nêu + bit 12 (xem đơn online để biết đơn cần đóng gói).
     id: 4,
     name: 'warehouse_staff',
     displayName: 'Nhân viên kho',
     description: 'Nhập kho, chuyển kho, kiểm kê, quản lý lô hạn dùng, đóng gói giao vận',
-    permissions: mask([0, 6, 7, 8, 9, 10, 34, 48, 49, 50, 12]), // = 1.970.342.016.849.857
+    permissions: mask([0, 6, 7, 8, 9, 10, 34, 48, 49, 50, 12]),
     dataScope: 'STORE',
   },
   {
-    // 8 bit: đối soát, hóa đơn GTGT, duyệt & thanh toán NCC, báo cáo tài chính.
     id: 5,
     name: 'accountant',
     displayName: 'Kế toán',
     description: 'Đối soát thanh toán, hóa đơn điện tử, thanh toán nhà cung cấp, báo cáo tài chính',
-    permissions: mask([0, 19, 30, 33, 35, 36, 39, 52]), // = 4.504.262.126.600.193
+    permissions: mask([0, 19, 30, 33, 35, 36, 39, 52]),
     dataScope: 'ALL',
   },
   {
@@ -150,8 +135,7 @@ async function main() {
     });
   }
 
-  // Chèn id tay không làm bộ đếm tự tăng của roles nhảy theo. Đẩy bộ đếm lên id lớn nhất,
-  // nếu không thì role tạo sau này qua API sẽ nhận id 1 và lỗi trùng khóa chính.
+  // Đẩy bộ đếm id của roles lên id lớn nhất, tránh role tạo sau qua API bị trùng khóa chính
   await prisma.$executeRawUnsafe(
     `SELECT setval(pg_get_serial_sequence('roles', 'id'), (SELECT MAX(id) FROM roles))`,
   );
