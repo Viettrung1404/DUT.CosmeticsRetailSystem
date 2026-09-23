@@ -6,8 +6,8 @@ import {
   IUserSessionRepository,
 } from '../../../domain/repositories/user-session.repository.interface';
 import { JwtTokenService } from '../../../infrastructure/adapters/jwt.service';
-import { PrismaService } from '@infrastructure/database/prisma.service';
 import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
+import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
 import { UnauthorizedException } from '@nestjs/common';
 import { UserEntity } from '../../../domain/entities/user.entity';
 
@@ -16,7 +16,7 @@ describe('RefreshTokenUseCase', () => {
   let userRepo: jest.Mocked<IUserRepository>;
   let sessionRepo: jest.Mocked<IUserSessionRepository>;
   let jwtService: jest.Mocked<JwtTokenService>;
-  let prisma: jest.Mocked<any>;
+  let getPermissionsUseCase: jest.Mocked<GetUserEffectivePermissionsUseCase>;
   let unitOfWork: jest.Mocked<IUnitOfWork>;
 
   beforeEach(async () => {
@@ -46,11 +46,9 @@ describe('RefreshTokenUseCase', () => {
       verifyAccessToken: jest.fn(),
     } as any;
 
-    prisma = {
-      permission: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-    };
+    getPermissionsUseCase = {
+      execute: jest.fn().mockResolvedValue(['PRODUCT_VIEW']),
+    } as any;
 
     unitOfWork = {
       runInTransaction: jest.fn().mockImplementation((work) => work()),
@@ -63,7 +61,7 @@ describe('RefreshTokenUseCase', () => {
         { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo },
         { provide: UNIT_OF_WORK, useValue: unitOfWork },
         { provide: JwtTokenService, useValue: jwtService },
-        { provide: PrismaService, useValue: prisma },
+        { provide: GetUserEffectivePermissionsUseCase, useValue: getPermissionsUseCase },
       ],
     }).compile();
 
@@ -100,6 +98,7 @@ describe('RefreshTokenUseCase', () => {
     expect(result.refreshToken).toBe('new-refresh-token');
     expect(sessionRepo.revokeById).toHaveBeenCalledWith('session-1');
     expect(sessionRepo.create).toHaveBeenCalled();
+    expect(getPermissionsUseCase.execute).toHaveBeenCalledWith('user-1');
   });
 
   it('should throw UnauthorizedException if session is revoked', async () => {
@@ -120,9 +119,10 @@ describe('RefreshTokenUseCase', () => {
       userId: 'user-1',
       refreshToken: 'expired-token',
       isRevoked: false,
-      expiresAt: new Date(Date.now() - 1000), // Ä‘Ã£ háº¿t háº¡n
+      expiresAt: new Date(Date.now() - 1000), // đã hết hạn
     });
 
     await expect(useCase.execute('expired-token')).rejects.toThrow(UnauthorizedException);
   });
 });
+

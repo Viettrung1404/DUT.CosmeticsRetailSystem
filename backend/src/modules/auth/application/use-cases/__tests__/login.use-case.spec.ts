@@ -7,7 +7,7 @@ import {
 } from '../../../domain/repositories/user-session.repository.interface';
 import { BcryptService } from '../../../infrastructure/adapters/bcrypt.service';
 import { JwtTokenService } from '../../../infrastructure/adapters/jwt.service';
-import { PrismaService } from '@infrastructure/database/prisma.service';
+import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
 import { UserEntity } from '../../../domain/entities/user.entity';
 import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
 
@@ -17,7 +17,7 @@ describe('LoginUseCase', () => {
   let sessionRepo: jest.Mocked<IUserSessionRepository>;
   let bcryptService: jest.Mocked<BcryptService>;
   let jwtService: jest.Mocked<JwtTokenService>;
-  let prisma: jest.Mocked<any>;
+  let getPermissionsUseCase: jest.Mocked<GetUserEffectivePermissionsUseCase>;
 
   beforeEach(async () => {
     userRepo = {
@@ -51,11 +51,9 @@ describe('LoginUseCase', () => {
       verifyAccessToken: jest.fn(),
     } as any;
 
-    prisma = {
-      permission: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-    };
+    getPermissionsUseCase = {
+      execute: jest.fn().mockResolvedValue(['PRODUCT_VIEW']),
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -64,7 +62,7 @@ describe('LoginUseCase', () => {
         { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo },
         { provide: BcryptService, useValue: bcryptService },
         { provide: JwtTokenService, useValue: jwtService },
-        { provide: PrismaService, useValue: prisma },
+        { provide: GetUserEffectivePermissionsUseCase, useValue: getPermissionsUseCase },
       ],
     }).compile();
 
@@ -99,6 +97,7 @@ describe('LoginUseCase', () => {
     expect(result.refreshToken).toBe('mock-refresh-token');
     expect(result.user.email).toBe('user@glowup.vn');
     expect(userRepo.updateLastLogin).toHaveBeenCalledWith('user-1');
+    expect(getPermissionsUseCase.execute).toHaveBeenCalledWith('user-1');
   });
 
   it('should throw UnauthorizedException when password is incorrect', async () => {
@@ -150,3 +149,4 @@ describe('LoginUseCase', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 });
+
