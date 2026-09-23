@@ -6,7 +6,7 @@ import {
 } from '../../domain/repositories/user-session.repository.interface';
 import { BcryptService } from '../../infrastructure/adapters/bcrypt.service';
 import { JwtTokenService } from '../../infrastructure/adapters/jwt.service';
-import { PrismaService } from '@infrastructure/database/prisma.service';
+import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
 
 export interface LoginInput {
   email: string;
@@ -34,7 +34,7 @@ export class LoginUseCase {
     @Inject(USER_SESSION_REPOSITORY) private readonly sessionRepo: IUserSessionRepository,
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtTokenService,
-    private readonly prisma: PrismaService,
+    private readonly getPermissionsUseCase: GetUserEffectivePermissionsUseCase,
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
@@ -66,8 +66,8 @@ export class LoginUseCase {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
-    // 5. Compute effective permissions
-    const permissionCodes = await this.getPermissionCodes(user.getEffectivePermissions());
+    // 5. Compute effective permissions via Permissions service
+    const permissionCodes = await this.getPermissionsUseCase.execute(user.id!);
 
     // 6. Generate JWT tokens
     const accessToken = this.jwtService.generateAccessToken({
@@ -105,16 +105,5 @@ export class LoginUseCase {
       },
     };
   }
-
-  /**
-   * Decode effective permission bitmask to permission code strings.
-   */
-  private async getPermissionCodes(effectivePerms: bigint): Promise<string[]> {
-    if (effectivePerms === BigInt(0)) return [];
-
-    const permissions = await this.prisma.permission.findMany();
-    return permissions
-      .filter((p) => (effectivePerms & p.bitValue) !== BigInt(0))
-      .map((p) => p.permissionCode);
-  }
 }
+

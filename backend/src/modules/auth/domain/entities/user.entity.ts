@@ -139,13 +139,5 @@ export class UserEntity {
   updatePasswordHash(newHash: string): void {
     this._passwordHash = newHash;
   }
-
-  /**
-   * Calculates effective permissions via bitmask formula:
-   * (roles.permissions | users.extra_permissions) & ~users.revoked_permissions
-   */
-  getEffectivePermissions(): bigint {
-    const rolePerms = this._rolePermissions ?? BigInt(0);
-    return (rolePerms | this._extraPermissions) & ~this._revokedPermissions;
-  }
 }
+

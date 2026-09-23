@@ -10,6 +10,9 @@ import { BcryptService } from '../../infrastructure/adapters/bcrypt.service';
 import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
 import * as crypto from 'crypto';
 
+export const DEFAULT_CUSTOMER_ROLE_ID = 6;
+export const EMAIL_VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export interface RegisterInput {
   email: string;
   password: string;
@@ -57,7 +60,7 @@ export class RegisterUseCase {
 
     // 5. Create User entity
     const user = new UserEntity({
-      roleId: 6, // Customer role
+      roleId: DEFAULT_CUSTOMER_ROLE_ID,
       email: input.email,
       passwordHash,
       phone: input.phone || null,
@@ -88,7 +91,7 @@ export class RegisterUseCase {
 
       const rToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(rToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+      const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
 
       await this.tokenRepo.create({
         userId: uId,
@@ -111,3 +114,4 @@ export class RegisterUseCase {
     };
   }
 }
+
