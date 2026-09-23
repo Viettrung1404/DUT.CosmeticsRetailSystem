@@ -27,31 +27,34 @@ describe('GetCategoryTreeUseCase', () => {
     useCase = module.get<GetCategoryTreeUseCase>(GetCategoryTreeUseCase);
   });
 
-  it('should return nested category tree structure', async () => {
+  it('nên trả về cấu trúc cây danh mục đa cấp chính xác', async () => {
     const childCategory = new CategoryEntity({
       id: 'cat-child-1',
       parentId: 'cat-root-1',
-      name: 'Son thá»i',
+      name: 'Son thỏi',
       slug: 'son-thoi',
       sortOrder: 1,
     });
 
     const rootCategory = new CategoryEntity({
       id: 'cat-root-1',
-      name: 'Trang Ä‘iá»ƒm mÃ´i',
+      name: 'Trang điểm môi',
       slug: 'trang-diem-moi',
       sortOrder: 1,
-      children: [childCategory],
     });
+    rootCategory.addChild(childCategory);
 
     categoryRepo.findTree.mockResolvedValue([rootCategory]);
 
     const result = await useCase.execute();
 
     expect(result.length).toBe(1);
-    expect(result[0].name).toBe('Trang Ä‘iá»ƒm mÃ´i');
+    expect(result[0].name).toBe('Trang điểm môi');
+    expect(result[0].isRoot()).toBe(true);
+    expect(result[0].hasChildren()).toBe(true);
     expect(result[0].children.length).toBe(1);
-    expect(result[0].children[0].name).toBe('Son thá»i');
+    expect(result[0].children[0].name).toBe('Son thỏi');
+    expect(result[0].children[0].isRoot()).toBe(false);
     expect(categoryRepo.findTree).toHaveBeenCalledTimes(1);
   });
 });
