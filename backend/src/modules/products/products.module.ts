@@ -5,8 +5,12 @@ import { GetProductsUseCase } from './application/use-cases/get-products.use-cas
 import { GetProductDetailUseCase } from './application/use-cases/get-product-detail.use-case';
 import { CreateProductUseCase } from './application/use-cases/create-product.use-case';
 import { DeleteProductUseCase } from './application/use-cases/delete-product.use-case';
+import { SearchProductsUseCase } from './application/use-cases/search-products.use-case';
+import { SuggestProductsUseCase } from './application/use-cases/suggest-products.use-case';
+import { GetRelatedProductsUseCase } from './application/use-cases/get-related-products.use-case';
 import { PRODUCT_REPOSITORY } from './domain/repositories/product.repository.interface';
 import { PrismaProductRepository } from './infrastructure/persistence/prisma-product.repository';
+import { ElasticsearchProductService } from './infrastructure/search/elasticsearch-product.service';
 
 @Module({
   controllers: [ProductCustomerController, ProductAdminController],
@@ -16,6 +20,12 @@ import { PrismaProductRepository } from './infrastructure/persistence/prisma-pro
     GetProductDetailUseCase,
     CreateProductUseCase,
     DeleteProductUseCase,
+    SearchProductsUseCase,
+    SuggestProductsUseCase,
+    GetRelatedProductsUseCase,
+
+    // Search Engine
+    ElasticsearchProductService,
 
     // Repository Port -> Adapter Mapping
     {
@@ -24,11 +34,15 @@ import { PrismaProductRepository } from './infrastructure/persistence/prisma-pro
     },
   ],
   exports: [
+    PRODUCT_REPOSITORY,
     GetProductsUseCase,
     GetProductDetailUseCase,
     CreateProductUseCase,
     DeleteProductUseCase,
+    SearchProductsUseCase,
+    SuggestProductsUseCase,
+    GetRelatedProductsUseCase,
+    ElasticsearchProductService,
   ],
 })
 export class ProductsModule {}
-

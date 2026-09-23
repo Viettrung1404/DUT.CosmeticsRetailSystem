@@ -1,11 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductEntity, ProductVariantProps } from '../../domain/entities/product.entity';
+import {
+  ProductEntity,
+  ProductImageProps,
+  ProductIngredientProps,
+  ProductVariantProps,
+} from '../../domain/entities/product.entity';
 
-/**
- * Response DTO cho Product — thuộc presentation layer.
- * Chứa Swagger decorators (@ApiProperty) vì đây là concern hiển thị API.
- * Mapping từ Domain Entity sang DTO được thực hiện qua static method fromDomain().
- */
 export class ProductResponseDto {
   @ApiProperty({ example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
   id: string;
@@ -15,6 +15,15 @@ export class ProductResponseDto {
 
   @ApiPropertyOptional({ example: 'b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a33' })
   brandId?: string | null;
+
+  @ApiPropertyOptional({ example: 'Black Rouge' })
+  brandName?: string | null;
+
+  @ApiPropertyOptional({ example: 'Trang điểm môi' })
+  categoryName?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/primary.jpg' })
+  primaryImage?: string | null;
 
   @ApiProperty({ example: 'Son kem lì Black Rouge Air Fit Velvet Tint' })
   name: string;
@@ -64,6 +73,15 @@ export class ProductResponseDto {
   @ApiProperty({ type: 'array', items: { type: 'object' } })
   variants: ProductVariantProps[];
 
+  @ApiPropertyOptional({ type: 'array', items: { type: 'object' } })
+  images?: ProductImageProps[];
+
+  @ApiPropertyOptional({ type: 'array', items: { type: 'object' } })
+  ingredients?: ProductIngredientProps[];
+
+  @ApiPropertyOptional({ type: [String], example: ['son lì', 'hot trend'] })
+  tags?: string[];
+
   @ApiPropertyOptional()
   createdAt?: Date;
 
@@ -75,6 +93,9 @@ export class ProductResponseDto {
     dto.id = entity.id!;
     dto.categoryId = entity.categoryId;
     dto.brandId = entity.brandId;
+    dto.brandName = entity.brandName;
+    dto.categoryName = entity.categoryName;
+    dto.primaryImage = entity.primaryImageUrl;
     dto.name = entity.name;
     dto.slug = entity.slug;
     dto.sku = entity.sku;
@@ -91,6 +112,9 @@ export class ProductResponseDto {
     dto.option2Name = entity.option2Name;
     dto.option3Name = entity.option3Name;
     dto.variants = entity.variants;
+    dto.images = entity.images;
+    dto.ingredients = entity.ingredients;
+    dto.tags = entity.tags;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;
     return dto;
