@@ -59,7 +59,21 @@ export class CategoryEntity {
   get createdAt(): Date | undefined { return this._createdAt; }
   get updatedAt(): Date | undefined { return this._updatedAt; }
 
-  set children(children: CategoryEntity[]) {
-    this._children = children;
+  // Nghiệp vụ miền (Domain Behaviors)
+  public addChild(child: CategoryEntity): void {
+    if (!child) return;
+    this._children.push(child);
+  }
+
+  public setChildren(children: CategoryEntity[]): void {
+    this._children = children ?? [];
+  }
+
+  public hasChildren(): boolean {
+    return this._children.length > 0;
+  }
+
+  public isRoot(): boolean {
+    return !this._parentId;
   }
 }

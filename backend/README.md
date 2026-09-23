@@ -58,6 +58,10 @@ Theo phân công Sprint 1:
 
 ## 3. Cài đặt và Chạy dự án
 
+```bash
+Stop-Process -Name node -Force
+```
+
 ### 3.1 Cài đặt dependencies
 ```bash
 cd backend
