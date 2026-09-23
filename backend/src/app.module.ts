@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
+import { CacheModule } from '@core/cache/cache.module';
 import { ProductsModule } from '@modules/products/products.module';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
@@ -17,6 +18,7 @@ import { CategoriesModule } from '@modules/categories/categories.module';
     }),
     PrismaModule,
     AuthModule,
+    CacheModule,
     ProductsModule,
     PermissionsModule,
     CategoriesModule,

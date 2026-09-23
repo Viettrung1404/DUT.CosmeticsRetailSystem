@@ -25,12 +25,16 @@ export class PrismaCategoryRepository implements ICategoryRepository {
     // Second pass: assemble parent-child tree hierarchy
     for (const raw of categories) {
       const currentEntity = entityMap.get(raw.id)!;
-      if (raw.parentId && entityMap.has(raw.parentId)) {
-        const parentEntity = entityMap.get(raw.parentId)!;
-        parentEntity.children.push(currentEntity);
-      } else {
+      if (!raw.parentId) {
+        // Chỉ các danh mục không có parentId mới là Root Category
         rootCategories.push(currentEntity);
+      } else if (entityMap.has(raw.parentId)) {
+        // Gắn vào cha nếu cha đang active (tồn tại trong entityMap)
+        const parentEntity = entityMap.get(raw.parentId)!;
+        parentEntity.addChild(currentEntity);
       }
+      // Lưu ý: Nếu có parentId nhưng cha không active (không có trong entityMap),
+      // danh mục này là orphan node và sẽ không được hiển thị làm root category.
     }
 
     return rootCategories;
