@@ -33,7 +33,9 @@ export class ProductAdminController {
   async getProducts(@Query() pageOptionsDto: PageOptionsDto) {
     const { items, total } = await this.getProductsUseCase.execute(pageOptionsDto);
 
-    const data = items.map((product) => ProductResponseDto.fromDomain(product));
+    const data = items.map((product) =>
+      ProductResponseDto.fromDomain(product, { onlyActiveVariants: false }),
+    );
     const meta = new PageMetaDto({ pageOptionsDto, itemCount: total });
     return new PageDto(data, meta);
   }
@@ -43,7 +45,7 @@ export class ProductAdminController {
   @ApiOkResponse({ type: ProductResponseDto })
   async getProductById(@Param('id', ParseUUIDPipe) id: string) {
     const product = await this.getProductDetailUseCase.executeById(id);
-    return ProductResponseDto.fromDomain(product);
+    return ProductResponseDto.fromDomain(product, { onlyActiveVariants: false });
   }
 
   @Post()
@@ -51,7 +53,7 @@ export class ProductAdminController {
   @ApiCreatedResponse({ type: ProductResponseDto })
   async createProduct(@Body() dto: CreateProductRequestDto) {
     const product = await this.createProductUseCase.execute(dto);
-    return ProductResponseDto.fromDomain(product);
+    return ProductResponseDto.fromDomain(product, { onlyActiveVariants: false });
   }
 
   @Delete(':id')

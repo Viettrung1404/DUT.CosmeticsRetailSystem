@@ -13,6 +13,22 @@ export interface ProductVariantProps {
   isActive?: boolean;
 }
 
+export interface ProductImageProps {
+  id?: string;
+  imageUrl: string;
+  altText?: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  productVariantId?: string | null;
+}
+
+export interface ProductIngredientProps {
+  id?: string;
+  ingredientName: string;
+  percentage?: string | null;
+  isKeyIngredient: boolean;
+}
+
 export interface ProductProps {
   id?: string;
   categoryId: string;
@@ -36,13 +52,21 @@ export interface ProductProps {
   metaDescription?: string | null;
   metaKeywords?: string | null;
   variants?: ProductVariantProps[];
+  images?: ProductImageProps[];
+  ingredients?: ProductIngredientProps[];
+  tags?: string[];
+  brandName?: string | null;
+  categoryName?: string;
+  categorySlug?: string;
+  isCategoryActive?: boolean;
+  isBrandActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 /**
- * Domain Entity thuần túy - Chứa các quy tắc nghiệp vụ bất biến của Sản phẩm
- * Không phụ thuộc vào NestJS, Prisma hay bất kỳ framework nào.
+ * Pure Domain Entity - encapsulates business invariants of Product.
+ * Completely framework-agnostic (independent of NestJS, Prisma, etc.).
  */
 export class ProductEntity {
   private _id?: string;
@@ -67,6 +91,14 @@ export class ProductEntity {
   private _metaDescription?: string | null;
   private _metaKeywords?: string | null;
   private _variants: ProductVariantProps[];
+  private _images: ProductImageProps[];
+  private _ingredients: ProductIngredientProps[];
+  private _tags: string[];
+  private _brandName?: string | null;
+  private _categoryName?: string;
+  private _categorySlug?: string;
+  private _isCategoryActive?: boolean;
+  private _isBrandActive?: boolean;
   private _createdAt?: Date;
   private _updatedAt?: Date;
 
@@ -93,6 +125,14 @@ export class ProductEntity {
     this._metaDescription = props.metaDescription;
     this._metaKeywords = props.metaKeywords;
     this._variants = props.variants ?? [];
+    this._images = props.images ?? [];
+    this._ingredients = props.ingredients ?? [];
+    this._tags = props.tags ?? [];
+    this._brandName = props.brandName;
+    this._categoryName = props.categoryName;
+    this._categorySlug = props.categorySlug;
+    this._isCategoryActive = props.isCategoryActive ?? true;
+    this._isBrandActive = props.isBrandActive ?? true;
     this._createdAt = props.createdAt;
     this._updatedAt = props.updatedAt;
   }
@@ -120,10 +160,24 @@ export class ProductEntity {
   get metaDescription(): string | null | undefined { return this._metaDescription; }
   get metaKeywords(): string | null | undefined { return this._metaKeywords; }
   get variants(): ProductVariantProps[] { return this._variants; }
+  get images(): ProductImageProps[] { return this._images; }
+  get ingredients(): ProductIngredientProps[] { return this._ingredients; }
+  get tags(): string[] { return this._tags; }
+  get brandName(): string | null | undefined { return this._brandName; }
+  get categoryName(): string | undefined { return this._categoryName; }
+  get categorySlug(): string | undefined { return this._categorySlug; }
+  get isCategoryActive(): boolean { return this._isCategoryActive ?? true; }
+  get isBrandActive(): boolean { return this._isBrandActive ?? true; }
   get createdAt(): Date | undefined { return this._createdAt; }
   get updatedAt(): Date | undefined { return this._updatedAt; }
 
-  // Nghiệp vụ miền (Domain Business Rules)
+  get primaryImageUrl(): string | null {
+    const primary = this._images.find((img) => img.isPrimary);
+    if (primary) return primary.imageUrl;
+    return this._images.length > 0 ? this._images[0].imageUrl : null;
+  }
+
+  // Domain Business Rules
   public activate(): void {
     this._isActive = true;
   }
