@@ -22,7 +22,7 @@ export class TransformResponseInterceptor<T>
 
     return next.handle().pipe(
       map((data) => {
-        // Nếu data đã được đóng gói chuẩn hoặc có message custom
+        // If data is already formatted or has custom message
         if (data && typeof data === 'object' && 'message' in data && 'data' in data) {
           return new ApiResponseDto(statusCode, true, data.message, data.data);
         }

@@ -9,7 +9,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // Cấu hình CORS
+  // CORS configuration
   app.enableCors({
     origin: true,
     credentials: true,
@@ -37,7 +37,7 @@ async function bootstrap() {
   // Global Response Interceptor
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
-  // Cấu hình Swagger API Documentation
+  // Swagger API Documentation
   const config = new DocumentBuilder()
     .setTitle('GlowUp Cosmetics Retail System API')
     .setDescription(
@@ -55,7 +55,9 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
+    .addTag('Auth (Xác thực & Người dùng)', 'API đăng ký, đăng nhập, xác thực email, OTP, JWT token')
     .addTag('Customer - Products (Việt Trung)', 'API phục vụ Website / Mobile cho khách hàng')
+    .addTag('Customer - Categories (Việt Trung)', 'API phục vụ menu điều hướng danh mục Web / Mobile')
     .addTag('Admin - Products (Thành Lập)', 'API phục vụ Dashboard quản trị cho Admin & Nhân viên')
     .build();
 
