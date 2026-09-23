@@ -26,6 +26,7 @@ import { RefreshTokenUseCase } from '../../application/use-cases/refresh-token.u
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case';
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case';
+import { GetMeUseCase } from '../../application/use-cases/get-me.use-case';
 import {
   ForgotPasswordDto,
   LoginDto,
@@ -39,8 +40,6 @@ import {
   ResendOtpDto,
   VerifyEmailDto,
 } from '../dtos/auth.dto';
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository.interface';
-import { Inject } from '@nestjs/common';
 
 @ApiTags('Auth (Xác thực & Người dùng)')
 @Controller('auth')
@@ -54,7 +53,7 @@ export class AuthController {
     private readonly logoutUseCase: LogoutUseCase,
     private readonly forgotPasswordUseCase: ForgotPasswordUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
-    @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
+    private readonly getMeUseCase: GetMeUseCase,
   ) {}
 
   @Public()
@@ -72,7 +71,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
   @ApiOkResponse({ description: 'Đăng nhập thành công', type: LoginResponseDto })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    const ipAddress = req.ip || (req.headers['x-forwarded-for'] as string) || undefined;
+    const forwarded = req.headers['x-forwarded-for'];
+    const ipAddress =
+      (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip) ||
+      undefined;
     const deviceInfo = req.headers['user-agent'] || undefined;
 
     return this.loginUseCase.execute({
@@ -142,21 +144,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Lấy thông tin tài khoản hiện tại' })
   @ApiOkResponse({ description: 'Thông tin tài khoản đang đăng nhập' })
   async getMe(@CurrentUser() currentUser: JwtPayload) {
-    const user = await this.userRepo.findById(currentUser.userId);
-    if (!user) {
-      return null;
-    }
-    return {
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      avatarUrl: user.avatarUrl,
-      roleName: user.roleName,
-      dataScope: user.dataScope,
-      emailVerified: user.emailVerified,
-      phoneVerified: user.phoneVerified,
-      createdAt: user.createdAt,
-    };
+    return this.getMeUseCase.execute(currentUser.userId);
   }
 }
+

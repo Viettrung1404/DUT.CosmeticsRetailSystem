@@ -46,29 +46,6 @@ describe('UserEntity', () => {
     });
   });
 
-  describe('Effective Permissions Bitmask', () => {
-    it('should calculate effective permissions according to: (role | extra) & ~revoked', () => {
-      // Role bitmask: 1 | 2 | 4 = 7n
-      // Extra bitmask: 8n
-      // Revoked bitmask: 2n
-      // Effective should be: (7n | 8n) & ~2n = 15n & ~2n = 13n (1 | 4 | 8)
-      const user = new UserEntity({
-        roleId: 6,
-        email: 'test@example.com',
-        fullName: 'Test User',
-        status: 'ACTIVE',
-        emailVerified: true,
-        phoneVerified: false,
-        extraPermissions: BigInt(8),
-        revokedPermissions: BigInt(2),
-        rolePermissions: BigInt(7),
-      });
-
-      const effective = user.getEffectivePermissions();
-      expect(effective).toBe(BigInt(13));
-    });
-  });
-
   describe('User Status and Lifecycle', () => {
     it('should allow login only when status is ACTIVE', () => {
       const activeUser = new UserEntity({

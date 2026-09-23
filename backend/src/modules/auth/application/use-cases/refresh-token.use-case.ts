@@ -5,8 +5,8 @@ import {
   IUserSessionRepository,
 } from '../../domain/repositories/user-session.repository.interface';
 import { JwtTokenService } from '../../infrastructure/adapters/jwt.service';
-import { PrismaService } from '@infrastructure/database/prisma.service';
 import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
+import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
 
 export interface RefreshTokenOutput {
   accessToken: string;
@@ -20,7 +20,7 @@ export class RefreshTokenUseCase {
     @Inject(USER_SESSION_REPOSITORY) private readonly sessionRepo: IUserSessionRepository,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: IUnitOfWork,
     private readonly jwtService: JwtTokenService,
-    private readonly prisma: PrismaService,
+    private readonly getPermissionsUseCase: GetUserEffectivePermissionsUseCase,
   ) {}
 
   async execute(oldRefreshToken: string): Promise<RefreshTokenOutput> {
@@ -46,12 +46,8 @@ export class RefreshTokenUseCase {
       throw new UnauthorizedException('Tài khoản không hợp lệ');
     }
 
-    // 5. Compute effective permissions
-    const effectivePerms = user.getEffectivePermissions();
-    const permissions = await this.prisma.permission.findMany();
-    const permissionCodes = permissions
-      .filter((p) => (effectivePerms & p.bitValue) !== BigInt(0))
-      .map((p) => p.permissionCode);
+    // 5. Compute effective permissions via Permissions service
+    const permissionCodes = await this.getPermissionsUseCase.execute(user.id!);
 
     // 6. Generate new token pair
     const accessToken = this.jwtService.generateAccessToken({
@@ -78,3 +74,4 @@ export class RefreshTokenUseCase {
     return { accessToken, refreshToken: newRefreshToken };
   }
 }
+

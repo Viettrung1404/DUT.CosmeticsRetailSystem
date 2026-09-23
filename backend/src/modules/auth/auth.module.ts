@@ -8,6 +8,7 @@ import { RefreshTokenUseCase } from './application/use-cases/refresh-token.use-c
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { ForgotPasswordUseCase } from './application/use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from './application/use-cases/reset-password.use-case';
+import { GetMeUseCase } from './application/use-cases/get-me.use-case';
 import { USER_REPOSITORY } from './domain/repositories/user.repository.interface';
 import { VERIFICATION_TOKEN_REPOSITORY } from './domain/repositories/verification-token.repository.interface';
 import { USER_SESSION_REPOSITORY } from './domain/repositories/user-session.repository.interface';
@@ -18,8 +19,10 @@ import { PrismaUserSessionRepository } from './infrastructure/persistence/prisma
 import { BcryptService } from './infrastructure/adapters/bcrypt.service';
 import { JwtTokenService } from './infrastructure/adapters/jwt.service';
 import { NodemailerEmailService } from './infrastructure/adapters/nodemailer-email.service';
+import { PermissionsModule } from '@modules/permissions/permissions.module';
 
 @Module({
+  imports: [PermissionsModule],
   controllers: [AuthController],
   providers: [
     // Use Cases
@@ -31,6 +34,7 @@ import { NodemailerEmailService } from './infrastructure/adapters/nodemailer-ema
     LogoutUseCase,
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
+    GetMeUseCase,
 
     // Adapters & Services
     BcryptService,
@@ -62,6 +66,8 @@ import { NodemailerEmailService } from './infrastructure/adapters/nodemailer-ema
     JwtTokenService,
     RegisterUseCase,
     LoginUseCase,
+    GetMeUseCase,
   ],
 })
 export class AuthModule {}
+

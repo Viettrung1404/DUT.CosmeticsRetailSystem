@@ -8,6 +8,8 @@ import {
 
 @Injectable()
 export class PrismaPermissionRepository implements IPermissionRepository {
+  private cachedDefinitions: PermissionDefinition[] | null = null;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findUserPermissionMasks(userId: string): Promise<UserPermissionMasks | null> {
@@ -25,16 +27,23 @@ export class PrismaPermissionRepository implements IPermissionRepository {
     }
 
     return {
-      rolePermissions: user.role.permissions,
+      rolePermissions: user.role?.permissions ?? 0n,
       extraPermissions: user.extraPermissions,
       revokedPermissions: user.revokedPermissions,
     };
   }
 
   async findAllDefinitions(): Promise<PermissionDefinition[]> {
-    return this.prisma.permission.findMany({
+    if (this.cachedDefinitions) {
+      return this.cachedDefinitions;
+    }
+
+    this.cachedDefinitions = await this.prisma.permission.findMany({
       select: { bitPosition: true, permissionCode: true },
       orderBy: { bitPosition: 'asc' },
     });
+
+    return this.cachedDefinitions;
   }
 }
+

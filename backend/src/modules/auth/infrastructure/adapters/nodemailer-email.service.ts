@@ -41,7 +41,7 @@ export class NodemailerEmailService implements IEmailService {
           <a href="${verifyUrl}" style="background-color: #ff69b4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Xác thực tài khoản</a>
         </div>
         <p>Hoặc truy cập liên kết: <a href="${verifyUrl}">${verifyUrl}</a></p>
-        <p>Liên kết này có hiệu lực trong 5 phút.</p>
+        <p>Liên kết này có hiệu lực trong 24 giờ.</p>
       </div>
     `;
 
@@ -74,7 +74,7 @@ export class NodemailerEmailService implements IEmailService {
           <a href="${resetUrl}" style="background-color: #ff69b4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Đặt lại mật khẩu</a>
         </div>
         <p>Hoặc truy cập: <a href="${resetUrl}">${resetUrl}</a></p>
-        <p>Liên kết này có hiệu lực trong 15 phút. Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
+        <p>Liên kết này có hiệu lực trong 30 phút. Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
       </div>
     `;
 
