@@ -4,22 +4,22 @@ import {
   PRODUCT_REPOSITORY,
 } from '../../domain/repositories/product.repository.interface';
 import { ProductEntity } from '../../domain/entities/product.entity';
-import { ProductFilterDto } from '../../presentation/dtos/product-filter.dto';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 
 @Injectable()
-export class GetProductsUseCase {
+export class SearchProductsUseCase {
   constructor(
     @Inject(PRODUCT_REPOSITORY)
     private readonly productRepository: IProductRepository,
   ) {}
 
   async execute(
-    filterOrOptions: ProductFilterDto | PageOptionsDto,
+    query: string,
+    options: PageOptionsDto,
   ): Promise<{ items: ProductEntity[]; total: number }> {
-    if (filterOrOptions instanceof ProductFilterDto || 'categoryId' in filterOrOptions || 'sortBy' in filterOrOptions) {
-      return this.productRepository.findFiltered(filterOrOptions as ProductFilterDto);
+    if (!query || query.trim().length === 0) {
+      return { items: [], total: 0 };
     }
-    return this.productRepository.findAll(filterOrOptions as PageOptionsDto);
+    return this.productRepository.search(query.trim(), options);
   }
 }

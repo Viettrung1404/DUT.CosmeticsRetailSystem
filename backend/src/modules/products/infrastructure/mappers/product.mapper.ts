@@ -1,16 +1,26 @@
 import {
   Product as PrismaProduct,
   ProductVariant as PrismaProductVariant,
+  ProductImage as PrismaProductImage,
+  ProductIngredient as PrismaProductIngredient,
+  ProductTag as PrismaProductTag,
+  Brand as PrismaBrand,
+  Category as PrismaCategory,
 } from '@prisma/client';
 import { ProductEntity } from '../../domain/entities/product.entity';
 
-/** Prisma Product kèm các quan hệ đã eager-load */
-type ProductWithRelations = PrismaProduct & {
+/** Prisma Product with eagerly-loaded relations */
+export type ProductWithRelations = PrismaProduct & {
   variants?: PrismaProductVariant[];
+  images?: PrismaProductImage[];
+  ingredients?: PrismaProductIngredient[];
+  tags?: PrismaProductTag[];
+  brand?: PrismaBrand | null;
+  category?: PrismaCategory | null;
 };
 
-/** Dữ liệu Product để lưu/cập nhật (không bao gồm các trường auto-generated) */
-interface ProductPersistenceData {
+/** Product persistence data (excluding auto-generated fields) */
+export interface ProductPersistenceData {
   id?: string;
   categoryId: string;
   brandId?: string | null;
@@ -32,9 +42,7 @@ interface ProductPersistenceData {
 }
 
 export class ProductMapper {
-  /**
-   * Chuyển đổi dữ liệu từ Prisma (persistence) sang Domain Entity
-   */
+  /** Converts Prisma persistence data to Domain Entity */
   static toDomain(raw: ProductWithRelations): ProductEntity {
     return new ProductEntity({
       id: raw.id,
@@ -58,6 +66,9 @@ export class ProductMapper {
       metaTitle: raw.metaTitle,
       metaDescription: raw.metaDescription,
       metaKeywords: raw.metaKeywords,
+      brandName: raw.brand?.name ?? null,
+      categoryName: raw.category?.name,
+      categorySlug: raw.category?.slug,
       variants: raw.variants?.map((v: PrismaProductVariant) => ({
         id: v.id,
         sku: v.sku,
@@ -72,14 +83,27 @@ export class ProductMapper {
         option3Value: v.option3Value,
         isActive: v.isActive,
       })),
+      images: raw.images?.map((img: PrismaProductImage) => ({
+        id: img.id,
+        imageUrl: img.imageUrl,
+        altText: img.altText,
+        sortOrder: img.sortOrder,
+        isPrimary: img.isPrimary,
+        productVariantId: img.productVariantId,
+      })),
+      ingredients: raw.ingredients?.map((pi: PrismaProductIngredient) => ({
+        id: pi.id,
+        ingredientName: pi.ingredientName,
+        percentage: pi.percentage,
+        isKeyIngredient: pi.isKeyIngredient,
+      })),
+      tags: raw.tags?.map((pt: PrismaProductTag) => pt.tagName),
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
     });
   }
 
-  /**
-   * Chuyển đổi Domain Entity sang dữ liệu Prisma để lưu trữ
-   */
+  /** Converts Domain Entity to persistence data */
   static toPersistence(entity: ProductEntity): ProductPersistenceData {
     return {
       id: entity.id,
@@ -103,5 +127,3 @@ export class ProductMapper {
     };
   }
 }
-
-

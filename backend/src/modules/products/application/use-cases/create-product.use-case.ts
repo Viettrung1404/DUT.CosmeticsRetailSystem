@@ -6,8 +6,7 @@ import {
 import { ProductEntity } from '../../domain/entities/product.entity';
 
 /**
- * Input cho Use Case tạo sản phẩm mới.
- * Được định nghĩa ở application layer (không phụ thuộc presentation).
+ * Input for CreateProductUseCase defined at the application layer.
  */
 export interface CreateProductInput {
   categoryId: string;
