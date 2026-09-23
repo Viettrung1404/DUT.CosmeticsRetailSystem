@@ -7,6 +7,7 @@ import { ProductsModule } from '@modules/products/products.module';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
+import { CategoriesModule } from '@modules/categories/categories.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PermissionGuard } from '@core/guards/permission.guard';
     AuthModule,
     ProductsModule,
     PermissionsModule,
+    CategoriesModule,
   ],
   providers: [
     {
@@ -31,3 +33,4 @@ import { PermissionGuard } from '@core/guards/permission.guard';
   ],
 })
 export class AppModule {}
+
