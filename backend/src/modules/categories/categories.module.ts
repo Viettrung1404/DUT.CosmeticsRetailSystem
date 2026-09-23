@@ -1,0 +1,18 @@
+import { Module } from '@nestjs/common';
+import { CategoryCustomerController } from './presentation/controllers/category-customer.controller';
+import { GetCategoryTreeUseCase } from './application/use-cases/get-category-tree.use-case';
+import { CATEGORY_REPOSITORY } from './domain/repositories/category.repository.interface';
+import { PrismaCategoryRepository } from './infrastructure/persistence/prisma-category.repository';
+
+@Module({
+  controllers: [CategoryCustomerController],
+  providers: [
+    GetCategoryTreeUseCase,
+    {
+      provide: CATEGORY_REPOSITORY,
+      useClass: PrismaCategoryRepository,
+    },
+  ],
+  exports: [CATEGORY_REPOSITORY, GetCategoryTreeUseCase],
+})
+export class CategoriesModule {}
