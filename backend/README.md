@@ -6,6 +6,12 @@ Dự án Backend cho Hệ thống Quản lý Bán lẻ Mỹ phẩm **GlowUp**, �
 
 ## 1. Cấu trúc Clean Architecture trong từng Module
 
+> 📖 **Xem hướng dẫn chi tiết toàn diện:** Đọc file [ARCHITECTURE.md](file:///d:/VS_Code/DUT/PBL6/backend/ARCHITECTURE.md) để nắm vững:
+> - Nguyên lý **The Dependency Rule** & **Dependency Inversion (DIP)**
+> - Luồng xử lý chi tiết từ Request -> Controller -> Use Case -> Repo -> DB
+> - Hướng dẫn từng bước cách tạo module mới
+> - Các "bẫy" anti-patterns cần tránh và Checklist trước khi tạo PR
+
 Mỗi tính năng/phân hệ được đóng gói trong một module riêng biệt tại `src/modules/<module-name>/` gồm 4 phân lớp:
 
 ```
@@ -55,8 +61,17 @@ Theo phân công Sprint 1:
 ### 3.1 Cài đặt dependencies
 ```bash
 cd backend
-npm install
+npm ci
 ```
+
+> [!WARNING]
+> **Luôn dùng `npm ci`**, KHÔNG dùng `npm install`.
+> `npm install` sẽ tự cập nhật `package-lock.json` — gây lệch phiên bản thư viện giữa các thành viên và dễ xung đột khi merge.
+
+> [!CAUTION]
+> **Không chạy `npm audit fix --force`.**
+> npm sẽ báo lỗ hổng bảo mật khi cài, nhưng nếu fix bằng `--force` sẽ nâng NestJS từ **v10 lên v12**, thay đổi `package-lock.json` và **có nguy cơ vỡ code**.
+> Hiện tại team thống nhất **giữ NestJS 10** để đảm bảo ổn định.
 
 ### 3.2 Cấu hình môi trường (`.env`)
 Mở file `.env` và điền chuỗi kết nối từ tài khoản **Neon** của bạn:
