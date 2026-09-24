@@ -15,6 +15,10 @@ describe('GetCategoryTreeUseCase', () => {
       findTree: jest.fn(),
       findById: jest.fn(),
       findBySlug: jest.fn(),
+      findAll: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      countActiveChildren: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

@@ -14,6 +14,10 @@ export interface CategoryProps {
   updatedAt?: Date;
 }
 
+export type CategoryChanges = Partial<
+  Omit<CategoryProps, 'id' | 'children' | 'createdAt' | 'updatedAt'>
+>;
+
 export class CategoryEntity {
   private _id?: string;
   private _parentId?: string | null;
@@ -75,5 +79,26 @@ export class CategoryEntity {
 
   public isRoot(): boolean {
     return !this._parentId;
+  }
+
+  public update(changes: CategoryChanges): void {
+    if (changes.name != null) {
+      if (changes.name.trim().length === 0) {
+        throw new Error('Tên danh mục không được để trống');
+      }
+      this._name = changes.name.trim();
+    }
+    if (changes.slug != null) this._slug = changes.slug;
+    if (changes.sortOrder != null) this._sortOrder = changes.sortOrder;
+    if (changes.isActive != null) this._isActive = changes.isActive;
+    if (changes.parentId !== undefined) this._parentId = changes.parentId;
+    if (changes.description !== undefined) this._description = changes.description;
+    if (changes.imageUrl !== undefined) this._imageUrl = changes.imageUrl;
+    if (changes.metaTitle !== undefined) this._metaTitle = changes.metaTitle;
+    if (changes.metaDescription !== undefined) this._metaDescription = changes.metaDescription;
+  }
+
+  public deactivate(): void {
+    this._isActive = false;
   }
 }
