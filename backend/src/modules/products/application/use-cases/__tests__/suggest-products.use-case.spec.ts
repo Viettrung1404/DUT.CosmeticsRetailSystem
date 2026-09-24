@@ -21,6 +21,10 @@ describe('SuggestProductsUseCase', () => {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      findAllForAdmin: jest.fn(),
+      findBySku: jest.fn(),
+      findCategoryState: jest.fn(),
+      brandExists: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
