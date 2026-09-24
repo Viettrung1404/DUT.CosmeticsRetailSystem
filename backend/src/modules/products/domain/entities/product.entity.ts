@@ -62,6 +62,35 @@ export interface ProductProps {
   updatedAt?: Date;
 }
 
+export type ProductChanges = Partial<
+  Pick<
+    ProductProps,
+    | 'categoryId'
+    | 'brandId'
+    | 'name'
+    | 'slug'
+    | 'sku'
+    | 'description'
+    | 'shortDescription'
+    | 'basePrice'
+    | 'salePrice'
+    | 'option1Name'
+    | 'option2Name'
+    | 'option3Name'
+    | 'isActive'
+    | 'isFeatured'
+    | 'metaTitle'
+    | 'metaDescription'
+    | 'metaKeywords'
+  >
+>;
+
+export interface VariantOptionValues {
+  option1Value?: string | null;
+  option2Value?: string | null;
+  option3Value?: string | null;
+}
+
 /**
  * Pure Domain Entity - encapsulates business invariants of Product.
  * Completely framework-agnostic (independent of NestJS, Prisma, etc.).
@@ -185,4 +214,46 @@ export class ProductEntity {
     this._name = name.trim();
     this._description = description;
   }
+
+  public update(changes: ProductChanges): void {
+    if (changes.name != null) this.updateBasicInfo(changes.name, this._description);
+    if (changes.categoryId != null) this._categoryId = changes.categoryId;
+    if (changes.slug != null) this._slug = changes.slug;
+    if (changes.sku != null) this._sku = changes.sku;
+    if (changes.basePrice != null) this._basePrice = changes.basePrice;
+    if (changes.isActive != null) this._isActive = changes.isActive;
+    if (changes.isFeatured != null) this._isFeatured = changes.isFeatured;
+    if (changes.brandId !== undefined) this._brandId = changes.brandId;
+    if (changes.description !== undefined) this._description = changes.description;
+    if (changes.shortDescription !== undefined) this._shortDescription = changes.shortDescription;
+    if (changes.salePrice !== undefined) this._salePrice = changes.salePrice;
+    if (changes.option1Name !== undefined) this._option1Name = changes.option1Name;
+    if (changes.option2Name !== undefined) this._option2Name = changes.option2Name;
+    if (changes.option3Name !== undefined) this._option3Name = changes.option3Name;
+    if (changes.metaTitle !== undefined) this._metaTitle = changes.metaTitle;
+    if (changes.metaDescription !== undefined) this._metaDescription = changes.metaDescription;
+    if (changes.metaKeywords !== undefined) this._metaKeywords = changes.metaKeywords;
+  }
+
+  public hasValidSalePrice(): boolean {
+    return this._salePrice == null || this._salePrice <= this._basePrice;
+  }
+
+  // Biến thể chỉ được có giá trị ở đúng những thuộc tính mà sản phẩm đã khai báo tên
+  public getVariantOptionError(values: VariantOptionValues): string | null {
+    const names = [this._option1Name, this._option2Name, this._option3Name];
+    const vals = [values.option1Value, values.option2Value, values.option3Value];
+    for (let i = 0; i < 3; i++) {
+      if (!names[i] && vals[i]) {
+        return `Sản phẩm chưa khai báo thuộc tính ${i + 1}, biến thể không được có giá trị thuộc tính ${i + 1}`;
+      }
+      if (names[i] && !vals[i]) {
+        return `Biến thể phải có giá trị cho thuộc tính "${names[i]}"`;
+      }
+    }
+    return null;
+  }
 }
+
+export const variantOptionKey = (values: VariantOptionValues): string =>
+  [values.option1Value ?? '', values.option2Value ?? '', values.option3Value ?? ''].join('|');

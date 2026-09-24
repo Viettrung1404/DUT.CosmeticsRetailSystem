@@ -1,10 +1,11 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
+  AdminProductListFilter,
   IProductRepository,
   ProductSuggestionItem,
 } from '../../domain/repositories/product.repository.interface';
-import { ProductEntity } from '../../domain/entities/product.entity';
+import { ProductEntity, ProductImageProps } from '../../domain/entities/product.entity';
 import { ProductMapper } from '../mappers/product.mapper';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { ProductFilterDto, ProductSortBy } from '../../presentation/dtos/product-filter.dto';
@@ -231,8 +232,17 @@ export class PrismaProductRepository implements IProductRepository {
 
   async create(product: ProductEntity): Promise<ProductEntity> {
     const data = ProductMapper.toPersistence(product);
+    // Tạo lồng biến thể + ảnh trong cùng một câu lệnh để Prisma bọc chung một transaction
     const created = await this.prisma.product.create({
-      data,
+      data: {
+        ...data,
+        variants: product.variants.length
+          ? { create: product.variants.map((v) => ProductMapper.variantToPersistence(v)) }
+          : undefined,
+        images: product.images.length
+          ? { create: product.images.map((img) => ProductMapper.imageToPersistence(img)) }
+          : undefined,
+      },
       include: productIncludeConfig,
     });
 
@@ -261,12 +271,26 @@ export class PrismaProductRepository implements IProductRepository {
     return domainEntity;
   }
 
-  async update(product: ProductEntity): Promise<ProductEntity> {
+  async update(
+    product: ProductEntity,
+    options?: { images?: ProductImageProps[] },
+  ): Promise<ProductEntity> {
     const data = ProductMapper.toPersistence(product);
-    const updated = await this.prisma.product.update({
-      where: { id: product.id },
-      data,
-      include: productIncludeConfig,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (options?.images) {
+        await tx.productImage.deleteMany({ where: { productId: product.id, productVariantId: null } });
+        await tx.productImage.createMany({
+          data: options.images.map((img) => ({
+            ...ProductMapper.imageToPersistence(img),
+            productId: product.id!,
+          })),
+        });
+      }
+      return tx.product.update({
+        where: { id: product.id },
+        data,
+        include: productIncludeConfig,
+      });
     });
 
     const domainEntity = ProductMapper.toDomain(updated);
@@ -298,5 +322,47 @@ export class PrismaProductRepository implements IProductRepository {
     await this.prisma.product.delete({
       where: { id },
     });
+  }
+
+  async findAllForAdmin(
+    filter: AdminProductListFilter,
+  ): Promise<{ items: ProductEntity[]; total: number }> {
+    const where: Prisma.ProductWhereInput = {
+      isActive: filter.isActive,
+      categoryId: filter.categoryId,
+      brandId: filter.brandId,
+      OR: filter.search
+        ? [
+            { name: { contains: filter.search, mode: 'insensitive' } },
+            { sku: { contains: filter.search, mode: 'insensitive' } },
+          ]
+        : undefined,
+    };
+
+    const [rawItems, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        skip: filter.skip,
+        take: filter.take,
+        orderBy: { createdAt: filter.order },
+        include: productIncludeConfig,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return { items: rawItems.map((item) => ProductMapper.toDomain(item)), total };
+  }
+
+  async findBySku(sku: string): Promise<ProductEntity | null> {
+    const raw = await this.prisma.product.findUnique({ where: { sku }, include: productIncludeConfig });
+    return raw ? ProductMapper.toDomain(raw) : null;
+  }
+
+  findCategoryState(categoryId: string): Promise<{ isActive: boolean } | null> {
+    return this.prisma.category.findUnique({ where: { id: categoryId }, select: { isActive: true } });
+  }
+
+  async brandExists(brandId: string): Promise<boolean> {
+    return (await this.prisma.brand.count({ where: { id: brandId } })) > 0;
   }
 }

@@ -7,7 +7,11 @@ import {
   Brand as PrismaBrand,
   Category as PrismaCategory,
 } from '@prisma/client';
-import { ProductEntity } from '../../domain/entities/product.entity';
+import {
+  ProductEntity,
+  ProductImageProps,
+  ProductVariantProps,
+} from '../../domain/entities/product.entity';
 
 /** Prisma Product with eagerly-loaded relations */
 export type ProductWithRelations = PrismaProduct & {
@@ -124,6 +128,30 @@ export class ProductMapper {
       metaTitle: entity.metaTitle,
       metaDescription: entity.metaDescription,
       metaKeywords: entity.metaKeywords,
+    };
+  }
+
+  static variantToPersistence(v: ProductVariantProps) {
+    return {
+      sku: v.sku,
+      barcode: v.barcode ?? null,
+      option1Value: v.option1Value ?? null,
+      option2Value: v.option2Value ?? null,
+      option3Value: v.option3Value ?? null,
+      price: v.price,
+      costPrice: v.costPrice,
+      weight: v.weight ?? null,
+      unit: v.unit ?? null,
+      isActive: v.isActive ?? true,
+    };
+  }
+
+  static imageToPersistence(img: ProductImageProps) {
+    return {
+      imageUrl: img.imageUrl,
+      altText: img.altText ?? null,
+      sortOrder: img.sortOrder,
+      isPrimary: img.isPrimary,
     };
   }
 }

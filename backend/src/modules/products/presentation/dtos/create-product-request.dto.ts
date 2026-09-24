@@ -1,52 +1,169 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { CreateProductVariantRequestDto } from './product-variant-request.dto';
+
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+// Chuỗi rỗng coi như không có giá trị, tránh "" lọt qua kiểm tra và đụng UNIQUE trên DB
+const emptyToNull = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() || null : value;
+const MONEY = { maxDecimalPlaces: 2 };
+const MAX_MONEY = 9_999_999_999.99;
+
+export class ProductImageRequestDto {
+  @ApiProperty({ example: 'https://cdn.glowup.vn/products/velvet-tint-1.jpg' })
+  @IsUrl({}, { message: 'Đường dẫn ảnh không hợp lệ' })
+  imageUrl: string;
+
+  @ApiPropertyOptional({ example: 'Son Black Rouge A01' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  altText?: string | null;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+}
 
 export class CreateProductRequestDto {
   @ApiProperty({ description: 'ID danh mục', example: 'c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22' })
-  @IsUUID()
-  @IsNotEmpty({ message: 'Danh mục không được để trống' })
+  @IsUUID('4', { message: 'ID danh mục không hợp lệ' })
   categoryId: string;
 
   @ApiPropertyOptional({ description: 'ID thương hiệu', example: 'b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a33' })
-  @IsUUID()
   @IsOptional()
-  brandId?: string;
+  @IsUUID('4', { message: 'ID thương hiệu không hợp lệ' })
+  brandId?: string | null;
 
-  @ApiProperty({ description: 'Tên sản phẩm', example: 'Son kem lì Black Rouge Air Fit Velvet Tint' })
+  @ApiProperty({ example: 'Son kem lì Black Rouge Air Fit Velvet Tint' })
+  @Transform(trim)
   @IsString()
   @IsNotEmpty({ message: 'Tên sản phẩm không được để trống' })
+  @MaxLength(255, { message: 'Tên sản phẩm tối đa 255 ký tự' })
   name: string;
 
-  @ApiProperty({ description: 'Slug định danh đường dẫn', example: 'son-kem-li-black-rouge-air-fit-velvet-tint' })
+  @ApiProperty({ example: 'son-kem-li-black-rouge-air-fit-velvet-tint' })
+  @Transform(trim)
   @IsString()
-  @IsNotEmpty({ message: 'Slug không được để trống' })
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    message: 'Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang',
+  })
+  @MaxLength(255)
   slug: string;
 
-  @ApiProperty({ description: 'Mã Model SKU', example: 'BR-VELVET-TINT' })
+  @ApiProperty({ example: 'BR-VELVET-TINT' })
+  @Transform(trim)
   @IsString()
-  @IsNotEmpty({ message: 'SKU không được để trống' })
+  @IsNotEmpty({ message: 'SKU sản phẩm không được để trống' })
+  @MaxLength(50, { message: 'SKU sản phẩm tối đa 50 ký tự' })
   sku: string;
 
-  @ApiProperty({ description: 'Giá niêm yết tham chiếu', example: 199000 })
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  shortDescription?: string | null;
+
+  @ApiProperty({ example: 199000 })
+  @IsNumber(MONEY, { message: 'Giá gốc phải là số, tối đa 2 chữ số thập phân' })
+  @Min(0, { message: 'Giá gốc không được âm' })
+  @Max(MAX_MONEY)
   basePrice: number;
 
-  @ApiPropertyOptional({ description: 'Mô tả sản phẩm' })
-  @IsString()
+  @ApiPropertyOptional({ example: 179000 })
   @IsOptional()
-  description?: string;
+  @IsNumber(MONEY, { message: 'Giá khuyến mãi phải là số, tối đa 2 chữ số thập phân' })
+  @Min(0, { message: 'Giá khuyến mãi không được âm' })
+  @Max(MAX_MONEY)
+  salePrice?: number | null;
 
-  @ApiPropertyOptional({ description: 'Tên thuộc tính 1 (e.g. Màu sắc)' })
-  @IsString()
+  @ApiPropertyOptional({ example: 'Màu sắc' })
   @IsOptional()
-  option1Name?: string;
+  @Transform(emptyToNull)
+  @IsString()
+  @MaxLength(50)
+  option1Name?: string | null;
 
-  @ApiPropertyOptional({ description: 'Tên thuộc tính 2 (e.g. Dung tích)' })
-  @IsString()
+  @ApiPropertyOptional({ example: 'Dung tích' })
   @IsOptional()
-  option2Name?: string;
+  @Transform(emptyToNull)
+  @IsString()
+  @MaxLength(50)
+  option2Name?: string | null;
 
-  @ApiPropertyOptional({ description: 'Tên thuộc tính 3' })
-  @IsString()
+  @ApiPropertyOptional()
   @IsOptional()
-  option3Name?: string;
+  @Transform(emptyToNull)
+  @IsString()
+  @MaxLength(50)
+  option3Name?: string | null;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  metaTitle?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  metaDescription?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  metaKeywords?: string | null;
+
+  @ApiProperty({ type: [CreateProductVariantRequestDto], description: 'Ít nhất 1 biến thể' })
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Sản phẩm phải có ít nhất 1 biến thể' })
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductVariantRequestDto)
+  variants: CreateProductVariantRequestDto[];
+
+  @ApiPropertyOptional({ type: [ProductImageRequestDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductImageRequestDto)
+  images?: ProductImageRequestDto[];
 }
