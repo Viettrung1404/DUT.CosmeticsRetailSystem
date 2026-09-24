@@ -4,11 +4,12 @@ import { Public } from '@core/decorators/public.decorator';
 import { CACHE_SERVICE, ICacheService } from '@core/cache/cache.service.interface';
 import { GetCategoryTreeUseCase } from '../../application/use-cases/get-category-tree.use-case';
 import { CategoryTreeResponseDto } from '../dtos/category-tree-response.dto';
+import { CATEGORY_TREE_CACHE_KEY } from '../../categories.constants';
 
 @ApiTags('Customer - Categories (Việt Trung)')
 @Controller('categories')
 export class CategoryCustomerController {
-  private static readonly CACHE_KEY = 'categories:tree:customer';
+  private static readonly CACHE_KEY = CATEGORY_TREE_CACHE_KEY;
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 phút
 
   constructor(
