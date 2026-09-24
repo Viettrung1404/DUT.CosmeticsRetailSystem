@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
-import { ICategoryRepository } from '../../domain/repositories/category.repository.interface';
+import {
+  CategoryListFilter,
+  ICategoryRepository,
+} from '../../domain/repositories/category.repository.interface';
 import { CategoryEntity } from '../../domain/entities/category.entity';
 import { CategoryMapper } from '../mappers/category.mapper';
 
@@ -8,9 +12,9 @@ import { CategoryMapper } from '../mappers/category.mapper';
 export class PrismaCategoryRepository implements ICategoryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findTree(): Promise<CategoryEntity[]> {
+  async findTree(options?: { includeInactive?: boolean }): Promise<CategoryEntity[]> {
     const categories = await this.prisma.category.findMany({
-      where: { isActive: true },
+      where: options?.includeInactive ? undefined : { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
 
@@ -52,5 +56,44 @@ export class PrismaCategoryRepository implements ICategoryRepository {
       where: { slug },
     });
     return raw ? CategoryMapper.toDomain(raw) : null;
+  }
+
+  async findAll(filter: CategoryListFilter): Promise<{ items: CategoryEntity[]; total: number }> {
+    const where: Prisma.CategoryWhereInput = {
+      isActive: filter.isActive,
+      parentId: filter.parentId,
+      name: filter.search ? { contains: filter.search, mode: 'insensitive' } : undefined,
+    };
+
+    const [rawItems, total] = await Promise.all([
+      this.prisma.category.findMany({
+        where,
+        skip: filter.skip,
+        take: filter.take,
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: filter.order }],
+      }),
+      this.prisma.category.count({ where }),
+    ]);
+
+    return { items: rawItems.map((raw) => CategoryMapper.toDomain(raw)), total };
+  }
+
+  async create(category: CategoryEntity): Promise<CategoryEntity> {
+    const created = await this.prisma.category.create({
+      data: CategoryMapper.toPersistence(category),
+    });
+    return CategoryMapper.toDomain(created);
+  }
+
+  async update(category: CategoryEntity): Promise<CategoryEntity> {
+    const updated = await this.prisma.category.update({
+      where: { id: category.id },
+      data: CategoryMapper.toPersistence(category),
+    });
+    return CategoryMapper.toDomain(updated);
+  }
+
+  countActiveChildren(id: string): Promise<number> {
+    return this.prisma.category.count({ where: { parentId: id, isActive: true } });
   }
 }

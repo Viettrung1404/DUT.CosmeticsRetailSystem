@@ -1,4 +1,4 @@
-import { Category as PrismaCategory } from '@prisma/client';
+import { Category as PrismaCategory, Prisma } from '@prisma/client';
 import { CategoryEntity } from '../../domain/entities/category.entity';
 
 export type PrismaCategoryWithChildren = PrismaCategory & {
@@ -22,5 +22,19 @@ export class CategoryMapper {
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
     });
+  }
+
+  static toPersistence(entity: CategoryEntity): Prisma.CategoryUncheckedCreateInput {
+    return {
+      parentId: entity.parentId ?? null,
+      name: entity.name,
+      slug: entity.slug,
+      description: entity.description,
+      imageUrl: entity.imageUrl,
+      sortOrder: entity.sortOrder,
+      isActive: entity.isActive,
+      metaTitle: entity.metaTitle,
+      metaDescription: entity.metaDescription,
+    };
   }
 }
