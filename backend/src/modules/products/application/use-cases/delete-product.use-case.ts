@@ -11,12 +11,14 @@ export class DeleteProductUseCase {
     private readonly productRepository: IProductRepository,
   ) {}
 
+  // Xóa mềm: sản phẩm đã nằm trong đơn hàng, giỏ hàng, tồn kho nên không xóa hẳn được
   async execute(id: string): Promise<void> {
     const product = await this.productRepository.findById(id);
     if (!product) {
       throw new NotFoundException(`Không tìm thấy sản phẩm với ID: ${id}`);
     }
 
-    await this.productRepository.delete(id);
+    product.deactivate();
+    await this.productRepository.update(product);
   }
 }
