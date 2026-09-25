@@ -4,10 +4,12 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
 import {
   Button,
   Form,
+  Image,
   Input,
   InputNumber,
   Modal,
@@ -18,6 +20,7 @@ import {
   Table,
   Tag,
   Typography,
+  Upload,
   message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -29,6 +32,7 @@ import {
   getBrands,
   updateBrand,
 } from '../../api/brandsApi'
+import { uploadImage } from '../../api/uploadApi'
 import type { Brand, BrandPayload } from '../../types/catalog'
 
 function errorText(error: unknown) {
@@ -38,7 +42,7 @@ function errorText(error: unknown) {
       | undefined
     return body?.message ?? body?.data?.message ?? 'Có lỗi xảy ra'
   }
-  return 'Có lỗi xảy ra'
+  return error instanceof Error ? error.message : 'Có lỗi xảy ra'
 }
 
 function toSlug(value: string) {
@@ -58,6 +62,7 @@ export default function BrandsPage() {
   const [items, setItems] = useState<Brand[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState<'logo' | 'banner' | null>(null)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<boolean | undefined>()
   const [page, setPage] = useState(1)
@@ -118,6 +123,19 @@ export default function BrandsPage() {
     setOpen(true)
   }
 
+  const upload = async (file: File, field: 'logoUrl' | 'bannerUrl') => {
+    setUploading(field === 'logoUrl' ? 'logo' : 'banner')
+    try {
+      const url = await uploadImage(file, 'brands')
+      form.setFieldValue(field, url)
+      message.success('Tải ảnh lên thành công')
+    } catch (error) {
+      message.error(errorText(error))
+    } finally {
+      setUploading(null)
+    }
+  }
+
   const save = async () => {
     const values = await form.validateFields()
     setSaving(true)
@@ -146,10 +164,13 @@ export default function BrandsPage() {
         render: (_, row) => (
           <Space>
             {row.logoUrl ? (
-              <img
+              <Image
                 src={row.logoUrl}
                 alt={row.name}
-                style={{ width: 36, height: 36, objectFit: 'contain' }}
+                width={36}
+                height={36}
+                preview={false}
+                style={{ objectFit: 'contain' }}
               />
             ) : null}
             <div>
@@ -168,15 +189,13 @@ export default function BrandsPage() {
         title: 'Nổi bật',
         dataIndex: 'isFeatured',
         width: 100,
-        render: (value) =>
-          value ? <Tag color="gold">Có</Tag> : <Tag>Không</Tag>,
+        render: (value) => value ? <Tag color="gold">Có</Tag> : <Tag>Không</Tag>,
       },
       {
         title: 'Trạng thái',
         dataIndex: 'isActive',
         width: 130,
-        render: (value) =>
-          value ? <Tag color="green">Hoạt động</Tag> : <Tag>Đã ẩn</Tag>,
+        render: (value) => value ? <Tag color="green">Hoạt động</Tag> : <Tag>Đã ẩn</Tag>,
       },
       {
         title: 'Thao tác',
@@ -184,11 +203,7 @@ export default function BrandsPage() {
         width: 150,
         render: (_, row) => (
           <Space>
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => openEdit(row)}
-            />
+            <Button type="text" icon={<EditOutlined />} onClick={() => openEdit(row)} />
             <Popconfirm
               title="Xóa thương hiệu?"
               description="Chỉ xóa được khi thương hiệu chưa có sản phẩm."
@@ -213,21 +228,13 @@ export default function BrandsPage() {
 
   return (
     <>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 16,
-          marginBottom: 20,
-          flexWrap: 'wrap',
-        }}
-      >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
             Quản lý thương hiệu
           </Typography.Title>
           <Typography.Text type="secondary">
-            CRUD thương hiệu theo API Admin Sprint 1.
+            CRUD thương hiệu và upload logo/banner theo API Admin.
           </Typography.Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -294,7 +301,7 @@ export default function BrandsPage() {
         onCancel={() => setOpen(false)}
         onOk={() => void save()}
         confirmLoading={saving}
-        width={720}
+        width={760}
         destroyOnHidden
       >
         <Form
@@ -306,11 +313,7 @@ export default function BrandsPage() {
             }
           }}
         >
-          <Form.Item
-            name="name"
-            label="Tên thương hiệu"
-            rules={[{ required: true, message: 'Nhập tên thương hiệu' }]}
-          >
+          <Form.Item name="name" label="Tên thương hiệu" rules={[{ required: true, message: 'Nhập tên thương hiệu' }]}>
             <Input maxLength={100} />
           </Form.Item>
           <Form.Item
@@ -329,12 +332,54 @@ export default function BrandsPage() {
           <Form.Item name="countryOfOrigin" label="Quốc gia xuất xứ">
             <Input maxLength={100} />
           </Form.Item>
-          <Form.Item name="logoUrl" label="Logo URL" rules={[{ type: 'url' }]}>
-            <Input />
+
+          <Form.Item label="Logo">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Upload
+                accept="image/jpeg,image/png,image/webp"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  void upload(file as File, 'logoUrl')
+                  return false
+                }}
+              >
+                <Button icon={<UploadOutlined />} loading={uploading === 'logo'}>
+                  Upload logo
+                </Button>
+              </Upload>
+              <Form.Item name="logoUrl" noStyle rules={[{ type: 'url' }]}>
+                <Input placeholder="Hoặc nhập URL logo" />
+              </Form.Item>
+              <Form.Item noStyle shouldUpdate={(prev, next) => prev.logoUrl !== next.logoUrl}>
+                {({ getFieldValue }) =>
+                  getFieldValue('logoUrl') ? (
+                    <Image src={getFieldValue('logoUrl')} width={100} height={70} style={{ objectFit: 'contain' }} />
+                  ) : null
+                }
+              </Form.Item>
+            </Space>
           </Form.Item>
-          <Form.Item name="bannerUrl" label="Banner URL" rules={[{ type: 'url' }]}>
-            <Input />
+
+          <Form.Item label="Banner">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Upload
+                accept="image/jpeg,image/png,image/webp"
+                showUploadList={false}
+                beforeUpload={(file) => {
+                  void upload(file as File, 'bannerUrl')
+                  return false
+                }}
+              >
+                <Button icon={<UploadOutlined />} loading={uploading === 'banner'}>
+                  Upload banner
+                </Button>
+              </Upload>
+              <Form.Item name="bannerUrl" noStyle rules={[{ type: 'url' }]}>
+                <Input placeholder="Hoặc nhập URL banner" />
+              </Form.Item>
+            </Space>
           </Form.Item>
+
           <Form.Item name="websiteUrl" label="Website" rules={[{ type: 'url' }]}>
             <Input />
           </Form.Item>
