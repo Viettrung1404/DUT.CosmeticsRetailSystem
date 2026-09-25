@@ -12,9 +12,13 @@ export class GetProductDetailUseCase {
     private readonly productRepository: IProductRepository,
   ) {}
 
-  async executeBySlug(slug: string): Promise<ProductEntity> {
+  async executeBySlug(slug: string, onlyActive = true): Promise<ProductEntity> {
     const product = await this.productRepository.findBySlug(slug);
-    if (!product) {
+    if (
+      !product ||
+      (onlyActive &&
+        (!product.isActive || !product.isCategoryActive || !product.isBrandActive))
+    ) {
       throw new NotFoundException(`Không tìm thấy sản phẩm với slug: ${slug}`);
     }
 

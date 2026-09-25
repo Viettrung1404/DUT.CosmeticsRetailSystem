@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { PageOptionsDto } from '@core/common/pagination.dto';
 
 export enum ProductSortBy {
   PRICE_ASC = 'price_asc',
@@ -10,30 +11,15 @@ export enum ProductSortBy {
   RATING = 'rating',
 }
 
-export class ProductFilterDto {
-  @ApiPropertyOptional({ example: 1, default: 1, description: 'Số trang' })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
+export class ProductFilterDto extends PageOptionsDto {
+  @ApiPropertyOptional({ description: 'Lọc theo ID danh mục (UUID)' })
   @IsOptional()
-  page?: number = 1;
-
-  @ApiPropertyOptional({ example: 20, default: 20, description: 'Số lượng item mỗi trang' })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  @IsOptional()
-  limit?: number = 20;
-
-  @ApiPropertyOptional({ description: 'Lọc theo ID danh mục' })
-  @IsOptional()
-  @IsString()
+  @IsUUID()
   categoryId?: string;
 
-  @ApiPropertyOptional({ description: 'Lọc theo ID thương hiệu' })
+  @ApiPropertyOptional({ description: 'Lọc theo ID thương hiệu (UUID)' })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   brandId?: string;
 
   @ApiPropertyOptional({ description: 'Giá tối thiểu (VNĐ)' })
@@ -58,7 +44,7 @@ export class ProductFilterDto {
   @IsOptional()
   rating?: number;
 
-  @ApiPropertyOptional({ description: 'Lọc theo tag sản phẩm (cách nhau bởi dấu phẩy nếu nhiều)' })
+  @ApiPropertyOptional({ description: 'Lọc theo tag sản phẩm' })
   @IsOptional()
   @IsString()
   tag?: string;
@@ -71,8 +57,5 @@ export class ProductFilterDto {
   @IsOptional()
   @IsEnum(ProductSortBy)
   sortBy?: ProductSortBy = ProductSortBy.NEWEST;
-
-  get skip(): number {
-    return ((this.page ?? 1) - 1) * (this.limit ?? 20);
-  }
 }
+
