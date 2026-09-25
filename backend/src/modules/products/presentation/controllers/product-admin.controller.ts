@@ -57,7 +57,9 @@ export class ProductAdminController {
       isActive: query.isActive,
     });
 
-    const data = items.map((product) => ProductResponseDto.fromDomain(product));
+    const data = items.map((product) =>
+      ProductResponseDto.fromDomain(product, { onlyActiveVariants: false }),
+    );
     return new PageDto(data, new PageMetaDto({ pageOptionsDto: query, itemCount: total }));
   }
 
@@ -68,7 +70,7 @@ export class ProductAdminController {
   @ApiNotFoundResponse({ description: 'Không tìm thấy sản phẩm' })
   async getProductById(@Param('id', ParseUUIDPipe) id: string) {
     const product = await this.getProductDetailUseCase.executeById(id);
-    return ProductResponseDto.fromDomain(product);
+    return ProductResponseDto.fromDomain(product, { onlyActiveVariants: false });
   }
 
   @Post()
@@ -80,7 +82,10 @@ export class ProductAdminController {
   @ApiConflictResponse({ description: 'Trùng slug, SKU hoặc mã vạch' })
   async createProduct(@Body() dto: CreateProductRequestDto) {
     const product = await this.createProductUseCase.execute(dto);
-    return { message: 'Thêm sản phẩm thành công', data: ProductResponseDto.fromDomain(product) };
+    return {
+      message: 'Thêm sản phẩm thành công',
+      data: ProductResponseDto.fromDomain(product, { onlyActiveVariants: false }),
+    };
   }
 
   @Patch(':id')
@@ -91,7 +96,10 @@ export class ProductAdminController {
   @ApiConflictResponse({ description: 'Trùng slug hoặc SKU' })
   async updateProduct(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProductRequestDto) {
     const product = await this.updateProductUseCase.execute(id, dto);
-    return { message: 'Cập nhật sản phẩm thành công', data: ProductResponseDto.fromDomain(product) };
+    return {
+      message: 'Cập nhật sản phẩm thành công',
+      data: ProductResponseDto.fromDomain(product, { onlyActiveVariants: false }),
+    };
   }
 
   @Delete(':id')

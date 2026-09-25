@@ -17,9 +17,22 @@ export class GetProductsUseCase {
   async execute(
     filterOrOptions: ProductFilterDto | PageOptionsDto,
   ): Promise<{ items: ProductEntity[]; total: number }> {
-    if (filterOrOptions instanceof ProductFilterDto || 'categoryId' in filterOrOptions || 'sortBy' in filterOrOptions) {
+    if (filterOrOptions instanceof ProductFilterDto || this.hasFilterCriteria(filterOrOptions)) {
       return this.productRepository.findFiltered(filterOrOptions as ProductFilterDto);
     }
-    return this.productRepository.findAll(filterOrOptions as PageOptionsDto);
+    return this.productRepository.findAll(filterOrOptions);
+  }
+
+  private hasFilterCriteria(options: any): boolean {
+    return (
+      options != null &&
+      (options.categoryId !== undefined ||
+        options.brandId !== undefined ||
+        options.minPrice !== undefined ||
+        options.maxPrice !== undefined ||
+        options.rating !== undefined ||
+        options.tag !== undefined ||
+        options.sortBy !== undefined)
+    );
   }
 }

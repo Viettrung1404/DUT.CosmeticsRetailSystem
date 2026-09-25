@@ -58,6 +58,8 @@ export interface ProductProps {
   brandName?: string | null;
   categoryName?: string;
   categorySlug?: string;
+  isCategoryActive?: boolean;
+  isBrandActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -124,6 +126,8 @@ export class ProductEntity {
   private _brandName?: string | null;
   private _categoryName?: string;
   private _categorySlug?: string;
+  private _isCategoryActive?: boolean;
+  private _isBrandActive?: boolean;
   private _createdAt?: Date;
   private _updatedAt?: Date;
 
@@ -156,6 +160,8 @@ export class ProductEntity {
     this._brandName = props.brandName;
     this._categoryName = props.categoryName;
     this._categorySlug = props.categorySlug;
+    this._isCategoryActive = props.isCategoryActive ?? true;
+    this._isBrandActive = props.isBrandActive ?? true;
     this._createdAt = props.createdAt;
     this._updatedAt = props.updatedAt;
   }
@@ -189,6 +195,8 @@ export class ProductEntity {
   get brandName(): string | null | undefined { return this._brandName; }
   get categoryName(): string | undefined { return this._categoryName; }
   get categorySlug(): string | undefined { return this._categorySlug; }
+  get isCategoryActive(): boolean { return this._isCategoryActive ?? true; }
+  get isBrandActive(): boolean { return this._isBrandActive ?? true; }
   get createdAt(): Date | undefined { return this._createdAt; }
   get updatedAt(): Date | undefined { return this._updatedAt; }
 
