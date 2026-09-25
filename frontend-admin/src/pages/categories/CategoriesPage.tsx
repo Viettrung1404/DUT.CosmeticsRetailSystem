@@ -1,4 +1,6 @@
 import {
+  CheckOutlined,
+  CloseOutlined,
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
@@ -23,6 +25,7 @@ import {
   message,
 } from 'antd'
 import type { DataNode } from 'antd/es/tree'
+import type { TreeProps } from 'antd'
 import axios from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -40,7 +43,7 @@ function errorText(error: unknown) {
       | undefined
     return body?.message ?? body?.data?.message ?? 'Có lỗi xảy ra'
   }
-  return 'Có lỗi xảy ra'
+  return error instanceof Error ? error.message : 'Có lỗi xảy ra'
 }
 
 function toSlug(value: string) {
@@ -59,17 +62,13 @@ function flatten(nodes: Category[]): Category[] {
   return nodes.flatMap((node) => [node, ...flatten(node.children ?? [])])
 }
 
-function toTreeData(nodes: Category[]): DataNode[] {
-  return nodes.map((node) => ({
-    key: node.id,
-    title: (
-      <Space>
-        <span>{node.name}</span>
-        {!node.isActive && <Tag>Đã ẩn</Tag>}
-      </Space>
-    ),
-    children: toTreeData(node.children ?? []),
-  }))
+function findParent(nodes: Category[], childId: string): Category | null {
+  for (const node of nodes) {
+    if ((node.children ?? []).some((child) => child.id === childId)) return node
+    const found = findParent(node.children ?? [], childId)
+    if (found) return found
+  }
+  return null
 }
 
 export default function CategoriesPage() {
@@ -80,9 +79,11 @@ export default function CategoriesPage() {
   const [selected, setSelected] = useState<Category | null>(null)
   const [editing, setEditing] = useState<Category | null>(null)
   const [open, setOpen] = useState(false)
+  const [inlineId, setInlineId] = useState<string | null>(null)
+  const [inlineName, setInlineName] = useState('')
+  const [reordering, setReordering] = useState(false)
 
   const allCategories = useMemo(() => flatten(tree), [tree])
-  const treeData = useMemo(() => toTreeData(tree), [tree])
 
   const load = async () => {
     setLoading(true)
@@ -103,6 +104,78 @@ export default function CategoriesPage() {
   useEffect(() => {
     void load()
   }, [])
+
+  const saveInline = async (category: Category) => {
+    const name = inlineName.trim()
+    if (!name) {
+      message.warning('Tên danh mục không được để trống')
+      return
+    }
+
+    try {
+      await updateCategory(category.id, {
+        name,
+        slug: category.slug === toSlug(category.name) ? toSlug(name) : category.slug,
+      })
+      message.success('Đã đổi tên danh mục')
+      setInlineId(null)
+      await load()
+    } catch (error) {
+      message.error(errorText(error))
+    }
+  }
+
+  const treeData = useMemo<DataNode[]>(
+    () => {
+      const mapNodes = (nodes: Category[]): DataNode[] =>
+        nodes.map((node) => ({
+          key: node.id,
+          title:
+            inlineId === node.id ? (
+              <Space size={4} onClick={(event) => event.stopPropagation()}>
+                <Input
+                  size="small"
+                  autoFocus
+                  value={inlineName}
+                  style={{ width: 180 }}
+                  onChange={(event) => setInlineName(event.target.value)}
+                  onPressEnter={() => void saveInline(node)}
+                />
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<CheckOutlined />}
+                  onClick={() => void saveInline(node)}
+                />
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<CloseOutlined />}
+                  onClick={() => setInlineId(null)}
+                />
+              </Space>
+            ) : (
+              <Space>
+                <span>{node.name}</span>
+                {!node.isActive && <Tag>Đã ẩn</Tag>}
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setInlineId(node.id)
+                    setInlineName(node.name)
+                  }}
+                />
+              </Space>
+            ),
+          children: mapNodes(node.children ?? []),
+        }))
+      return mapNodes(tree)
+    },
+    [tree, inlineId, inlineName],
+  )
 
   const openCreate = (parentId?: string | null) => {
     setEditing(null)
@@ -133,10 +206,7 @@ export default function CategoriesPage() {
 
   const save = async () => {
     const values = await form.validateFields()
-    const payload = {
-      ...values,
-      parentId: values.parentId || null,
-    }
+    const payload = { ...values, parentId: values.parentId || null }
     setSaving(true)
     try {
       if (editing) {
@@ -152,6 +222,53 @@ export default function CategoriesPage() {
       message.error(errorText(error))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDrop: TreeProps['onDrop'] = async (info) => {
+    const dragId = info.dragNode.key.toString()
+    const dropId = info.node.key.toString()
+    if (dragId === dropId) return
+
+    const dragged = allCategories.find((item) => item.id === dragId)
+    const target = allCategories.find((item) => item.id === dropId)
+    if (!dragged || !target) return
+
+    const targetParent = findParent(tree, dropId)
+    const dropToGap = info.dropToGap
+    const nextParentId = dropToGap ? targetParent?.id ?? null : target.id
+    const siblings = dropToGap
+      ? targetParent?.children ?? tree
+      : target.children ?? []
+
+    let index = dropToGap ? siblings.findIndex((item) => item.id === dropId) : siblings.length
+    if (dropToGap && info.dropPosition > 0) index += 1
+
+    const reordered = siblings
+      .filter((item) => item.id !== dragId)
+      .map((item) => item.id)
+    reordered.splice(Math.max(0, index), 0, dragId)
+
+    setReordering(true)
+    try {
+      await updateCategory(dragId, {
+        parentId: nextParentId,
+        sortOrder: Math.max(0, index),
+      })
+      await Promise.all(
+        reordered.map((id, sortOrder) =>
+          id === dragId
+            ? Promise.resolve()
+            : updateCategory(id, { sortOrder }),
+        ),
+      )
+      message.success('Đã cập nhật vị trí danh mục')
+      await load()
+    } catch (error) {
+      message.error(errorText(error))
+      await load()
+    } finally {
+      setReordering(false)
     }
   }
 
@@ -171,7 +288,7 @@ export default function CategoriesPage() {
             Quản lý danh mục
           </Typography.Title>
           <Typography.Text type="secondary">
-            Cây danh mục đầy đủ, gồm cả danh mục đã ẩn.
+            Kéo thả để sắp xếp/chuyển cấp; bấm biểu tượng bút ngay trên cây để sửa tên nhanh.
           </Typography.Text>
         </div>
         <Space>
@@ -186,12 +303,14 @@ export default function CategoriesPage() {
 
       <Row gutter={20}>
         <Col xs={24} lg={10}>
-          <Card loading={loading} title="Cây danh mục">
+          <Card loading={loading || reordering} title="Cây danh mục">
             <Tree
               blockNode
               defaultExpandAll
+              draggable
               treeData={treeData}
               selectedKeys={selected ? [selected.id] : []}
+              onDrop={handleDrop}
               onSelect={(keys) => {
                 const id = keys[0]?.toString()
                 setSelected(
@@ -210,22 +329,14 @@ export default function CategoriesPage() {
                   <Typography.Title level={4} style={{ marginBottom: 2 }}>
                     {selected.name}
                   </Typography.Title>
-                  <Typography.Text type="secondary">
-                    {selected.slug}
-                  </Typography.Text>
+                  <Typography.Text type="secondary">{selected.slug}</Typography.Text>
                 </div>
-
                 <div>
                   Trạng thái:{' '}
-                  {selected.isActive ? (
-                    <Tag color="green">Hoạt động</Tag>
-                  ) : (
-                    <Tag>Đã ẩn</Tag>
-                  )}
+                  {selected.isActive ? <Tag color="green">Hoạt động</Tag> : <Tag>Đã ẩn</Tag>}
                 </div>
                 <div>Thứ tự: {selected.sortOrder}</div>
                 <div>Mô tả: {selected.description || '—'}</div>
-
                 <Space wrap>
                   <Button
                     type="primary"
@@ -234,11 +345,8 @@ export default function CategoriesPage() {
                   >
                     Thêm danh mục con
                   </Button>
-                  <Button
-                    icon={<EditOutlined />}
-                    onClick={() => openEdit(selected)}
-                  >
-                    Sửa
+                  <Button icon={<EditOutlined />} onClick={() => openEdit(selected)}>
+                    Sửa đầy đủ
                   </Button>
                   <Popconfirm
                     title="Ẩn danh mục?"
@@ -254,9 +362,7 @@ export default function CategoriesPage() {
                       }
                     }}
                   >
-                    <Button danger icon={<DeleteOutlined />}>
-                      Xóa mềm
-                    </Button>
+                    <Button danger icon={<DeleteOutlined />}>Xóa mềm</Button>
                   </Popconfirm>
                 </Space>
               </Space>
