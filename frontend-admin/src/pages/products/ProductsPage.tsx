@@ -506,10 +506,9 @@ export default function ProductsPage() {
     [],
   )
 
-  const optionNames = Form.useWatch([], form)
-  const watchedOption1 = optionNames?.option1Name
-  const watchedOption2 = optionNames?.option2Name
-  const watchedOption3 = optionNames?.option3Name
+  const watchedOption1 = Form.useWatch('option1Name', form)
+  const watchedOption2 = Form.useWatch('option2Name', form)
+  const watchedOption3 = Form.useWatch('option3Name', form)
 
   return (
     <>
