@@ -66,10 +66,32 @@ export class PrismaProductRepository implements IProductRepository {
   }
 
   async findFiltered(filter: ProductFilterDto): Promise<{ items: ProductEntity[]; total: number }> {
+    let categoryCondition: Prisma.ProductWhereInput['categoryId'];
+    if (filter.categoryId) {
+      const subCategories = await this.prisma.category.findMany({
+        where: { parentId: filter.categoryId, isActive: true },
+        select: { id: true },
+      });
+      const categoryIds = [filter.categoryId, ...subCategories.map((c) => c.id)];
+      categoryCondition = { in: categoryIds };
+    }
+
     const where: Prisma.ProductWhereInput = {
       isActive: true,
-      ...(filter.categoryId && { categoryId: filter.categoryId }),
-      ...(filter.brandId && { brandId: filter.brandId }),
+      category: { isActive: true },
+      AND: [
+        ...(filter.brandId
+          ? [{ brand: { id: filter.brandId, isActive: true } }]
+          : [
+              {
+                OR: [
+                  { brandId: null },
+                  { brand: { isActive: true } },
+                ],
+              },
+            ]),
+        ...(categoryCondition ? [{ categoryId: categoryCondition }] : []),
+      ],
       ...((filter.minPrice !== undefined || filter.maxPrice !== undefined) && {
         basePrice: {
           ...(filter.minPrice !== undefined && { gte: filter.minPrice }),
@@ -127,9 +149,21 @@ export class PrismaProductRepository implements IProductRepository {
     // 1. Attempt Elasticsearch search first
     if (this.esService) {
       const esResult = await this.esService.search(query, options.skip, options.limit);
-      if (esResult && esResult.ids.length > 0) {
+      if (esResult !== null) {
+        if (esResult.ids.length === 0) {
+          return { items: [], total: 0 };
+        }
+
         const rawItems = await this.prisma.product.findMany({
-          where: { id: { in: esResult.ids } },
+          where: {
+            id: { in: esResult.ids },
+            isActive: true,
+            category: { isActive: true },
+            OR: [
+              { brandId: null },
+              { brand: { isActive: true } },
+            ],
+          },
           include: productIncludeConfig,
         });
 
@@ -144,14 +178,25 @@ export class PrismaProductRepository implements IProductRepository {
       }
     }
 
-    // 2. Fallback to PostgreSQL ILIKE search
+    // 2. Fallback to PostgreSQL ILIKE search (only if Elasticsearch is unavailable)
     const where: Prisma.ProductWhereInput = {
       isActive: true,
-      OR: [
-        { name: { contains: query, mode: 'insensitive' } },
-        { description: { contains: query, mode: 'insensitive' } },
-        { brand: { name: { contains: query, mode: 'insensitive' } } },
-        { ingredients: { some: { ingredientName: { contains: query, mode: 'insensitive' } } } },
+      category: { isActive: true },
+      AND: [
+        {
+          OR: [
+            { brandId: null },
+            { brand: { isActive: true } },
+          ],
+        },
+        {
+          OR: [
+            { name: { contains: query, mode: 'insensitive' } },
+            { description: { contains: query, mode: 'insensitive' } },
+            { brand: { name: { contains: query, mode: 'insensitive' } } },
+            { ingredients: { some: { ingredientName: { contains: query, mode: 'insensitive' } } } },
+          ],
+        },
       ],
     };
 
@@ -175,7 +220,7 @@ export class PrismaProductRepository implements IProductRepository {
   async suggest(query: string, limit = 8): Promise<ProductSuggestionItem[]> {
     if (this.esService) {
       const esSuggestions = await this.esService.suggest(query, limit);
-      if (esSuggestions && esSuggestions.length > 0) {
+      if (esSuggestions !== null) {
         return esSuggestions;
       }
     }
@@ -184,27 +229,42 @@ export class PrismaProductRepository implements IProductRepository {
     const items = await this.prisma.product.findMany({
       where: {
         isActive: true,
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { brand: { name: { contains: query, mode: 'insensitive' } } },
+        category: { isActive: true },
+        AND: [
+          {
+            OR: [
+              { brandId: null },
+              { brand: { isActive: true } },
+            ],
+          },
+          {
+            OR: [
+              { name: { contains: query, mode: 'insensitive' } },
+              { brand: { name: { contains: query, mode: 'insensitive' } } },
+            ],
+          },
         ],
       },
       take: limit,
       include: {
         images: {
-          where: { isPrimary: true },
-          take: 1,
+          orderBy: { sortOrder: 'asc' },
+          take: 3,
         },
       },
     });
 
-    return items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      slug: item.slug,
-      imageUrl: item.images[0]?.imageUrl ?? null,
-      price: Number(item.salePrice ?? item.basePrice),
-    }));
+    return items.map((item) => {
+      const primaryImg = item.images.find((img) => img.isPrimary);
+      const imageUrl = primaryImg ? primaryImg.imageUrl : item.images[0]?.imageUrl ?? null;
+      return {
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        imageUrl,
+        price: Number(item.salePrice ?? item.basePrice),
+      };
+    });
   }
 
   async findRelated(
@@ -217,9 +277,20 @@ export class PrismaProductRepository implements IProductRepository {
       where: {
         id: { not: productId },
         isActive: true,
-        OR: [
-          { categoryId },
-          ...(brandId ? [{ brandId }] : []),
+        category: { isActive: true },
+        AND: [
+          {
+            OR: [
+              { brandId: null },
+              { brand: { isActive: true } },
+            ],
+          },
+          {
+            OR: [
+              { categoryId },
+              ...(brandId ? [{ brandId }] : []),
+            ],
+          },
         ],
       },
       take: limit,
@@ -322,6 +393,10 @@ export class PrismaProductRepository implements IProductRepository {
     await this.prisma.product.delete({
       where: { id },
     });
+
+    if (this.esService) {
+      await this.esService.deleteProduct(id);
+    }
   }
 
   async findAllForAdmin(

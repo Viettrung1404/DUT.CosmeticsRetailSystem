@@ -120,6 +120,19 @@ export class ElasticsearchProductService implements OnModuleInit {
     }
   }
 
+  async deleteProduct(id: string): Promise<void> {
+    if (!this.isConnected || !this.client) return;
+    try {
+      await this.client.delete({
+        index: this.indexName,
+        id,
+      });
+      this.logger.log(`Deleted product ${id} from Elasticsearch index`);
+    } catch (error) {
+      this.logger.error(`Failed to delete product ${id} from ES: ${(error as Error).message}`);
+    }
+  }
+
   async search(query: string, from = 0, size = 20): Promise<{ ids: string[]; total: number } | null> {
     if (!this.isConnected || !this.client) return null;
     try {
@@ -172,7 +185,7 @@ export class ElasticsearchProductService implements OnModuleInit {
                 multi_match: {
                   query,
                   fields: ['name^3', 'brandName^2'],
-                  fuzziness: 'AUTO',
+                  type: 'phrase_prefix',
                 },
               },
             ],

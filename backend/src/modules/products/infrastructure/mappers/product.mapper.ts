@@ -73,6 +73,8 @@ export class ProductMapper {
       brandName: raw.brand?.name ?? null,
       categoryName: raw.category?.name,
       categorySlug: raw.category?.slug,
+      isCategoryActive: raw.category ? raw.category.isActive : true,
+      isBrandActive: raw.brand ? raw.brand.isActive : true,
       variants: raw.variants?.map((v: PrismaProductVariant) => ({
         id: v.id,
         sku: v.sku,
