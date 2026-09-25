@@ -9,6 +9,7 @@ import { PermissionsModule } from '@modules/permissions/permissions.module';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
+import { UploadsModule } from '@modules/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CategoriesModule } from '@modules/categories/categories.module';
     }),
     PrismaModule,
     AuthModule,
+    UploadsModule,
     CacheModule,
     ProductsModule,
     PermissionsModule,
