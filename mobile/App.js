@@ -1,24 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+// Import các màn hình từ thư mục src/screens
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+
+const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Khung dự án GlowUp Mobile đã sẵn sàng!</Text>
-    </View>
+    <NavigationContainer>
+      {/* headerShown: false để ẩn thanh tiêu đề mặc định */}
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ff69b4',
-  },
-});
