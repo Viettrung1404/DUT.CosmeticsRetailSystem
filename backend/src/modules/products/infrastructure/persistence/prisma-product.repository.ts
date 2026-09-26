@@ -3,6 +3,7 @@ import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
   AdminProductListFilter,
   IProductRepository,
+  ProductChildrenUpdate,
   ProductSuggestionItem,
 } from '../../domain/repositories/product.repository.interface';
 import { ProductEntity, ProductImageProps } from '../../domain/entities/product.entity';
@@ -12,7 +13,7 @@ import { ProductFilterDto, ProductSortBy } from '../../presentation/dtos/product
 import { ElasticsearchProductService } from '../search/elasticsearch-product.service';
 import { Prisma } from '@prisma/client';
 
-const productIncludeConfig = {
+export const productIncludeConfig = {
   variants: true,
   images: {
     orderBy: { sortOrder: 'asc' as const },
@@ -68,12 +69,7 @@ export class PrismaProductRepository implements IProductRepository {
   async findFiltered(filter: ProductFilterDto): Promise<{ items: ProductEntity[]; total: number }> {
     let categoryCondition: Prisma.ProductWhereInput['categoryId'];
     if (filter.categoryId) {
-      const subCategories = await this.prisma.category.findMany({
-        where: { parentId: filter.categoryId, isActive: true },
-        select: { id: true },
-      });
-      const categoryIds = [filter.categoryId, ...subCategories.map((c) => c.id)];
-      categoryCondition = { in: categoryIds };
+      categoryCondition = { in: await this.collectCategoryIds(filter.categoryId) };
     }
 
     const where: Prisma.ProductWhereInput = {
@@ -303,7 +299,7 @@ export class PrismaProductRepository implements IProductRepository {
 
   async create(product: ProductEntity): Promise<ProductEntity> {
     const data = ProductMapper.toPersistence(product);
-    // Tạo lồng biến thể + ảnh trong cùng một câu lệnh để Prisma bọc chung một transaction
+    // Tạo lồng biến thể, ảnh, tag, thành phần trong cùng một câu lệnh để Prisma bọc chung một transaction
     const created = await this.prisma.product.create({
       data: {
         ...data,
@@ -313,77 +309,53 @@ export class PrismaProductRepository implements IProductRepository {
         images: product.images.length
           ? { create: product.images.map((img) => ProductMapper.imageToPersistence(img)) }
           : undefined,
+        tags: product.tags.length
+          ? { create: product.tags.map((tagName) => ({ tagName })) }
+          : undefined,
+        ingredients: product.ingredients.length
+          ? { create: product.ingredients.map((i) => ProductMapper.ingredientToPersistence(i)) }
+          : undefined,
       },
       include: productIncludeConfig,
     });
 
     const domainEntity = ProductMapper.toDomain(created);
 
-    // Sync to Elasticsearch
     if (this.esService) {
-      await this.esService.indexProduct({
-        id: domainEntity.id!,
-        name: domainEntity.name,
-        slug: domainEntity.slug,
-        sku: domainEntity.sku,
-        brandName: domainEntity.brandName,
-        categoryName: domainEntity.categoryName,
-        ingredients: domainEntity.ingredients.map((i) => i.ingredientName),
-        tags: domainEntity.tags,
-        basePrice: domainEntity.basePrice,
-        salePrice: domainEntity.salePrice,
-        primaryImage: domainEntity.primaryImageUrl,
-        avgRating: domainEntity.avgRating,
-        totalSold: domainEntity.totalSold,
-        isActive: domainEntity.isActive,
-      });
+      await this.esService.indexProduct(ProductMapper.toSearchDocument(domainEntity));
     }
 
     return domainEntity;
   }
 
-  async update(
-    product: ProductEntity,
-    options?: { images?: ProductImageProps[] },
-  ): Promise<ProductEntity> {
+  async update(product: ProductEntity, options?: ProductChildrenUpdate): Promise<ProductEntity> {
     const data = ProductMapper.toPersistence(product);
+    const productId = product.id!;
     const updated = await this.prisma.$transaction(async (tx) => {
       if (options?.images) {
-        await tx.productImage.deleteMany({ where: { productId: product.id, productVariantId: null } });
-        await tx.productImage.createMany({
-          data: options.images.map((img) => ({
-            ...ProductMapper.imageToPersistence(img),
-            productId: product.id!,
-          })),
+        await this.syncImages(tx, productId, options.images);
+      }
+      if (options?.tags) {
+        await tx.productTag.deleteMany({ where: { productId } });
+        await tx.productTag.createMany({ data: options.tags.map((tagName) => ({ productId, tagName })) });
+      }
+      if (options?.ingredients) {
+        await tx.productIngredient.deleteMany({ where: { productId } });
+        await tx.productIngredient.createMany({
+          data: options.ingredients.map((i) => ({ ...ProductMapper.ingredientToPersistence(i), productId })),
         });
       }
       return tx.product.update({
-        where: { id: product.id },
+        where: { id: productId },
         data,
         include: productIncludeConfig,
       });
-    });
+    }, { timeout: 15_000 });
 
     const domainEntity = ProductMapper.toDomain(updated);
 
-    // Sync to Elasticsearch
     if (this.esService) {
-      await this.esService.indexProduct({
-        id: domainEntity.id!,
-        name: domainEntity.name,
-        slug: domainEntity.slug,
-        sku: domainEntity.sku,
-        brandName: domainEntity.brandName,
-        categoryName: domainEntity.categoryName,
-        ingredients: domainEntity.ingredients.map((i) => i.ingredientName),
-        tags: domainEntity.tags,
-        basePrice: domainEntity.basePrice,
-        salePrice: domainEntity.salePrice,
-        primaryImage: domainEntity.primaryImageUrl,
-        avgRating: domainEntity.avgRating,
-        totalSold: domainEntity.totalSold,
-        isActive: domainEntity.isActive,
-      });
+      await this.esService.indexProduct(ProductMapper.toSearchDocument(domainEntity));
     }
 
     return domainEntity;
@@ -439,5 +411,47 @@ export class PrismaProductRepository implements IProductRepository {
 
   async brandExists(brandId: string): Promise<boolean> {
     return (await this.prisma.brand.count({ where: { id: brandId } })) > 0;
+  }
+
+  // So theo link ảnh: ảnh còn trong danh sách giữ nguyên id, chỉ xóa ảnh bị bỏ và thêm ảnh mới
+  private async syncImages(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    images: ProductImageProps[],
+  ): Promise<void> {
+    const existing = await tx.productImage.findMany({ where: { productId, productVariantId: null } });
+    const byUrl = new Map(existing.map((img) => [img.imageUrl, img.id]));
+    const keptIds = new Set<string>();
+
+    for (const img of images) {
+      const data = ProductMapper.imageToPersistence(img);
+      const existingId = byUrl.get(img.imageUrl);
+      if (existingId) {
+        keptIds.add(existingId);
+        await tx.productImage.update({ where: { id: existingId }, data });
+      } else {
+        await tx.productImage.create({ data: { ...data, productId } });
+      }
+    }
+
+    const removedIds = existing.filter((img) => !keptIds.has(img.id)).map((img) => img.id);
+    if (removedIds.length) {
+      await tx.productImage.deleteMany({ where: { id: { in: removedIds } } });
+    }
+  }
+
+  // Lấy danh mục gốc + mọi cấp con cháu đang hoạt động, từng tầng một
+  private async collectCategoryIds(rootId: string): Promise<string[]> {
+    const ids = [rootId];
+    let currentLevel = [rootId];
+    while (currentLevel.length) {
+      const children = await this.prisma.category.findMany({
+        where: { parentId: { in: currentLevel }, isActive: true, id: { notIn: ids } },
+        select: { id: true },
+      });
+      currentLevel = children.map((c) => c.id);
+      ids.push(...currentLevel);
+    }
+    return ids;
   }
 }

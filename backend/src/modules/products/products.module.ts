@@ -20,6 +20,7 @@ import { PrismaProductVariantRepository } from './infrastructure/persistence/pri
 import { PRODUCT_REPOSITORY } from './domain/repositories/product.repository.interface';
 import { PrismaProductRepository } from './infrastructure/persistence/prisma-product.repository';
 import { ElasticsearchProductService } from './infrastructure/search/elasticsearch-product.service';
+import { ProductSearchSyncService } from './infrastructure/search/product-search-sync.service';
 
 @Module({
   controllers: [ProductCustomerController, ProductAdminController, ProductVariantAdminController],
@@ -41,6 +42,7 @@ import { ElasticsearchProductService } from './infrastructure/search/elasticsear
 
     // Search Engine
     ElasticsearchProductService,
+    ProductSearchSyncService,
 
     // Repository Port -> Adapter Mapping
     {

@@ -1,4 +1,8 @@
-import { ProductEntity, ProductImageProps } from '../entities/product.entity';
+import {
+  ProductEntity,
+  ProductImageProps,
+  ProductIngredientProps,
+} from '../entities/product.entity';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { ProductFilterDto } from '../../presentation/dtos/product-filter.dto';
 
@@ -10,6 +14,13 @@ export interface ProductSuggestionItem {
   slug: string;
   imageUrl?: string | null;
   price: number;
+}
+
+// Trường nào có mặt thì thay toàn bộ danh sách đó; undefined = giữ nguyên
+export interface ProductChildrenUpdate {
+  images?: ProductImageProps[];
+  tags?: string[];
+  ingredients?: ProductIngredientProps[];
 }
 
 export interface AdminProductListFilter {
@@ -31,7 +42,7 @@ export interface IProductRepository {
   suggest(query: string, limit?: number): Promise<ProductSuggestionItem[]>;
   findRelated(productId: string, categoryId: string, brandId?: string | null, limit?: number): Promise<ProductEntity[]>;
   create(product: ProductEntity): Promise<ProductEntity>;
-  update(product: ProductEntity, options?: { images?: ProductImageProps[] }): Promise<ProductEntity>;
+  update(product: ProductEntity, options?: ProductChildrenUpdate): Promise<ProductEntity>;
   delete(id: string): Promise<void>;
   findAllForAdmin(filter: AdminProductListFilter): Promise<{ items: ProductEntity[]; total: number }>;
   findBySku(sku: string): Promise<ProductEntity | null>;

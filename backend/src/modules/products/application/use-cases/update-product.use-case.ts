@@ -10,9 +10,19 @@ import {
   PRODUCT_REPOSITORY,
 } from '../../domain/repositories/product.repository.interface';
 import { ProductChanges, ProductEntity } from '../../domain/entities/product.entity';
-import { normalizeImages, ProductImageInput } from './create-product.use-case';
+import {
+  normalizeImages,
+  normalizeIngredients,
+  normalizeTags,
+  ProductImageInput,
+  ProductIngredientInput,
+} from './create-product.use-case';
 
-export type UpdateProductInput = ProductChanges & { images?: ProductImageInput[] };
+export type UpdateProductInput = ProductChanges & {
+  images?: ProductImageInput[];
+  tags?: string[];
+  ingredients?: ProductIngredientInput[];
+};
 
 @Injectable()
 export class UpdateProductUseCase {
@@ -22,7 +32,7 @@ export class UpdateProductUseCase {
   ) {}
 
   async execute(id: string, input: UpdateProductInput): Promise<ProductEntity> {
-    const { images, ...changes } = input;
+    const { images, tags, ingredients, ...changes } = input;
     const product = await this.productRepository.findById(id);
     if (!product) {
       throw new NotFoundException('Không tìm thấy sản phẩm');
@@ -52,6 +62,8 @@ export class UpdateProductUseCase {
 
     return this.productRepository.update(product, {
       images: images ? normalizeImages(images) : undefined,
+      tags: tags ? normalizeTags(tags) : undefined,
+      ingredients: ingredients ? normalizeIngredients(ingredients) : undefined,
     });
   }
 
