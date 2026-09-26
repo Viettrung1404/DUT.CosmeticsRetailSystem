@@ -5,7 +5,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PERMISSIONS_KEY } from '@core/decorators/require-permissions.decorator';
+import {
+  ANY_PERMISSIONS_KEY,
+  PERMISSIONS_KEY,
+} from '@core/decorators/require-permissions.decorator';
 import { JwtPayload } from './jwt-auth.guard';
 
 @Injectable()
@@ -13,13 +16,14 @@ export class PermissionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
-      PERMISSIONS_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const targets = [context.getHandler(), context.getClass()];
+    const requiredPermissions =
+      this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, targets) ?? [];
+    const anyOfPermissions =
+      this.reflector.getAllAndOverride<string[]>(ANY_PERMISSIONS_KEY, targets) ?? [];
 
     // If no specific permissions are required, allow access
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    if (requiredPermissions.length === 0 && anyOfPermissions.length === 0) {
       return true;
     }
 
@@ -37,6 +41,16 @@ export class PermissionGuard implements CanActivate {
     if (!hasPermission) {
       throw new ForbiddenException(
         `Yêu cầu quyền: ${requiredPermissions.join(', ')}`,
+      );
+    }
+
+    const hasAnyPermission =
+      anyOfPermissions.length === 0 ||
+      anyOfPermissions.some((perm) => user.permissionCodes.includes(perm));
+
+    if (!hasAnyPermission) {
+      throw new ForbiddenException(
+        `Yêu cầu một trong các quyền: ${anyOfPermissions.join(', ')}`,
       );
     }
 
