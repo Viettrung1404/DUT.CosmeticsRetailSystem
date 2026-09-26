@@ -120,6 +120,26 @@ export class ElasticsearchProductService implements OnModuleInit {
     }
   }
 
+  get isAvailable(): boolean {
+    return this.isConnected && !!this.client;
+  }
+
+  // Ghi đè hàng loạt; trả về số tài liệu ghi thành công
+  async bulkIndex(docs: ElasticsearchProductDocument[]): Promise<number> {
+    if (!this.isAvailable || docs.length === 0) return 0;
+    try {
+      const result = await this.client!.bulk({
+        operations: docs.flatMap((doc) => [{ index: { _index: this.indexName, _id: doc.id } }, doc]),
+      });
+      const failed = result.items.filter((item) => item.index?.error).length;
+      if (failed) this.logger.error(`Bulk index: ${failed}/${docs.length} documents failed`);
+      return docs.length - failed;
+    } catch (error) {
+      this.logger.error(`Bulk index failed: ${(error as Error).message}`);
+      return 0;
+    }
+  }
+
   async deleteProduct(id: string): Promise<void> {
     if (!this.isConnected || !this.client) return;
     try {

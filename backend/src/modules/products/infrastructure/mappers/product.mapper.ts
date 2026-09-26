@@ -10,8 +10,10 @@ import {
 import {
   ProductEntity,
   ProductImageProps,
+  ProductIngredientProps,
   ProductVariantProps,
 } from '../../domain/entities/product.entity';
+import { ElasticsearchProductDocument } from '../search/elasticsearch-product.service';
 
 /** Prisma Product with eagerly-loaded relations */
 export type ProductWithRelations = PrismaProduct & {
@@ -145,6 +147,33 @@ export class ProductMapper {
       weight: v.weight ?? null,
       unit: v.unit ?? null,
       isActive: v.isActive ?? true,
+    };
+  }
+
+  static toSearchDocument(entity: ProductEntity): ElasticsearchProductDocument {
+    return {
+      id: entity.id!,
+      name: entity.name,
+      slug: entity.slug,
+      sku: entity.sku,
+      brandName: entity.brandName,
+      categoryName: entity.categoryName,
+      ingredients: entity.ingredients.map((i) => i.ingredientName),
+      tags: entity.tags,
+      basePrice: entity.basePrice,
+      salePrice: entity.salePrice,
+      primaryImage: entity.primaryImageUrl,
+      avgRating: entity.avgRating,
+      totalSold: entity.totalSold,
+      isActive: entity.isActive,
+    };
+  }
+
+  static ingredientToPersistence(i: ProductIngredientProps) {
+    return {
+      ingredientName: i.ingredientName,
+      percentage: i.percentage ?? null,
+      isKeyIngredient: i.isKeyIngredient,
     };
   }
 

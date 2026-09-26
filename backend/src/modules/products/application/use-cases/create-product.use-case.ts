@@ -17,6 +17,7 @@ import {
   ProductChanges,
   ProductEntity,
   ProductImageProps,
+  ProductIngredientProps,
   ProductVariantProps,
   variantOptionKey,
 } from '../../domain/entities/product.entity';
@@ -26,7 +27,15 @@ export type CreateProductInput = Required<Pick<ProductChanges, 'categoryId' | 'n
   Omit<ProductChanges, 'categoryId' | 'name' | 'slug' | 'sku' | 'basePrice'> & {
     variants: ProductVariantProps[];
     images?: ProductImageInput[];
+    tags?: string[];
+    ingredients?: ProductIngredientInput[];
   };
+
+export interface ProductIngredientInput {
+  ingredientName: string;
+  percentage?: string | null;
+  isKeyIngredient?: boolean;
+}
 
 export interface ProductImageInput {
   imageUrl: string;
@@ -45,7 +54,7 @@ export class CreateProductUseCase {
   ) {}
 
   async execute(input: CreateProductInput): Promise<ProductEntity> {
-    const { variants, images = [], ...productFields } = input;
+    const { variants, images = [], tags = [], ingredients = [], ...productFields } = input;
 
     if (await this.productRepository.findBySlug(input.slug)) {
       throw new ConflictException(`Slug "${input.slug}" đã được sản phẩm khác sử dụng`);
@@ -60,6 +69,8 @@ export class CreateProductUseCase {
       name: input.name.trim(),
       variants: variants.map((v) => ({ ...v, isActive: v.isActive ?? true })),
       images: normalizeImages(images),
+      tags: normalizeTags(tags),
+      ingredients: normalizeIngredients(ingredients),
     });
 
     if (!product.hasValidSalePrice()) {
@@ -111,9 +122,25 @@ export function normalizeImages(images: ProductImageInput[]): ProductImageProps[
   if (primaryCount > 1) {
     throw new BadRequestException('Chỉ được chọn tối đa 1 ảnh chính');
   }
+  if (new Set(images.map((img) => img.imageUrl)).size !== images.length) {
+    throw new BadRequestException('Danh sách ảnh có ảnh bị trùng');
+  }
   return images.map((img, index) => ({
     ...img,
     sortOrder: img.sortOrder ?? index,
     isPrimary: primaryCount === 0 ? index === 0 : !!img.isPrimary,
+  }));
+}
+
+// Tag là khóa chính cùng product_id nên phải bỏ trùng trước khi lưu
+export function normalizeTags(tags: string[]): string[] {
+  return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
+}
+
+export function normalizeIngredients(ingredients: ProductIngredientInput[]): ProductIngredientProps[] {
+  return ingredients.map((item) => ({
+    ingredientName: item.ingredientName.trim(),
+    percentage: item.percentage ?? null,
+    isKeyIngredient: item.isKeyIngredient ?? false,
   }));
 }

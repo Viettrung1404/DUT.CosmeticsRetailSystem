@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -47,6 +48,27 @@ export class ProductImageRequestDto {
   @IsOptional()
   @IsBoolean()
   isPrimary?: boolean;
+}
+
+export class ProductIngredientRequestDto {
+  @ApiProperty({ example: 'Niacinamide' })
+  @Transform(trim)
+  @IsString()
+  @IsNotEmpty({ message: 'Tên thành phần không được để trống' })
+  @MaxLength(150, { message: 'Tên thành phần tối đa 150 ký tự' })
+  ingredientName: string;
+
+  @ApiPropertyOptional({ example: '5%' })
+  @IsOptional()
+  @Transform(emptyToNull)
+  @IsString()
+  @MaxLength(20)
+  percentage?: string | null;
+
+  @ApiPropertyOptional({ example: true, default: false })
+  @IsOptional()
+  @IsBoolean()
+  isKeyIngredient?: boolean;
 }
 
 export class CreateProductRequestDto {
@@ -166,4 +188,21 @@ export class CreateProductRequestDto {
   @ValidateNested({ each: true })
   @Type(() => ProductImageRequestDto)
   images?: ProductImageRequestDto[];
+
+  @ApiPropertyOptional({ example: ['bestseller', 'organic'], description: 'Gửi lên khi sửa = thay toàn bộ tag cũ' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @Transform(({ value }) => (Array.isArray(value) ? value.map((t) => (typeof t === 'string' ? t.trim() : t)) : value))
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true, message: 'Tag không được để trống' })
+  @MaxLength(50, { each: true, message: 'Mỗi tag tối đa 50 ký tự' })
+  tags?: string[];
+
+  @ApiPropertyOptional({ type: [ProductIngredientRequestDto], description: 'Gửi lên khi sửa = thay toàn bộ thành phần cũ' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductIngredientRequestDto)
+  ingredients?: ProductIngredientRequestDto[];
 }

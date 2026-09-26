@@ -130,6 +130,26 @@ describe('Product admin use cases', () => {
       );
     });
 
+    it('lưu tag (bỏ trùng, bỏ rỗng) và thành phần kèm sản phẩm', async () => {
+      const result = await run({
+        ...validInput(),
+        tags: ['bestseller', ' bestseller ', 'organic', ''],
+        ingredients: [{ ingredientName: ' Niacinamide ', percentage: '5%', isKeyIngredient: true }, { ingredientName: 'Glycerin' }],
+      });
+
+      expect(result.tags).toEqual(['bestseller', 'organic']);
+      expect(result.ingredients).toEqual([
+        { ingredientName: 'Niacinamide', percentage: '5%', isKeyIngredient: true },
+        { ingredientName: 'Glycerin', percentage: null, isKeyIngredient: false },
+      ]);
+    });
+
+    it('chặn danh sách ảnh có link trùng', async () => {
+      const input = validInput();
+      input.images = [{ imageUrl: 'https://cdn.glowup.vn/a.jpg' }, { imageUrl: 'https://cdn.glowup.vn/a.jpg' }];
+      await expect(run(input)).rejects.toThrow('ảnh bị trùng');
+    });
+
     it('chặn slug sản phẩm đã tồn tại', async () => {
       repo.findBySlug.mockResolvedValueOnce(makeProduct());
       await expect(run(validInput())).rejects.toThrow(ConflictException);
@@ -160,6 +180,19 @@ describe('Product admin use cases', () => {
       await expect(
         new UpdateProductUseCase(repo).execute(PRODUCT_ID, { basePrice: 100000 }),
       ).rejects.toThrow('Giá khuyến mãi không được lớn hơn giá gốc');
+    });
+
+    it('gửi tags, ingredients thì truyền danh sách mới xuống repository; không gửi thì giữ nguyên', async () => {
+      repo.findById.mockResolvedValue(makeProduct());
+      await new UpdateProductUseCase(repo).execute(PRODUCT_ID, {
+        tags: ['hot-deal', 'hot-deal'],
+        ingredients: [{ ingredientName: 'Retinol' }],
+      });
+      expect(repo.update).toHaveBeenCalledWith(expect.any(ProductEntity), {
+        images: undefined,
+        tags: ['hot-deal'],
+        ingredients: [{ ingredientName: 'Retinol', percentage: null, isKeyIngredient: false }],
+      });
     });
 
     it('gửi images thì truyền danh sách ảnh mới xuống repository', async () => {
