@@ -1,7 +1,10 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from '../permission.guard';
-import { PERMISSIONS_KEY } from '@core/decorators/require-permissions.decorator';
+import {
+  ANY_PERMISSIONS_KEY,
+  PERMISSIONS_KEY,
+} from '@core/decorators/require-permissions.decorator';
 
 describe('PermissionGuard', () => {
   let guard: PermissionGuard;
@@ -62,5 +65,34 @@ describe('PermissionGuard', () => {
     });
 
     expect(guard.canActivate(context)).toBe(true);
+  });
+  describe('RequireAnyPermission', () => {
+    const mockAnyOf = (anyOf: string[]) =>
+      reflector.getAllAndOverride.mockImplementation((key: unknown) =>
+        key === ANY_PERMISSIONS_KEY ? anyOf : undefined,
+      );
+
+    it('cho qua khi người dùng có một trong các quyền', () => {
+      mockAnyOf(['PRODUCT_CREATE', 'PRODUCT_UPDATE', 'PRODUCT_CATEGORY_MANAGE']);
+      const context = createMockContext({ userId: 'user-1', permissionCodes: ['PRODUCT_CREATE'] });
+
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('chặn khi người dùng không có quyền nào trong danh sách', () => {
+      mockAnyOf(['PRODUCT_CREATE', 'PRODUCT_UPDATE']);
+      const context = createMockContext({ userId: 'user-1', permissionCodes: ['PRODUCT_VIEW'] });
+
+      expect(() => guard.canActivate(context)).toThrow('Yêu cầu một trong các quyền');
+    });
+
+    it('vẫn đòi đủ quyền của RequirePermissions khi dùng chung', () => {
+      reflector.getAllAndOverride.mockImplementation((key: unknown) =>
+        key === PERMISSIONS_KEY ? ['PRODUCT_VIEW'] : ['PRODUCT_CREATE', 'PRODUCT_UPDATE'],
+      );
+      const context = createMockContext({ userId: 'user-1', permissionCodes: ['PRODUCT_UPDATE'] });
+
+      expect(() => guard.canActivate(context)).toThrow('Yêu cầu quyền: PRODUCT_VIEW');
+    });
   });
 });

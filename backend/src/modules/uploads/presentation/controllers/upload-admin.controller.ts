@@ -11,7 +11,7 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
+import { RequireAnyPermission } from '@core/decorators/require-permissions.decorator';
 import {
   MAX_IMAGE_SIZE,
   UPLOAD_FOLDERS,
@@ -29,7 +29,7 @@ export class UploadAdminController {
   constructor(private readonly uploadImageUseCase: UploadImageUseCase) {}
 
   @Post('images')
-  @RequirePermissions('PRODUCT_UPDATE')
+  @RequireAnyPermission('PRODUCT_CREATE', 'PRODUCT_UPDATE', 'PRODUCT_CATEGORY_MANAGE')
   @UseInterceptors(
     UploadErrorInterceptor,
     FileInterceptor('file', { limits: { fileSize: MAX_IMAGE_SIZE, files: 1 } }),
