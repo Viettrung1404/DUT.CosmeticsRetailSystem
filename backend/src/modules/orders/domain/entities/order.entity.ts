@@ -1,4 +1,5 @@
 import { OrderItemEntity } from './order-item.entity';
+import { OrderStatus } from '../../../../core/domain/orders/order-status.enum';
 
 export interface ShippingAddressVo {
   recipientName: string;
@@ -15,7 +16,7 @@ export class OrderEntity {
   customerId: string | null;
   storeId: string;
   orderType: string; // 'ONLINE' | 'STORE_PICKUP' | 'POS'
-  status: string; // 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPING' | 'COMPLETED' | 'CANCELLED'
+  status: OrderStatus;
   subtotal: number;
   discountAmount: number;
   shippingFee: number;

@@ -6,6 +6,8 @@ import {
 } from '../../domain/repositories/order.repository.interface';
 import { OrderEntity, ShippingAddressVo } from '../../domain/entities/order.entity';
 import { OrderItemEntity } from '../../domain/entities/order-item.entity';
+import { OrderStatus, OrderActor } from '../../../../core/domain/orders/order-status.enum';
+import { OrderStateMachine } from '../../../../core/domain/orders/order-state-machine';
 
 @Injectable()
 export class PrismaOrderRepository implements IOrderRepository {
@@ -15,22 +17,26 @@ export class PrismaOrderRepository implements IOrderRepository {
     data: CreateOrderTransactionInput,
   ): Promise<OrderEntity> {
     return this.prisma.$transaction(async (tx) => {
-      // 1. Reserve inventory for all items at designated store
+      // 1. Pessimistic Row Lock (SELECT ... FOR UPDATE) on inventory rows to prevent race condition
       for (const item of data.items) {
-        const inv = await tx.inventory.findFirst({
-          where: {
-            storeId: data.storeId,
-            productVariantId: item.productVariantId,
-          },
-        });
+        const inventories = await tx.$queryRaw<
+          Array<{ id: string; quantity: number; reserved_quantity: number }>
+        >`
+          SELECT id, quantity, reserved_quantity 
+          FROM inventories 
+          WHERE store_id = ${data.storeId}::uuid 
+            AND product_variant_id = ${item.productVariantId}::uuid 
+          FOR UPDATE;
+        `;
 
-        if (!inv) {
+        if (!inventories || inventories.length === 0) {
           throw new BadRequestException(
             `Sản phẩm ${item.productName} chưa được cấu hình tồn kho tại chi nhánh này`,
           );
         }
 
-        const available = inv.quantity - inv.reservedQuantity;
+        const inv = inventories[0];
+        const available = inv.quantity - inv.reserved_quantity;
         if (available < item.quantity) {
           throw new BadRequestException(
             `Sản phẩm ${item.productName} - ${item.variantName} không đủ tồn kho (còn ${available}, yêu cầu ${item.quantity})`,
@@ -47,14 +53,14 @@ export class PrismaOrderRepository implements IOrderRepository {
         });
       }
 
-      // 2. Create Order record
+      // 2. Create Order record with OrderStatus.PENDING
       const order = await tx.order.create({
         data: {
           orderNumber: data.orderNumber,
           customerId: data.customerId,
           storeId: data.storeId,
           orderType: data.orderType,
-          status: 'PENDING',
+          status: OrderStatus.PENDING,
           subtotal: data.subtotal,
           discountAmount: data.discountAmount,
           shippingFee: data.shippingFee,
@@ -202,26 +208,47 @@ export class PrismaOrderRepository implements IOrderRepository {
     reason?: string,
   ): Promise<OrderEntity> {
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { items: true },
-      });
+      // Pessimistic Row Lock (SELECT ... FOR UPDATE) on the order row
+      const orders = await tx.$queryRaw<
+        Array<{
+          id: string;
+          status: string;
+          store_id: string;
+          customer_id: string | null;
+          coupon_id: string | null;
+          loyalty_points_used: number;
+          order_number: string;
+        }>
+      >`
+        SELECT id, status, store_id, customer_id, coupon_id, loyalty_points_used, order_number 
+        FROM orders 
+        WHERE id = ${orderId}::uuid 
+        FOR UPDATE;
+      `;
 
-      if (!existing) {
+      if (!orders || orders.length === 0) {
         throw new BadRequestException('Đơn hàng không tồn tại');
       }
 
-      if (existing.status !== 'PENDING') {
-        throw new BadRequestException(
-          'Chỉ có thể hủy đơn hàng khi đơn đang ở trạng thái PENDING',
-        );
-      }
+      const existingRow = orders[0];
+
+      // Single Source of Truth: OrderStateMachine validates transition
+      const actor: OrderActor = customerId ? 'CUSTOMER' : 'SYSTEM';
+      OrderStateMachine.assertValidTransition(
+        existingRow.status as OrderStatus,
+        OrderStatus.CANCELLED,
+        actor,
+      );
+
+      const items = await tx.orderItem.findMany({
+        where: { orderId: existingRow.id },
+      });
 
       // 1. Release reserved stock
-      for (const item of existing.items) {
+      for (const item of items) {
         await tx.inventory.updateMany({
           where: {
-            storeId: existing.storeId,
+            storeId: existingRow.store_id,
             productVariantId: item.productVariantId,
           },
           data: {
@@ -233,13 +260,13 @@ export class PrismaOrderRepository implements IOrderRepository {
       }
 
       // 2. Refund coupon if used
-      if (existing.couponId) {
+      if (existingRow.coupon_id) {
         await tx.couponUsage.deleteMany({
-          where: { orderId: existing.id },
+          where: { orderId: existingRow.id },
         });
 
         await tx.coupon.update({
-          where: { id: existing.couponId },
+          where: { id: existingRow.coupon_id },
           data: {
             usedCount: { decrement: 1 },
           },
@@ -247,44 +274,44 @@ export class PrismaOrderRepository implements IOrderRepository {
       }
 
       // 3. Refund loyalty points if used
-      if (existing.loyaltyPointsUsed > 0 && existing.customerId) {
+      if (existingRow.loyalty_points_used > 0 && existingRow.customer_id) {
         await tx.customer.update({
-          where: { id: existing.customerId },
+          where: { id: existingRow.customer_id },
           data: {
-            totalPoints: { increment: existing.loyaltyPointsUsed },
+            totalPoints: { increment: existingRow.loyalty_points_used },
           },
         });
 
         await tx.loyaltyPointsTransaction.create({
           data: {
-            customerId: existing.customerId,
-            orderId: existing.id,
-            points: existing.loyaltyPointsUsed,
+            customerId: existingRow.customer_id,
+            orderId: existingRow.id,
+            points: existingRow.loyalty_points_used,
             type: 'REFUND',
-            description: `Hoàn điểm do hủy đơn hàng ${existing.orderNumber}`,
+            description: `Hoàn điểm do hủy đơn hàng ${existingRow.order_number}`,
           },
         });
       }
 
       // 4. Update Payment to CANCELLED
       await tx.payment.updateMany({
-        where: { orderId: existing.id },
+        where: { orderId: existingRow.id },
         data: { status: 'CANCELLED' },
       });
 
       // 5. Add status history
       await tx.orderStatusHistory.create({
         data: {
-          orderId: existing.id,
-          status: 'CANCELLED',
+          orderId: existingRow.id,
+          status: OrderStatus.CANCELLED,
           note: reason || 'Khách hàng hủy đơn',
         },
       });
 
       // 6. Update order status to CANCELLED
       const updatedOrder = await tx.order.update({
-        where: { id: existing.id },
-        data: { status: 'CANCELLED' },
+        where: { id: existingRow.id },
+        data: { status: OrderStatus.CANCELLED },
         include: { items: true, payments: true },
       });
 

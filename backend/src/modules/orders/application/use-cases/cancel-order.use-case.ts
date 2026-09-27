@@ -10,6 +10,8 @@ import {
   IOrderRepository,
 } from '../../domain/repositories/order.repository.interface';
 import { OrderEntity } from '../../domain/entities/order.entity';
+import { OrderStatus } from '../../../../core/domain/orders/order-status.enum';
+import { OrderStateMachine } from '../../../../core/domain/orders/order-state-machine';
 
 export interface CancelOrderInput {
   orderId: string;
@@ -36,11 +38,12 @@ export class CancelOrderUseCase {
       throw new ForbiddenException('Bạn không có quyền hủy đơn hàng này');
     }
 
-    if (order.status !== 'PENDING') {
-      throw new BadRequestException(
-        'Chỉ có thể hủy đơn hàng khi đơn đang ở trạng thái Chờ xử lý (PENDING)',
-      );
-    }
+    // Single Source of Truth: OrderStateMachine validates transition for CUSTOMER actor
+    OrderStateMachine.assertValidTransition(
+      order.status as OrderStatus,
+      OrderStatus.CANCELLED,
+      'CUSTOMER',
+    );
 
     return this.orderRepo.cancelOrderWithTransaction(orderId, customerId, reason);
   }

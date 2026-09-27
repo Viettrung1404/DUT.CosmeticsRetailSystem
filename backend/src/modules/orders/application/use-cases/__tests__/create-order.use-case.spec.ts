@@ -4,6 +4,7 @@ import { IOrderRepository } from '../../../domain/repositories/order.repository.
 import { OrderPricingService } from '../../services/order-pricing.service';
 import { StoreResolverService } from '../../services/store-resolver.service';
 import { OrderEntity } from '../../../domain/entities/order.entity';
+import { OrderStatus } from '../../../../../core/domain/orders/order-status.enum';
 
 describe('CreateOrderUseCase (TDD)', () => {
   let useCase: CreateOrderUseCase;
@@ -91,7 +92,7 @@ describe('CreateOrderUseCase (TDD)', () => {
       customerId,
       storeId: 'store-online',
       orderType: 'ONLINE',
-      status: 'PENDING',
+      status: OrderStatus.PENDING,
       subtotal: 200000,
       discountAmount: 0,
       shippingFee: 30000,

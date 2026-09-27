@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { CancelOrderUseCase } from '../cancel-order.use-case';
 import { IOrderRepository } from '../../../domain/repositories/order.repository.interface';
 import { OrderEntity } from '../../../domain/entities/order.entity';
+import { OrderStatus } from '../../../../../core/domain/orders/order-status.enum';
 
 describe('CancelOrderUseCase (TDD)', () => {
   let useCase: CancelOrderUseCase;
@@ -28,12 +29,12 @@ describe('CancelOrderUseCase (TDD)', () => {
     const existingOrder = new OrderEntity({
       id: 'ord-1',
       customerId: 'cust-1',
-      status: 'PENDING',
+      status: OrderStatus.PENDING,
     } as any);
 
     mockOrderRepo.findById.mockResolvedValue(existingOrder);
     mockOrderRepo.cancelOrderWithTransaction.mockResolvedValue(
-      new OrderEntity({ ...existingOrder, status: 'CANCELLED' }),
+      new OrderEntity({ ...existingOrder, status: OrderStatus.CANCELLED }),
     );
 
     const result = await useCase.execute({
@@ -85,7 +86,7 @@ describe('CancelOrderUseCase (TDD)', () => {
       useCase.execute({ orderId: 'ord-1', customerId: 'cust-1' }),
     ).rejects.toThrow(
       new BadRequestException(
-        'Chỉ có thể hủy đơn hàng khi đơn đang ở trạng thái Chờ xử lý (PENDING)',
+        'Không thể chuyển trạng thái đơn hàng từ PROCESSING sang CANCELLED bởi vai trò CUSTOMER',
       ),
     );
   });
