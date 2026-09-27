@@ -16,10 +16,15 @@ import { CancelExpiredOrdersUseCase } from './application/use-cases/cancel-expir
 import { OrderExpiryScheduler } from './infrastructure/schedulers/order-expiry.scheduler';
 import { CustomerContextService } from '../../core/services/customer-context.service';
 import { CartModule } from '../cart/cart.module';
+import { PermissionsModule } from '@modules/permissions/permissions.module';
+import { OrderAdminController } from './presentation/controllers/order-admin.controller';
+import { ADMIN_ORDER_REPOSITORY } from './domain/repositories/admin-order.repository.interface';
+import { PrismaAdminOrderRepository } from './infrastructure/repositories/prisma-admin-order.repository';
+import { GetAdminOrdersUseCase } from './application/use-cases/get-admin-orders.use-case';
 
 @Module({
-  imports: [CartModule],
-  controllers: [CustomerOrderController],
+  imports: [CartModule, PermissionsModule],
+  controllers: [CustomerOrderController, OrderAdminController],
   providers: [
     CustomerContextService,
     OrderPricingService,
@@ -46,6 +51,11 @@ import { CartModule } from '../cart/cart.module';
     CancelOrderUseCase,
     CancelExpiredOrdersUseCase,
     OrderExpiryScheduler,
+    {
+      provide: ADMIN_ORDER_REPOSITORY,
+      useClass: PrismaAdminOrderRepository,
+    },
+    GetAdminOrdersUseCase,
   ],
   exports: [
     ORDER_REPOSITORY,
