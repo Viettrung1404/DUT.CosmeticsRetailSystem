@@ -12,6 +12,7 @@ import { PermissionGuard } from '@core/guards/permission.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
 import { UploadsModule } from '@modules/uploads/uploads.module';
 import { CartModule } from '@modules/cart/cart.module';
+import { CustomersModule } from '@modules/customers/customers.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { CartModule } from '@modules/cart/cart.module';
     CategoriesModule,
     BrandsModule,
     CartModule,
+    CustomersModule,
   ],
   providers: [
     {
