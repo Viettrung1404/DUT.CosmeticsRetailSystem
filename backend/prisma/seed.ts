@@ -1,4 +1,4 @@
-// Nguồn dữ liệu: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (53 quyền) và mục 5.1 (6 vai trò)
+// Nguồn dữ liệu: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (53 quyền) và mục 5.1 (6 vai trò, 4 hạng thành viên)
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -117,6 +117,14 @@ const ROLES = [
   },
 ];
 
+// Tài liệu chỉ chốt tên và điểm tối thiểu; % giảm giá và hệ số nhân điểm giữ mặc định của bảng (0 và 1.0)
+const LOYALTY_TIERS = [
+  { name: 'Bronze', minPoints: 0 },
+  { name: 'Silver', minPoints: 1000 },
+  { name: 'Gold', minPoints: 5000 },
+  { name: 'Diamond', minPoints: 15000 },
+];
+
 async function main() {
   for (const [bitPosition, permissionCode, permissionName, module] of PERMISSIONS) {
     const data = { bitValue: 1n << BigInt(bitPosition), permissionCode, permissionName, module };
@@ -140,7 +148,18 @@ async function main() {
     `SELECT setval(pg_get_serial_sequence('roles', 'id'), (SELECT MAX(id) FROM roles))`,
   );
 
+  // Cột name không có UNIQUE nên không dùng upsert được; tìm theo tên rồi tạo hoặc sửa
+  for (const tier of LOYALTY_TIERS) {
+    const existing = await prisma.loyaltyTier.findFirst({ where: { name: tier.name } });
+    if (existing) {
+      await prisma.loyaltyTier.update({ where: { id: existing.id }, data: tier });
+    } else {
+      await prisma.loyaltyTier.create({ data: tier });
+    }
+  }
+
   console.log(`Đã seed ${PERMISSIONS.length} quyền và ${ROLES.length} vai trò (id ${ROLES.map((r) => r.id).join(', ')}).`);
+  console.log(`Đã seed ${LOYALTY_TIERS.length} hạng thành viên: ${LOYALTY_TIERS.map((t) => t.name).join(', ')}.`);
 }
 
 main()
