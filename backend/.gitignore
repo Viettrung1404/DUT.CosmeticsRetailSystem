@@ -33,3 +33,5 @@ Thumbs.db
 /.nyc_output
 
 /scripts
+
+/.agents

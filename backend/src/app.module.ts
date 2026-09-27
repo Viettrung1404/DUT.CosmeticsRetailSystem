@@ -13,6 +13,8 @@ import { CategoriesModule } from '@modules/categories/categories.module';
 import { UploadsModule } from '@modules/uploads/uploads.module';
 import { CartModule } from '@modules/cart/cart.module';
 import { CustomersModule } from '@modules/customers/customers.module';
+import { OrdersModule } from '@modules/orders/orders.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -20,6 +22,7 @@ import { CustomersModule } from '@modules/customers/customers.module';
       isGlobal: true,
       envFilePath: ['.env'],
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UploadsModule,
@@ -30,6 +33,7 @@ import { CustomersModule } from '@modules/customers/customers.module';
     BrandsModule,
     CartModule,
     CustomersModule,
+    OrdersModule,
   ],
   providers: [
     {
