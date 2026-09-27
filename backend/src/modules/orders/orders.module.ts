@@ -21,6 +21,9 @@ import { OrderAdminController } from './presentation/controllers/order-admin.con
 import { ADMIN_ORDER_REPOSITORY } from './domain/repositories/admin-order.repository.interface';
 import { PrismaAdminOrderRepository } from './infrastructure/repositories/prisma-admin-order.repository';
 import { GetAdminOrdersUseCase } from './application/use-cases/get-admin-orders.use-case';
+import { AdminOrderAccessService } from './application/services/admin-order-access.service';
+import { GetAdminOrderDetailUseCase } from './application/use-cases/get-admin-order-detail.use-case';
+import { ConfirmAdminOrderUseCase } from './application/use-cases/confirm-admin-order.use-case';
 
 @Module({
   imports: [CartModule, PermissionsModule],
@@ -56,6 +59,9 @@ import { GetAdminOrdersUseCase } from './application/use-cases/get-admin-orders.
       useClass: PrismaAdminOrderRepository,
     },
     GetAdminOrdersUseCase,
+    AdminOrderAccessService,
+    GetAdminOrderDetailUseCase,
+    ConfirmAdminOrderUseCase,
   ],
   exports: [
     ORDER_REPOSITORY,
