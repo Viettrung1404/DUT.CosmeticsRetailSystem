@@ -519,6 +519,9 @@ model Cart {
   store    Store?     @relation(fields: [storeId], references: [id])
   items    CartItem[]
 
+  @@unique([customerId])
+  @@index([sessionId])
+  @@index([updatedAt])
   @@map("carts")
 }
 
@@ -528,11 +531,14 @@ model CartItem {
   productVariantId String   @map("product_variant_id") @db.Uuid
   quantity         Int
   unitPrice        Decimal  @map("unit_price") @db.Decimal(12, 2)
+  isSelected       Boolean  @default(true) @map("is_selected")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [productVariantId], references: [id])
 
+  @@unique([cartId, productVariantId])
+  @@index([cartId])
   @@map("cart_items")
 }
 

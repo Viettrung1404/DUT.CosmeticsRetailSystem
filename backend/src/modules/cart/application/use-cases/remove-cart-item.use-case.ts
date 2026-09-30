@@ -1,6 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CART_REPOSITORY, ICartRepository } from '../../domain/repositories/cart.repository.interface';
-import { CartEntity } from '../../domain/entities/cart.entity';
 
 export interface RemoveCartItemInput {
   cartItemId: string;
@@ -15,7 +14,7 @@ export class RemoveCartItemUseCase {
     private readonly cartRepository: ICartRepository,
   ) {}
 
-  async execute(input: RemoveCartItemInput): Promise<CartEntity> {
+  async execute(input: RemoveCartItemInput): Promise<void> {
     const item = await this.cartRepository.findCartItemById(input.cartItemId);
     if (!item) {
       throw new NotFoundException('Sản phẩm trong giỏ hàng không tồn tại');
@@ -36,7 +35,6 @@ export class RemoveCartItemUseCase {
 
     await this.cartRepository.removeItem(item.id);
 
-    const updated = await this.cartRepository.findCartById(cart.id);
-    return updated || new CartEntity({ id: cart.id, customerId: cart.customerId, sessionId: cart.sessionId, items: [] });
+    // #7: No more double fetch — controller calls GetCartUseCase once
   }
 }

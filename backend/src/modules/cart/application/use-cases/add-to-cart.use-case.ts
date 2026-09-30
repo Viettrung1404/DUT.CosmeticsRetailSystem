@@ -1,6 +1,6 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CART_REPOSITORY, ICartRepository } from '../../domain/repositories/cart.repository.interface';
-import { CartEntity } from '../../domain/entities/cart.entity';
+import { CartItemEntity } from '../../domain/entities/cart-item.entity';
 
 export interface AddToCartInput {
   customerId?: string;
@@ -17,7 +17,7 @@ export class AddToCartUseCase {
     private readonly cartRepository: ICartRepository,
   ) {}
 
-  async execute(input: AddToCartInput): Promise<CartEntity> {
+  async execute(input: AddToCartInput): Promise<void> {
     if (!input.customerId && !input.sessionId) {
       throw new BadRequestException('Phải cung cấp customerId hoặc sessionId');
     }
@@ -30,10 +30,14 @@ export class AddToCartUseCase {
       input.storeId,
     );
 
-    if (!variantInfo || !variantInfo.isActive) {
+    if (!variantInfo) {
+      throw new NotFoundException('Biến thể sản phẩm không tồn tại');
+    }
+    if (!variantInfo.isActive) {
       throw new BadRequestException('Biến thể sản phẩm không tồn tại hoặc đã ngừng kinh doanh');
     }
 
+    // Fail-fast validation against available stock
     if (input.quantity > variantInfo.availableStock) {
       throw new BadRequestException(
         `Số lượng yêu cầu (${input.quantity}) vượt quá tồn kho khả dụng (${variantInfo.availableStock})`,
@@ -53,29 +57,30 @@ export class AddToCartUseCase {
       });
     }
 
-    const existingItem = await this.cartRepository.findCartItem(cart.id, input.productVariantId);
-    const targetQuantity = existingItem ? existingItem.quantity + input.quantity : input.quantity;
+    // Rich Domain Model: Validate via CartEntity Aggregate Root
+    const newItem = new CartItemEntity({
+      id: '',
+      cartId: cart.id,
+      productVariantId: input.productVariantId,
+      quantity: input.quantity,
+      unitPrice: variantInfo.price,
+      currentPrice: variantInfo.price,
+      availableStock: variantInfo.availableStock,
+      isVariantActive: variantInfo.isActive,
+    });
 
-    if (targetQuantity > variantInfo.availableStock) {
-      throw new BadRequestException(
-        `Số lượng yêu cầu (${targetQuantity}) vượt quá tồn kho khả dụng (${variantInfo.availableStock})`,
-      );
-    }
-    if (targetQuantity > 99) {
-      throw new BadRequestException('Số lượng cho mỗi sản phẩm tối đa là 99');
-    }
-
-    if (existingItem) {
-      await this.cartRepository.updateItemQuantity(existingItem.id, targetQuantity);
-    } else {
-      await this.cartRepository.addItem(cart.id, {
-        productVariantId: input.productVariantId,
-        quantity: input.quantity,
-        unitPrice: variantInfo.price,
-      });
+    try {
+      cart.addItem(newItem, variantInfo.availableStock);
+    } catch (err: any) {
+      throw new BadRequestException(err.message);
     }
 
-    const updated = await this.cartRepository.findCartById(cart.id);
-    return updated || cart;
+    // P1: Atomic Upsert to DB — protects against race conditions
+    await this.cartRepository.addItem(cart.id, {
+      productVariantId: input.productVariantId,
+      quantity: input.quantity,
+      unitPrice: variantInfo.price,
+      isSelected: true,
+    });
   }
 }
