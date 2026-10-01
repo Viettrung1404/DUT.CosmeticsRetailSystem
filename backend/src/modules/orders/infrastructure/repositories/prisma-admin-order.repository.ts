@@ -12,11 +12,23 @@ import {
   IAdminOrderRepository,
   OrderAccessInfo,
   OrderCustomerSummary,
+  OrderStatusChangeResult,
+  UpdateOrderStatusInput,
 } from '../../domain/repositories/admin-order.repository.interface';
 import {
   findStockShortages,
   formatShortages,
 } from '../../application/utils/stock-check.util';
+import { allocateFefo, minExpiryForOnline } from '../../application/utils/fefo.util';
+import {
+  calculateCommission,
+  calculateEarnedPoints,
+  readPointRate,
+  resolveTier,
+} from '../../application/utils/loyalty.util';
+
+const LOYALTY_SETTING_KEY = 'loyalty_config';
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 const CUSTOMER_SELECT = {
   id: true,
@@ -219,6 +231,226 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
         input.note || 'Đơn hàng đã được xác nhận',
       );
     });
+  }
+
+  async updateStatus(input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult> {
+    // Xuất kho nhiều dòng tốn nhiều câu lệnh, mặc định 5 giây của Prisma dễ hết giờ với Neon
+    return this.prisma.$transaction(async (tx) => {
+      const order = await this.lockOrder(tx, input.orderId);
+      const target = input.target as OrderStatus;
+      OrderStateMachine.assertValidTransition(order.status as OrderStatus, target, 'ADMIN');
+
+      const result: OrderStatusChangeResult = {
+        stockDeducted: false,
+        codPaymentsCompleted: 0,
+        loyalty: null,
+        commissionAmount: null,
+      };
+
+      if (target === OrderStatus.SHIPPING) {
+        await this.deductStockForShipping(tx, order, input.changedBy);
+        result.stockDeducted = true;
+      }
+
+      if (target === OrderStatus.DELIVERED) {
+        const paid = await tx.payment.updateMany({
+          where: { orderId: order.id, paymentMethod: 'COD', status: 'PENDING' },
+          data: { status: 'COMPLETED', paidAt: new Date() },
+        });
+        result.codPaymentsCompleted = paid.count;
+      }
+
+      if (target === OrderStatus.COMPLETED) {
+        result.loyalty = await this.rewardCustomer(tx, order);
+        result.commissionAmount = await this.createCommission(tx, order);
+      }
+
+      await this.changeStatus(
+        tx,
+        order.id,
+        target,
+        input.changedBy,
+        input.note || `Chuyển trạng thái sang ${target}`,
+      );
+      return result;
+    }, { timeout: 15000 });
+  }
+
+  // Tài liệu 04 mục 7: xuất kho giao vận trừ cả quantity lẫn reserved_quantity, trừ lô theo FEFO và ghi order_item_batches
+  private async deductStockForShipping(
+    tx: Prisma.TransactionClient,
+    order: LockedOrderRow,
+    changedBy: string,
+  ): Promise<void> {
+    const items = await tx.orderItem.findMany({
+      where: { orderId: order.id },
+      select: { id: true, productVariantId: true, productName: true, variantName: true, quantity: true },
+    });
+    const inventories = await this.lockInventories(
+      tx,
+      order.store_id,
+      items.map((i) => i.productVariantId),
+    );
+    const reservedByOrder = order.order_type === 'ONLINE';
+    const minExpiry = minExpiryForOnline(new Date());
+    const note = `Xuất kho giao đơn ${order.order_number}`;
+
+    for (const item of items) {
+      const inv = inventories.find((i) => i.product_variant_id === item.productVariantId);
+      if (!inv || inv.quantity < item.quantity) {
+        throw new BadRequestException(
+          `Không đủ tồn kho để xuất: ${item.productName} (${item.variantName}), cần ${item.quantity}, còn ${inv?.quantity ?? 0}`,
+        );
+      }
+
+      const batches = await tx.$queryRaw<{ id: string; quantity: number; expiry_date: Date }[]>`
+        SELECT id, quantity, expiry_date
+        FROM batches
+        WHERE store_id = ${order.store_id}::uuid
+          AND product_variant_id = ${item.productVariantId}::uuid
+          AND is_active = true
+        ORDER BY id
+        FOR UPDATE
+      `;
+
+      // Dữ liệu cũ chưa nhập lô (trước luồng nhập kho Sprint 3): chỉ trừ tồn tổng
+      if (batches.length === 0) {
+        await tx.inventoryTransaction.create({
+          data: {
+            storeId: order.store_id,
+            productVariantId: item.productVariantId,
+            transactionType: 'OUT',
+            quantity: -item.quantity,
+            referenceType: 'ORDER',
+            referenceId: order.id,
+            note,
+            createdBy: changedBy,
+          },
+        });
+      } else {
+        const { allocations, shortfall } = allocateFefo(
+          batches.map((b) => ({ id: b.id, quantity: b.quantity, expiryDate: b.expiry_date })),
+          item.quantity,
+          minExpiry,
+        );
+        if (shortfall > 0) {
+          throw new BadRequestException(
+            `Không đủ hàng còn hạn từ 3 tháng trở lên để giao đơn online: ${item.productName} (${item.variantName}), thiếu ${shortfall}`,
+          );
+        }
+        for (const a of allocations) {
+          await tx.batch.update({ where: { id: a.batchId }, data: { quantity: { decrement: a.quantity } } });
+          await tx.orderItemBatch.create({
+            data: { orderItemId: item.id, batchId: a.batchId, quantity: a.quantity },
+          });
+          await tx.inventoryTransaction.create({
+            data: {
+              storeId: order.store_id,
+              productVariantId: item.productVariantId,
+              batchId: a.batchId,
+              transactionType: 'OUT',
+              quantity: -a.quantity,
+              referenceType: 'ORDER',
+              referenceId: order.id,
+              note,
+              createdBy: changedBy,
+            },
+          });
+        }
+      }
+
+      await tx.inventory.update({
+        where: { id: inv.id },
+        data: {
+          quantity: { decrement: item.quantity },
+          ...(reservedByOrder ? { reservedQuantity: { decrement: item.quantity } } : {}),
+        },
+      });
+    }
+  }
+
+  private async rewardCustomer(
+    tx: Prisma.TransactionClient,
+    order: LockedOrderRow,
+  ): Promise<OrderStatusChangeResult['loyalty']> {
+    if (!order.customer_id) {
+      return null;
+    }
+
+    const totalAmount = Number(order.total_amount);
+    const [customer, setting, tiers] = await Promise.all([
+      tx.customer.findUniqueOrThrow({
+        where: { id: order.customer_id },
+        select: { totalPoints: true, loyaltyTierId: true, loyaltyTier: { select: { pointMultiplier: true } } },
+      }),
+      tx.setting.findUnique({ where: { key: LOYALTY_SETTING_KEY } }),
+      tx.loyaltyTier.findMany({ select: { id: true, name: true, minPoints: true } }),
+    ]);
+
+    const pointRate = readPointRate(setting?.value);
+    const multiplier = Number(customer.loyaltyTier?.pointMultiplier ?? 1);
+    const pointsEarned = pointRate ? calculateEarnedPoints(totalAmount, pointRate, multiplier) : 0;
+    const newTier = resolveTier(tiers, customer.totalPoints + pointsEarned);
+    const tierChanged = newTier !== null && newTier.id !== customer.loyaltyTierId;
+
+    await tx.customer.update({
+      where: { id: order.customer_id },
+      data: {
+        totalPoints: { increment: pointsEarned },
+        totalSpent: { increment: totalAmount },
+        totalOrders: { increment: 1 },
+        ...(tierChanged ? { loyaltyTierId: newTier.id } : {}),
+      },
+    });
+
+    if (pointsEarned > 0) {
+      await tx.loyaltyPointsTransaction.create({
+        data: {
+          customerId: order.customer_id,
+          orderId: order.id,
+          points: pointsEarned,
+          type: 'EARN',
+          description: `Tích điểm đơn hàng ${order.order_number}`,
+        },
+      });
+    }
+
+    return {
+      configured: pointRate !== null,
+      pointsEarned,
+      newTierName: tierChanged ? newTier.name : null,
+    };
+  }
+
+  private async createCommission(
+    tx: Prisma.TransactionClient,
+    order: LockedOrderRow,
+  ): Promise<number | null> {
+    if (!order.sales_staff_id) {
+      return null;
+    }
+    const employee = await tx.employee.findUnique({
+      where: { id: order.sales_staff_id },
+      select: { commissionRate: true },
+    });
+    const rate = Number(employee?.commissionRate ?? 0);
+    if (rate <= 0) {
+      return null;
+    }
+
+    const amount = calculateCommission(Number(order.total_amount), rate);
+    const vnNow = new Date(Date.now() + VN_OFFSET_MS);
+    await tx.commission.create({
+      data: {
+        employeeId: order.sales_staff_id,
+        orderId: order.id,
+        amount,
+        rate,
+        periodMonth: vnNow.getUTCMonth() + 1,
+        periodYear: vnNow.getUTCFullYear(),
+      },
+    });
+    return amount;
   }
 
   // SELECT ... FOR UPDATE: giữ khóa dòng đơn tới hết transaction, hai người thao tác cùng lúc sẽ phải xếp hàng

@@ -138,7 +138,22 @@ export interface ConfirmOrderInput {
   note?: string;
 }
 
+export interface UpdateOrderStatusInput {
+  orderId: string;
+  target: string;
+  changedBy: string;
+  note?: string;
+}
+
+export interface OrderStatusChangeResult {
+  stockDeducted: boolean;
+  codPaymentsCompleted: number;
+  loyalty: { configured: boolean; pointsEarned: number; newTierName: string | null } | null;
+  commissionAmount: number | null;
+}
+
 export interface IAdminOrderRepository {
+  updateStatus(input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult>;
   findMany(query: AdminOrderListQuery): Promise<{ items: AdminOrderListItem[]; total: number }>;
   findAccessInfo(orderId: string): Promise<OrderAccessInfo | null>;
   findDetail(orderId: string): Promise<AdminOrderDetail | null>;

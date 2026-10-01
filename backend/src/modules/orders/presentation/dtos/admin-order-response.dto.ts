@@ -5,6 +5,8 @@ import {
   OrderStoreSummary,
 } from '../../domain/repositories/admin-order.repository.interface';
 import { AdminOrderDetailWithActions } from '../../application/use-cases/get-admin-order-detail.use-case';
+import { ADMIN_STATUS_TARGETS } from '../../application/utils/order-actions.util';
+import { OrderStatus } from '@core/domain/orders/order-status.enum';
 
 export class OrderCustomerSummaryDto implements OrderCustomerSummary {
   @ApiProperty() id: string;
@@ -101,6 +103,12 @@ class OrderSalesStaffDto {
 
 class AdminOrderActionsDto {
   @ApiProperty({ description: 'Hiện nút "Xác nhận"' }) canConfirm: boolean;
+  @ApiProperty({
+    enum: ADMIN_STATUS_TARGETS,
+    isArray: true,
+    description: 'Trạng thái kế tiếp hợp lệ cho dropdown đổi trạng thái (rỗng nếu không đổi được)',
+  })
+  nextStatuses: OrderStatus[];
 }
 
 export class AdminOrderDetailDto {

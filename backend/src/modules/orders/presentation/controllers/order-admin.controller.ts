@@ -14,8 +14,9 @@ import { RequirePermissions } from '@core/decorators/require-permissions.decorat
 import { GetAdminOrdersUseCase } from '../../application/use-cases/get-admin-orders.use-case';
 import { GetAdminOrderDetailUseCase } from '../../application/use-cases/get-admin-order-detail.use-case';
 import { ConfirmAdminOrderUseCase } from '../../application/use-cases/confirm-admin-order.use-case';
+import { UpdateAdminOrderStatusUseCase } from '../../application/use-cases/update-admin-order-status.use-case';
 import { AdminOrderQueryDto } from '../dtos/admin-order-query.dto';
-import { ConfirmOrderDto } from '../dtos/admin-order-action.dto';
+import { ConfirmOrderDto, UpdateOrderStatusDto } from '../dtos/admin-order-action.dto';
 import { AdminOrderDetailDto, AdminOrderListItemDto } from '../dtos/admin-order-response.dto';
 
 @ApiTags('Admin - Orders (Thành Lập)')
@@ -26,6 +27,7 @@ export class OrderAdminController {
     private readonly getAdminOrdersUseCase: GetAdminOrdersUseCase,
     private readonly getAdminOrderDetailUseCase: GetAdminOrderDetailUseCase,
     private readonly confirmAdminOrderUseCase: ConfirmAdminOrderUseCase,
+    private readonly updateAdminOrderStatusUseCase: UpdateAdminOrderStatusUseCase,
   ) {}
 
   @Get()
@@ -81,5 +83,33 @@ export class OrderAdminController {
   ) {
     const detail = await this.confirmAdminOrderUseCase.execute(userId, id, dto.note);
     return { message: 'Xác nhận đơn hàng thành công', data: AdminOrderDetailDto.fromDomain(detail) };
+  }
+
+  @Put(':id/status')
+  @RequirePermissions('ORDER_STATUS_UPDATE')
+  @ApiOperation({
+    summary:
+      'Admin - Đổi trạng thái CONFIRMED → PROCESSING → SHIPPING → DELIVERED → COMPLETED. ' +
+      'SHIPPING: trừ kho (FEFO); DELIVERED: thu tiền COD; COMPLETED: tích điểm, cộng tổng chi tiêu, xét hạng, hoa hồng',
+  })
+  @ApiOkResponse({ type: AdminOrderDetailDto })
+  @ApiBadRequestResponse({ description: 'Chuyển sai thứ tự hoặc không đủ hàng còn hạn để xuất' })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy đơn hàng' })
+  @ApiForbiddenResponse({ description: 'Thiếu quyền ORDER_STATUS_UPDATE hoặc đơn thuộc cửa hàng khác' })
+  async updateOrderStatus(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateOrderStatusDto,
+  ) {
+    const { detail, notes } = await this.updateAdminOrderStatusUseCase.execute(
+      userId,
+      id,
+      dto.status,
+      dto.note,
+    );
+    return {
+      message: ['Cập nhật trạng thái đơn hàng thành công.', ...notes].join(' '),
+      data: AdminOrderDetailDto.fromDomain(detail),
+    };
   }
 }
