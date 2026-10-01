@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { CacheModule } from '@core/cache/cache.module';
@@ -20,6 +21,10 @@ import { CustomersModule } from '@modules/customers/customers.module';
       isGlobal: true,
       envFilePath: ['.env'],
     }),
+    {
+      ...ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+      global: true,
+    },
     PrismaModule,
     AuthModule,
     UploadsModule,

@@ -824,6 +824,7 @@ model Customer {
   couponUsages        CouponUsage[]
   invoices            Invoice[]
 
+  @@index([loyaltyTierId])
   @@map("customers")
 }
 
@@ -843,6 +844,7 @@ model CustomerAddress {
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
+  @@index([customerId, isDefault])
   @@map("customer_addresses")
 }
 

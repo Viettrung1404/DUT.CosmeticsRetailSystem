@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CUSTOMER_REPOSITORY, ICustomerRepository } from '../../domain/repositories/customer.repository.interface';
 import { CustomerAddressEntity } from '../../domain/entities/customer-address.entity';
 
@@ -30,6 +30,12 @@ export class UpdateCustomerAddressUseCase {
 
     if (address.customerId !== input.customerId) {
       throw new ForbiddenException('Bạn không có quyền chỉnh sửa địa chỉ này');
+    }
+
+    if (address.isDefault && input.isDefault === false) {
+      throw new BadRequestException(
+        'Không thể hủy trạng thái mặc định của địa chỉ mặc định. Hãy đặt một địa chỉ khác làm mặc định.',
+      );
     }
 
     if (input.isDefault === true) {

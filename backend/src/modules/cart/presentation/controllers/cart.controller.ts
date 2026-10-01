@@ -37,7 +37,7 @@ export class CartController {
     private readonly removeCartItemUseCase: RemoveCartItemUseCase,
     private readonly mergeCartUseCase: MergeCartUseCase,
     private readonly customerContext: CustomerContextService,
-  ) {}
+  ) { }
 
   private async resolveCustomerIdAndSession(req: any, headerSession?: string, bodySession?: string) {
     const userId = req.user?.userId;

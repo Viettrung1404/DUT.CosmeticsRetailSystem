@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { CustomerContextService } from '@core/services/customer-context.service';
@@ -16,8 +15,6 @@ import { CartController } from './presentation/controllers/cart.controller';
 @Module({
   imports: [
     PrismaModule,
-    // Rate limiting configuration — 100 requests per 60 seconds default per IP
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     // Enable cron scheduling for cart cleanup
     ScheduleModule.forRoot(),
   ],
