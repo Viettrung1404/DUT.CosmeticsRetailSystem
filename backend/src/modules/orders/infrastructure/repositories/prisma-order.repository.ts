@@ -23,7 +23,7 @@ export class PrismaOrderRepository implements IOrderRepository {
           Array<{ id: string; quantity: number; reserved_quantity: number }>
         >`
           SELECT id, quantity, reserved_quantity 
-          FROM inventories 
+          FROM inventory 
           WHERE store_id = ${data.storeId}::uuid 
             AND product_variant_id = ${item.productVariantId}::uuid 
           FOR UPDATE;

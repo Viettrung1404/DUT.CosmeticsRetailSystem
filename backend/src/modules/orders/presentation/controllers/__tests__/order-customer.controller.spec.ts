@@ -43,7 +43,7 @@ describe('CustomerOrderController (TDD)', () => {
     controller = module.get<CustomerOrderController>(CustomerOrderController);
   });
 
-  const mockReq = { user: { id: 'usr-1' } };
+  const mockReq = { user: { userId: 'usr-1' } };
 
   it('should preview order successfully', async () => {
     mockCustomerContext.getCustomerIdFromUserId.mockResolvedValue('cust-1');

@@ -41,7 +41,7 @@ export class CustomerOrderController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xem trước chi phí đơn hàng, khuyến mãi, điểm thưởng và kho xử lý' })
   async previewOrder(@Req() req: any, @Body() dto: PreviewOrderDto) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.id))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.previewOrderUseCase.execute({
       customerId,
@@ -62,7 +62,7 @@ export class CustomerOrderController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Khởi tạo đơn hàng mới' })
   async createOrder(@Req() req: any, @Body() dto: CreateOrderDto) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.id))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.createOrderUseCase.execute({
       customerId,
@@ -85,7 +85,7 @@ export class CustomerOrderController {
   @Get('customers/me/orders')
   @ApiOperation({ summary: 'Lấy danh sách lịch sử đơn hàng của khách hàng' })
   async getCustomerOrders(@Req() req: any, @Query() query: OrderQueryDto) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.id))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.getCustomerOrdersUseCase.execute({
       customerId,
@@ -104,7 +104,7 @@ export class CustomerOrderController {
   @Get('orders/:id')
   @ApiOperation({ summary: 'Xem chi tiết đơn hàng (có bảo vệ IDOR)' })
   async getOrderDetail(@Req() req: any, @Param('id') id: string) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.id))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.getOrderDetailUseCase.execute(id, customerId);
 
@@ -122,7 +122,7 @@ export class CustomerOrderController {
     @Param('id') id: string,
     @Body() dto: CancelOrderDto,
   ) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.id))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.cancelOrderUseCase.execute({
       orderId: id,
