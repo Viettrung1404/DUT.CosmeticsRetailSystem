@@ -15,8 +15,13 @@ import { GetAdminOrdersUseCase } from '../../application/use-cases/get-admin-ord
 import { GetAdminOrderDetailUseCase } from '../../application/use-cases/get-admin-order-detail.use-case';
 import { ConfirmAdminOrderUseCase } from '../../application/use-cases/confirm-admin-order.use-case';
 import { UpdateAdminOrderStatusUseCase } from '../../application/use-cases/update-admin-order-status.use-case';
+import { CancelAdminOrderUseCase } from '../../application/use-cases/cancel-admin-order.use-case';
 import { AdminOrderQueryDto } from '../dtos/admin-order-query.dto';
-import { ConfirmOrderDto, UpdateOrderStatusDto } from '../dtos/admin-order-action.dto';
+import {
+  CancelOrderByAdminDto,
+  ConfirmOrderDto,
+  UpdateOrderStatusDto,
+} from '../dtos/admin-order-action.dto';
 import { AdminOrderDetailDto, AdminOrderListItemDto } from '../dtos/admin-order-response.dto';
 
 @ApiTags('Admin - Orders (Thành Lập)')
@@ -28,6 +33,7 @@ export class OrderAdminController {
     private readonly getAdminOrderDetailUseCase: GetAdminOrderDetailUseCase,
     private readonly confirmAdminOrderUseCase: ConfirmAdminOrderUseCase,
     private readonly updateAdminOrderStatusUseCase: UpdateAdminOrderStatusUseCase,
+    private readonly cancelAdminOrderUseCase: CancelAdminOrderUseCase,
   ) {}
 
   @Get()
@@ -109,6 +115,28 @@ export class OrderAdminController {
     );
     return {
       message: ['Cập nhật trạng thái đơn hàng thành công.', ...notes].join(' '),
+      data: AdminOrderDetailDto.fromDomain(detail),
+    };
+  }
+
+  @Put(':id/cancel')
+  @RequirePermissions('ORDER_CANCEL')
+  @ApiOperation({
+    summary:
+      'Admin - Hủy đơn ở PENDING / CONFIRMED / PROCESSING: trả hàng đang giữ, hoàn coupon, hoàn điểm, tạo phiếu hoàn tiền nếu đã thu',
+  })
+  @ApiOkResponse({ type: AdminOrderDetailDto })
+  @ApiBadRequestResponse({ description: 'Đơn đã giao/hoàn tất/đã hủy, hoặc thiếu lý do' })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy đơn hàng' })
+  @ApiForbiddenResponse({ description: 'Thiếu quyền ORDER_CANCEL hoặc đơn thuộc cửa hàng khác' })
+  async cancelOrder(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelOrderByAdminDto,
+  ) {
+    const { detail, notes } = await this.cancelAdminOrderUseCase.execute(userId, id, dto.reason);
+    return {
+      message: ['Hủy đơn hàng thành công.', ...notes].join(' '),
       data: AdminOrderDetailDto.fromDomain(detail),
     };
   }

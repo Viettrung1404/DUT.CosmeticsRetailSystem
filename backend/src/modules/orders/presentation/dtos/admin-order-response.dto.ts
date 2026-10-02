@@ -109,6 +109,7 @@ class AdminOrderActionsDto {
     description: 'Trạng thái kế tiếp hợp lệ cho dropdown đổi trạng thái (rỗng nếu không đổi được)',
   })
   nextStatuses: OrderStatus[];
+  @ApiProperty({ description: 'Hiện nút "Hủy đơn" (PENDING, CONFIRMED, PROCESSING)' }) canCancel: boolean;
 }
 
 export class AdminOrderDetailDto {

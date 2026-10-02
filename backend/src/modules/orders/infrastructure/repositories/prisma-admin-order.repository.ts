@@ -8,7 +8,9 @@ import {
   AdminOrderListItem,
   AdminOrderListQuery,
   AdminOrderScopeFilter,
+  CancelOrderByAdminInput,
   ConfirmOrderInput,
+  OrderCancelResult,
   IAdminOrderRepository,
   OrderAccessInfo,
   OrderCustomerSummary,
@@ -272,6 +274,101 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
         input.changedBy,
         input.note || `Chuyển trạng thái sang ${target}`,
       );
+      return result;
+    }, { timeout: 15000 });
+  }
+
+  // FR-04.05: hoàn giữ hàng, hoàn coupon, hoàn điểm; đã thu tiền thì tạo phiếu hoàn tiền chờ xử lý
+  async cancelByAdmin(input: CancelOrderByAdminInput): Promise<OrderCancelResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await this.lockOrder(tx, input.orderId);
+      OrderStateMachine.assertValidTransition(
+        order.status as OrderStatus,
+        OrderStatus.CANCELLED,
+        'ADMIN',
+      );
+
+      const result: OrderCancelResult = {
+        reservationReleased: false,
+        couponReleased: false,
+        pointsRefunded: 0,
+        refundAmount: 0,
+      };
+
+      // Chỉ hủy được trước SHIPPING nên hàng vẫn đang giữ, chưa trừ khỏi kho
+      if (order.order_type === 'ONLINE') {
+        const items = await tx.orderItem.findMany({
+          where: { orderId: order.id },
+          select: { productVariantId: true, quantity: true },
+        });
+        const inventories = await this.lockInventories(
+          tx,
+          order.store_id,
+          items.map((i) => i.productVariantId),
+        );
+        for (const item of items) {
+          const inv = inventories.find((i) => i.product_variant_id === item.productVariantId);
+          if (inv) {
+            await tx.inventory.update({
+              where: { id: inv.id },
+              data: { reservedQuantity: { decrement: item.quantity } },
+            });
+          }
+        }
+        result.reservationReleased = items.length > 0;
+      }
+
+      if (order.coupon_id) {
+        const usage = await tx.couponUsage.deleteMany({ where: { orderId: order.id } });
+        if (usage.count > 0) {
+          await tx.coupon.update({
+            where: { id: order.coupon_id },
+            data: { usedCount: { decrement: 1 } },
+          });
+          result.couponReleased = true;
+        }
+      }
+
+      if (order.loyalty_points_used > 0 && order.customer_id) {
+        await tx.customer.update({
+          where: { id: order.customer_id },
+          data: { totalPoints: { increment: order.loyalty_points_used } },
+        });
+        await tx.loyaltyPointsTransaction.create({
+          data: {
+            customerId: order.customer_id,
+            orderId: order.id,
+            points: order.loyalty_points_used,
+            type: 'REFUND',
+            description: `Hoàn điểm do hủy đơn hàng ${order.order_number}`,
+          },
+        });
+        result.pointsRefunded = order.loyalty_points_used;
+      }
+
+      const payments = await tx.payment.findMany({
+        where: { orderId: order.id },
+        select: { id: true, amount: true, status: true },
+      });
+      for (const payment of payments) {
+        if (payment.status === 'COMPLETED') {
+          await tx.refund.create({
+            data: {
+              orderId: order.id,
+              paymentId: payment.id,
+              amount: payment.amount,
+              reason: input.reason,
+              status: 'PENDING',
+            },
+          });
+          result.refundAmount += Number(payment.amount);
+        } else if (payment.status === 'PENDING') {
+          // Cùng giá trị với luồng khách tự hủy (CancelOrderUseCase) để báo cáo đọc thống nhất
+          await tx.payment.update({ where: { id: payment.id }, data: { status: 'CANCELLED' } });
+        }
+      }
+
+      await this.changeStatus(tx, order.id, OrderStatus.CANCELLED, input.changedBy, input.reason);
       return result;
     }, { timeout: 15000 });
   }

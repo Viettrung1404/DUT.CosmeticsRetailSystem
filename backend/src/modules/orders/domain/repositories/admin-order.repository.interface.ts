@@ -152,7 +152,21 @@ export interface OrderStatusChangeResult {
   commissionAmount: number | null;
 }
 
+export interface CancelOrderByAdminInput {
+  orderId: string;
+  changedBy: string;
+  reason: string;
+}
+
+export interface OrderCancelResult {
+  reservationReleased: boolean;
+  couponReleased: boolean;
+  pointsRefunded: number;
+  refundAmount: number;
+}
+
 export interface IAdminOrderRepository {
+  cancelByAdmin(input: CancelOrderByAdminInput): Promise<OrderCancelResult>;
   updateStatus(input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult>;
   findMany(query: AdminOrderListQuery): Promise<{ items: AdminOrderListItem[]; total: number }>;
   findAccessInfo(orderId: string): Promise<OrderAccessInfo | null>;

@@ -25,6 +25,7 @@ import { AdminOrderAccessService } from './application/services/admin-order-acce
 import { GetAdminOrderDetailUseCase } from './application/use-cases/get-admin-order-detail.use-case';
 import { ConfirmAdminOrderUseCase } from './application/use-cases/confirm-admin-order.use-case';
 import { UpdateAdminOrderStatusUseCase } from './application/use-cases/update-admin-order-status.use-case';
+import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-order.use-case';
 
 @Module({
   imports: [CartModule, PermissionsModule],
@@ -64,6 +65,7 @@ import { UpdateAdminOrderStatusUseCase } from './application/use-cases/update-ad
     GetAdminOrderDetailUseCase,
     ConfirmAdminOrderUseCase,
     UpdateAdminOrderStatusUseCase,
+    CancelAdminOrderUseCase,
   ],
   exports: [
     ORDER_REPOSITORY,

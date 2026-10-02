@@ -12,6 +12,7 @@ export const ADMIN_STATUS_TARGETS = [
 export interface AdminOrderActions {
   canConfirm: boolean;
   nextStatuses: OrderStatus[];
+  canCancel: boolean;
 }
 
 // Để FE-Admin chỉ hiện nút hợp lệ với trạng thái hiện tại, luật lấy từ OrderStateMachine
@@ -22,5 +23,6 @@ export const getAdminOrderActions = (status: string): AdminOrderActions => {
     nextStatuses: ADMIN_STATUS_TARGETS.filter((target) =>
       OrderStateMachine.canTransition(current, target, 'ADMIN'),
     ),
+    canCancel: OrderStateMachine.canTransition(current, OrderStatus.CANCELLED, 'ADMIN'),
   };
 };

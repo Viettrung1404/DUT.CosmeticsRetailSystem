@@ -7,4 +7,5 @@ export const createAdminOrderRepositoryMock = (): jest.Mocked<IAdminOrderReposit
     findDetail: jest.fn(),
     confirm: jest.fn(),
     updateStatus: jest.fn(),
+    cancelByAdmin: jest.fn(),
   }) as unknown as jest.Mocked<IAdminOrderRepository>;

@@ -10,10 +10,15 @@ import { UpdateCustomerAddressUseCase } from './application/use-cases/update-cus
 import { DeleteCustomerAddressUseCase } from './application/use-cases/delete-customer-address.use-case';
 import { SetDefaultAddressUseCase } from './application/use-cases/set-default-address.use-case';
 import { CustomerController } from './presentation/controllers/customer.controller';
+import { PermissionsModule } from '@modules/permissions/permissions.module';
+import { CustomerAdminController } from './presentation/controllers/customer-admin.controller';
+import { ADMIN_CUSTOMER_REPOSITORY } from './domain/repositories/admin-customer.repository.interface';
+import { PrismaAdminCustomerRepository } from './infrastructure/persistence/prisma-admin-customer.repository';
+import { GetAdminCustomersUseCase } from './application/use-cases/get-admin-customers.use-case';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [CustomerController],
+  imports: [PrismaModule, PermissionsModule],
+  controllers: [CustomerController, CustomerAdminController],
   providers: [
     CustomerContextService,
     GetCustomerProfileUseCase,
@@ -26,6 +31,11 @@ import { CustomerController } from './presentation/controllers/customer.controll
       provide: CUSTOMER_REPOSITORY,
       useClass: PrismaCustomerRepository,
     },
+    {
+      provide: ADMIN_CUSTOMER_REPOSITORY,
+      useClass: PrismaAdminCustomerRepository,
+    },
+    GetAdminCustomersUseCase,
   ],
   exports: [
     CUSTOMER_REPOSITORY,
