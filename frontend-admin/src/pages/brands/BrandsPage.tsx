@@ -1,13 +1,16 @@
 import {
   DeleteOutlined,
   EditOutlined,
+  GlobalOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  StarFilled,
   UploadOutlined,
 } from '@ant-design/icons'
 import {
   Button,
+  Card,
   Form,
   Image,
   Input,
@@ -96,11 +99,7 @@ export default function BrandsPage() {
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({
-      sortOrder: 0,
-      isFeatured: false,
-      isActive: true,
-    })
+    form.setFieldsValue({ sortOrder: 0, isFeatured: false, isActive: true })
     setOpen(true)
   }
 
@@ -161,48 +160,81 @@ export default function BrandsPage() {
       {
         title: 'Thương hiệu',
         dataIndex: 'name',
+        width: 280,
         render: (_, row) => (
-          <Space>
-            {row.logoUrl ? (
-              <Image
-                src={row.logoUrl}
-                alt={row.name}
-                width={36}
-                height={36}
-                preview={false}
-                style={{ objectFit: 'contain' }}
-              />
-            ) : null}
+          <Space size={10}>
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 9,
+                background: '#F8FAFC',
+                border: '1px solid #E5E7EB',
+                display: 'grid',
+                placeItems: 'center',
+                overflow: 'hidden',
+                flex: '0 0 auto',
+              }}
+            >
+              {row.logoUrl ? (
+                <Image
+                  src={row.logoUrl}
+                  alt={row.name}
+                  width={36}
+                  height={36}
+                  preview={false}
+                  style={{ objectFit: 'contain' }}
+                />
+              ) : (
+                <Typography.Text strong style={{ fontSize: 11 }}>{row.name.slice(0, 2).toUpperCase()}</Typography.Text>
+              )}
+            </div>
             <div>
-              <div style={{ fontWeight: 600 }}>{row.name}</div>
-              <Typography.Text type="secondary">{row.slug}</Typography.Text>
+              <div style={{ fontWeight: 700, color: '#111827' }}>{row.name}</div>
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>{row.slug}</Typography.Text>
             </div>
           </Space>
         ),
       },
       {
-        title: 'Xuất xứ',
+        title: 'Quốc gia',
         dataIndex: 'countryOfOrigin',
-        render: (value) => value || '—',
+        width: 150,
+        render: (value) => value ? <Tag>{value}</Tag> : '—',
+      },
+      {
+        title: 'Website',
+        dataIndex: 'websiteUrl',
+        width: 190,
+        ellipsis: true,
+        render: (value) =>
+          value ? (
+            <a href={value} target="_blank" rel="noreferrer" style={{ color: '#9F1239' }}>
+              <GlobalOutlined /> {value.replace(/^https?:\/\//, '')}
+            </a>
+          ) : '—',
       },
       {
         title: 'Nổi bật',
         dataIndex: 'isFeatured',
         width: 100,
-        render: (value) => value ? <Tag color="gold">Có</Tag> : <Tag>Không</Tag>,
+        align: 'center',
+        render: (value) =>
+          value ? <StarFilled style={{ color: '#D97706' }} /> : <span style={{ color: '#D1D5DB' }}>☆</span>,
       },
       {
         title: 'Trạng thái',
         dataIndex: 'isActive',
-        width: 130,
-        render: (value) => value ? <Tag color="green">Hoạt động</Tag> : <Tag>Đã ẩn</Tag>,
+        width: 135,
+        render: (value) => value ? <Tag color="green">Đang hợp tác</Tag> : <Tag>Đã ẩn</Tag>,
       },
       {
         title: 'Thao tác',
         key: 'actions',
-        width: 150,
+        width: 120,
+        fixed: 'right',
         render: (_, row) => (
-          <Space>
+          <Space size={2}>
             <Button type="text" icon={<EditOutlined />} onClick={() => openEdit(row)} />
             <Popconfirm
               title="Xóa thương hiệu?"
@@ -226,15 +258,19 @@ export default function BrandsPage() {
     [],
   )
 
+  const featuredCount = items.filter((item) => item.isFeatured).length
+  const activeCount = items.filter((item) => item.isActive).length
+  const countryCount = new Set(items.map((item) => item.countryOfOrigin).filter(Boolean)).size
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div className="glowup-page-header">
         <div>
-          <Typography.Title level={3} style={{ marginBottom: 4 }}>
+          <Typography.Title level={2} className="glowup-page-title">
             Quản lý thương hiệu
           </Typography.Title>
-          <Typography.Text type="secondary">
-            CRUD thương hiệu và upload logo/banner theo API Admin.
+          <Typography.Text className="glowup-page-subtitle">
+            Quản lý các thương hiệu mỹ phẩm đối tác và trạng thái hiển thị trong hệ thống.
           </Typography.Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
@@ -242,61 +278,89 @@ export default function BrandsPage() {
         </Button>
       </div>
 
-      <Space wrap style={{ marginBottom: 16 }}>
-        <Input
-          allowClear
-          prefix={<SearchOutlined />}
-          placeholder="Tìm theo tên"
-          style={{ width: 260 }}
-          onPressEnter={(event) => {
-            setPage(1)
-            setSearch(event.currentTarget.value.trim())
-          }}
-          onChange={(event) => {
-            if (!event.target.value) {
-              setPage(1)
-              setSearch('')
-            }
-          }}
-        />
-        <Select
-          allowClear
-          placeholder="Trạng thái"
-          style={{ width: 160 }}
-          options={[
-            { label: 'Hoạt động', value: true },
-            { label: 'Đã ẩn', value: false },
-          ]}
-          onChange={(value) => {
-            setPage(1)
-            setStatus(value)
-          }}
-        />
-        <Button icon={<ReloadOutlined />} onClick={() => void load()}>
-          Tải lại
-        </Button>
-      </Space>
+      <div className="glowup-stat-strip">
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Tổng thương hiệu</div>
+          <div className="glowup-stat-value">{total}</div>
+          <div className="glowup-stat-meta">Theo dữ liệu hiện tại</div>
+        </div>
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Đang hoạt động</div>
+          <div className="glowup-stat-value">{activeCount}</div>
+          <div className="glowup-stat-meta">Trong trang đang xem</div>
+        </div>
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Nổi bật</div>
+          <div className="glowup-stat-value">{featuredCount}</div>
+          <div className="glowup-stat-meta">Được ưu tiên hiển thị</div>
+        </div>
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Quốc gia</div>
+          <div className="glowup-stat-value">{countryCount}</div>
+          <div className="glowup-stat-meta">Nguồn gốc thương hiệu</div>
+        </div>
+      </div>
 
-      <Table<Brand>
-        rowKey="id"
-        loading={loading}
-        columns={columns}
-        dataSource={items}
-        scroll={{ x: 800 }}
-        pagination={{
-          current: page,
-          pageSize: limit,
-          total,
-          showSizeChanger: true,
-          onChange: (nextPage, nextLimit) => {
-            setPage(nextPage)
-            setLimit(nextLimit)
-          },
-        }}
-      />
+      <Card className="glowup-toolbar-card" style={{ marginBottom: 14 }}>
+        <Space wrap>
+          <Input
+            allowClear
+            prefix={<SearchOutlined style={{ color: '#9CA3AF' }} />}
+            placeholder="Tìm tên thương hiệu..."
+            style={{ width: 280 }}
+            onPressEnter={(event) => {
+              setPage(1)
+              setSearch(event.currentTarget.value.trim())
+            }}
+            onChange={(event) => {
+              if (!event.target.value) {
+                setPage(1)
+                setSearch('')
+              }
+            }}
+          />
+          <Select
+            allowClear
+            placeholder="Trạng thái"
+            style={{ width: 170 }}
+            options={[
+              { label: 'Đang hoạt động', value: true },
+              { label: 'Đã ẩn', value: false },
+            ]}
+            onChange={(value) => {
+              setPage(1)
+              setStatus(value)
+            }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={() => void load()}>
+            Tải lại
+          </Button>
+        </Space>
+      </Card>
+
+      <Card className="glowup-table-card">
+        <Table<Brand>
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={items}
+          scroll={{ x: 980 }}
+          pagination={{
+            current: page,
+            pageSize: limit,
+            total,
+            showSizeChanger: true,
+            showTotal: (value) => `Tổng ${value} thương hiệu`,
+            onChange: (nextPage, nextLimit) => {
+              setPage(nextPage)
+              setLimit(nextLimit)
+            },
+          }}
+        />
+      </Card>
 
       <Modal
-        title={editing ? 'Sửa thương hiệu' : 'Thêm thương hiệu'}
+        title={editing ? 'Chỉnh sửa thương hiệu' : 'Thêm thương hiệu'}
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => void save()}
@@ -321,10 +385,7 @@ export default function BrandsPage() {
             label="Slug"
             rules={[
               { required: true, message: 'Nhập slug' },
-              {
-                pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-                message: 'Slug chỉ gồm chữ thường, số và dấu gạch ngang',
-              },
+              { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: 'Slug chỉ gồm chữ thường, số và dấu gạch ngang' },
             ]}
           >
             <Input maxLength={150} />
