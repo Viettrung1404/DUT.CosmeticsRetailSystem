@@ -5,12 +5,527 @@ body,
   margin: 0;
 }
 
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111827;
+  background: #f5f6f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   min-width: 320px;
-  background: #f5f5f5;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  background: #f5f6f8;
+  color: #111827;
 }
 
 * {
   box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.glowup-admin-shell {
+  min-height: 100vh;
+  background: #f5f6f8;
+}
+
+.glowup-sider {
+  background: #111827 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 12px 0 30px rgba(15, 23, 42, 0.08);
+  position: sticky !important;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
+}
+
+.glowup-brand {
+  height: 72px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+}
+
+.glowup-brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #be123c, #881337);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  box-shadow: 0 10px 24px rgba(190, 18, 60, 0.28);
+  flex: 0 0 auto;
+}
+
+.glowup-brand-copy {
+  min-width: 0;
+  line-height: 1.05;
+}
+
+.glowup-brand-name {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.glowup-brand-subtitle {
+  margin-top: 4px;
+  color: #fb7185;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.glowup-nav-label {
+  margin: 18px 20px 8px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.glowup-sider .ant-menu {
+  background: transparent !important;
+  border-inline-end: 0 !important;
+  padding: 0 10px;
+}
+
+.glowup-sider .ant-menu-item {
+  min-height: 42px;
+  margin: 4px 0;
+  border-radius: 8px;
+  color: #d1d5db;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.glowup-sider .ant-menu-item .anticon {
+  color: #cbd5e1;
+}
+
+.glowup-sider .ant-menu-item-selected {
+  background: #311820 !important;
+  color: #fff !important;
+  box-shadow: inset 3px 0 0 #be123c;
+}
+
+.glowup-sider .ant-menu-item-selected .anticon {
+  color: #fb7185 !important;
+}
+
+.glowup-user-panel {
+  margin: 16px 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.glowup-header {
+  height: 64px !important;
+  line-height: 64px !important;
+  padding: 0 22px !important;
+  background: #fff !important;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.glowup-header-search {
+  width: min(420px, 42vw);
+}
+
+.glowup-header-search .ant-input-affix-wrapper {
+  background: #f8fafc;
+  border-color: #eef2f7;
+}
+
+.glowup-content {
+  margin: 0 !important;
+  padding: 22px 24px 36px !important;
+  background: #f5f6f8;
+  min-width: 0;
+}
+
+.glowup-breadcrumb {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.glowup-page-surface {
+  min-height: 360px;
+}
+
+.glowup-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.glowup-page-title {
+  margin: 0 !important;
+  color: #111827 !important;
+  font-size: 26px !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.025em;
+}
+
+.glowup-page-subtitle {
+  display: block;
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.glowup-toolbar-card,
+.glowup-panel,
+.glowup-table-card {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025), 0 8px 28px rgba(15, 23, 42, 0.035);
+  overflow: hidden;
+}
+
+.glowup-toolbar-card .ant-card-body {
+  padding: 14px 16px;
+}
+
+.glowup-panel .ant-card-head,
+.glowup-table-card .ant-card-head {
+  min-height: 52px;
+  border-bottom-color: #eef2f7;
+}
+
+.glowup-panel .ant-card-head-title,
+.glowup-table-card .ant-card-head-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.glowup-panel .ant-card-body,
+.glowup-table-card .ant-card-body {
+  padding: 16px;
+}
+
+.glowup-table-card .ant-card-body {
+  padding: 0;
+}
+
+.ant-table-wrapper .ant-table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  color: #374151;
+  border-bottom-color: #eef2f7;
+  font-size: 13px;
+}
+
+.ant-table-wrapper .ant-table-row:hover > td {
+  background: #fff7f9 !important;
+}
+
+.ant-tag {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding-inline: 8px;
+}
+
+.ant-btn-primary {
+  background: #be123c;
+}
+
+.ant-btn-primary:not(:disabled):not(.ant-btn-disabled):hover {
+  background: #9f1239;
+}
+
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-input:focus,
+.ant-input-focused,
+.ant-select-focused .ant-select-selector,
+.ant-input-number-focused {
+  border-color: #be123c !important;
+  box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.08) !important;
+}
+
+.glowup-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.glowup-stat-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.glowup-stat-label {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.glowup-stat-value {
+  margin-top: 8px;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.glowup-stat-meta {
+  margin-top: 4px;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.glowup-bulk-bar {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #1f2937;
+  color: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.glowup-category-tree .ant-tree-node-content-wrapper {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 7px;
+}
+
+.glowup-category-tree .ant-tree-node-selected {
+  background: #fff1f2 !important;
+  color: #9f1239 !important;
+}
+
+.glowup-login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 42%) 1fr;
+  background: #f5f6f8;
+}
+
+.glowup-login-visual {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  padding: 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  background:
+    radial-gradient(circle at 72% 24%, rgba(190, 18, 60, 0.34), transparent 26%),
+    radial-gradient(circle at 18% 78%, rgba(124, 58, 237, 0.16), transparent 30%),
+    linear-gradient(150deg, #111827 0%, #191822 48%, #3a101f 100%);
+}
+
+.glowup-login-visual::before,
+.glowup-login-visual::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(2px);
+  opacity: 0.35;
+}
+
+.glowup-login-visual::before {
+  width: 250px;
+  height: 250px;
+  right: -65px;
+  top: 17%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.glowup-login-visual::after {
+  width: 110px;
+  height: 330px;
+  right: 18%;
+  bottom: 12%;
+  border-radius: 55px 55px 20px 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(190, 18, 60, 0.2));
+  box-shadow: -145px 72px 0 -14px rgba(255, 255, 255, 0.08);
+}
+
+.glowup-login-brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+}
+
+.glowup-login-kicker {
+  position: relative;
+  z-index: 1;
+  max-width: 390px;
+  color: #f3f4f6;
+}
+
+.glowup-login-kicker h2 {
+  margin: 0 0 10px;
+  font-size: 34px;
+  line-height: 1.13;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.glowup-login-kicker p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.glowup-login-form-side {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #f5f6f8;
+}
+
+.glowup-login-card {
+  width: min(440px, 100%);
+  border: 1px solid #e5e7eb !important;
+  border-radius: 14px !important;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.08) !important;
+}
+
+.glowup-login-card .ant-card-body {
+  padding: 34px;
+}
+
+.glowup-login-title {
+  margin-bottom: 4px !important;
+  font-size: 25px !important;
+  letter-spacing: -0.025em;
+}
+
+.glowup-login-footnote {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid #eef2f7;
+  color: #9ca3af;
+  font-size: 11px;
+  text-align: center;
+}
+
+.glowup-product-modal .ant-modal-content,
+.glowup-variant-modal .ant-modal-content {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.glowup-product-modal .ant-modal-body {
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+  background: #f8fafc;
+  padding: 18px;
+}
+
+.glowup-product-modal .ant-form > .ant-divider,
+.glowup-product-modal .ant-form > h5 {
+  margin-top: 18px;
+}
+
+@media (max-width: 1100px) {
+  .glowup-stat-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .glowup-login-page {
+    grid-template-columns: 36% 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .glowup-login-page {
+    display: block;
+  }
+
+  .glowup-login-visual {
+    min-height: 220px;
+    padding: 28px;
+  }
+
+  .glowup-login-kicker h2 {
+    font-size: 26px;
+  }
+
+  .glowup-login-form-side {
+    min-height: calc(100vh - 220px);
+    padding: 22px 16px;
+  }
+
+  .glowup-content {
+    padding: 18px 14px 28px !important;
+  }
+
+  .glowup-header-search {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .glowup-stat-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .glowup-login-visual {
+    display: none;
+  }
+
+  .glowup-login-form-side {
+    min-height: 100vh;
+  }
 }
