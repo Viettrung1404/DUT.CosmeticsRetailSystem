@@ -1,4 +1,4 @@
-import { LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Checkbox, Form, Input, Typography } from 'antd'
 import axios from 'axios'
 import { useState } from 'react'
@@ -53,50 +53,42 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="glowup-login-page">
-      <section className="glowup-login-visual" aria-hidden="true">
-        <div className="glowup-login-brand">
+    <div className="glowup-login-page glowup-login-page-simple">
+      <aside className="glowup-login-art" aria-hidden="true">
+        <div className="glowup-login-art-brand">
           <div className="glowup-brand-mark">GU</div>
           <div>
-            <div style={{ fontSize: 17 }}>GlowUp</div>
-            <div style={{ color: '#FDA4AF', fontSize: 10, marginTop: 2, letterSpacing: '.08em' }}>
-              RETAIL MANAGEMENT
-            </div>
+            <div className="glowup-login-art-name">GlowUp</div>
+            <div className="glowup-login-art-subtitle">Cosmetics Retail System</div>
           </div>
         </div>
 
-        <div className="glowup-login-kicker">
-          <div style={{ color: '#FB7185', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', marginBottom: 10 }}>
-            ENTERPRISE ADMIN
-          </div>
-          <h2>Vận hành hệ thống bán lẻ mỹ phẩm rõ ràng và hiệu quả.</h2>
-          <p>
-            Không gian quản trị tập trung cho sản phẩm, danh mục, thương hiệu và biến thể trong toàn hệ thống GlowUp.
-          </p>
+        <div className="glowup-login-art-scene">
+          <span className="glowup-cosmetic glowup-cosmetic-bottle" />
+          <span className="glowup-cosmetic glowup-cosmetic-tube" />
+          <span className="glowup-cosmetic glowup-cosmetic-jar" />
         </div>
 
-        <Text style={{ position: 'relative', zIndex: 1, color: '#94A3B8', fontSize: 11 }}>
-          © 2026 GlowUp Cosmetics Retail System
-        </Text>
-      </section>
+        <div className="glowup-login-art-caption">
+          Quản trị sản phẩm · Danh mục · Thương hiệu
+        </div>
+      </aside>
 
-      <main className="glowup-login-form-side">
-        <Card className="glowup-login-card">
-          <div style={{ marginBottom: 26 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-              <div className="glowup-brand-mark">GU</div>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 15 }}>GlowUp Admin</div>
-                <div style={{ color: '#9CA3AF', fontSize: 10 }}>Enterprise Portal</div>
-              </div>
+      <main className="glowup-login-form-side glowup-login-form-side-simple">
+        <Card className="glowup-login-card glowup-login-card-simple">
+          <div className="glowup-login-form-brand">
+            <div className="glowup-login-form-icon">GU</div>
+            <div>
+              <div className="glowup-login-form-name">GlowUp</div>
+              <div className="glowup-login-form-badge">ADMIN</div>
             </div>
+          </div>
 
+          <div className="glowup-login-heading">
             <Title level={2} className="glowup-login-title">
               Đăng nhập quản trị
             </Title>
-            <Text type="secondary">
-              Đăng nhập để truy cập hệ thống quản lý GlowUp.
-            </Text>
+            <Text type="secondary">Đăng nhập để truy cập hệ thống quản lý GlowUp</Text>
           </div>
 
           {errorMessage && (
@@ -104,7 +96,7 @@ export default function LoginPage() {
               type="error"
               showIcon
               message={errorMessage}
-              style={{ marginBottom: 20 }}
+              className="glowup-login-error"
             />
           )}
 
@@ -113,6 +105,7 @@ export default function LoginPage() {
             onFinish={onFinish}
             requiredMark={false}
             initialValues={{ remember: true }}
+            className="glowup-login-form"
           >
             <Form.Item
               label="Email"
@@ -123,8 +116,8 @@ export default function LoginPage() {
               ]}
             >
               <Input
-                prefix={<MailOutlined style={{ color: '#9CA3AF' }} />}
-                placeholder="admin@glowup.com"
+                prefix={<MailOutlined />}
+                placeholder="admin@glowup.vn"
                 autoComplete="email"
               />
             </Form.Item>
@@ -135,25 +128,17 @@ export default function LoginPage() {
               rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
             >
               <Input.Password
-                prefix={<LockOutlined style={{ color: '#9CA3AF' }} />}
+                prefix={<LockOutlined />}
                 placeholder="Nhập mật khẩu"
                 autoComplete="current-password"
               />
             </Form.Item>
 
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                margin: '-2px 0 20px',
-              }}
-            >
+            <div className="glowup-login-options">
               <Form.Item name="remember" valuePropName="checked" noStyle>
                 <Checkbox>Ghi nhớ đăng nhập</Checkbox>
               </Form.Item>
-              <Button type="link" style={{ padding: 0, color: '#9F1239' }}>
+              <Button type="link" className="glowup-login-forgot">
                 Quên mật khẩu?
               </Button>
             </div>
@@ -163,16 +148,11 @@ export default function LoginPage() {
               htmlType="submit"
               block
               loading={submitting}
-              style={{ height: 42 }}
+              className="glowup-login-submit"
             >
               Đăng nhập
             </Button>
           </Form>
-
-          <div className="glowup-login-footnote">
-            <SafetyCertificateOutlined style={{ marginRight: 6 }} />
-            Dành cho quản trị viên và nhân viên được cấp quyền
-          </div>
         </Card>
       </main>
     </div>
