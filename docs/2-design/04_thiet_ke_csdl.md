@@ -1327,7 +1327,7 @@ Giả sử:
 | pos_session_id | UUID | FK(pos_sessions.id), NULL | Phiên bán hàng POS thu khoản tiền này (cho thanh toán tiền mặt tại quầy) |
 | payment_method | VARCHAR(20) | NOT NULL | `VNPAY`, `MOMO`, `ZALOPAY`, `COD`, `CASH`, `CARD`, `TRANSFER` |
 | amount | DECIMAL(12,2) | NOT NULL | Số tiền thanh toán |
-| status | VARCHAR(20) | NOT NULL | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `REFUNDED` |
+| status | VARCHAR(20) | NOT NULL | `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `REFUNDED`, `CANCELLED` (đơn bị hủy khi khoản thanh toán còn `PENDING` — chưa thu tiền nên không cần hoàn) |
 | transaction_id | VARCHAR(100) | NULL | Mã giao dịch từ cổng thanh toán / ngân hàng |
 | gateway_response | JSONB | NULL | Log toàn bộ kết quả trả về từ gateway |
 | paid_at | TIMESTAMP WITH TIME ZONE | NULL | Thời điểm thanh toán thành công |
@@ -1886,6 +1886,7 @@ Chiến lược Index đóng vai trò quan trọng trong việc tăng tốc đ�
   - `idx_users_role` ON `users(role_id)` (Lấy vai trò và quyền khi xác thực người dùng)
   - `idx_user_oauth` ON `user_oauth_accounts(provider, provider_user_id)` (Đăng nhập mạng xã hội)
   - `idx_pos_sessions_store_status` ON `pos_sessions(store_id, status)` (Quản lý phiên POS theo chi nhánh)
+  - `idx_inventory_transactions_store_created` ON `inventory_transactions(store_id, created_at DESC)` (Tra cứu thẻ kho theo kỳ, xem mục A.5)
   - `idx_invoices_order` ON `invoices(order_id)` (Tra cứu hóa đơn từ đơn hàng)
   - `idx_invoices_lookup` ON `invoices(lookup_code)` (Khách hàng tra cứu HĐĐT trực tuyến)
   - `idx_invoices_number` ON `invoices(invoice_number)` (Kế toán tìm kiếm số hóa đơn)
@@ -1917,6 +1918,7 @@ Chiến lược Index đóng vai trò quan trọng trong việc tăng tốc đ�
   - `idx_inventory_low_stock` ON `inventory(store_id, product_variant_id)` WHERE `quantity <= min_quantity`.
   - `idx_batches_fefo_active` ON `batches(product_variant_id, store_id, expiry_date ASC)` WHERE `is_active = TRUE AND quantity > 0` (Tối ưu thuật toán tự động gợi ý xuất kho theo hạn sử dụng sớm nhất - FEFO).
   - `idx_orders_einvoice_pending` ON `orders(id)` WHERE `einvoice_status = 'PENDING'` (Job tự động quét phát hành hóa đơn điện tử hàng loạt).
+  - `uq_pos_sessions_store_open` UNIQUE ON `pos_sessions(store_id)` WHERE `status = 'OPEN'` (Mỗi chi nhánh chỉ một ca POS đang mở; chặn ngay ở CSDL khi hai thu ngân bấm mở ca cùng lúc).
 
 ---
 
@@ -1926,10 +1928,10 @@ Chiến lược Index đóng vai trò quan trọng trong việc tăng tốc đ�
 Hệ thống cần có dữ liệu hạt giống (Seed Data) ở các bảng danh mục cốt lõi trước khi đi vào hoạt động:
 - **Roles (Kèm Bitmask & Data Scope chuẩn):**
   - `id = 1`: `Admin` — `permissions = (1::BIGINT << 53) - 1` (Sở hữu trọn vẹn 53 bit quyền hệ thống từ bit 0 đến 52), `data_scope = 'ALL'`
-  - `id = 2`: `Store Manager` (Cửa hàng trưởng) — `permissions` bao gồm các bit thuộc module Product, Inventory, Order, Staff, Basic Report kèm các quyền quản lý chuyển kho (bit 48), kiểm kê (bit 49), đổi trả hàng (bit 51); `data_scope = 'STORE'`
-  - `id = 3`: `Sales Staff` (NV bán hàng) — `permissions = 3.221.505` (bit 0, 11, 13, 16, 20, 21), `data_scope = 'STORE'`
-  - `id = 4`: `Warehouse Staff` (NV kho) — `permissions` gồm bit 0, 6, 7, 8, 9, 10, 34 kèm quyền chuyển kho (bit 48), kiểm kê kho (bit 49), giao vận 3PL (bit 50); `data_scope = 'STORE'`
-  - `id = 5`: `Accountant` (Kế toán) — `permissions` gồm các bit tài chính, doanh thu, thanh toán nhà cung cấp, xuất hóa đơn GTGT (bit 52), báo cáo tổng thể; `data_scope = 'ALL'`
+  - `id = 2`: `Store Manager` (Cửa hàng trưởng) — `permissions` bao gồm các bit thuộc module Product, Inventory, Order, Staff, Basic Report kèm các quyền quản lý chuyển kho (bit 48), kiểm kê (bit 49), đổi trả hàng (bit 51), đứng quầy thu tiền (bit 16) và chốt ca POS (bit 19); `data_scope = 'STORE'`
+  - `id = 3`: `Sales Staff` (NV bán hàng) — `permissions = 3.221.569` (bit 0, 6, 11, 13, 16, 20, 21; bit 6 chỉ để xem tồn kho cửa hàng mình), `data_scope = 'STORE'`
+  - `id = 4`: `Warehouse Staff` (NV kho, làm tại kho tổng) — `permissions` gồm bit 0, 6, 7, 8, 9, 10, 12 (chỉ xem đơn), 32 (lập đơn đặt hàng NCC), 34 kèm quyền chuyển kho (bit 48), kiểm kê kho (bit 49); không có bit 50 vì Quản lý cửa hàng đóng gói đơn online; `data_scope = 'STORE'`
+  - `id = 5`: `Accountant` (Kế toán) — `permissions` gồm các bit tài chính, doanh thu, đối soát (bit 19), hoàn tiền qua cổng thanh toán / chuyển khoản (bit 17), thanh toán nhà cung cấp, xuất hóa đơn GTGT (bit 52), báo cáo tổng thể; `data_scope = 'ALL'`
   - `id = 6`: `Customer` (Khách mua hàng) — `permissions = 0` (không có quyền trang quản trị), `data_scope = 'SELF'` (mặc định lúc đăng ký)
 - **Permissions:** Nạp đầy đủ 53 bản ghi từ bit 0 đến bit 52 vào bảng `permissions` làm từ điển tra cứu cho màn hình phân quyền Admin UI.
 - **Loyalty Tiers:**
@@ -1940,7 +1942,7 @@ Hệ thống cần có dữ liệu hạt giống (Seed Data) ở các bảng dan
 - **Settings:** Khởi tạo cấu hình cấu trúc JSONB cho phí ship cơ bản, % thuế VAT, tích hợp cổng giao vận 3PL, tài khoản xuất Hóa đơn điện tử máy tính tiền.
 
 ### 5.2. Sample Data (Phục vụ Development / Staging)
-- **Stores:** 3 chi nhánh mô phỏng tại Hà Nội và TP.HCM.
+- **Stores:** 3 chi nhánh mô phỏng tại Hà Nội và TP.HCM, cộng ít nhất 1 kho tổng (`type = 'WAREHOUSE'`) vì nhà cung cấp chỉ giao hàng về kho tổng (lệnh `npm run seed:stores`).
 - **Categories & Brands:** Top 5 hãng mỹ phẩm lớn (L'Oreal, Innisfree, MAC...), khoảng 10 categories chính (Chăm sóc da, Trang điểm, Nước hoa...).
 - **Products:** Cần generate ~100 sản phẩm mẫu x 3 biến thể = 300 records variants.
 - **Inventory:** Tồn kho random từ 10 - 50 cho từng mặt hàng ở mỗi cửa hàng kèm phân bổ số lô HSD tương ứng.
@@ -1988,7 +1990,7 @@ Tài liệu này ghi nhận các điều chỉnh thiết kế đã được ch�
 | `invoice_items` | Bổ sung cột chiết khấu (`discount_amount`) nếu cần hiển thị chi tiết khoản giảm giá của từng sản phẩm trên hóa đơn, tránh lệch tổng tiền khi có khuyến mãi dòng hàng. |
 | `reviews` | Kiểm tra chống một khách hàng gửi nhiều đánh giá cho cùng một sản phẩm trong cùng một đơn hàng (xử lý tại tầng Backend Validation). |
 | `carts` | Rà soát logic tầng nghiệp vụ để đảm bảo mỗi khách hàng đã đăng nhập chỉ sở hữu duy nhất 1 giỏ hàng hoạt động (`is_active = TRUE`). |
-| `inventory_transactions` | Bổ sung Composite Index `(store_id, created_at)` khi lượng giao dịch thẻ kho tăng cao, phục vụ tra cứu lịch sử xuất nhập theo kỳ báo cáo. |
+| `inventory_transactions` | ~~Bổ sung Composite Index `(store_id, created_at)`~~ — đã thêm `idx_inventory_transactions_store_created` (migration `add_pos_inventory_constraints`, Sprint 3). |
 | `refunds` | Đối chiếu chặt chẽ quan hệ giữa `refunds` và `return_orders` khi hoàn thiện nghiệp vụ hoàn tiền tương ứng với hoàn hàng thực tế. |
 
 ### A.6. Bốn ràng buộc bắt buộc phải giữ bằng Code (Application-level Invariants)
