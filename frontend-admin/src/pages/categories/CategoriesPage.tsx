@@ -3,13 +3,16 @@ import {
   CloseOutlined,
   DeleteOutlined,
   EditOutlined,
+  FolderOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import {
   Button,
   Card,
   Col,
+  Empty,
   Form,
   Input,
   InputNumber,
@@ -82,8 +85,10 @@ export default function CategoriesPage() {
   const [inlineId, setInlineId] = useState<string | null>(null)
   const [inlineName, setInlineName] = useState('')
   const [reordering, setReordering] = useState(false)
+  const [treeSearch, setTreeSearch] = useState('')
 
   const allCategories = useMemo(() => flatten(tree), [tree])
+  const activeCount = allCategories.filter((item) => item.isActive).length
 
   const load = async () => {
     setLoading(true)
@@ -125,66 +130,86 @@ export default function CategoriesPage() {
     }
   }
 
-  const treeData = useMemo<DataNode[]>(
-    () => {
-      const mapNodes = (nodes: Category[]): DataNode[] =>
-        nodes.map((node) => ({
-          key: node.id,
-          title:
-            inlineId === node.id ? (
-              <Space size={4} onClick={(event) => event.stopPropagation()}>
-                <Input
-                  size="small"
-                  autoFocus
-                  value={inlineName}
-                  style={{ width: 180 }}
-                  onChange={(event) => setInlineName(event.target.value)}
-                  onPressEnter={() => void saveInline(node)}
-                />
-                <Button
-                  size="small"
-                  type="text"
-                  icon={<CheckOutlined />}
-                  onClick={() => void saveInline(node)}
-                />
-                <Button
-                  size="small"
-                  type="text"
-                  icon={<CloseOutlined />}
-                  onClick={() => setInlineId(null)}
-                />
-              </Space>
-            ) : (
-              <Space>
+  const visibleTree = useMemo(() => {
+    const keyword = treeSearch.trim().toLowerCase()
+    if (!keyword) return tree
+
+    const filterNodes = (nodes: Category[]): Category[] =>
+      nodes.flatMap((node) => {
+        const children = filterNodes(node.children ?? [])
+        if (node.name.toLowerCase().includes(keyword) || children.length) {
+          return [{ ...node, children }]
+        }
+        return []
+      })
+
+    return filterNodes(tree)
+  }, [tree, treeSearch])
+
+  const treeData = useMemo<DataNode[]>(() => {
+    const mapNodes = (nodes: Category[]): DataNode[] =>
+      nodes.map((node) => ({
+        key: node.id,
+        icon: <FolderOutlined />,
+        title:
+          inlineId === node.id ? (
+            <Space size={4} onClick={(event) => event.stopPropagation()}>
+              <Input
+                size="small"
+                autoFocus
+                value={inlineName}
+                style={{ width: 180 }}
+                onChange={(event) => setInlineName(event.target.value)}
+                onPressEnter={() => void saveInline(node)}
+              />
+              <Button
+                size="small"
+                type="text"
+                icon={<CheckOutlined />}
+                onClick={() => void saveInline(node)}
+              />
+              <Button
+                size="small"
+                type="text"
+                icon={<CloseOutlined />}
+                onClick={() => setInlineId(null)}
+              />
+            </Space>
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+              }}
+            >
+              <Space size={6}>
                 <span>{node.name}</span>
                 {!node.isActive && <Tag>Đã ẩn</Tag>}
-                <Button
-                  size="small"
-                  type="text"
-                  icon={<EditOutlined />}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setInlineId(node.id)
-                    setInlineName(node.name)
-                  }}
-                />
               </Space>
-            ),
-          children: mapNodes(node.children ?? []),
-        }))
-      return mapNodes(tree)
-    },
-    [tree, inlineId, inlineName],
-  )
+              <Button
+                size="small"
+                type="text"
+                icon={<EditOutlined />}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setInlineId(node.id)
+                  setInlineName(node.name)
+                }}
+              />
+            </div>
+          ),
+        children: mapNodes(node.children ?? []),
+      }))
+    return mapNodes(visibleTree)
+  }, [visibleTree, inlineId, inlineName])
 
   const openCreate = (parentId?: string | null) => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({
-      parentId: parentId ?? null,
-      sortOrder: 0,
-      isActive: true,
-    })
+    form.setFieldsValue({ parentId: parentId ?? null, sortOrder: 0, isActive: true })
     setOpen(true)
   }
 
@@ -237,29 +262,20 @@ export default function CategoriesPage() {
     const targetParent = findParent(tree, dropId)
     const dropToGap = info.dropToGap
     const nextParentId = dropToGap ? targetParent?.id ?? null : target.id
-    const siblings = dropToGap
-      ? targetParent?.children ?? tree
-      : target.children ?? []
+    const siblings = dropToGap ? targetParent?.children ?? tree : target.children ?? []
 
     let index = dropToGap ? siblings.findIndex((item) => item.id === dropId) : siblings.length
     if (dropToGap && info.dropPosition > 0) index += 1
 
-    const reordered = siblings
-      .filter((item) => item.id !== dragId)
-      .map((item) => item.id)
+    const reordered = siblings.filter((item) => item.id !== dragId).map((item) => item.id)
     reordered.splice(Math.max(0, index), 0, dragId)
 
     setReordering(true)
     try {
-      await updateCategory(dragId, {
-        parentId: nextParentId,
-        sortOrder: Math.max(0, index),
-      })
+      await updateCategory(dragId, { parentId: nextParentId, sortOrder: Math.max(0, index) })
       await Promise.all(
         reordered.map((id, sortOrder) =>
-          id === dragId
-            ? Promise.resolve()
-            : updateCategory(id, { sortOrder }),
+          id === dragId ? Promise.resolve() : updateCategory(id, { sortOrder }),
         ),
       )
       message.success('Đã cập nhật vị trí danh mục')
@@ -272,23 +288,19 @@ export default function CategoriesPage() {
     }
   }
 
+  const selectedParent = selected?.parentId
+    ? allCategories.find((item) => item.id === selected.parentId)
+    : null
+
   return (
     <>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 16,
-          marginBottom: 20,
-          flexWrap: 'wrap',
-        }}
-      >
+      <div className="glowup-page-header">
         <div>
-          <Typography.Title level={3} style={{ marginBottom: 4 }}>
+          <Typography.Title level={2} className="glowup-page-title">
             Quản lý danh mục
           </Typography.Title>
-          <Typography.Text type="secondary">
-            Kéo thả để sắp xếp/chuyển cấp; bấm biểu tượng bút ngay trên cây để sửa tên nhanh.
+          <Typography.Text className="glowup-page-subtitle">
+            Tổ chức cây phân cấp danh mục đa tầng cho toàn bộ sản phẩm mỹ phẩm.
           </Typography.Text>
         </div>
         <Space>
@@ -301,10 +313,48 @@ export default function CategoriesPage() {
         </Space>
       </div>
 
-      <Row gutter={20}>
-        <Col xs={24} lg={10}>
-          <Card loading={loading || reordering} title="Cây danh mục">
+      <div className="glowup-stat-strip">
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Tổng danh mục</div>
+          <div className="glowup-stat-value">{allCategories.length}</div>
+          <div className="glowup-stat-meta">Toàn bộ cấp trong cây danh mục</div>
+        </div>
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Đang hoạt động</div>
+          <div className="glowup-stat-value">{activeCount}</div>
+          <div className="glowup-stat-meta">Sẵn sàng gán sản phẩm</div>
+        </div>
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Danh mục gốc</div>
+          <div className="glowup-stat-value">{tree.length}</div>
+          <div className="glowup-stat-meta">Nhánh cấp cao nhất</div>
+        </div>
+        <div className="glowup-stat-card">
+          <div className="glowup-stat-label">Đang ẩn</div>
+          <div className="glowup-stat-value">{allCategories.length - activeCount}</div>
+          <div className="glowup-stat-meta">Không hiển thị trong catalog</div>
+        </div>
+      </div>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={10}>
+          <Card
+            className="glowup-panel"
+            loading={loading || reordering}
+            title="Cấu trúc cây danh mục"
+            extra={<Tag>{tree.length} nhánh</Tag>}
+          >
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: '#9CA3AF' }} />}
+              placeholder="Tìm nhanh tên danh mục..."
+              value={treeSearch}
+              onChange={(event) => setTreeSearch(event.target.value)}
+              style={{ marginBottom: 14 }}
+            />
             <Tree
+              className="glowup-category-tree"
+              showIcon
               blockNode
               defaultExpandAll
               draggable
@@ -313,41 +363,104 @@ export default function CategoriesPage() {
               onDrop={handleDrop}
               onSelect={(keys) => {
                 const id = keys[0]?.toString()
-                setSelected(
-                  id ? allCategories.find((item) => item.id === id) ?? null : null,
-                )
+                setSelected(id ? allCategories.find((item) => item.id === id) ?? null : null)
               }}
             />
+            <Button
+              type="dashed"
+              block
+              icon={<PlusOutlined />}
+              style={{ marginTop: 14 }}
+              onClick={() => openCreate(selected?.id ?? null)}
+            >
+              {selected ? 'Thêm danh mục con' : 'Thêm danh mục gốc'}
+            </Button>
           </Card>
         </Col>
 
-        <Col xs={24} lg={14}>
-          <Card title="Chi tiết danh mục">
+        <Col xs={24} xl={14}>
+          <Card className="glowup-panel" title="Chi tiết danh mục">
             {selected ? (
-              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                <div>
-                  <Typography.Title level={4} style={{ marginBottom: 2 }}>
-                    {selected.name}
-                  </Typography.Title>
-                  <Typography.Text type="secondary">{selected.slug}</Typography.Text>
+              <Space direction="vertical" size={18} style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                  <div>
+                    <Space size={8} wrap>
+                      <Tag color={selected.isActive ? 'green' : 'default'}>
+                        {selected.isActive ? 'Đang hoạt động' : 'Đã ẩn'}
+                      </Tag>
+                      <Typography.Text type="secondary">Mã: {selected.id}</Typography.Text>
+                    </Space>
+                    <Typography.Title level={3} style={{ margin: '10px 0 2px' }}>
+                      {selected.name}
+                    </Typography.Title>
+                    <Typography.Text type="secondary">/{selected.slug}</Typography.Text>
+                  </div>
+                  <Space>
+                    <Button icon={<EditOutlined />} onClick={() => openEdit(selected)}>
+                      Chỉnh sửa
+                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate(selected.id)}>
+                      Thêm danh mục con
+                    </Button>
+                  </Space>
                 </div>
+
+                <Row gutter={[12, 12]}>
+                  <Col xs={24} md={12}>
+                    <div className="glowup-stat-card">
+                      <div className="glowup-stat-label">Danh mục cha</div>
+                      <div style={{ marginTop: 7, fontWeight: 650 }}>
+                        {selectedParent?.name ?? 'Danh mục gốc'}
+                      </div>
+                    </div>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <div className="glowup-stat-card">
+                      <div className="glowup-stat-label">Thứ tự hiển thị</div>
+                      <div style={{ marginTop: 7, fontWeight: 650 }}>{selected.sortOrder}</div>
+                    </div>
+                  </Col>
+                </Row>
+
                 <div>
-                  Trạng thái:{' '}
-                  {selected.isActive ? <Tag color="green">Hoạt động</Tag> : <Tag>Đã ẩn</Tag>}
-                </div>
-                <div>Thứ tự: {selected.sortOrder}</div>
-                <div>Mô tả: {selected.description || '—'}</div>
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => openCreate(selected.id)}
+                  <Typography.Text strong>Mô tả</Typography.Text>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: 14,
+                      borderRadius: 10,
+                      background: '#F8FAFC',
+                      border: '1px solid #EEF2F7',
+                      color: '#4B5563',
+                      lineHeight: 1.65,
+                    }}
                   >
-                    Thêm danh mục con
-                  </Button>
-                  <Button icon={<EditOutlined />} onClick={() => openEdit(selected)}>
-                    Sửa đầy đủ
-                  </Button>
+                    {selected.description || 'Chưa có mô tả cho danh mục này.'}
+                  </div>
+                </div>
+
+                <div>
+                  <Typography.Text strong>Xem trước kết quả tìm kiếm</Typography.Text>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: 16,
+                      borderRadius: 10,
+                      background: '#fff',
+                      border: '1px solid #E5E7EB',
+                    }}
+                  >
+                    <div style={{ color: '#16A34A', fontSize: 12 }}>glowup.vn/danh-muc/{selected.slug}</div>
+                    <div style={{ color: '#1D4ED8', fontSize: 16, fontWeight: 600, margin: '3px 0' }}>
+                      {selected.metaTitle || `${selected.name} | GlowUp`}
+                    </div>
+                    <div style={{ color: '#6B7280', fontSize: 12, lineHeight: 1.5 }}>
+                      {selected.metaDescription || selected.description || 'Thông tin danh mục sản phẩm chính hãng tại GlowUp.'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Popconfirm
                     title="Ẩn danh mục?"
                     description="Backend sẽ chặn nếu còn danh mục con đang hoạt động."
@@ -362,26 +475,24 @@ export default function CategoriesPage() {
                       }
                     }}
                   >
-                    <Button danger icon={<DeleteOutlined />}>Xóa mềm</Button>
+                    <Button danger icon={<DeleteOutlined />}>Ẩn danh mục</Button>
                   </Popconfirm>
-                </Space>
+                </div>
               </Space>
             ) : (
-              <Typography.Text type="secondary">
-                Chọn một danh mục trong cây để xem và chỉnh sửa.
-              </Typography.Text>
+              <Empty description="Chọn một danh mục trong cây để xem chi tiết" />
             )}
           </Card>
         </Col>
       </Row>
 
       <Modal
-        title={editing ? 'Sửa danh mục' : 'Thêm danh mục'}
+        title={editing ? 'Chỉnh sửa danh mục' : 'Thêm danh mục'}
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => void save()}
         confirmLoading={saving}
-        width={700}
+        width={720}
         destroyOnHidden
       >
         <Form
@@ -393,20 +504,25 @@ export default function CategoriesPage() {
             }
           }}
         >
-          <Form.Item name="parentId" label="Danh mục cha">
-            <Select
-              allowClear
-              placeholder="Danh mục gốc"
-              options={allCategories
-                .filter((item) => item.id !== editing?.id && item.isActive)
-                .map((item) => ({ label: item.name, value: item.id }))}
-            />
-          </Form.Item>
-          <Form.Item
-            name="name"
-            label="Tên danh mục"
-            rules={[{ required: true, message: 'Nhập tên danh mục' }]}
-          >
+          <Row gutter={14}>
+            <Col xs={24} md={12}>
+              <Form.Item name="parentId" label="Danh mục cha">
+                <Select
+                  allowClear
+                  placeholder="Danh mục gốc"
+                  options={allCategories
+                    .filter((item) => item.id !== editing?.id && item.isActive)
+                    .map((item) => ({ label: item.name, value: item.id }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="sortOrder" label="Thứ tự hiển thị">
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="name" label="Tên danh mục" rules={[{ required: true, message: 'Nhập tên danh mục' }]}>
             <Input maxLength={150} />
           </Form.Item>
           <Form.Item
@@ -414,22 +530,16 @@ export default function CategoriesPage() {
             label="Slug"
             rules={[
               { required: true, message: 'Nhập slug' },
-              {
-                pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-                message: 'Slug chỉ gồm chữ thường, số và dấu gạch ngang',
-              },
+              { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: 'Slug chỉ gồm chữ thường, số và dấu gạch ngang' },
             ]}
           >
             <Input maxLength={150} />
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={3} />
+            <Input.TextArea rows={4} />
           </Form.Item>
           <Form.Item name="imageUrl" label="Ảnh URL" rules={[{ type: 'url' }]}>
             <Input />
-          </Form.Item>
-          <Form.Item name="sortOrder" label="Thứ tự hiển thị">
-            <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="isActive" label="Hoạt động" valuePropName="checked">
             <Switch />
@@ -438,7 +548,7 @@ export default function CategoriesPage() {
             <Input maxLength={255} />
           </Form.Item>
           <Form.Item name="metaDescription" label="SEO description">
-            <Input.TextArea rows={2} />
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
