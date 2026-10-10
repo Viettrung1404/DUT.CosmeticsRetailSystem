@@ -80,6 +80,7 @@ const ROLES = [
     description: 'Quản lý vận hành, kho, đơn hàng và nhân sự của chi nhánh được giao',
     permissions: mask([
       0, 6, 7, 8, 9, 10, 48, 49, 11, 12, 13, 14, 15, 50, 51, 25, 26, 27, 28, 29, 35, 17, 37, 20,
+      16, 19,
     ]),
     dataScope: 'STORE',
   },
@@ -88,15 +89,15 @@ const ROLES = [
     name: 'sales_staff',
     displayName: 'Nhân viên bán hàng',
     description: 'Bán hàng tại quầy POS, thu tiền, tra cứu khách hàng',
-    permissions: mask([0, 11, 13, 16, 20, 21]),
+    permissions: mask([0, 6, 11, 13, 16, 20, 21]),
     dataScope: 'STORE',
   },
   {
     id: 4,
     name: 'warehouse_staff',
     displayName: 'Nhân viên kho',
-    description: 'Nhập kho, chuyển kho, kiểm kê, quản lý lô hạn dùng, đóng gói giao vận',
-    permissions: mask([0, 6, 7, 8, 9, 10, 34, 48, 49, 50, 12]),
+    description: 'Làm tại kho tổng: lập đơn đặt hàng NCC, nhập kho, chuyển kho, kiểm kê, quản lý lô hạn dùng',
+    permissions: mask([0, 6, 7, 8, 9, 10, 32, 34, 48, 49, 12]),
     dataScope: 'STORE',
   },
   {
@@ -104,7 +105,7 @@ const ROLES = [
     name: 'accountant',
     displayName: 'Kế toán',
     description: 'Đối soát thanh toán, hóa đơn điện tử, thanh toán nhà cung cấp, báo cáo tài chính',
-    permissions: mask([0, 19, 30, 33, 35, 36, 39, 52]),
+    permissions: mask([0, 17, 19, 30, 33, 35, 36, 39, 52]),
     dataScope: 'ALL',
   },
   {
