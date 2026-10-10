@@ -30,6 +30,7 @@ import type {
   AdminCustomerListItem,
   AdminCustomerQuery,
   AdminOrderListItem,
+  OrderStoreSummary,
 } from '../../types/orders'
 
 const { Title, Text } = Typography
@@ -49,6 +50,24 @@ const statusColors: Record<string, string> = {
   PENDING: 'gold', CONFIRMED: 'blue', PROCESSING: 'purple', SHIPPING: 'cyan', DELIVERED: 'geekblue', COMPLETED: 'green', CANCELLED: 'red',
 }
 
+type LoyaltyTierOption = { id: string; name: string }
+
+function mergeTiers(current: LoyaltyTierOption[], items: AdminCustomerListItem[]) {
+  const tierMap = new Map(current.map((tier) => [tier.id, tier]))
+  items.forEach((item) => {
+    if (item.loyaltyTier?.id) tierMap.set(item.loyaltyTier.id, item.loyaltyTier)
+  })
+  return Array.from(tierMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+}
+
+function mergeStores(current: OrderStoreSummary[], orders: AdminOrderListItem[]) {
+  const storeMap = new Map(current.map((store) => [store.id, store]))
+  orders.forEach((order) => {
+    if (order.store?.id) storeMap.set(order.store.id, order.store)
+  })
+  return Array.from(storeMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+}
+
 export default function CustomersPage() {
   const navigate = useNavigate()
   const [messageApi, contextHolder] = message.useMessage()
@@ -57,6 +76,8 @@ export default function CustomersPage() {
   const [total, setTotal] = useState(0)
   const [query, setQuery] = useState<AdminCustomerQuery>({ page: 1, limit: 20, order: 'DESC' })
   const [keyword, setKeyword] = useState('')
+  const [knownTiers, setKnownTiers] = useState<LoyaltyTierOption[]>([])
+  const [knownStores, setKnownStores] = useState<OrderStoreSummary[]>([])
   const [selected, setSelected] = useState<AdminCustomerListItem | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [history, setHistory] = useState<AdminOrderListItem[]>([])
@@ -65,7 +86,9 @@ export default function CustomersPage() {
     setLoading(true)
     try {
       const result = await getAdminCustomers(next)
-      setCustomers(result.data ?? [])
+      const items = result.data ?? []
+      setCustomers(items)
+      setKnownTiers((current) => mergeTiers(current, items))
       setTotal(Number(result.meta?.itemCount ?? 0))
     } catch {
       messageApi.error('Không thể tải danh sách khách hàng')
@@ -79,10 +102,31 @@ export default function CustomersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.page, query.limit, query.loyaltyTierId, query.storeId, query.sortBy, query.order])
 
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        const [customerResult, orderResult] = await Promise.all([
+          getAdminCustomers({ page: 1, limit: 100, order: 'DESC' }),
+          getAdminOrders({ page: 1, limit: 100, order: 'DESC' }),
+        ])
+        setKnownTiers((current) => mergeTiers(current, customerResult.data ?? []))
+        setKnownStores((current) => mergeStores(current, orderResult.data ?? []))
+      } catch {
+        // Filter options are progressive; the main table can still work if this preload fails.
+      }
+    }
+    void loadFilterOptions()
+  }, [])
+
   const applySearch = () => {
     const next = { ...query, page: 1, search: keyword.trim() || undefined }
     setQuery(next)
     void loadCustomers(next)
+  }
+
+  const resetFilters = () => {
+    setKeyword('')
+    setQuery({ page: 1, limit: 20, order: 'DESC' })
   }
 
   const openCustomer = async (customer: AdminCustomerListItem) => {
@@ -92,6 +136,7 @@ export default function CustomersPage() {
     try {
       const result = await getAdminOrders({ customerId: customer.id, page: 1, limit: 10, order: 'DESC' })
       setHistory(result.data ?? [])
+      setKnownStores((current) => mergeStores(current, result.data ?? []))
     } catch {
       messageApi.warning('Không tải được lịch sử đơn hàng của khách hàng')
     } finally {
@@ -201,15 +246,40 @@ export default function CustomersPage() {
             allowClear
             prefix={<SearchOutlined />}
             placeholder="Tên, SĐT hoặc email..."
-            style={{ width: 260 }}
+            style={{ width: 250 }}
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             onPressEnter={applySearch}
           />
           <Select
             allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Hạng thành viên"
+            style={{ width: 170 }}
+            value={query.loyaltyTierId}
+            onChange={(loyaltyTierId) => setQuery((current) => ({ ...current, page: 1, loyaltyTierId }))}
+            options={knownTiers.map((tier) => ({ value: tier.id, label: tier.name }))}
+            notFoundContent="Chưa có hạng trong dữ liệu đã tải"
+          />
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Cửa hàng"
+            style={{ width: 205 }}
+            value={query.storeId}
+            onChange={(storeId) => setQuery((current) => ({ ...current, page: 1, storeId }))}
+            options={knownStores.map((store) => ({
+              value: store.id,
+              label: `${store.name}${store.code ? ` (${store.code})` : ''}`,
+            }))}
+            notFoundContent="Chưa có cửa hàng trong dữ liệu đã tải"
+          />
+          <Select
+            allowClear
             placeholder="Sắp xếp"
-            style={{ width: 180 }}
+            style={{ width: 165 }}
             value={query.sortBy}
             onChange={(sortBy) => setQuery((current) => ({ ...current, page: 1, sortBy }))}
             options={[
@@ -219,7 +289,7 @@ export default function CustomersPage() {
             ]}
           />
           <Button type="primary" icon={<SearchOutlined />} onClick={applySearch}>Tìm kiếm</Button>
-          <Button onClick={() => { setKeyword(''); setQuery({ page: 1, limit: 20, order: 'DESC' }) }}>Xóa lọc</Button>
+          <Button onClick={resetFilters}>Xóa lọc</Button>
         </Space>
       </Card>
 
