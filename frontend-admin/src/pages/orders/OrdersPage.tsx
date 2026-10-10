@@ -22,7 +22,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAdminOrders } from '../../api/ordersApi'
-import type { AdminOrderListItem, AdminOrderQuery } from '../../types/orders'
+import type { AdminOrderListItem, AdminOrderQuery, OrderStoreSummary } from '../../types/orders'
 
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
@@ -52,11 +52,20 @@ const money = new Intl.NumberFormat('vi-VN', {
   currency: 'VND',
 })
 
+function mergeStores(current: OrderStoreSummary[], items: AdminOrderListItem[]) {
+  const storeMap = new Map(current.map((store) => [store.id, store]))
+  items.forEach((item) => {
+    if (item.store?.id) storeMap.set(item.store.id, item.store)
+  })
+  return Array.from(storeMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+}
+
 export default function OrdersPage() {
   const navigate = useNavigate()
   const [messageApi, contextHolder] = message.useMessage()
   const [loading, setLoading] = useState(false)
   const [orders, setOrders] = useState<AdminOrderListItem[]>([])
+  const [knownStores, setKnownStores] = useState<OrderStoreSummary[]>([])
   const [total, setTotal] = useState(0)
   const [query, setQuery] = useState<AdminOrderQuery>({ page: 1, limit: 20, order: 'DESC' })
   const [keyword, setKeyword] = useState('')
@@ -66,7 +75,9 @@ export default function OrdersPage() {
     setLoading(true)
     try {
       const result = await getAdminOrders(next)
-      setOrders(result.data ?? [])
+      const items = result.data ?? []
+      setOrders(items)
+      setKnownStores((current) => mergeStores(current, items))
       setTotal(Number(result.meta?.itemCount ?? 0))
     } catch {
       messageApi.error('Không thể tải danh sách đơn hàng')
@@ -78,7 +89,7 @@ export default function OrdersPage() {
   useEffect(() => {
     void loadOrders(query)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.page, query.limit, query.status, query.orderType, query.fromDate, query.toDate, query.sortBy, query.order])
+  }, [query.page, query.limit, query.status, query.orderType, query.storeId, query.fromDate, query.toDate, query.sortBy, query.order])
 
   const applySearch = () => {
     const next = { ...query, page: 1, search: keyword.trim() || undefined }
@@ -223,7 +234,7 @@ export default function OrdersPage() {
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             onPressEnter={applySearch}
-            style={{ width: 240 }}
+            style={{ width: 220 }}
           />
           <Select
             allowClear
@@ -240,6 +251,20 @@ export default function OrdersPage() {
             value={query.orderType}
             onChange={(orderType) => setQuery((current) => ({ ...current, page: 1, orderType }))}
             options={[{ value: 'ONLINE', label: 'Online' }, { value: 'POS', label: 'POS' }]}
+          />
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Cửa hàng"
+            style={{ width: 205 }}
+            value={query.storeId}
+            onChange={(storeId) => setQuery((current) => ({ ...current, page: 1, storeId }))}
+            options={knownStores.map((store) => ({
+              value: store.id,
+              label: `${store.name}${store.code ? ` (${store.code})` : ''}`,
+            }))}
+            notFoundContent="Chưa có cửa hàng trong dữ liệu đã tải"
           />
           <RangePicker
             value={dates}
