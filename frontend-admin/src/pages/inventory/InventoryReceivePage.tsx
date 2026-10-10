@@ -33,47 +33,59 @@ type AdjustFormValue = {
 export default function InventoryReceivePage() {
   const [messageApi, contextHolder] = message.useMessage()
   const [mode, setMode] = useState<'receive' | 'adjust'>('receive')
+  const [submitting, setSubmitting] = useState(false)
   const [receiveForm] = Form.useForm<ReceiveFormValue>()
   const [adjustForm] = Form.useForm<AdjustFormValue>()
 
   const submitReceive = async (value: ReceiveFormValue) => {
     const payload: ReceivePurchaseOrderInput = {
       purchaseOrderId: value.purchaseOrderId,
-      note: value.note,
+      note: value.note?.trim() || undefined,
       items: value.items.map((item) => ({
         purchaseOrderItemId: item.purchaseOrderItemId,
         quantity: item.quantity,
-        batchNumber: item.batchNumber,
+        batchNumber: item.batchNumber.trim(),
         expiryDate: item.expiryDate.format('YYYY-MM-DD'),
         manufactureDate: item.manufactureDate?.format('YYYY-MM-DD'),
       })),
     }
     try {
+      setSubmitting(true)
       await receivePurchaseOrder(payload)
       messageApi.success('Nhận hàng thành công')
       receiveForm.resetFields()
+      receiveForm.setFieldsValue({ items: [{} as ReceiveFormValue['items'][number]] })
     } catch {
       messageApi.error('Không thể nhận hàng. Kiểm tra PO, số lượng và thông tin lô.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const submitAdjust = async (value: AdjustFormValue) => {
+    if (value.quantity === 0) {
+      messageApi.warning('Số lượng điều chỉnh phải khác 0')
+      return
+    }
     const payload: AdjustInventoryInput = {
-      storeId: value.storeId,
-      productVariantId: value.productVariantId,
+      storeId: value.storeId.trim(),
+      productVariantId: value.productVariantId.trim(),
       quantity: value.quantity,
-      reason: value.reason,
-      batchId: value.batchId || undefined,
-      batchNumber: value.batchNumber || undefined,
+      reason: value.reason.trim(),
+      batchId: value.batchId?.trim() || undefined,
+      batchNumber: value.batchNumber?.trim() || undefined,
       expiryDate: value.expiryDate?.format('YYYY-MM-DD'),
       manufactureDate: value.manufactureDate?.format('YYYY-MM-DD'),
     }
     try {
+      setSubmitting(true)
       await adjustInventory(payload)
       messageApi.success('Điều chỉnh tồn kho thành công')
       adjustForm.resetFields()
     } catch {
       messageApi.error('Không thể điều chỉnh tồn kho. Kiểm tra số lượng, lô và phần hàng đang giữ chỗ.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -81,7 +93,10 @@ export default function InventoryReceivePage() {
     <div>
       {contextHolder}
       <div className="glowup-page-header">
-        <div><Title level={2} className="glowup-page-title">Nhập / điều chỉnh kho</Title><Text className="glowup-page-subtitle">Nhận hàng theo PO hoặc điều chỉnh tồn kho theo đúng API Sprint 3 hiện có.</Text></div>
+        <div>
+          <Title level={2} className="glowup-page-title">Nhập / điều chỉnh kho</Title>
+          <Text className="glowup-page-subtitle">Nhận hàng theo PO hoặc điều chỉnh tồn kho theo đúng API Sprint 3 hiện có.</Text>
+        </div>
       </div>
 
       <Radio.Group value={mode} onChange={(e) => setMode(e.target.value)} buttonStyle="solid" style={{ marginBottom: 16 }}>
@@ -116,7 +131,7 @@ export default function InventoryReceivePage() {
             </Form.List>
 
             <Form.Item name="note" label="Ghi chú kiểm hàng" style={{ marginTop: 16 }}><Input.TextArea rows={3} maxLength={500} placeholder="Hàng móp, thiếu, ghi chú chất lượng..." /></Form.Item>
-            <Button type="primary" htmlType="submit">Xác nhận nhập kho</Button>
+            <Button type="primary" htmlType="submit" loading={submitting}>Xác nhận nhập kho</Button>
           </Form>
         </Card>
       ) : (
@@ -132,7 +147,7 @@ export default function InventoryReceivePage() {
               <Form.Item name="manufactureDate" label="Ngày sản xuất"><DatePicker style={{ width: '100%' }} /></Form.Item>
             </div>
             <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Phải nhập lý do điều chỉnh' }]}><Input.TextArea rows={3} maxLength={500} placeholder="Ví dụ: Hủy hàng hết hạn, mất mát, hàng mẫu, giao bù..." /></Form.Item>
-            <Button type="primary" htmlType="submit">Xác nhận điều chỉnh</Button>
+            <Button type="primary" htmlType="submit" loading={submitting}>Xác nhận điều chỉnh</Button>
           </Form>
         </Card>
       )}
