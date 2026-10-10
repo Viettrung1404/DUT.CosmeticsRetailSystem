@@ -105,7 +105,7 @@ const ROLES = [
     name: 'accountant',
     displayName: 'Kế toán',
     description: 'Đối soát thanh toán, hóa đơn điện tử, thanh toán nhà cung cấp, báo cáo tài chính',
-    permissions: mask([0, 17, 19, 30, 33, 35, 36, 39, 52]),
+    permissions: mask([0, 17, 19, 27, 30, 33, 35, 36, 39, 52]),
     dataScope: 'ALL',
   },
   {

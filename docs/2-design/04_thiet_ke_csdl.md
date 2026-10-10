@@ -1931,7 +1931,7 @@ Hệ thống cần có dữ liệu hạt giống (Seed Data) ở các bảng dan
   - `id = 2`: `Store Manager` (Cửa hàng trưởng) — `permissions` bao gồm các bit thuộc module Product, Inventory, Order, Staff, Basic Report kèm các quyền quản lý chuyển kho (bit 48), kiểm kê (bit 49), đổi trả hàng (bit 51), đứng quầy thu tiền (bit 16) và chốt ca POS (bit 19); `data_scope = 'STORE'`
   - `id = 3`: `Sales Staff` (NV bán hàng) — `permissions = 3.221.569` (bit 0, 6, 11, 13, 16, 20, 21; bit 6 chỉ để xem tồn kho cửa hàng mình), `data_scope = 'STORE'`
   - `id = 4`: `Warehouse Staff` (NV kho, làm tại kho tổng) — `permissions` gồm bit 0, 6, 7, 8, 9, 10, 12 (chỉ xem đơn), 32 (lập đơn đặt hàng NCC), 34 kèm quyền chuyển kho (bit 48), kiểm kê kho (bit 49); không có bit 50 vì Quản lý cửa hàng đóng gói đơn online; `data_scope = 'STORE'`
-  - `id = 5`: `Accountant` (Kế toán) — `permissions` gồm các bit tài chính, doanh thu, đối soát (bit 19), hoàn tiền qua cổng thanh toán / chuyển khoản (bit 17), thanh toán nhà cung cấp, xuất hóa đơn GTGT (bit 52), báo cáo tổng thể; `data_scope = 'ALL'`
+  - `id = 5`: `Accountant` (Kế toán) — `permissions` gồm các bit tài chính, doanh thu, đối soát (bit 19), hoàn tiền qua cổng thanh toán / chuyển khoản (bit 17), xem bảng hoa hồng đã chốt để chi trả (bit 27, chỉ xem), thanh toán nhà cung cấp, xuất hóa đơn GTGT (bit 52), báo cáo tổng thể; `data_scope = 'ALL'`
   - `id = 6`: `Customer` (Khách mua hàng) — `permissions = 0` (không có quyền trang quản trị), `data_scope = 'SELF'` (mặc định lúc đăng ký)
 - **Permissions:** Nạp đầy đủ 53 bản ghi từ bit 0 đến bit 52 vào bảng `permissions` làm từ điển tra cứu cho màn hình phân quyền Admin UI.
 - **Loyalty Tiers:**
