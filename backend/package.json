@@ -17,6 +17,7 @@
     "prisma:studio": "prisma studio",
     "seed:products": "ts-node --transpile-only prisma/seed-products.ts",
     "seed:products:clean": "ts-node --transpile-only prisma/seed-products.ts --clean",
+    "seed:stores": "ts-node --transpile-only prisma/seed-stores.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

@@ -385,6 +385,7 @@ model InventoryTransaction {
   batch   Batch?         @relation(fields: [batchId], references: [id])
   creator User?          @relation(fields: [createdBy], references: [id])
 
+  @@index([storeId, createdAt(sort: Desc)], map: "idx_inventory_transactions_store_created")
   @@map("inventory_transactions")
 }
 
