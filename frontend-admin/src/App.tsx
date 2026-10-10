@@ -7,6 +7,10 @@ import ProductsPage from './pages/products/ProductsPage'
 import OrdersPage from './pages/orders/OrdersPage'
 import OrderDetailPage from './pages/orders/OrderDetailPage'
 import CustomersPage from './pages/customers/CustomersPage'
+import PosPage from './pages/pos/PosPage'
+import PosSessionsPage from './pages/pos/PosSessionsPage'
+import InventoryPage from './pages/inventory/InventoryPage'
+import InventoryReceivePage from './pages/inventory/InventoryReceivePage'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 export default function App() {
@@ -23,6 +27,10 @@ export default function App() {
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="customers" element={<CustomersPage />} />
+          <Route path="pos" element={<PosPage />} />
+          <Route path="pos/sessions" element={<PosSessionsPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="inventory/receive" element={<InventoryReceivePage />} />
         </Route>
       </Route>
 
