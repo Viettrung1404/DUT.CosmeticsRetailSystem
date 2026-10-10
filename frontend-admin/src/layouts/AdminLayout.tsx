@@ -50,10 +50,10 @@ const menuItems = [
     children: [
       { key: '/admin/orders', icon: <ShoppingCartOutlined />, label: 'Đơn hàng' },
       { key: '/admin/customers', icon: <TeamOutlined />, label: 'Khách hàng' },
+      { key: '/admin/pos', icon: <ShoppingCartOutlined />, label: 'POS' },
       { key: '/admin/pos/sessions', icon: <ShopOutlined />, label: 'Ca POS' },
       { key: '/admin/inventory', icon: <DatabaseOutlined />, label: 'Tồn kho' },
       { key: '/admin/inventory/receive', icon: <DatabaseOutlined />, label: 'Nhập / điều chỉnh kho' },
-      { key: 'pos-sales', icon: <ShoppingCartOutlined />, label: 'POS bán hàng', disabled: true },
     ],
   },
   {
@@ -74,6 +74,7 @@ function resolvePageName(pathname: string) {
   if (pathname === '/admin/orders') return 'Quản lý đơn hàng'
   if (pathname.startsWith('/admin/orders/')) return 'Chi tiết đơn hàng'
   if (pathname === '/admin/customers') return 'Quản lý khách hàng'
+  if (pathname === '/admin/pos') return 'POS tại cửa hàng'
   if (pathname === '/admin/pos/sessions') return 'Ca bán hàng POS'
   if (pathname === '/admin/inventory') return 'Quản lý tồn kho'
   if (pathname === '/admin/inventory/receive') return 'Nhập / điều chỉnh kho'
