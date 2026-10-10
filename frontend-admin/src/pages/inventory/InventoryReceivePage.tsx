@@ -1,6 +1,7 @@
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, DatePicker, Form, Input, InputNumber, Radio, Space, Typography, message } from 'antd'
 import dayjs from 'dayjs'
+import { useState } from 'react'
 import { adjustInventory, receivePurchaseOrder } from '../../api/operationsApi'
 import type { AdjustInventoryInput, ReceivePurchaseOrderInput } from '../../types/operations'
 
@@ -31,7 +32,7 @@ type AdjustFormValue = {
 
 export default function InventoryReceivePage() {
   const [messageApi, contextHolder] = message.useMessage()
-  const [mode, setMode] = useStateMode()
+  const [mode, setMode] = useState<'receive' | 'adjust'>('receive')
   const [receiveForm] = Form.useForm<ReceiveFormValue>()
   const [adjustForm] = Form.useForm<AdjustFormValue>()
 
@@ -137,9 +138,4 @@ export default function InventoryReceivePage() {
       )}
     </div>
   )
-}
-
-function useStateMode() {
-  const React = require('react') as typeof import('react')
-  return React.useState<'receive' | 'adjust'>('receive')
 }
