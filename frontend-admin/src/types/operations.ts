@@ -76,6 +76,14 @@ export type InventoryQuery = {
   status?: StockStatus
 }
 
+export type PosInventoryQuery = {
+  storeId: string
+  page?: number
+  limit?: number
+  order?: 'ASC' | 'DESC'
+  search?: string
+}
+
 export type ReceivePurchaseOrderInput = {
   purchaseOrderId: string
   items: Array<{
