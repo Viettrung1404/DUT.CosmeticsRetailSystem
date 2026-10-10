@@ -6,6 +6,7 @@ import type {
   InventoryQuery,
   OpenPosSessionInput,
   PageResult,
+  PosInventoryQuery,
   PosSession,
   PosSessionQuery,
   ReceivePurchaseOrderInput,
@@ -39,6 +40,11 @@ export async function closePosSession(id: string, input: ClosePosSessionInput): 
 export async function reconcilePosSession(id: string, note?: string): Promise<PosSession> {
   const response = await axiosClient.post(`/pos/sessions/${id}/reconcile`, { note })
   return unwrap<PosSession>(response.data)
+}
+
+export async function getPosInventory(query: PosInventoryQuery): Promise<PageResult<InventoryItem>> {
+  const response = await axiosClient.get('/pos/inventory', { params: query })
+  return unwrap<PageResult<InventoryItem>>(response.data)
 }
 
 export async function getAdminInventory(query: InventoryQuery = {}): Promise<PageResult<InventoryItem>> {
