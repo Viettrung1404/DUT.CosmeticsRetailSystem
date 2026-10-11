@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { CustomerContextService } from '@core/services/customer-context.service';
 import { CART_REPOSITORY } from './domain/repositories/cart.repository.interface';
@@ -8,10 +9,15 @@ import { GetCartUseCase } from './application/use-cases/get-cart.use-case';
 import { UpdateCartItemUseCase } from './application/use-cases/update-cart-item.use-case';
 import { RemoveCartItemUseCase } from './application/use-cases/remove-cart-item.use-case';
 import { MergeCartUseCase } from './application/use-cases/merge-cart.use-case';
+import { CartCleanupService } from './application/use-cases/cart-cleanup.service';
 import { CartController } from './presentation/controllers/cart.controller';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [
+    PrismaModule,
+    // Enable cron scheduling for cart cleanup
+    ScheduleModule.forRoot(),
+  ],
   controllers: [CartController],
   providers: [
     CustomerContextService,
@@ -20,6 +26,7 @@ import { CartController } from './presentation/controllers/cart.controller';
     UpdateCartItemUseCase,
     RemoveCartItemUseCase,
     MergeCartUseCase,
+    CartCleanupService,
     {
       provide: CART_REPOSITORY,
       useClass: PrismaCartRepository,

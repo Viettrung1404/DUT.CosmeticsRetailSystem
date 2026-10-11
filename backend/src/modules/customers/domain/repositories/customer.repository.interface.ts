@@ -14,4 +14,14 @@ export interface ICustomerRepository {
   deleteAddress(addressId: string): Promise<void>;
   unsetDefaultAddresses(customerId: string): Promise<void>;
   setDefaultAddress(customerId: string, addressId: string): Promise<void>;
+  updateProfile(
+    customerId: string,
+    data: {
+      fullName?: string;
+      phone?: string;
+      gender?: string;
+      dateOfBirth?: Date | null;
+    },
+  ): Promise<CustomerEntity>;
 }
+

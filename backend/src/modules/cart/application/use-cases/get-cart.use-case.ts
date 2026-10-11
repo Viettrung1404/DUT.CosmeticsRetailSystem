@@ -1,32 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CART_REPOSITORY, ICartRepository } from '../../domain/repositories/cart.repository.interface';
-import { CartEntity } from '../../domain/entities/cart.entity';
+import { CartItemResponseDto, CartResponseDto } from '../../presentation/dtos/cart-response.dto';
 
 export interface GetCartInput {
   customerId?: string;
   sessionId?: string;
 }
 
-export interface CartResponseDto {
-  id: string;
-  customerId: string | null;
-  sessionId: string | null;
-  storeId: string | null;
-  items: {
-    id: string;
-    productVariantId: string;
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number;
-    productName?: string;
-    variantName?: string;
-    sku?: string;
-    thumbnailUrl?: string;
-    availableStock?: number;
-  }[];
-  totalQuantity: number;
-  subtotal: number;
-}
+// Re-export for compatibility with other modules if needed
+export { CartItemResponseDto, CartResponseDto };
 
 @Injectable()
 export class GetCartUseCase {
@@ -36,54 +18,92 @@ export class GetCartUseCase {
   ) {}
 
   async execute(input: GetCartInput): Promise<CartResponseDto> {
+    const emptyCart: CartResponseDto = {
+      id: '',
+      customerId: input.customerId || null,
+      sessionId: input.sessionId || null,
+      storeId: null,
+      items: [],
+      unavailableItems: [],
+      totalQuantity: 0,
+      subtotal: 0,
+      selectedQuantity: 0,
+      selectedSubtotal: 0,
+      hasPriceChanges: false,
+    };
+
     if (!input.customerId && !input.sessionId) {
-      return {
-        id: '',
-        customerId: null,
-        sessionId: null,
-        storeId: null,
-        items: [],
-        totalQuantity: 0,
-        subtotal: 0,
-      };
+      return emptyCart;
     }
 
+    // P1: Single fetch — findCart loads cart, items, variants, images, and inventory in 1 roundtrip
     const cart = await this.cartRepository.findCart({
       customerId: input.customerId,
       sessionId: input.sessionId,
     });
 
-    if (!cart) {
-      return {
-        id: '',
-        customerId: input.customerId || null,
-        sessionId: input.sessionId || null,
-        storeId: null,
-        items: [],
-        totalQuantity: 0,
-        subtotal: 0,
-      };
+    if (!cart || cart.items.length === 0) {
+      return { ...emptyCart, id: cart?.id || '' };
     }
+
+    const availableItems: CartItemResponseDto[] = [];
+    const unavailableItems: CartItemResponseDto[] = [];
+    let hasPriceChanges = false;
+
+    for (const item of cart.items) {
+      const isAvailable = item.isVariantActive;
+      const priceChanged = item.priceChanged;
+
+      if (priceChanged) {
+        hasPriceChanges = true;
+      }
+
+      const dto: CartItemResponseDto = {
+        id: item.id,
+        productVariantId: item.productVariantId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        currentPrice: item.currentPrice,
+        totalPrice: item.getTotalPrice(),
+        priceChanged,
+        isSelected: item.isSelected,
+        isQuantityExceeded: item.isQuantityExceeded,
+        productName: item.productName,
+        variantName: item.variantName,
+        sku: item.sku,
+        thumbnailUrl: item.thumbnailUrl,
+        availableStock: item.availableStock ?? 0,
+        isAvailable,
+      };
+
+      if (isAvailable) {
+        availableItems.push(dto);
+      } else {
+        unavailableItems.push(dto);
+      }
+    }
+
+    // P2: Pure read-only — NO side-effect database writes on GET method
+
+    const totalQuantity = availableItems.reduce((sum, i) => sum + i.quantity, 0);
+    const subtotal = availableItems.reduce((sum, i) => sum + i.totalPrice, 0);
+
+    const selectedItems = availableItems.filter((i) => i.isSelected);
+    const selectedQuantity = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
+    const selectedSubtotal = selectedItems.reduce((sum, i) => sum + i.totalPrice, 0);
 
     return {
       id: cart.id,
       customerId: cart.customerId,
       sessionId: cart.sessionId,
       storeId: cart.storeId,
-      items: cart.items.map((i) => ({
-        id: i.id,
-        productVariantId: i.productVariantId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        totalPrice: i.getTotalPrice(),
-        productName: i.productName,
-        variantName: i.variantName,
-        sku: i.sku,
-        thumbnailUrl: i.thumbnailUrl,
-        availableStock: i.availableStock,
-      })),
-      totalQuantity: cart.getTotalQuantity(),
-      subtotal: cart.getSubtotal(),
+      items: availableItems,
+      unavailableItems,
+      totalQuantity,
+      subtotal,
+      selectedQuantity,
+      selectedSubtotal,
+      hasPriceChanges,
     };
   }
 }

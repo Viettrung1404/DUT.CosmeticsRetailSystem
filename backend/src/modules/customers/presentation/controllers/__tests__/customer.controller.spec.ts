@@ -1,5 +1,6 @@
 import { CustomerController } from '../customer.controller';
 import { GetCustomerProfileUseCase } from '../../../application/use-cases/get-customer-profile.use-case';
+import { UpdateCustomerProfileUseCase } from '../../../application/use-cases/update-customer-profile.use-case';
 import { GetCustomerAddressesUseCase } from '../../../application/use-cases/get-customer-addresses.use-case';
 import { CreateCustomerAddressUseCase } from '../../../application/use-cases/create-customer-address.use-case';
 import { UpdateCustomerAddressUseCase } from '../../../application/use-cases/update-customer-address.use-case';
@@ -12,6 +13,7 @@ import { CustomerAddressEntity } from '../../../domain/entities/customer-address
 describe('CustomerController (Presentation TDD)', () => {
   let controller: CustomerController;
   let mockGetProfile: jest.Mocked<GetCustomerProfileUseCase>;
+  let mockUpdateProfile: jest.Mocked<UpdateCustomerProfileUseCase>;
   let mockGetAddresses: jest.Mocked<GetCustomerAddressesUseCase>;
   let mockCreateAddress: jest.Mocked<CreateCustomerAddressUseCase>;
   let mockUpdateAddress: jest.Mocked<UpdateCustomerAddressUseCase>;
@@ -21,6 +23,7 @@ describe('CustomerController (Presentation TDD)', () => {
 
   beforeEach(() => {
     mockGetProfile = { execute: jest.fn() } as any;
+    mockUpdateProfile = { execute: jest.fn() } as any;
     mockGetAddresses = { execute: jest.fn() } as any;
     mockCreateAddress = { execute: jest.fn() } as any;
     mockUpdateAddress = { execute: jest.fn() } as any;
@@ -30,6 +33,7 @@ describe('CustomerController (Presentation TDD)', () => {
 
     controller = new CustomerController(
       mockGetProfile,
+      mockUpdateProfile,
       mockGetAddresses,
       mockCreateAddress,
       mockUpdateAddress,
@@ -50,6 +54,31 @@ describe('CustomerController (Presentation TDD)', () => {
     const res = await controller.getProfile({ user: { userId: 'u-1' } });
     expect(mockGetProfile.execute).toHaveBeenCalledWith('u-1');
     expect(res.fullName).toBe('Văn A');
+  });
+
+  it('should update customer profile', async () => {
+    mockCustomerContext.getCustomerIdFromUserId.mockResolvedValue('cust-1');
+    const updated = new CustomerEntity({
+      id: 'cust-1',
+      userId: 'u-1',
+      fullName: 'Văn B',
+    });
+    mockUpdateProfile.execute.mockResolvedValue(updated);
+
+    const res = await controller.updateProfile(
+      { user: { userId: 'u-1' } },
+      { fullName: 'Văn B' },
+    );
+
+    expect(mockCustomerContext.getCustomerIdFromUserId).toHaveBeenCalledWith('u-1');
+    expect(mockUpdateProfile.execute).toHaveBeenCalledWith({
+      customerId: 'cust-1',
+      fullName: 'Văn B',
+      phone: undefined,
+      gender: undefined,
+      dateOfBirth: undefined,
+    });
+    expect(res.fullName).toBe('Văn B');
   });
 
   it('should create address using customerId from context', async () => {

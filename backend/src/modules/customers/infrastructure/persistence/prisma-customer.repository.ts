@@ -121,19 +121,29 @@ export class PrismaCustomerRepository implements ICustomerRepository {
     customerId: string,
     address: Omit<CustomerAddressEntity, 'id' | 'customerId' | 'createdAt' | 'updatedAt' | 'getFullAddress'>,
   ): Promise<CustomerAddressEntity> {
-    const raw = await this.prisma.customerAddress.create({
-      data: {
-        customerId,
-        label: address.label,
-        recipientName: address.recipientName,
-        phone: address.phone,
-        addressLine: address.addressLine,
-        city: address.city,
-        district: address.district,
-        ward: address.ward,
-        isDefault: address.isDefault,
-      },
+    const raw = await this.prisma.$transaction(async (tx) => {
+      if (address.isDefault) {
+        await tx.customerAddress.updateMany({
+          where: { customerId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.customerAddress.create({
+        data: {
+          customerId,
+          label: address.label,
+          recipientName: address.recipientName,
+          phone: address.phone,
+          addressLine: address.addressLine,
+          city: address.city,
+          district: address.district,
+          ward: address.ward,
+          isDefault: address.isDefault,
+        },
+      });
     });
+
     return this.mapToAddressEntity(raw);
   }
 
@@ -141,19 +151,35 @@ export class PrismaCustomerRepository implements ICustomerRepository {
     addressId: string,
     address: Partial<Omit<CustomerAddressEntity, 'id' | 'customerId' | 'createdAt' | 'updatedAt' | 'getFullAddress'>>,
   ): Promise<CustomerAddressEntity> {
-    const raw = await this.prisma.customerAddress.update({
-      where: { id: addressId },
-      data: {
-        ...(address.label !== undefined && { label: address.label }),
-        ...(address.recipientName !== undefined && { recipientName: address.recipientName }),
-        ...(address.phone !== undefined && { phone: address.phone }),
-        ...(address.addressLine !== undefined && { addressLine: address.addressLine }),
-        ...(address.city !== undefined && { city: address.city }),
-        ...(address.district !== undefined && { district: address.district }),
-        ...(address.ward !== undefined && { ward: address.ward }),
-        ...(address.isDefault !== undefined && { isDefault: address.isDefault }),
-      },
+    const raw = await this.prisma.$transaction(async (tx) => {
+      if (address.isDefault) {
+        const existing = await tx.customerAddress.findUnique({
+          where: { id: addressId },
+          select: { customerId: true },
+        });
+        if (existing) {
+          await tx.customerAddress.updateMany({
+            where: { customerId: existing.customerId, isDefault: true },
+            data: { isDefault: false },
+          });
+        }
+      }
+
+      return tx.customerAddress.update({
+        where: { id: addressId },
+        data: {
+          ...(address.label !== undefined && { label: address.label }),
+          ...(address.recipientName !== undefined && { recipientName: address.recipientName }),
+          ...(address.phone !== undefined && { phone: address.phone }),
+          ...(address.addressLine !== undefined && { addressLine: address.addressLine }),
+          ...(address.city !== undefined && { city: address.city }),
+          ...(address.district !== undefined && { district: address.district }),
+          ...(address.ward !== undefined && { ward: address.ward }),
+          ...(address.isDefault !== undefined && { isDefault: address.isDefault }),
+        },
+      });
     });
+
     return this.mapToAddressEntity(raw);
   }
 
@@ -171,9 +197,60 @@ export class PrismaCustomerRepository implements ICustomerRepository {
   }
 
   async setDefaultAddress(customerId: string, addressId: string): Promise<void> {
-    await this.prisma.customerAddress.update({
-      where: { id: addressId },
-      data: { isDefault: true },
+    await this.prisma.$transaction([
+      this.prisma.customerAddress.updateMany({
+        where: { customerId, isDefault: true },
+        data: { isDefault: false },
+      }),
+      this.prisma.customerAddress.update({
+        where: { id: addressId },
+        data: { isDefault: true },
+      }),
+    ]);
+  }
+
+  async updateProfile(
+    customerId: string,
+    data: {
+      fullName?: string;
+      phone?: string;
+      gender?: string;
+      dateOfBirth?: Date | null;
+    },
+  ): Promise<CustomerEntity> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.customer.findUnique({
+        where: { id: customerId },
+        select: { userId: true },
+      });
+
+      const customerUpdate = await tx.customer.update({
+        where: { id: customerId },
+        data: {
+          ...(data.fullName !== undefined && { fullName: data.fullName }),
+          ...(data.phone !== undefined && { phone: data.phone }),
+          ...(data.gender !== undefined && { gender: data.gender }),
+          ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
+        },
+        include: {
+          user: true,
+          loyaltyTier: true,
+        },
+      });
+
+      if (existing?.userId && (data.fullName !== undefined || data.phone !== undefined)) {
+        await tx.user.update({
+          where: { id: existing.userId },
+          data: {
+            ...(data.fullName !== undefined && { fullName: data.fullName }),
+            ...(data.phone !== undefined && { phone: data.phone }),
+          },
+        });
+      }
+
+      return customerUpdate;
     });
+
+    return this.mapToCustomerEntity(updated);
   }
 }

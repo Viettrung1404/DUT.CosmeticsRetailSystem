@@ -3,6 +3,7 @@ import { ICustomerRepository } from '../../../domain/repositories/customer.repos
 import { CustomerEntity } from '../../../domain/entities/customer.entity';
 import { CustomerAddressEntity } from '../../../domain/entities/customer-address.entity';
 import { GetCustomerProfileUseCase } from '../get-customer-profile.use-case';
+import { UpdateCustomerProfileUseCase } from '../update-customer-profile.use-case';
 import { GetCustomerAddressesUseCase } from '../get-customer-addresses.use-case';
 import { CreateCustomerAddressUseCase } from '../create-customer-address.use-case';
 import { UpdateCustomerAddressUseCase } from '../update-customer-address.use-case';
@@ -12,6 +13,7 @@ import { SetDefaultAddressUseCase } from '../set-default-address.use-case';
 describe('Customer Use Cases (Application TDD)', () => {
   let mockRepo: jest.Mocked<ICustomerRepository>;
   let getProfileUseCase: GetCustomerProfileUseCase;
+  let updateProfileUseCase: UpdateCustomerProfileUseCase;
   let getAddressesUseCase: GetCustomerAddressesUseCase;
   let createAddressUseCase: CreateCustomerAddressUseCase;
   let updateAddressUseCase: UpdateCustomerAddressUseCase;
@@ -30,9 +32,11 @@ describe('Customer Use Cases (Application TDD)', () => {
       deleteAddress: jest.fn(),
       unsetDefaultAddresses: jest.fn(),
       setDefaultAddress: jest.fn(),
+      updateProfile: jest.fn(),
     };
 
     getProfileUseCase = new GetCustomerProfileUseCase(mockRepo);
+    updateProfileUseCase = new UpdateCustomerProfileUseCase(mockRepo);
     getAddressesUseCase = new GetCustomerAddressesUseCase(mockRepo);
     createAddressUseCase = new CreateCustomerAddressUseCase(mockRepo);
     updateAddressUseCase = new UpdateCustomerAddressUseCase(mockRepo);
@@ -63,6 +67,46 @@ describe('Customer Use Cases (Application TDD)', () => {
       expect(res.id).toBe('cust-1');
       expect(res.fullName).toBe('Nguyễn Văn A');
       expect(res.totalPoints).toBe(100);
+    });
+  });
+
+  describe('UpdateCustomerProfileUseCase', () => {
+    it('should throw NotFoundException if customer not found', async () => {
+      mockRepo.findById.mockResolvedValue(null);
+
+      await expect(
+        updateProfileUseCase.execute({ customerId: 'cust-999', fullName: 'New Name' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should update customer profile successfully', async () => {
+      const existing = new CustomerEntity({
+        id: 'cust-1',
+        fullName: 'Old Name',
+      });
+      const updated = new CustomerEntity({
+        id: 'cust-1',
+        fullName: 'New Name',
+        phone: '0909999999',
+        gender: 'FEMALE',
+      });
+      mockRepo.findById.mockResolvedValue(existing);
+      mockRepo.updateProfile.mockResolvedValue(updated);
+
+      const res = await updateProfileUseCase.execute({
+        customerId: 'cust-1',
+        fullName: 'New Name',
+        phone: '0909999999',
+        gender: 'FEMALE',
+      });
+
+      expect(mockRepo.updateProfile).toHaveBeenCalledWith('cust-1', {
+        fullName: 'New Name',
+        phone: '0909999999',
+        gender: 'FEMALE',
+        dateOfBirth: undefined,
+      });
+      expect(res.fullName).toBe('New Name');
     });
   });
 
@@ -193,6 +237,68 @@ describe('Customer Use Cases (Application TDD)', () => {
 
       expect(mockRepo.unsetDefaultAddresses).toHaveBeenCalledWith('cust-1');
       expect(mockRepo.setDefaultAddress).toHaveBeenCalledWith('cust-1', 'addr-1');
+    });
+
+    it('should prevent unsetting default on an address that is currently default', async () => {
+      const defaultAddress = new CustomerAddressEntity({
+        id: 'addr-def',
+        customerId: 'cust-1',
+        recipientName: 'Tôi',
+        phone: '0901234567',
+        addressLine: '123 Đường A',
+        city: 'Đà Nẵng',
+        district: 'Hải Châu',
+        ward: 'Thạch Thang',
+        isDefault: true,
+      });
+      mockRepo.findAddressById.mockResolvedValue(defaultAddress);
+
+      await expect(
+        updateAddressUseCase.execute({
+          addressId: 'addr-def',
+          customerId: 'cust-1',
+          isDefault: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should auto-promote remaining address to default when deleting default address', async () => {
+      const defaultAddress = new CustomerAddressEntity({
+        id: 'addr-def',
+        customerId: 'cust-1',
+        recipientName: 'Tôi',
+        phone: '0901234567',
+        addressLine: '123 Đường A',
+        city: 'Đà Nẵng',
+        district: 'Hải Châu',
+        ward: 'Thạch Thang',
+        isDefault: true,
+      });
+      const remainingAddress = new CustomerAddressEntity({
+        id: 'addr-rem',
+        customerId: 'cust-1',
+        recipientName: 'Tôi 2',
+        phone: '0901234567',
+        addressLine: '456 Đường B',
+        city: 'Đà Nẵng',
+        district: 'Hải Châu',
+        ward: 'Thạch Thang',
+        isDefault: false,
+      });
+
+      mockRepo.findAddressById.mockResolvedValue(defaultAddress);
+      mockRepo.deleteAddress.mockResolvedValue();
+      mockRepo.findAddressesByCustomerId.mockResolvedValue([remainingAddress]);
+      mockRepo.setDefaultAddress.mockResolvedValue();
+
+      await deleteAddressUseCase.execute({
+        addressId: 'addr-def',
+        customerId: 'cust-1',
+      });
+
+      expect(mockRepo.deleteAddress).toHaveBeenCalledWith('addr-def');
+      expect(mockRepo.findAddressesByCustomerId).toHaveBeenCalledWith('cust-1');
+      expect(mockRepo.setDefaultAddress).toHaveBeenCalledWith('cust-1', 'addr-rem');
     });
   });
 });
