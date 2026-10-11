@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { CustomerContextService } from '@core/services/customer-context.service';
 import { CART_REPOSITORY } from './domain/repositories/cart.repository.interface';
@@ -13,11 +12,7 @@ import { CartCleanupService } from './application/use-cases/cart-cleanup.service
 import { CartController } from './presentation/controllers/cart.controller';
 
 @Module({
-  imports: [
-    PrismaModule,
-    // Enable cron scheduling for cart cleanup
-    ScheduleModule.forRoot(),
-  ],
+  imports: [PrismaModule],
   controllers: [CartController],
   providers: [
     CustomerContextService,
