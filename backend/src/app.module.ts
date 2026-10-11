@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { CacheModule } from '@core/cache/cache.module';
@@ -11,6 +12,10 @@ import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
 import { UploadsModule } from '@modules/uploads/uploads.module';
+import { CartModule } from '@modules/cart/cart.module';
+import { CustomersModule } from '@modules/customers/customers.module';
+import { OrdersModule } from '@modules/orders/orders.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -18,6 +23,11 @@ import { UploadsModule } from '@modules/uploads/uploads.module';
       isGlobal: true,
       envFilePath: ['.env'],
     }),
+    ScheduleModule.forRoot(),
+    {
+      ...ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+      global: true,
+    },
     PrismaModule,
     AuthModule,
     UploadsModule,
@@ -26,6 +36,9 @@ import { UploadsModule } from '@modules/uploads/uploads.module';
     PermissionsModule,
     CategoriesModule,
     BrandsModule,
+    CartModule,
+    CustomersModule,
+    OrdersModule,
   ],
   providers: [
     {

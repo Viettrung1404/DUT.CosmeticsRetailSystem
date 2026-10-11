@@ -84,4 +84,21 @@ describe('JwtAuthGuard', () => {
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
+
+  it('should attach user payload on public route when token is valid', () => {
+    reflector.getAllAndOverride.mockReturnValue(true);
+    const token = jwt.sign({ userId: 'user-123', roleId: 6 }, 'test-secret');
+    const context = createMockContext(`Bearer ${token}`);
+
+    expect(guard.canActivate(context)).toBe(true);
+    expect(context.switchToHttp().getRequest().user).toMatchObject({ userId: 'user-123' });
+  });
+
+  it('should allow public route as guest when token is invalid', () => {
+    reflector.getAllAndOverride.mockReturnValue(true);
+    const context = createMockContext('Bearer invalid.token.here');
+
+    expect(guard.canActivate(context)).toBe(true);
+    expect(context.switchToHttp().getRequest().user).toBeNull();
+  });
 });

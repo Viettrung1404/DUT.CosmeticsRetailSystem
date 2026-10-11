@@ -31,26 +31,37 @@ export class JwtAuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (isPublic) {
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
+
+    if (isPublic) {
+      // Route public (giỏ hàng...) vẫn cần biết khách đã đăng nhập nếu có token hợp lệ
+      if (token) {
+        try {
+          request.user = this.verify(token);
+        } catch {
+          // Token hỏng thì coi như khách vãng lai
+        }
+      }
+      return true;
+    }
 
     if (!token) {
       throw new UnauthorizedException('Token không được cung cấp');
     }
 
     try {
-      const secret = this.configService.get<string>('JWT_SECRET', 'glowup-secret-key');
-      const payload = jwt.verify(token, secret) as JwtPayload;
-      request.user = payload;
+      request.user = this.verify(token);
     } catch {
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }
 
     return true;
+  }
+
+  private verify(token: string): JwtPayload {
+    const secret = this.configService.get<string>('JWT_SECRET', 'glowup-secret-key');
+    return jwt.verify(token, secret) as JwtPayload;
   }
 
   private extractTokenFromHeader(request: any): string | undefined {

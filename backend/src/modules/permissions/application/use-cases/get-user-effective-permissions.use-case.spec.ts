@@ -32,6 +32,7 @@ describe('GetUserEffectivePermissionsUseCase', () => {
     repository = {
       findUserPermissionMasks: jest.fn(),
       findAllDefinitions: jest.fn().mockResolvedValue(DEFINITIONS),
+      findUserScopeInfo: jest.fn(),
     };
     useCase = new GetUserEffectivePermissionsUseCase(repository);
   });

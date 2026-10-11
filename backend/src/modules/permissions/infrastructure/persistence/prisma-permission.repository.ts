@@ -4,6 +4,7 @@ import {
   IPermissionRepository,
   PermissionDefinition,
   UserPermissionMasks,
+  UserScopeInfo,
 } from '../../domain/repositories/permission.repository.interface';
 
 @Injectable()
@@ -30,6 +31,28 @@ export class PrismaPermissionRepository implements IPermissionRepository {
       rolePermissions: user.role?.permissions ?? 0n,
       extraPermissions: user.extraPermissions,
       revokedPermissions: user.revokedPermissions,
+    };
+  }
+
+  async findUserScopeInfo(userId: string): Promise<UserScopeInfo | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: { select: { dataScope: true } },
+        userStores: { select: { storeId: true } },
+        employee: { select: { id: true, storeId: true } },
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      dataScope: user.role?.dataScope ?? 'SELF',
+      assignedStoreIds: user.userStores.map((us) => us.storeId),
+      employeeId: user.employee?.id ?? null,
+      employeeStoreId: user.employee?.storeId ?? null,
     };
   }
 
