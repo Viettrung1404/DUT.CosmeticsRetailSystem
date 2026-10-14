@@ -2,6 +2,8 @@
 
 Dự án Backend cho Hệ thống Quản lý Bán lẻ Mỹ phẩm **GlowUp**, được xây dựng bằng **NestJS**, **Prisma ORM**, kết nối **PostgreSQL 17 (Neon Database)** theo mô hình **Clean Architecture (Module-centric)**.
 
+Sprint 3 backend end-user: [thiết kế, decision log, cấu hình và nghiệm thu](docs/sprint-3.md), [Postman](docs/sprint-3.postman_collection.json), [hợp đồng Mobile](docs/sprint-3-mobile.md). Ba cổng thanh toán mặc định tắt cho đến khi merchant sandbox và callback HTTPS sẵn sàng. Dùng Node.js ≥20.9; đã kiểm chứng trên Node.js 22.14.
+
 ---
 
 ## 1. Cấu trúc Clean Architecture trong từng Module

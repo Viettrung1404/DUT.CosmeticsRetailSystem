@@ -349,7 +349,7 @@ flowchart TD
 
 ## 6. Quy tắc nghiệp vụ (Business Rules)
 
-- **BR-01:** Giá trị đơn hàng trực tuyến tối thiểu để thanh toán là 100,000 VNĐ.
+- **BR-01 (Sprint 3):** Không áp dụng mức tối thiểu chung 100.000 VNĐ. Số tiền nguyên VND sau giảm giá/điểm phải nằm trong hạn mức từng cổng: MoMo từ 1.000 VNĐ, VNPay từ 5.000 VNĐ, ZaloPay theo merchant đã xác nhận. Trần MVP 50.000.000 VNĐ hoặc hạn mức merchant thấp hơn; kiểm tra trước khi giữ hàng/trừ điểm. Chi tiết: [Sprint 3 backend](../../backend/docs/sprint-3.md).
 - **BR-02:** Tỷ lệ tích điểm áp dụng chung là 1% tổng giá trị đơn hàng (sau khi đã trừ khuyến mãi), 1 điểm = 1 VNĐ.
 - **BR-03:** Khách hàng không được dùng điểm thưởng để thanh toán quá 50% giá trị của đơn hàng mới.
 - **BR-04:** Mỹ phẩm có hạn sử dụng còn dưới 3 tháng sẽ tự động bị đánh dấu là "Cận date" và không được phép xuất kho cho đơn đặt hàng Online (chỉ bán thanh lý tại POS).
