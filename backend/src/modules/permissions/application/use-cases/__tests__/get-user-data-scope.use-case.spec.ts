@@ -1,9 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
-import { GetUserDataScopeUseCase } from './get-user-data-scope.use-case';
+import { GetUserDataScopeUseCase } from '../get-user-data-scope.use-case';
 import {
   IPermissionRepository,
   UserScopeInfo,
-} from '../../domain/repositories/permission.repository.interface';
+} from '../../../domain/repositories/permission.repository.interface';
 
 describe('GetUserDataScopeUseCase', () => {
   let repository: jest.Mocked<IPermissionRepository>;
