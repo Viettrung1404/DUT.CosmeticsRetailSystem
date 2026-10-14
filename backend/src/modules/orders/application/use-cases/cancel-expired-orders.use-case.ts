@@ -8,8 +8,7 @@ import {
 export class CancelExpiredOrdersUseCase {
   private readonly logger = new Logger(CancelExpiredOrdersUseCase.name);
 
-  // Sprint 2: 30 minutes for COD orders (FR-02.06)
-  // NOTE: When Sprint 3 introduces VNPay/MoMo, online payment orders will expire in 15 minutes (BR-07)
+  // COD expiry only. PaymentWorker owns online deadlines and paid verification grace.
   private readonly EXPIRY_MINUTES_COD = 30;
 
   constructor(

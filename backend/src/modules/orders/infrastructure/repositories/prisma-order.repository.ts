@@ -4,10 +4,20 @@ import {
   IOrderRepository,
   CreateOrderTransactionInput,
 } from '../../domain/repositories/order.repository.interface';
-import { OrderEntity, ShippingAddressVo } from '../../domain/entities/order.entity';
+import {
+  OrderEntity,
+  ShippingAddressVo,
+} from '../../domain/entities/order.entity';
 import { OrderItemEntity } from '../../domain/entities/order-item.entity';
-import { OrderStatus, OrderActor } from '../../../../core/domain/orders/order-status.enum';
+import {
+  OrderStatus,
+  OrderActor,
+} from '../../../../core/domain/orders/order-status.enum';
 import { OrderStateMachine } from '../../../../core/domain/orders/order-state-machine';
+import { enqueueOrderEvent } from '@core/services/order-events';
+import { validatePaymentAmount } from '@modules/payments/domain/payment-policy';
+import { assertGatewayReady } from '@modules/payments/domain/gateway-readiness';
+import { cancelReservedOrder } from '@core/services/cancel-reserved-order';
 
 @Injectable()
 export class PrismaOrderRepository implements IOrderRepository {
@@ -16,18 +26,66 @@ export class PrismaOrderRepository implements IOrderRepository {
   async createOrderWithTransaction(
     data: CreateOrderTransactionInput,
   ): Promise<OrderEntity> {
-    return this.prisma.$transaction(async (tx) => {
+    validatePaymentAmount(data.paymentMethod, data.totalAmount);
+    assertGatewayReady(data.paymentMethod);
+    return this.prisma.transaction(async (tx) => {
+      const locked = await tx.$queryRaw<
+        Array<{
+          id: string;
+          product_variant_id: string;
+          quantity: number;
+          reserved_quantity: number;
+        }>
+      >`
+        SELECT id, product_variant_id, quantity, reserved_quantity FROM inventory
+        WHERE store_id=${data.storeId}::uuid AND product_variant_id = ANY(${data.items.map((i) => i.productVariantId)}::uuid[])
+        ORDER BY id FOR UPDATE`;
+      // Revalidate balances and usage while locked; pricing snapshots alone cannot prevent concurrent spending.
+      if (data.couponId) {
+        await tx.$queryRaw`SELECT id FROM coupons WHERE id=${data.couponId}::uuid FOR UPDATE`;
+        const coupon = await tx.coupon.findUnique({
+          where: { id: data.couponId },
+        });
+        const now = new Date();
+        if (
+          !coupon ||
+          !coupon.isActive ||
+          now < coupon.startDate ||
+          now > coupon.endDate ||
+          Number(coupon.minOrderAmount) > data.subtotal ||
+          (coupon.customerId && coupon.customerId !== data.customerId) ||
+          (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses)
+        )
+          throw new BadRequestException(
+            'Mã giảm giá không còn đủ điều kiện sử dụng',
+          );
+        const used = await tx.couponUsage.count({
+          where: { couponId: data.couponId, customerId: data.customerId },
+        });
+        if (used >= coupon.maxUsesPerCustomer)
+          throw new BadRequestException(
+            'Bạn đã sử dụng hết lượt cho mã giảm giá này',
+          );
+      }
+      if (data.loyaltyPointsUsed > 0) {
+        await tx.$queryRaw`SELECT id FROM customers WHERE id=${data.customerId}::uuid FOR UPDATE`;
+        const customer = await tx.customer.findUniqueOrThrow({
+          where: { id: data.customerId },
+          select: { totalPoints: true },
+        });
+        if (
+          !Number.isSafeInteger(data.loyaltyPointsUsed) ||
+          customer.totalPoints < data.loyaltyPointsUsed
+        )
+          throw new BadRequestException(
+            'Số điểm thưởng không còn đủ để thanh toán',
+          );
+      }
       // 1. Pessimistic Row Lock (SELECT ... FOR UPDATE) on inventory rows to prevent race condition
       for (const item of data.items) {
-        const inventories = await tx.$queryRaw<
-          Array<{ id: string; quantity: number; reserved_quantity: number }>
-        >`
-          SELECT id, quantity, reserved_quantity 
-          FROM inventory 
-          WHERE store_id = ${data.storeId}::uuid 
-            AND product_variant_id = ${item.productVariantId}::uuid 
-          FOR UPDATE;
-        `;
+        const inventories = locked.filter(
+          (i) => i.product_variant_id === item.productVariantId,
+        );
 
         if (!inventories || inventories.length === 0) {
           throw new BadRequestException(
@@ -51,6 +109,7 @@ export class PrismaOrderRepository implements IOrderRepository {
             },
           },
         });
+        inv.reserved_quantity += item.quantity;
       }
 
       // 2. Create Order record with OrderStatus.PENDING
@@ -146,6 +205,11 @@ export class PrismaOrderRepository implements IOrderRepository {
         },
       });
 
+      await enqueueOrderEvent(tx, order.id, 'PENDING');
+      if (data.cartId)
+        await tx.cartItem.deleteMany({
+          where: { cartId: data.cartId, cart: { customerId: data.customerId } },
+        });
       const fullOrder = await tx.order.findUnique({
         where: { id: order.id },
         include: { items: true, payments: true },
@@ -207,7 +271,7 @@ export class PrismaOrderRepository implements IOrderRepository {
     customerId?: string,
     reason?: string,
   ): Promise<OrderEntity> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.transaction(async (tx) => {
       // Pessimistic Row Lock (SELECT ... FOR UPDATE) on the order row
       const orders = await tx.$queryRaw<
         Array<{
@@ -231,6 +295,8 @@ export class PrismaOrderRepository implements IOrderRepository {
       }
 
       const existingRow = orders[0];
+      if (customerId && customerId !== existingRow.customer_id)
+        throw new BadRequestException('Đơn hàng không thuộc khách hàng');
 
       // Single Source of Truth: OrderStateMachine validates transition
       const actor: OrderActor = customerId ? 'CUSTOMER' : 'SYSTEM';
@@ -240,78 +306,21 @@ export class PrismaOrderRepository implements IOrderRepository {
         actor,
       );
 
-      const items = await tx.orderItem.findMany({
-        where: { orderId: existingRow.id },
-      });
-
-      // 1. Release reserved stock
-      for (const item of items) {
-        await tx.inventory.updateMany({
-          where: {
-            storeId: existingRow.store_id,
-            productVariantId: item.productVariantId,
-          },
-          data: {
-            reservedQuantity: {
-              decrement: item.quantity,
-            },
-          },
-        });
-      }
-
-      // 2. Refund coupon if used
-      if (existingRow.coupon_id) {
-        await tx.couponUsage.deleteMany({
-          where: { orderId: existingRow.id },
-        });
-
-        await tx.coupon.update({
-          where: { id: existingRow.coupon_id },
-          data: {
-            usedCount: { decrement: 1 },
-          },
-        });
-      }
-
-      // 3. Refund loyalty points if used
-      if (existingRow.loyalty_points_used > 0 && existingRow.customer_id) {
-        await tx.customer.update({
-          where: { id: existingRow.customer_id },
-          data: {
-            totalPoints: { increment: existingRow.loyalty_points_used },
-          },
-        });
-
-        await tx.loyaltyPointsTransaction.create({
-          data: {
-            customerId: existingRow.customer_id,
-            orderId: existingRow.id,
-            points: existingRow.loyalty_points_used,
-            type: 'REFUND',
-            description: `Hoàn điểm do hủy đơn hàng ${existingRow.order_number}`,
-          },
-        });
-      }
-
-      // 4. Update Payment to CANCELLED
-      await tx.payment.updateMany({
-        where: { orderId: existingRow.id },
-        data: { status: 'CANCELLED' },
-      });
-
-      // 5. Add status history
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: existingRow.id,
-          status: OrderStatus.CANCELLED,
-          note: reason || 'Khách hàng hủy đơn',
-        },
-      });
-
-      // 6. Update order status to CANCELLED
-      const updatedOrder = await tx.order.update({
+      // One batch releases every reservation, coupon and point exactly once.
+      await cancelReservedOrder(
+        tx,
+        existingRow.id,
+        reason || 'Khách hàng hủy đơn',
+      );
+      await tx.$executeRaw`INSERT INTO refunds
+        (id,order_id,payment_id,amount,reason,status,compensation_key,updated_at)
+        SELECT gen_random_uuid(),p.order_id,p.id,p.amount,${reason || 'Đơn hàng đã hủy'},'PENDING',
+          COALESCE('ONLINE_UNFULFILLED:'||p.payment_method||':'||NULLIF(p.transaction_id,''),
+            'CANCEL:'||p.order_id||':'||p.id),clock_timestamp()
+        FROM payments p WHERE p.order_id=${existingRow.id}::uuid AND p.status='COMPLETED'
+        ON CONFLICT(compensation_key) DO NOTHING`;
+      const updatedOrder = await tx.order.findUniqueOrThrow({
         where: { id: existingRow.id },
-        data: { status: OrderStatus.CANCELLED },
         include: { items: true, payments: true },
       });
 
@@ -324,6 +333,7 @@ export class PrismaOrderRepository implements IOrderRepository {
       where: {
         status: 'PENDING',
         createdAt: { lte: cutoffDate },
+        payments: { some: { paymentMethod: 'COD' } },
       },
       select: {
         id: true,
@@ -336,7 +346,7 @@ export class PrismaOrderRepository implements IOrderRepository {
       try {
         await this.cancelOrderWithTransaction(
           order.id,
-          order.customerId || undefined,
+          undefined,
           'Hệ thống tự động hủy do quá hạn 30 phút chưa xác nhận',
         );
         cancelledCount++;
@@ -443,7 +453,14 @@ export class PrismaOrderRepository implements IOrderRepository {
             createdAt: i.createdAt,
           }),
       ),
-      payments: row.payments,
+      payments: (row.payments || []).map((p: any) => ({
+        id: p.id,
+        paymentMethod: p.paymentMethod,
+        amount: Number(p.amount),
+        status: p.status,
+        paidAt: p.paidAt,
+        createdAt: p.createdAt,
+      })),
     });
   }
 }
