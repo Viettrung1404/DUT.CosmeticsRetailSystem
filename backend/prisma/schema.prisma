@@ -70,6 +70,7 @@ model User {
   customer                   Customer?
   devices                    UserDevice[]
   notifications              Notification[]
+  emailOutbox                 EmailOutbox[]
   auditLogs                  AuditLog[]
   orderStatusHistories       OrderStatusHistory[]
   posSessionsAsCashier       PosSession[]          @relation("CashierSessions")
@@ -759,14 +760,66 @@ model Payment {
   gatewayResponse Json?     @map("gateway_response") @db.JsonB
   paidAt          DateTime? @map("paid_at") @db.Timestamptz
   reconciledAt    DateTime? @map("reconciled_at") @db.Timestamptz
+  merchantReference String? @unique @map("merchant_reference") @db.VarChar(100)
+  requestId         String? @map("request_id") @db.VarChar(50)
+  platform          String? @db.VarChar(10)
+  returnState       String? @unique @map("return_state") @db.VarChar(64)
+  returnStateExpiresAt DateTime? @map("return_state_expires_at") @db.Timestamptz
+  returnUrl         String? @map("return_url") @db.Text
+  paymentUrl        String? @map("payment_url") @db.Text
+  walletDeeplink    String? @map("wallet_deeplink") @db.Text
+  qrCodeData        String? @map("qr_code_data") @db.Text
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz
+  requestSnapshot   Json? @map("request_snapshot") @db.JsonB
+  gatewayReportedStatus String? @map("gateway_reported_status") @db.VarChar(20)
+  verificationPending Boolean @default(false) @map("verification_pending")
+  firstPaidReceivedAt DateTime? @map("first_paid_received_at") @db.Timestamptz
+  nextQueryAt       DateTime? @map("next_query_at") @db.Timestamptz
+  recoveryUntil     DateTime? @map("recovery_until") @db.Timestamptz
+  claimToken        String? @map("claim_token") @db.Uuid
+  leaseUntil        DateTime? @map("lease_until") @db.Timestamptz
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   posSession PosSession? @relation(fields: [posSessionId], references: [id])
   refunds    Refund[]
+  webhookInbox PaymentWebhookInbox[]
+  charges      PaymentCharge[]
 
+  @@index([nextQueryAt, leaseUntil])
+  @@index([orderId, createdAt])
   @@map("payments")
+}
+
+model PaymentWebhookInbox {
+  id String @id @default(uuid()) @db.Uuid
+  paymentId String @map("payment_id") @db.Uuid
+  eventKey String @unique @map("event_key") @db.VarChar(64)
+  payloadHash String @map("payload_hash") @db.VarChar(64)
+  payload Json @db.JsonB
+  transactionId String @map("transaction_id") @db.VarChar(100)
+  reportedStatus String @map("reported_status") @db.VarChar(20)
+  receivedAt DateTime @default(dbgenerated("clock_timestamp()")) @map("received_at") @db.Timestamptz
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([paymentId, processedAt])
+  @@map("payment_webhook_inbox")
+}
+
+model PaymentCharge {
+  id String @id @default(uuid()) @db.Uuid
+  paymentId String @map("payment_id") @db.Uuid
+  gateway String @db.VarChar(20)
+  transactionId String @map("transaction_id") @db.VarChar(100)
+  amount Decimal @db.Decimal(12, 2)
+  firstPaidReceivedAt DateTime @default(dbgenerated("clock_timestamp()")) @map("first_paid_received_at") @db.Timestamptz
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz
+  fulfilled Boolean @default(false)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@unique([gateway, transactionId])
+  @@index([paymentId])
+  @@map("payment_charges")
 }
 
 model Refund {
@@ -778,6 +831,7 @@ model Refund {
   reason              String    @db.Text
   status              String    @db.VarChar(20)
   refundTransactionId String?   @map("refund_transaction_id") @db.VarChar(100)
+  compensationKey     String? @unique @map("compensation_key") @db.VarChar(160)
   processedAt         DateTime? @map("processed_at") @db.Timestamptz
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -1252,11 +1306,33 @@ model Notification {
   type      String   @db.VarChar(50)
   data      Json?    @db.JsonB
   isRead    Boolean  @default(false) @map("is_read")
+  eventKey  String? @unique @map("event_key") @db.VarChar(160)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, isRead, createdAt])
   @@map("notifications")
+}
+
+model EmailOutbox {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  eventKey String @unique @map("event_key") @db.VarChar(160)
+  recipient String @db.VarChar(255)
+  subject String @db.VarChar(255)
+  text String @db.Text
+  status String @default("PENDING") @db.VarChar(20)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz
+  claimToken String? @map("claim_token") @db.Uuid
+  lastError String? @map("last_error") @db.VarChar(100)
+  sentAt DateTime? @map("sent_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([status, nextAttemptAt, leaseUntil])
+  @@map("email_outbox")
 }
 
 model UserDevice {

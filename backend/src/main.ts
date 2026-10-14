@@ -7,7 +7,8 @@ import { TransformResponseInterceptor } from '@core/interceptors/transform-respo
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
+  app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
 
   // CORS configuration
   app.enableCors({
@@ -55,10 +56,22 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
-    .addTag('Auth (Xác thực & Người dùng)', 'API đăng ký, đăng nhập, xác thực email, OTP, JWT token')
-    .addTag('Customer - Products (Việt Trung)', 'API phục vụ Website / Mobile cho khách hàng')
-    .addTag('Customer - Categories (Việt Trung)', 'API phục vụ menu điều hướng danh mục Web / Mobile')
-    .addTag('Admin - Products (Thành Lập)', 'API phục vụ Dashboard quản trị cho Admin & Nhân viên')
+    .addTag(
+      'Auth (Xác thực & Người dùng)',
+      'API đăng ký, đăng nhập, xác thực email, OTP, JWT token',
+    )
+    .addTag(
+      'Customer - Products (Việt Trung)',
+      'API phục vụ Website / Mobile cho khách hàng',
+    )
+    .addTag(
+      'Customer - Categories (Việt Trung)',
+      'API phục vụ menu điều hướng danh mục Web / Mobile',
+    )
+    .addTag(
+      'Admin - Products (Thành Lập)',
+      'API phục vụ Dashboard quản trị cho Admin & Nhân viên',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -71,7 +84,9 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  logger.log(`🚀 Ứng dụng GlowUp Backend đang chạy tại: http://localhost:${port}/${globalPrefix}`);
+  logger.log(
+    `🚀 Ứng dụng GlowUp Backend đang chạy tại: http://localhost:${port}/${globalPrefix}`,
+  );
   logger.log(`📚 Swagger API Docs: http://localhost:${port}/api/docs`);
 }
 
