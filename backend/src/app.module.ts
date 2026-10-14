@@ -9,6 +9,7 @@ import { CacheModule } from '@core/cache/cache.module';
 import { ProductsModule } from '@modules/products/products.module';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
 import { BrandsModule } from '@modules/brands/brands.module';
+import { NotificationsModule } from '@modules/notifications/notifications.module';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
@@ -39,6 +40,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     PermissionsModule,
     CategoriesModule,
     BrandsModule,
+    NotificationsModule,
     CartModule,
     CustomersModule,
     OrdersModule,

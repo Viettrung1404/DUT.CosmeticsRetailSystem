@@ -225,7 +225,7 @@ Sprint 1 ──── Sprint 2 ──── Sprint 3 ──── Sprint 4 ─�
 <tbody>
 
 <tr><td rowspan="5"><strong>Việt Trung</strong><br/><em>BE End-user</em></td>
-<td>📌 VNPay integration: <code>POST /api/v1/payments/vnpay/create</code> (tạo payment URL), <code>GET /api/v1/payments/vnpay/callback</code> (verify signature, update payment), <code>POST /api/v1/payments/vnpay/ipn</code> (IPN endpoint). Khi TT thành công → orders.status = CONFIRMED</td><td>T2–T3</td></tr>
+<td>📌 VNPay integration: <code>POST /api/v1/payments/vnpay/create</code> (tạo/reuse payment URL), <code>GET /api/v1/payments/vnpay/callback</code> (browser return chỉ điều hướng), <code>GET /api/v1/payments/vnpay/ipn</code> (verify signature, durable inbox, native ACK). Worker query xác minh paid đúng hạn rồi chuyển đơn PENDING → CONFIRMED; tiền muộn/thừa tạo manual refund.</td><td>T2–T3</td></tr>
 <tr><td>📌 MoMo integration: <code>POST /api/v1/payments/momo/create</code>, callback, IPN — adapter pattern tương tự VNPay</td><td>T4</td></tr>
 <tr><td>📌 ZaloPay integration: tương tự adapter pattern</td><td>T4</td></tr>
 <tr><td>📌 <code>PUT /api/v1/auth/change-password</code> (verify old → update hash → invalidate other sessions → email notify). <code>GET /api/v1/users/me</code>, <code>PUT /api/v1/users/me</code>, <code>POST /api/v1/upload/avatar</code> (resize → S3)</td><td>T5</td></tr>
@@ -262,6 +262,8 @@ Sprint 1 ──── Sprint 2 ──── Sprint 3 ──── Sprint 4 ─�
 </table>
 
 > **Deliverable Sprint 3:** POS bán hàng hoàn chỉnh. Thanh toán VNPay/MoMo/ZaloPay. Nhập/xuất kho. ✅ **MVP Complete — Hệ thống vận hành được cả Online lẫn Offline**
+
+> **Backend end-user Việt Trung — cập nhật 11/10/2026:** triển khai theo [thiết kế/decision log Sprint 3](../../backend/docs/sprint-3.md). Bỏ minimum 100.000 VND; dùng ngưỡng từng cổng, trần 50 triệu, online 15 phút + tối đa 60 giây xác minh paid đúng hạn, COD 30 phút. Mobile HTTPS bridge và handler tối thiểu bàn giao [Văn Kim](../../backend/docs/sprint-3-mobile.md); universal links/FCM sprint sau. Nghiệm thu chỉ hoàn tất khi có bằng chứng cả ba sandbox thật, merchant quota/hạn mức/timeout, Web/Mobile development build và tải Neon; hiện chưa có credentials/HTTPS public nên **chưa đạt nghiệm thu thanh toán**.
 
 ---
 
