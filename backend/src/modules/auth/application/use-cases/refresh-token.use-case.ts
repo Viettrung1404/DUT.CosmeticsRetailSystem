@@ -1,11 +1,17 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { USER_REPOSITORY, IUserRepository } from '../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../domain/repositories/user.repository.interface';
 import {
   USER_SESSION_REPOSITORY,
   IUserSessionRepository,
 } from '../../domain/repositories/user-session.repository.interface';
 import { JwtTokenService } from '../../infrastructure/adapters/jwt.service';
-import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
+import {
+  UNIT_OF_WORK,
+  IUnitOfWork,
+} from '@core/database/unit-of-work.interface';
 import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
 
 export interface RefreshTokenOutput {
@@ -17,7 +23,8 @@ export interface RefreshTokenOutput {
 export class RefreshTokenUseCase {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
-    @Inject(USER_SESSION_REPOSITORY) private readonly sessionRepo: IUserSessionRepository,
+    @Inject(USER_SESSION_REPOSITORY)
+    private readonly sessionRepo: IUserSessionRepository,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: IUnitOfWork,
     private readonly jwtService: JwtTokenService,
     private readonly getPermissionsUseCase: GetUserEffectivePermissionsUseCase,
@@ -50,28 +57,29 @@ export class RefreshTokenUseCase {
     const permissionCodes = await this.getPermissionsUseCase.execute(user.id!);
 
     // 6. Generate new token pair
-    const accessToken = this.jwtService.generateAccessToken({
-      userId: user.id!,
-      roleId: user.roleId,
-      roleName: user.roleName || 'Customer',
-      dataScope: user.dataScope || 'SELF',
-      permissionCodes,
-    });
-
     const newRefreshToken = this.jwtService.generateRefreshToken(user.id!);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     // 7. Token Rotation: Revoke old session and persist new session in atomic transaction
     await this.unitOfWork.runInTransaction(async () => {
-      await this.sessionRepo.revokeById(session.id);
-      await this.sessionRepo.create({
-        userId: user.id!,
-        refreshToken: newRefreshToken,
+      const rotated = await this.sessionRepo.rotateActive(
+        oldRefreshToken,
+        newRefreshToken,
         expiresAt,
-      });
+      );
+      if (!rotated || rotated.id !== session.id)
+        throw new UnauthorizedException(
+          'Refresh token đã được sử dụng hoặc thu hồi',
+        );
     });
-
+    const accessToken = this.jwtService.generateAccessToken({
+      userId: user.id!,
+      sid: session.id,
+      roleId: user.roleId,
+      roleName: user.roleName || 'Customer',
+      dataScope: user.dataScope || 'SELF',
+      permissionCodes,
+    });
     return { accessToken, refreshToken: newRefreshToken };
   }
 }
-

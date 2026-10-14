@@ -1,5 +1,13 @@
-import { Inject, Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
-import { USER_REPOSITORY, IUserRepository } from '../../domain/repositories/user.repository.interface';
+import {
+  Inject,
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../domain/repositories/user.repository.interface';
 import {
   USER_SESSION_REPOSITORY,
   IUserSessionRepository,
@@ -31,7 +39,8 @@ export interface LoginOutput {
 export class LoginUseCase {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
-    @Inject(USER_SESSION_REPOSITORY) private readonly sessionRepo: IUserSessionRepository,
+    @Inject(USER_SESSION_REPOSITORY)
+    private readonly sessionRepo: IUserSessionRepository,
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtTokenService,
     private readonly getPermissionsUseCase: GetUserEffectivePermissionsUseCase,
@@ -57,11 +66,16 @@ export class LoginUseCase {
 
     // 3. Check email verified
     if (!user.isEmailVerified()) {
-      throw new ForbiddenException('Email chưa được xác thực. Vui lòng kiểm tra email.');
+      throw new ForbiddenException(
+        'Email chưa được xác thực. Vui lòng kiểm tra email.',
+      );
     }
 
     // 4. Verify password
-    const isPasswordValid = await this.bcryptService.compare(input.password, user.passwordHash);
+    const isPasswordValid = await this.bcryptService.compare(
+      input.password,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
@@ -70,24 +84,25 @@ export class LoginUseCase {
     const permissionCodes = await this.getPermissionsUseCase.execute(user.id!);
 
     // 6. Generate JWT tokens
-    const accessToken = this.jwtService.generateAccessToken({
-      userId: user.id!,
-      roleId: user.roleId,
-      roleName: user.roleName || 'Customer',
-      dataScope: user.dataScope || 'SELF',
-      permissionCodes,
-    });
-
     const refreshToken = this.jwtService.generateRefreshToken(user.id!);
 
     // 7. Persist refresh token session
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    await this.sessionRepo.create({
+    const session = await this.sessionRepo.create({
       userId: user.id!,
       refreshToken,
       deviceInfo: input.deviceInfo,
       ipAddress: input.ipAddress,
       expiresAt,
+      expectedPasswordHash: user.passwordHash,
+    });
+    const accessToken = this.jwtService.generateAccessToken({
+      userId: user.id!,
+      sid: session.id,
+      roleId: user.roleId,
+      roleName: user.roleName || 'Customer',
+      dataScope: user.dataScope || 'SELF',
+      permissionCodes,
     });
 
     // 8. Update last_login_at
@@ -106,4 +121,3 @@ export class LoginUseCase {
     };
   }
 }
-

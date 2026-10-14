@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
+import { UsersModule } from '@modules/users/users.module';
 import { CacheModule } from '@core/cache/cache.module';
 import { ProductsModule } from '@modules/products/products.module';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
@@ -30,6 +31,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     },
     PrismaModule,
     AuthModule,
+    UsersModule,
     UploadsModule,
     CacheModule,
     ProductsModule,

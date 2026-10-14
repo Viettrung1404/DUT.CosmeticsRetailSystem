@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case';
 import { AuthController } from './presentation/controllers/auth.controller';
 import { RegisterUseCase } from './application/use-cases/register.use-case';
 import { LoginUseCase } from './application/use-cases/login.use-case';
@@ -35,6 +36,7 @@ import { PermissionsModule } from '@modules/permissions/permissions.module';
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
     GetMeUseCase,
+    ChangePasswordUseCase,
 
     // Adapters & Services
     BcryptService,
@@ -70,4 +72,3 @@ import { PermissionsModule } from '@modules/permissions/permissions.module';
   ],
 })
 export class AuthModule {}
-

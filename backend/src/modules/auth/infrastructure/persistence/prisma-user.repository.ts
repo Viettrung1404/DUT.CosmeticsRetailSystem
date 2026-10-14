@@ -55,26 +55,17 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async update(user: UserEntity): Promise<UserEntity> {
-    const data = UserMapper.toPersistence(user);
-    const raw = await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        roleId: data.roleId,
-        email: data.email,
-        passwordHash: data.passwordHash,
-        phone: data.phone,
-        fullName: data.fullName,
-        avatarUrl: data.avatarUrl,
-        status: data.status,
-        emailVerified: data.emailVerified,
-        phoneVerified: data.phoneVerified,
-        extraPermissions: data.extraPermissions,
-        revokedPermissions: data.revokedPermissions,
-        lastLoginAt: data.lastLoginAt,
-      },
-      include: { role: true },
+    return this.prisma.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id=${user.id}::uuid FOR UPDATE`;
+      const raw = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          ...user.changes,
+        },
+        include: { role: true },
+      });
+      return UserMapper.toDomain(raw);
     });
-    return UserMapper.toDomain(raw);
   }
 
   async updateLastLogin(userId: string): Promise<void> {
@@ -84,7 +75,10 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
-  async createCustomerForUser(userId: string, phone?: string | null): Promise<void> {
+  async createCustomerForUser(
+    userId: string,
+    phone?: string | null,
+  ): Promise<void> {
     await this.prisma.customer.create({
       data: {
         userId,
@@ -93,7 +87,9 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
-  async findCustomerByPhone(phone: string): Promise<{ id: string; userId: string | null } | null> {
+  async findCustomerByPhone(
+    phone: string,
+  ): Promise<{ id: string; userId: string | null } | null> {
     return this.prisma.customer.findUnique({
       where: { phone },
       select: { id: true, userId: true },

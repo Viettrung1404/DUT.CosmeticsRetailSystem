@@ -1,12 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RefreshTokenUseCase } from '../refresh-token.use-case';
-import { USER_REPOSITORY, IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../../domain/repositories/user.repository.interface';
 import {
   USER_SESSION_REPOSITORY,
   IUserSessionRepository,
 } from '../../../domain/repositories/user-session.repository.interface';
 import { JwtTokenService } from '../../../infrastructure/adapters/jwt.service';
-import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
+import {
+  UNIT_OF_WORK,
+  IUnitOfWork,
+} from '@core/database/unit-of-work.interface';
 import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
 import { UnauthorizedException } from '@nestjs/common';
 import { UserEntity } from '../../../domain/entities/user.entity';
@@ -38,6 +44,9 @@ describe('RefreshTokenUseCase', () => {
       revokeById: jest.fn(),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
+      rotateActive: jest
+        .fn()
+        .mockResolvedValue({ id: 'session-1', userId: 'user-1' }),
     };
 
     jwtService = {
@@ -61,14 +70,17 @@ describe('RefreshTokenUseCase', () => {
         { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo },
         { provide: UNIT_OF_WORK, useValue: unitOfWork },
         { provide: JwtTokenService, useValue: jwtService },
-        { provide: GetUserEffectivePermissionsUseCase, useValue: getPermissionsUseCase },
+        {
+          provide: GetUserEffectivePermissionsUseCase,
+          useValue: getPermissionsUseCase,
+        },
       ],
     }).compile();
 
     useCase = module.get<RefreshTokenUseCase>(RefreshTokenUseCase);
   });
 
-  it('should rotate tokens successfully (revoke old, issue new)', async () => {
+  it('rotates the refresh token while retaining the same sid', async () => {
     sessionRepo.findByRefreshToken.mockResolvedValue({
       id: 'session-1',
       userId: 'user-1',
@@ -96,8 +108,15 @@ describe('RefreshTokenUseCase', () => {
 
     expect(result.accessToken).toBe('new-access-token');
     expect(result.refreshToken).toBe('new-refresh-token');
-    expect(sessionRepo.revokeById).toHaveBeenCalledWith('session-1');
-    expect(sessionRepo.create).toHaveBeenCalled();
+    expect(sessionRepo.rotateActive).toHaveBeenCalledWith(
+      'valid-old-token',
+      'new-refresh-token',
+      expect.any(Date),
+    );
+    expect(sessionRepo.create).not.toHaveBeenCalled();
+    expect(jwtService.generateAccessToken).toHaveBeenCalledWith(
+      expect.objectContaining({ sid: 'session-1' }),
+    );
     expect(getPermissionsUseCase.execute).toHaveBeenCalledWith('user-1');
   });
 
@@ -110,7 +129,9 @@ describe('RefreshTokenUseCase', () => {
       expiresAt: new Date(Date.now() + 1000000),
     });
 
-    await expect(useCase.execute('revoked-token')).rejects.toThrow(UnauthorizedException);
+    await expect(useCase.execute('revoked-token')).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('should throw UnauthorizedException if session is expired', async () => {
@@ -122,7 +143,8 @@ describe('RefreshTokenUseCase', () => {
       expiresAt: new Date(Date.now() - 1000), // đã hết hạn
     });
 
-    await expect(useCase.execute('expired-token')).rejects.toThrow(UnauthorizedException);
+    await expect(useCase.execute('expired-token')).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 });
-

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { IVerificationTokenRepository } from '../../domain/repositories/verification-token.repository.interface';
 
@@ -48,13 +48,19 @@ export class PrismaVerificationTokenRepository implements IVerificationTokenRepo
   }
 
   async markAsUsed(id: string): Promise<void> {
-    await this.prisma.verificationToken.update({
-      where: { id },
+    const used = await this.prisma.verificationToken.updateMany({
+      where: { id, isUsed: false, expiresAt: { gt: new Date() } },
       data: { isUsed: true },
     });
+    if (used.count !== 1)
+      throw new BadRequestException('Mã xác thực đã được sử dụng hoặc hết hạn');
   }
 
-  async countRecentByUserId(userId: string, type: string, since: Date): Promise<number> {
+  async countRecentByUserId(
+    userId: string,
+    type: string,
+    since: Date,
+  ): Promise<number> {
     return this.prisma.verificationToken.count({
       where: {
         userId,
