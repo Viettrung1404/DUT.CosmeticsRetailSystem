@@ -174,6 +174,9 @@ describe('CreateOrderUseCase (TDD)', () => {
       paymentMethod: 'COD',
     });
 
-    expect(mockCartRepository.clearCart).toHaveBeenCalledWith('cart-1');
+    expect(mockOrderRepo.createOrderWithTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ cartId: 'cart-1' }),
+    );
+    expect(mockCartRepository.clearCart).not.toHaveBeenCalled();
   });
 });
