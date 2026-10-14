@@ -9,8 +9,12 @@ export class JwtTokenService {
   constructor(private readonly configService: ConfigService) {}
 
   generateAccessToken(payload: JwtPayload): string {
-    const secret = this.configService.get<string>('JWT_SECRET', 'glowup-secret-key');
-    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '15m');
+    const secret = this.configService.get<string>(
+      'JWT_SECRET',
+      'glowup-secret-key',
+    );
+    // Existing stateless access tokens survive session revocation; never exceed 15 minutes.
+    const expiresIn = '15m';
 
     return jwt.sign(payload, secret, { expiresIn });
   }
@@ -20,7 +24,10 @@ export class JwtTokenService {
   }
 
   verifyAccessToken(token: string): JwtPayload {
-    const secret = this.configService.get<string>('JWT_SECRET', 'glowup-secret-key');
+    const secret = this.configService.get<string>(
+      'JWT_SECRET',
+      'glowup-secret-key',
+    );
     return jwt.verify(token, secret) as JwtPayload;
   }
 }
