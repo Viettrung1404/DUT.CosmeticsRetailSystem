@@ -28,6 +28,7 @@ export interface CreateOrderTransactionInput {
   couponId?: string | null;
   loyaltyPointsUsed: number;
   paymentMethod: string;
+  cartId?: string;
   items: CreateOrderItemInput[];
 }
 

@@ -1,9 +1,17 @@
-import { Injectable, Inject, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import {
   ORDER_REPOSITORY,
   IOrderRepository,
 } from '../../domain/repositories/order.repository.interface';
-import { OrderEntity, ShippingAddressVo } from '../../domain/entities/order.entity';
+import {
+  OrderEntity,
+  ShippingAddressVo,
+} from '../../domain/entities/order.entity';
 import { OrderPricingService } from '../services/order-pricing.service';
 import { StoreResolverService } from '../services/store-resolver.service';
 import {
@@ -16,6 +24,8 @@ import {
 } from '../../../cart/domain/repositories/cart.repository.interface';
 import { formatOrderNumber } from '../utils/order-number.util';
 import { createVariantNameSnapshot } from '../utils/variant-name-snapshot.util';
+import { validatePaymentAmount } from '@modules/payments/domain/payment-policy';
+import { assertGatewayReady } from '@modules/payments/domain/gateway-readiness';
 
 export interface CreateOrderItemRequest {
   variantId: string;
@@ -60,7 +70,6 @@ export class CreateOrderUseCase {
     } = input;
 
     // 1. Determine items to order
-    let isFromCart = false;
     let cartIdToClear: string | null = null;
     let itemsToOrder = input.items || [];
 
@@ -73,7 +82,6 @@ export class CreateOrderUseCase {
         variantId: i.productVariantId,
         quantity: i.quantity,
       }));
-      isFromCart = true;
       cartIdToClear = cart.id;
     }
 
@@ -127,6 +135,8 @@ export class CreateOrderUseCase {
       pointsToUse: usePoints,
       customerAvailablePoints: customerPoints,
     });
+    validatePaymentAmount(paymentMethod, pricing.totalAmount);
+    assertGatewayReady(paymentMethod);
 
     // 7. Format Order Number: ORDYYYYMMDDXXXX
     const now = new Date();
@@ -171,18 +181,12 @@ export class CreateOrderUseCase {
       couponId: coupon ? coupon.id : null,
       loyaltyPointsUsed: usePoints || 0,
       paymentMethod,
+      cartId: cartIdToClear || undefined,
       items: snapshotItems,
     });
 
-    // 10. Clear cart if order placed from cart
-    if (isFromCart && cartIdToClear) {
-      await this.cartRepo.clearCart(cartIdToClear);
-    }
-
-    // 11. Notification (Postponed to Sprint 3 per specification)
-    this.logger.log(
-      `[ORDER_CREATED] Order ${orderNumber} created for customer ${customerId}. Notification deferred to Sprint 3.`,
-    );
+    // Notifications are persisted atomically by the repository.
+    this.logger.log(`[ORDER_CREATED] Order ${orderNumber} created`);
 
     return createdOrder;
   }
