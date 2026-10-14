@@ -1,10 +1,10 @@
 import { NotFoundException } from '@nestjs/common';
-import { GetUserEffectivePermissionsUseCase } from './get-user-effective-permissions.use-case';
+import { GetUserEffectivePermissionsUseCase } from '../get-user-effective-permissions.use-case';
 import {
   IPermissionRepository,
   PermissionDefinition,
   UserPermissionMasks,
-} from '../../domain/repositories/permission.repository.interface';
+} from '../../../domain/repositories/permission.repository.interface';
 
 const mask = (bits: number[]): bigint =>
   bits.reduce((acc, bit) => acc | (1n << BigInt(bit)), 0n);

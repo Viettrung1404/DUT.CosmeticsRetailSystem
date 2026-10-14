@@ -10,6 +10,7 @@ import * as jwt from 'jsonwebtoken';
 import { IS_PUBLIC_KEY } from '@core/decorators/public.decorator';
 
 export interface JwtPayload {
+  sid?: string;
   userId: string;
   roleId: number;
   roleName: string;
