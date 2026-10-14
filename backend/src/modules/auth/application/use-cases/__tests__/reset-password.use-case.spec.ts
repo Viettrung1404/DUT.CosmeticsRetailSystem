@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResetPasswordUseCase } from '../reset-password.use-case';
-import { USER_REPOSITORY, IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../../domain/repositories/user.repository.interface';
 import {
   VERIFICATION_TOKEN_REPOSITORY,
   IVerificationTokenRepository,
@@ -10,7 +13,10 @@ import {
   IUserSessionRepository,
 } from '../../../domain/repositories/user-session.repository.interface';
 import { BcryptService } from '../../../infrastructure/adapters/bcrypt.service';
-import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
+import {
+  UNIT_OF_WORK,
+  IUnitOfWork,
+} from '@core/database/unit-of-work.interface';
 import { BadRequestException } from '@nestjs/common';
 import { UserEntity } from '../../../domain/entities/user.entity';
 
@@ -49,6 +55,9 @@ describe('ResetPasswordUseCase', () => {
       revokeById: jest.fn(),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
+      rotateActive: jest
+        .fn()
+        .mockResolvedValue({ id: 'session-1', userId: 'user-1' }),
     };
 
     bcryptService = {
@@ -99,7 +108,10 @@ describe('ResetPasswordUseCase', () => {
 
     userRepo.findById.mockResolvedValue(user);
 
-    const result = await useCase.execute('valid-token', 'NewStrongPassword@2026');
+    const result = await useCase.execute(
+      'valid-token',
+      'NewStrongPassword@2026',
+    );
 
     expect(result.message).toContain('thành công');
     expect(bcryptService.hash).toHaveBeenCalledWith('NewStrongPassword@2026');
@@ -110,7 +122,9 @@ describe('ResetPasswordUseCase', () => {
   });
 
   it('should throw BadRequestException if new password is too weak', async () => {
-    await expect(useCase.execute('some-token', 'weak')).rejects.toThrow(BadRequestException);
+    await expect(useCase.execute('some-token', 'weak')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('should throw BadRequestException if token is invalid or expired', async () => {
