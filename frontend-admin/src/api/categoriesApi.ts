@@ -31,7 +31,8 @@ export async function getCategoryTree(): Promise<Category[]> {
 
 export async function createCategory(payload: CategoryPayload): Promise<Category> {
   const response = await axiosClient.post('/admin/categories', payload)
-  return unwrap<{ data: Category } | Category>(response.data) as Category
+  const body = unwrap<{ data: Category } | Category>(response.data)
+  return (body as { data?: Category }).data ?? (body as Category)
 }
 
 export async function updateCategory(
