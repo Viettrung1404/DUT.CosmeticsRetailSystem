@@ -5,6 +5,7 @@ import { PosSessionAdminController } from './presentation/controllers/pos-sessio
 import { PosProductController } from './presentation/controllers/pos-product.controller';
 import { PosCustomerController } from './presentation/controllers/pos-customer.controller';
 import { PosStoreController } from './presentation/controllers/pos-store.controller';
+import { PosOrderController } from './presentation/controllers/pos-order.controller';
 import { GetPosMyStoresUseCase } from './application/use-cases/get-pos-my-stores.use-case';
 import { OpenPosSessionUseCase } from './application/use-cases/open-pos-session.use-case';
 import { ClosePosSessionUseCase } from './application/use-cases/close-pos-session.use-case';
@@ -15,13 +16,18 @@ import { ScanPosProductUseCase } from './application/use-cases/scan-pos-product.
 import { SearchPosProductsUseCase } from './application/use-cases/search-pos-products.use-case';
 import { LookupPosCustomerUseCase } from './application/use-cases/lookup-pos-customer.use-case';
 import { CreatePosCustomerUseCase } from './application/use-cases/create-pos-customer.use-case';
+import { PreviewPosOrderUseCase } from './application/use-cases/preview-pos-order.use-case';
+import { CreatePosOrderUseCase } from './application/use-cases/create-pos-order.use-case';
 import { PosStoreAccessService } from './application/services/pos-store-access.service';
+import { PosSalePlanner } from './application/services/pos-sale-planner.service';
 import { POS_SESSION_REPOSITORY } from './domain/repositories/pos-session.repository.interface';
 import { POS_CATALOG_REPOSITORY } from './domain/repositories/pos-catalog.repository.interface';
 import { POS_CUSTOMER_REPOSITORY } from './domain/repositories/pos-customer.repository.interface';
+import { POS_ORDER_REPOSITORY } from './domain/repositories/pos-order.repository.interface';
 import { PrismaPosSessionRepository } from './infrastructure/persistence/prisma-pos-session.repository';
 import { PrismaPosCatalogRepository } from './infrastructure/persistence/prisma-pos-catalog.repository';
 import { PrismaPosCustomerRepository } from './infrastructure/persistence/prisma-pos-customer.repository';
+import { PrismaPosOrderRepository } from './infrastructure/persistence/prisma-pos-order.repository';
 
 @Module({
   imports: [PermissionsModule],
@@ -31,6 +37,7 @@ import { PrismaPosCustomerRepository } from './infrastructure/persistence/prisma
     PosProductController,
     PosCustomerController,
     PosStoreController,
+    PosOrderController,
   ],
   providers: [
     OpenPosSessionUseCase,
@@ -43,7 +50,10 @@ import { PrismaPosCustomerRepository } from './infrastructure/persistence/prisma
     LookupPosCustomerUseCase,
     CreatePosCustomerUseCase,
     GetPosMyStoresUseCase,
+    PreviewPosOrderUseCase,
+    CreatePosOrderUseCase,
     PosStoreAccessService,
+    PosSalePlanner,
     {
       provide: POS_SESSION_REPOSITORY,
       useClass: PrismaPosSessionRepository,
@@ -55,6 +65,10 @@ import { PrismaPosCustomerRepository } from './infrastructure/persistence/prisma
     {
       provide: POS_CUSTOMER_REPOSITORY,
       useClass: PrismaPosCustomerRepository,
+    },
+    {
+      provide: POS_ORDER_REPOSITORY,
+      useClass: PrismaPosOrderRepository,
     },
   ],
 })
