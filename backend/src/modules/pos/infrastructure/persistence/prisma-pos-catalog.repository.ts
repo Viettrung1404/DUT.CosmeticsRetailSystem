@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
-import { PosVariantStock } from '../../domain/entities/pos-lookup.entity';
+import { PosSellingStore, PosVariantStock } from '../../domain/entities/pos-lookup.entity';
 import {
   ExpiryWindow,
   IPosCatalogRepository,
@@ -90,5 +90,13 @@ export class PrismaPosCatalogRepository implements IPosCatalogRepository {
       this.prisma.productVariant.count({ where }),
     ]);
     return { items: rows.map((row) => toStock(row, window)), total };
+  }
+
+  findSellingStores(storeIds: string[]): Promise<PosSellingStore[]> {
+    return this.prisma.store.findMany({
+      where: { id: { in: storeIds }, isActive: true, type: { not: 'WAREHOUSE' } },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: 'asc' },
+    });
   }
 }

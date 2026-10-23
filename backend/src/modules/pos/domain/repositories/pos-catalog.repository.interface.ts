@@ -1,4 +1,4 @@
-import { PosVariantStock } from '../entities/pos-lookup.entity';
+import { PosSellingStore, PosVariantStock } from '../entities/pos-lookup.entity';
 
 export const POS_CATALOG_REPOSITORY = Symbol('IPosCatalogRepository');
 
@@ -20,4 +20,5 @@ export interface IPosCatalogRepository {
     skip: number,
     take: number,
   ): Promise<{ items: PosVariantStock[]; total: number }>;
+  findSellingStores(storeIds: string[]): Promise<PosSellingStore[]>;
 }
