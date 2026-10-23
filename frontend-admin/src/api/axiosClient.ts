@@ -43,6 +43,10 @@ function refreshAccessToken(refreshToken: string): Promise<AuthTokens> {
   if (!refreshPromise) {
     refreshPromise = refreshTokenRequest(refreshToken)
       .then((tokens) => {
+        // Do not restore a session that was logged out or replaced while refreshing.
+        if (localStorage.getItem(REFRESH_TOKEN_KEY) !== refreshToken) {
+          throw new Error('Authentication session changed during token refresh')
+        }
         localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken)
         localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken)
         return tokens
@@ -75,12 +79,19 @@ axiosClient.interceptors.response.use(
 
     try {
       const tokens = await refreshAccessToken(refreshToken)
+      // A logout/new login may have occurred after the shared refresh resolved.
+      if (localStorage.getItem(ACCESS_TOKEN_KEY) !== tokens.accessToken) {
+        return Promise.reject(new Error('Authentication session changed'))
+      }
       originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`
       return axiosClient(originalRequest)
     } catch (refreshError) {
-      clearSession()
-      if (window.location.pathname !== '/admin/login') {
-        window.location.replace('/admin/login')
+      // Only invalidate the same session; never clear a newer login.
+      if (localStorage.getItem(REFRESH_TOKEN_KEY) === refreshToken) {
+        clearSession()
+        if (window.location.pathname !== '/admin/login') {
+          window.location.replace('/admin/login')
+        }
       }
       return Promise.reject(refreshError)
     }
