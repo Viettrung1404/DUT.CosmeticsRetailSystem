@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { parseUuidVi } from '../pipes/parse-uuid-vi.pipe';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -66,7 +67,7 @@ export class PosSessionController {
   async close(
     @CurrentUser('userId') userId: string,
     @CurrentUser('permissionCodes') permissionCodes: string[],
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', parseUuidVi) id: string,
     @Body() dto: ClosePosSessionDto,
   ) {
     const session = await this.closePosSessionUseCase.execute(userId, permissionCodes ?? [], id, dto);
@@ -82,7 +83,7 @@ export class PosSessionController {
   @ApiConflictResponse({ description: 'Ca chưa đóng hoặc đã chốt' })
   async reconcile(
     @CurrentUser('userId') userId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', parseUuidVi) id: string,
     @Body() dto: ReconcilePosSessionDto,
   ) {
     const session = await this.reconcilePosSessionUseCase.execute(userId, id, dto.note);
