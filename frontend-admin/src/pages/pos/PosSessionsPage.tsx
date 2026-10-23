@@ -23,7 +23,7 @@ import {
 } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   closePosSession,
   getAdminPosSessions,
@@ -68,17 +68,21 @@ export default function PosSessionsPage() {
   const [countedCash, setCountedCash] = useState<number | null>(null)
   const [sessionNote, setSessionNote] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const requestId = useRef(0)
+  const checkedStoreId = useRef('')
 
   const load = async (next: PosSessionQuery = query) => {
+    const currentRequest = ++requestId.current
     setLoading(true)
     try {
       const result = await getAdminPosSessions(next)
+      if (currentRequest !== requestId.current) return
       setSessions(result.data ?? [])
       setTotal(Number(result.meta?.itemCount ?? 0))
     } catch {
-      messageApi.error('Không thể tải lịch sử ca POS')
+      if (currentRequest === requestId.current) messageApi.error('Không thể tải lịch sử ca POS')
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }
 
@@ -108,7 +112,11 @@ export default function PosSessionsPage() {
   const applyStore = () => setQuery((current) => ({ ...current, page: 1, storeId: storeId.trim() || undefined }))
 
   const handleReconcile = async () => {
-    if (!reconcileTarget) return
+    if (!reconcileTarget || actionLoading) return
+    if (reconcileTarget.difference !== null && reconcileTarget.difference !== 0 && !note.trim() && !reconcileTarget.note?.trim()) {
+      messageApi.warning('Ca có chênh lệch cần giải trình trước khi chốt')
+      return
+    }
     try {
       setActionLoading(true)
       await reconcilePosSession(reconcileTarget.id, note.trim() || undefined)
@@ -128,21 +136,27 @@ export default function PosSessionsPage() {
       messageApi.warning('Nhập Store UUID để kiểm tra ca đang mở')
       return
     }
+    checkedStoreId.current = id
+    setCurrentSession(null)
     setCurrentLoading(true)
     try {
       const result = await getCurrentPosSession(id)
+      if (checkedStoreId.current !== id) return
       setCurrentSession(result)
       if (!result) messageApi.info('Cửa hàng hiện chưa có ca POS đang mở')
     } catch {
-      setCurrentSession(null)
-      messageApi.error('Không thể kiểm tra ca hiện tại. Kiểm tra Store UUID và phạm vi dữ liệu.')
+      if (checkedStoreId.current === id) {
+        setCurrentSession(null)
+        messageApi.error('Không thể kiểm tra ca hiện tại. Kiểm tra Store UUID và phạm vi dữ liệu.')
+      }
     } finally {
-      setCurrentLoading(false)
+      if (checkedStoreId.current === id) setCurrentLoading(false)
     }
   }
 
   const handleOpen = async () => {
-    if (!currentStoreId.trim() || openingCash == null || openingCash < 0) {
+    if (actionLoading) return
+    if (!currentStoreId.trim() || !Number.isFinite(openingCash) || openingCash == null || openingCash < 0) {
       messageApi.warning('Nhập Store UUID và tiền đầu ca hợp lệ')
       return
     }
@@ -167,7 +181,8 @@ export default function PosSessionsPage() {
   }
 
   const handleClose = async () => {
-    if (!currentSession || countedCash == null || countedCash < 0) {
+    if (actionLoading) return
+    if (!currentSession || !Number.isFinite(countedCash) || countedCash == null || countedCash < 0) {
       messageApi.warning('Nhập số tiền thực tế đã đếm trong két')
       return
     }
@@ -210,15 +225,15 @@ export default function PosSessionsPage() {
           <Input
             placeholder="Store UUID"
             value={currentStoreId}
-            onChange={(e) => setCurrentStoreId(e.target.value)}
+            onChange={(e) => { checkedStoreId.current = ''; setCurrentSession(null); setCurrentStoreId(e.target.value) }}
             onPressEnter={() => void checkCurrentSession()}
             style={{ width: 320 }}
           />
           <Button loading={currentLoading} onClick={() => void checkCurrentSession()}>Kiểm tra ca</Button>
           {!currentSession ? (
-            <Button type="primary" icon={<LoginOutlined />} disabled={!currentStoreId.trim()} onClick={() => { setOpeningCash(null); setSessionNote(''); setOpenModal(true) }}>Mở ca</Button>
+            <Button type="primary" icon={<LoginOutlined />} disabled={!currentStoreId.trim() || currentLoading || actionLoading} onClick={() => { setOpeningCash(null); setSessionNote(''); setOpenModal(true) }}>Mở ca</Button>
           ) : (
-            <Button danger icon={<LogoutOutlined />} onClick={() => { setCountedCash(null); setSessionNote(''); setCloseModal(true) }}>Đóng ca</Button>
+            <Button danger icon={<LogoutOutlined />} disabled={actionLoading || currentLoading} onClick={() => { setCountedCash(null); setSessionNote(''); setCloseModal(true) }}>Đóng ca</Button>
           )}
         </Space>
 
