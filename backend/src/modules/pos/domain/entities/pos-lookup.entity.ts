@@ -26,3 +26,9 @@ export interface PosCustomerInfo {
   totalPoints: number;
   tier: { name: string; discountPercentage: number; pointMultiplier: number } | null;
 }
+
+export interface PosSellingStore {
+  id: string;
+  code: string;
+  name: string;
+}

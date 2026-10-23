@@ -4,6 +4,8 @@ import { PosSessionController } from './presentation/controllers/pos-session.con
 import { PosSessionAdminController } from './presentation/controllers/pos-session-admin.controller';
 import { PosProductController } from './presentation/controllers/pos-product.controller';
 import { PosCustomerController } from './presentation/controllers/pos-customer.controller';
+import { PosStoreController } from './presentation/controllers/pos-store.controller';
+import { GetPosMyStoresUseCase } from './application/use-cases/get-pos-my-stores.use-case';
 import { OpenPosSessionUseCase } from './application/use-cases/open-pos-session.use-case';
 import { ClosePosSessionUseCase } from './application/use-cases/close-pos-session.use-case';
 import { ReconcilePosSessionUseCase } from './application/use-cases/reconcile-pos-session.use-case';
@@ -28,6 +30,7 @@ import { PrismaPosCustomerRepository } from './infrastructure/persistence/prisma
     PosSessionAdminController,
     PosProductController,
     PosCustomerController,
+    PosStoreController,
   ],
   providers: [
     OpenPosSessionUseCase,
@@ -39,6 +42,7 @@ import { PrismaPosCustomerRepository } from './infrastructure/persistence/prisma
     SearchPosProductsUseCase,
     LookupPosCustomerUseCase,
     CreatePosCustomerUseCase,
+    GetPosMyStoresUseCase,
     PosStoreAccessService,
     {
       provide: POS_SESSION_REPOSITORY,

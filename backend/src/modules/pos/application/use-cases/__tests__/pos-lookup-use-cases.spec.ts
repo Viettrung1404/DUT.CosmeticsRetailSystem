@@ -41,6 +41,7 @@ describe('POS tra cứu sản phẩm', () => {
     catalog = {
       findVariantByBarcode: jest.fn(),
       searchVariants: jest.fn(),
+      findSellingStores: jest.fn(),
     };
     access = { assertCanSell: jest.fn().mockResolvedValue(undefined) };
   });
