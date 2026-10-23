@@ -118,12 +118,12 @@ const ROLES = [
   },
 ];
 
-// Tài liệu chỉ chốt tên và điểm tối thiểu; % giảm giá và hệ số nhân điểm giữ mặc định của bảng (0 và 1.0)
+// Hệ số nhân điểm theo hạng chốt ở quyết định P3; % giảm giá theo hạng giữ mặc định của bảng (0)
 const LOYALTY_TIERS = [
-  { name: 'Bronze', minPoints: 0 },
-  { name: 'Silver', minPoints: 1000 },
-  { name: 'Gold', minPoints: 5000 },
-  { name: 'Diamond', minPoints: 15000 },
+  { name: 'Bronze', minPoints: 0, pointMultiplier: 1 },
+  { name: 'Silver', minPoints: 1000, pointMultiplier: 1.2 },
+  { name: 'Gold', minPoints: 5000, pointMultiplier: 1.5 },
+  { name: 'Diamond', minPoints: 15000, pointMultiplier: 2 },
 ];
 
 async function main() {
@@ -158,6 +158,14 @@ async function main() {
       await prisma.loyaltyTier.create({ data: tier });
     }
   }
+
+  // BR-02: tích 1% giá trị thanh toán (nhân hệ số hạng); 1 điểm = 1đ khi dùng
+  const loyaltyConfig = { point_rate: 0.01 };
+  await prisma.setting.upsert({
+    where: { key: 'loyalty_config' },
+    update: { value: loyaltyConfig },
+    create: { key: 'loyalty_config', value: loyaltyConfig, group: 'loyalty', description: 'Tỷ lệ tích điểm theo giá trị thanh toán' },
+  });
 
   console.log(`Đã seed ${PERMISSIONS.length} quyền và ${ROLES.length} vai trò (id ${ROLES.map((r) => r.id).join(', ')}).`);
   console.log(`Đã seed ${LOYALTY_TIERS.length} hạng thành viên: ${LOYALTY_TIERS.map((t) => t.name).join(', ')}.`);

@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { calculatePointsRedemption } from '@core/utils/loyalty-policy.util';
 
 export interface PricingItemInput {
   unitPrice: number;
@@ -40,7 +41,6 @@ export interface OrderPricingResult {
 export class OrderPricingService {
   private readonly FREE_SHIPPING_THRESHOLD = 500000;
   private readonly STANDARD_SHIPPING_FEE = 30000;
-  private readonly POINT_RATE_VND = 1000;
 
   calculatePricing(input: CalculatePricingInput): OrderPricingResult {
     // 1. Calculate Subtotal
@@ -66,7 +66,7 @@ export class OrderPricingService {
     // 4. Calculate Points Discount
     let pointsDiscount = 0;
     if (input.pointsToUse && input.pointsToUse > 0) {
-      pointsDiscount = this.validateAndCalculatePointsDiscount(
+      pointsDiscount = calculatePointsRedemption(
         input.pointsToUse,
         input.customerAvailablePoints ?? 0,
         subtotal - discountAmount,
@@ -126,20 +126,5 @@ export class OrderPricingService {
     }
 
     return Math.min(discount, subtotal);
-  }
-
-  private validateAndCalculatePointsDiscount(
-    pointsToUse: number,
-    availablePoints: number,
-    maxAllowedDiscount: number,
-  ): number {
-    if (pointsToUse > availablePoints) {
-      throw new BadRequestException(
-        'Số điểm thưởng sử dụng vượt quá số điểm hiện có của bạn',
-      );
-    }
-
-    const rawDiscount = pointsToUse * this.POINT_RATE_VND;
-    return Math.min(rawDiscount, Math.max(0, maxAllowedDiscount));
   }
 }
