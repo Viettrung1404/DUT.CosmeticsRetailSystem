@@ -6,6 +6,7 @@ import { adjustInventory, receivePurchaseOrder } from '../../api/operationsApi'
 import type { AdjustInventoryInput, ReceivePurchaseOrderInput } from '../../types/operations'
 
 const { Title, Text } = Typography
+const uuidRule = { pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, message: 'UUID không hợp lệ' }
 
 type ReceiveFormValue = {
   purchaseOrderId: string
@@ -38,6 +39,11 @@ export default function InventoryReceivePage() {
   const [adjustForm] = Form.useForm<AdjustFormValue>()
 
   const submitReceive = async (value: ReceiveFormValue) => {
+    if (submitting) return
+    if (!value.items?.length || value.items.some((item) => item.manufactureDate && !item.manufactureDate.isBefore(item.expiryDate, 'day'))) {
+      messageApi.warning('Cần ít nhất một dòng nhận hàng và ngày sản xuất phải trước hạn dùng')
+      return
+    }
     const payload: ReceivePurchaseOrderInput = {
       purchaseOrderId: value.purchaseOrderId,
       note: value.note?.trim() || undefined,
@@ -63,8 +69,17 @@ export default function InventoryReceivePage() {
   }
 
   const submitAdjust = async (value: AdjustFormValue) => {
-    if (value.quantity === 0) {
+    if (submitting) return
+    if (!Number.isInteger(value.quantity) || value.quantity === 0) {
       messageApi.warning('Số lượng điều chỉnh phải khác 0')
+      return
+    }
+    if (value.quantity > 0 && (!value.batchNumber?.trim() || !value.expiryDate)) {
+      messageApi.warning('Nhập tăng tồn kho cần số lô và hạn sử dụng')
+      return
+    }
+    if (value.manufactureDate && value.expiryDate && !value.manufactureDate.isBefore(value.expiryDate, 'day')) {
+      messageApi.warning('Ngày sản xuất phải trước hạn sử dụng')
       return
     }
     const payload: AdjustInventoryInput = {
@@ -107,7 +122,7 @@ export default function InventoryReceivePage() {
       {mode === 'receive' ? (
         <Card title="Nhận hàng theo đơn đặt hàng">
           <Form form={receiveForm} layout="vertical" onFinish={submitReceive} initialValues={{ items: [{}] }}>
-            <Form.Item name="purchaseOrderId" label="Purchase Order ID" rules={[{ required: true, message: 'Nhập purchaseOrderId' }]}>
+            <Form.Item name="purchaseOrderId" label="Purchase Order ID" rules={[{ required: true, message: 'Nhập purchaseOrderId' }, uuidRule]}>
               <Input placeholder="UUID của PO" />
             </Form.Item>
 
@@ -117,10 +132,10 @@ export default function InventoryReceivePage() {
                   {fields.map(({ key, name }) => (
                     <Card key={key} size="small" title={`Dòng nhận hàng #${name + 1}`} extra={fields.length > 1 ? <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} /> : null}>
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.3fr 1.3fr 1.3fr', gap: 12 }}>
-                        <Form.Item name={[name, 'purchaseOrderItemId']} label="PO Item ID" rules={[{ required: true }]}><Input placeholder="UUID dòng PO" /></Form.Item>
+                        <Form.Item name={[name, 'purchaseOrderItemId']} label="PO Item ID" rules={[{ required: true }, uuidRule]}><Input placeholder="UUID dòng PO" /></Form.Item>
                         <Form.Item name={[name, 'quantity']} label="SL nhận" rules={[{ required: true }]}><InputNumber min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
                         <Form.Item name={[name, 'batchNumber']} label="Số lô" rules={[{ required: true }]}><Input placeholder="LOT2610A" /></Form.Item>
-                        <Form.Item name={[name, 'expiryDate']} label="Hạn dùng" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
+                        <Form.Item name={[name, 'expiryDate']} label="Hạn dùng" rules={[{ required: true }]}><DatePicker disabledDate={(date) => date.isBefore(dayjs(), 'day')} style={{ width: '100%' }} /></Form.Item>
                         <Form.Item name={[name, 'manufactureDate']} label="Ngày SX"><DatePicker style={{ width: '100%' }} /></Form.Item>
                       </div>
                     </Card>
@@ -138,10 +153,10 @@ export default function InventoryReceivePage() {
         <Card title="Điều chỉnh tồn kho">
           <Form form={adjustForm} layout="vertical" onFinish={submitAdjust}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <Form.Item name="storeId" label="Store ID" rules={[{ required: true }]}><Input placeholder="UUID cửa hàng / kho" /></Form.Item>
-              <Form.Item name="productVariantId" label="Product Variant ID" rules={[{ required: true }]}><Input placeholder="UUID biến thể" /></Form.Item>
+              <Form.Item name="storeId" label="Store ID" rules={[{ required: true }, uuidRule]}><Input placeholder="UUID cửa hàng / kho" /></Form.Item>
+              <Form.Item name="productVariantId" label="Product Variant ID" rules={[{ required: true }, uuidRule]}><Input placeholder="UUID biến thể" /></Form.Item>
               <Form.Item name="quantity" label="Số lượng điều chỉnh" extra="Âm = xuất, dương = nhập" rules={[{ required: true }]}><InputNumber precision={0} style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name="batchId" label="Batch ID (nếu xuất đúng lô)"><Input placeholder="Bỏ trống để backend tự FEFO" /></Form.Item>
+              <Form.Item name="batchId" label="Batch ID (nếu xuất đúng lô)" rules={[uuidRule]}><Input placeholder="Bỏ trống để backend tự FEFO" /></Form.Item>
               <Form.Item name="batchNumber" label="Số lô mới (nếu nhập)"><Input /></Form.Item>
               <Form.Item name="expiryDate" label="Hạn dùng lô mới"><DatePicker style={{ width: '100%' }} /></Form.Item>
               <Form.Item name="manufactureDate" label="Ngày sản xuất"><DatePicker style={{ width: '100%' }} /></Form.Item>
