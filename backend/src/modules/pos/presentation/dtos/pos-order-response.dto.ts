@@ -80,7 +80,7 @@ export class PosPreviewResponseDto extends PosPricingResponseDto {
 
 export class PosOrderCreatedResponseDto extends PosPricingResponseDto {
   @ApiProperty() orderId: string;
-  @ApiProperty({ example: 'ORD202610230001' }) orderNumber: string;
+  @ApiProperty({ example: 'POS202610230001' }) orderNumber: string;
   @ApiProperty() createdAt: Date;
   @ApiProperty({ description: 'Tổng khách đưa (cộng các phương thức)' }) totalReceived: number;
   @ApiProperty({ description: 'Tiền thừa phải thối lại khách (chỉ từ tiền mặt)' }) change: number;

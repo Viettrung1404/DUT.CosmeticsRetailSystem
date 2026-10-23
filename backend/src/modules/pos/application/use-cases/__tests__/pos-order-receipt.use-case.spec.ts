@@ -6,7 +6,7 @@ import { GetPosOrderReceiptUseCase } from '../get-pos-order-receipt.use-case';
 
 const receipt = (over: Partial<PosReceipt> = {}): PosReceipt => ({
   orderId: 'o1',
-  orderNumber: 'ORD202610230001',
+  orderNumber: 'POS202610230001',
   status: 'COMPLETED',
   createdAt: new Date(),
   storeId: 's1',

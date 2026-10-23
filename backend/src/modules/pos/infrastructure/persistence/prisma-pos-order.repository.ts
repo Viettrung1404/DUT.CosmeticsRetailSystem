@@ -497,7 +497,7 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
   // Khóa advisory để hai đơn POS cùng lúc không lấy trùng số; lấy số lớn nhất trong ngày + 1
   private async nextOrderNumber(tx: Prisma.TransactionClient, at: Date): Promise<string> {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('order_number'))`;
-    const prefix = `ORD${vnDay(at).ymd}`;
+    const prefix = `POS${vnDay(at).ymd}`;
     const last = await tx.order.findFirst({
       where: { orderNumber: { startsWith: prefix } },
       orderBy: { orderNumber: 'desc' },
