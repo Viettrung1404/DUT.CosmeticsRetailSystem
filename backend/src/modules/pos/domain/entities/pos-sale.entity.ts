@@ -163,6 +163,7 @@ export interface PosReceipt {
     discountAmount: number;
     pointsDiscount: number;
     lineTotal: number;
+    lineNetTotal: number;
   }>;
   subtotal: number;
   promotionDiscount: number;
