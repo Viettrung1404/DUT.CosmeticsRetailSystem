@@ -1,19 +1,28 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
-import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
+import {
+  RequireAnyPermission,
+  RequirePermissions,
+} from '@core/decorators/require-permissions.decorator';
 import { CreatePosOrderUseCase } from '../../application/use-cases/create-pos-order.use-case';
+import { GetPosOrderReceiptUseCase } from '../../application/use-cases/get-pos-order-receipt.use-case';
 import { PreviewPosOrderUseCase } from '../../application/use-cases/preview-pos-order.use-case';
 import { CreatePosOrderDto, PreviewPosOrderDto } from '../dtos/pos-order-request.dto';
-import { PosOrderCreatedResponseDto, PosPreviewResponseDto } from '../dtos/pos-order-response.dto';
+import {
+  PosOrderCreatedResponseDto,
+  PosPreviewResponseDto,
+  PosReceiptResponseDto,
+} from '../dtos/pos-order-response.dto';
 
 @ApiTags('POS - Sales (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -22,6 +31,7 @@ export class PosOrderController {
   constructor(
     private readonly previewPosOrderUseCase: PreviewPosOrderUseCase,
     private readonly createPosOrderUseCase: CreatePosOrderUseCase,
+    private readonly getPosOrderReceiptUseCase: GetPosOrderReceiptUseCase,
   ) {}
 
   @Post('preview')
@@ -55,5 +65,20 @@ export class PosOrderController {
     const messages = ['Bán hàng thành công'];
     if (result.sale.pointsNote) messages.push(result.sale.pointsNote);
     return { message: messages.join('. '), data: PosOrderCreatedResponseDto.fromResult(result) };
+  }
+
+  @Get(':id/receipt')
+  @RequireAnyPermission('ORDER_POS_CREATE', 'PAYMENT_COLLECT', 'PAYMENT_RECONCILE')
+  @ApiOperation({ summary: 'POS - Dữ liệu biên lai (FE in khổ 80mm); NV bán chỉ xem đơn trong ca của mình' })
+  @ApiOkResponse({ type: PosReceiptResponseDto })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy đơn bán tại quầy' })
+  @ApiForbiddenResponse({ description: 'Đơn không thuộc ca của bạn / ngoài phạm vi' })
+  async receipt(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('permissionCodes') permissionCodes: string[],
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const receipt = await this.getPosOrderReceiptUseCase.execute(userId, permissionCodes ?? [], id);
+    return PosReceiptResponseDto.fromDomain(receipt);
   }
 }

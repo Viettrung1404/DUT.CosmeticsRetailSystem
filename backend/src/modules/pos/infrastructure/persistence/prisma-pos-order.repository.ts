@@ -14,6 +14,7 @@ import {
   PosCreatedSale,
   PosDiscountType,
   PosPromotionRule,
+  PosReceipt,
   PosSaleContext,
   PosSaleVariant,
 } from '../../domain/entities/pos-sale.entity';
@@ -504,5 +505,69 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
     });
     const seq = last ? Number(last.orderNumber.slice(prefix.length)) + 1 : 1;
     return `${prefix}${String(seq).padStart(4, '0')}`;
+  }
+
+  async findReceipt(orderId: string): Promise<PosReceipt | null> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, orderType: 'POS' },
+      include: {
+        store: { select: { code: true, name: true } },
+        posSession: {
+          select: { id: true, sessionCode: true, cashierId: true, cashier: { select: { fullName: true } } },
+        },
+        customer: { select: { id: true, fullName: true, phone: true } },
+        items: { orderBy: { createdAt: 'asc' } },
+        payments: { orderBy: { createdAt: 'asc' } },
+        couponUsage: { include: { coupon: { select: { code: true } } } },
+        loyaltyTransactions: { where: { type: 'EARN' } },
+      },
+    });
+    if (!order) {
+      return null;
+    }
+
+    const items = order.items.map((i) => ({
+      productName: i.productName,
+      variantName: i.variantName,
+      quantity: i.quantity,
+      unitPrice: Number(i.unitPrice),
+      discountAmount: Number(i.discountAmount),
+      pointsDiscount: Number(i.pointsDiscount),
+      lineTotal: Number(i.totalPrice),
+    }));
+    const couponDiscount = Number(order.couponUsage?.discountAmount ?? 0);
+    const itemDiscounts = items.reduce((s, i) => s + i.discountAmount, 0);
+
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      createdAt: order.createdAt,
+      storeId: order.storeId,
+      store: order.store,
+      session: order.posSession
+        ? {
+            id: order.posSession.id,
+            code: order.posSession.sessionCode,
+            cashierId: order.posSession.cashierId,
+          }
+        : null,
+      cashierName: order.posSession?.cashier.fullName ?? null,
+      customer: order.customer,
+      items,
+      subtotal: Number(order.subtotal),
+      promotionDiscount: itemDiscounts - couponDiscount,
+      couponDiscount,
+      couponCode: order.couponUsage?.coupon.code ?? null,
+      pointsUsed: order.loyaltyPointsUsed,
+      pointsDiscount: items.reduce((s, i) => s + i.pointsDiscount, 0),
+      total: Number(order.totalAmount),
+      pointsEarned: order.loyaltyTransactions.reduce((s, t) => s + t.points, 0),
+      payments: order.payments.map((p) => ({
+        method: p.paymentMethod,
+        amount: Number(p.amount),
+        tenderedAmount: p.tenderedAmount === null ? null : Number(p.tenderedAmount),
+      })),
+    };
   }
 }
