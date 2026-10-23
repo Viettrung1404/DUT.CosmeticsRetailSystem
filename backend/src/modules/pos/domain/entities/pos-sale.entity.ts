@@ -145,6 +145,36 @@ export interface PosCreatedSale {
   commissionAmount: number;
 }
 
+export interface PosReceipt {
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  createdAt: Date;
+  storeId: string;
+  store: { code: string; name: string };
+  session: { id: string; code: string; cashierId: string } | null;
+  cashierName: string | null;
+  customer: { id: string; fullName: string | null; phone: string | null } | null;
+  items: Array<{
+    productName: string;
+    variantName: string;
+    quantity: number;
+    unitPrice: number;
+    discountAmount: number;
+    pointsDiscount: number;
+    lineTotal: number;
+  }>;
+  subtotal: number;
+  promotionDiscount: number;
+  couponDiscount: number;
+  couponCode: string | null;
+  pointsUsed: number;
+  pointsDiscount: number;
+  total: number;
+  pointsEarned: number;
+  payments: Array<{ method: string; amount: number; tenderedAmount: number | null }>;
+}
+
 export interface PosSaleCustomerSummary {
   id: string;
   fullName: string | null;

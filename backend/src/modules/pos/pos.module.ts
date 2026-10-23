@@ -18,6 +18,7 @@ import { LookupPosCustomerUseCase } from './application/use-cases/lookup-pos-cus
 import { CreatePosCustomerUseCase } from './application/use-cases/create-pos-customer.use-case';
 import { PreviewPosOrderUseCase } from './application/use-cases/preview-pos-order.use-case';
 import { CreatePosOrderUseCase } from './application/use-cases/create-pos-order.use-case';
+import { GetPosOrderReceiptUseCase } from './application/use-cases/get-pos-order-receipt.use-case';
 import { PosStoreAccessService } from './application/services/pos-store-access.service';
 import { PosSalePlanner } from './application/services/pos-sale-planner.service';
 import { POS_SESSION_REPOSITORY } from './domain/repositories/pos-session.repository.interface';
@@ -52,6 +53,7 @@ import { PrismaPosOrderRepository } from './infrastructure/persistence/prisma-po
     GetPosMyStoresUseCase,
     PreviewPosOrderUseCase,
     CreatePosOrderUseCase,
+    GetPosOrderReceiptUseCase,
     PosStoreAccessService,
     PosSalePlanner,
     {

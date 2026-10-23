@@ -4,6 +4,7 @@ import {
   PosPreviewResult,
   PosPricedLine,
   PosPricing,
+  PosReceipt,
   PosSaleCustomerSummary,
   PosStockShortage,
 } from '../../domain/entities/pos-sale.entity';
@@ -105,6 +106,54 @@ export class PosOrderCreatedResponseDto extends PosPricingResponseDto {
     dto.tierName = result.sale.tierName;
     dto.tierChanged = result.sale.tierChanged;
     dto.commissionAmount = result.sale.commissionAmount;
+    return dto;
+  }
+}
+
+export class PosReceiptResponseDto {
+  @ApiProperty() orderId: string;
+  @ApiProperty() orderNumber: string;
+  @ApiProperty() status: string;
+  @ApiProperty() createdAt: Date;
+  @ApiProperty() store: { code: string; name: string };
+  @ApiPropertyOptional() sessionCode: string | null;
+  @ApiPropertyOptional() cashierName: string | null;
+  @ApiPropertyOptional() customer: { id: string; fullName: string | null; phone: string | null } | null;
+  @ApiProperty() items: PosReceipt['items'];
+  @ApiProperty() subtotal: number;
+  @ApiProperty() promotionDiscount: number;
+  @ApiProperty() couponDiscount: number;
+  @ApiPropertyOptional() couponCode: string | null;
+  @ApiProperty() pointsUsed: number;
+  @ApiProperty() pointsDiscount: number;
+  @ApiProperty() total: number;
+  @ApiProperty() pointsEarned: number;
+  @ApiProperty() payments: PosReceipt['payments'];
+  @ApiProperty({ description: 'Tổng khách đưa' }) totalReceived: number;
+  @ApiProperty({ description: 'Tiền thừa đã thối lại' }) change: number;
+
+  static fromDomain(receipt: PosReceipt): PosReceiptResponseDto {
+    const dto = new PosReceiptResponseDto();
+    dto.orderId = receipt.orderId;
+    dto.orderNumber = receipt.orderNumber;
+    dto.status = receipt.status;
+    dto.createdAt = receipt.createdAt;
+    dto.store = receipt.store;
+    dto.sessionCode = receipt.session?.code ?? null;
+    dto.cashierName = receipt.cashierName;
+    dto.customer = receipt.customer;
+    dto.items = receipt.items;
+    dto.subtotal = receipt.subtotal;
+    dto.promotionDiscount = receipt.promotionDiscount;
+    dto.couponDiscount = receipt.couponDiscount;
+    dto.couponCode = receipt.couponCode;
+    dto.pointsUsed = receipt.pointsUsed;
+    dto.pointsDiscount = receipt.pointsDiscount;
+    dto.total = receipt.total;
+    dto.pointsEarned = receipt.pointsEarned;
+    dto.payments = receipt.payments;
+    dto.totalReceived = receipt.payments.reduce((s, p) => s + (p.tenderedAmount ?? p.amount), 0);
+    dto.change = dto.totalReceived - receipt.payments.reduce((s, p) => s + p.amount, 0);
     return dto;
   }
 }
