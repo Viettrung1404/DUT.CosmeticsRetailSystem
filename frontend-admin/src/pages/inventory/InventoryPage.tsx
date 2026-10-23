@@ -2,7 +2,7 @@ import { DownloadOutlined, ReloadOutlined, SearchOutlined, WarningOutlined } fro
 import { Button, Card, Input, Select, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getAdminInventory } from '../../api/operationsApi'
 import type { InventoryItem, InventoryQuery, StockStatus } from '../../types/operations'
 
@@ -24,24 +24,27 @@ export default function InventoryPage() {
   const [storeId, setStoreId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [brandId, setBrandId] = useState('')
+  const requestId = useRef(0)
 
   const load = async (next: InventoryQuery = query) => {
+    const currentRequest = ++requestId.current
     setLoading(true)
     try {
       const result = await getAdminInventory(next)
+      if (currentRequest !== requestId.current) return
       setRows(result.data ?? [])
       setTotal(Number(result.meta?.itemCount ?? 0))
     } catch {
-      messageApi.error('Không thể tải dữ liệu tồn kho')
+      if (currentRequest === requestId.current) messageApi.error('Không thể tải dữ liệu tồn kho')
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }
 
   useEffect(() => {
     void load(query)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.page, query.limit, query.status, query.storeId, query.categoryId, query.brandId])
+  }, [query.page, query.limit, query.status, query.storeId, query.categoryId, query.brandId, query.search])
 
   const applyFilters = () => {
     const next: InventoryQuery = {
@@ -53,19 +56,33 @@ export default function InventoryPage() {
       brandId: brandId.trim() || undefined,
     }
     setQuery(next)
-    void load(next)
   }
 
   const exportExcel = () => {
-    if (!rows.length) return messageApi.warning('Không có dữ liệu để xuất')
-    const body = rows.map((item) => `<tr><td>${item.store.name}</td><td>${item.variant.productName}</td><td>${item.variant.optionLabel ?? ''}</td><td>${item.variant.sku}</td><td>${item.variant.barcode ?? ''}</td><td>${item.quantity}</td><td>${item.reservedQuantity}</td><td>${item.availableQuantity}</td><td>${item.minQuantity}</td><td>${item.nearestExpiryDate ?? ''}</td></tr>`).join('')
-    const html = `﻿<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Cửa hàng</th><th>Sản phẩm</th><th>Biến thể</th><th>SKU</th><th>Barcode</th><th>Tồn thực tế</th><th>Giữ chỗ</th><th>Khả dụng</th><th>Tồn tối thiểu</th><th>Hạn gần nhất</th></tr>${body}</table></body></html>`
-    const url = URL.createObjectURL(new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' }))
+    if (!rows.length) {
+      messageApi.warning('Không có dữ liệu để xuất')
+      return
+    }
+    // Xuất CSV UTF-8 an toàn cho Excel; không đưa dữ liệu nhập vào HTML.
+    const csvCell = (value: string | number | null | undefined) => {
+      let cell = String(value ?? '')
+      if (/^[\\s]*[=+@-]/.test(cell)) cell = "'" + cell
+      return '"' + cell.replace(/"/g, '""') + '"'
+    }
+    const headers = ['Cửa hàng', 'Sản phẩm', 'Biến thể', 'SKU', 'Barcode', 'Tồn thực tế', 'Giữ chỗ', 'Khả dụng', 'Tồn tối thiểu', 'Hạn gần nhất']
+    const lines = rows.map((item) => [
+      item.store.name, item.variant.productName, item.variant.optionLabel,
+      item.variant.sku, item.variant.barcode, item.quantity, item.reservedQuantity,
+      item.availableQuantity, item.minQuantity, item.nearestExpiryDate,
+    ].map(csvCell).join(','))
+    const csv = '\uFEFF' + [headers.map(csvCell).join(','), ...lines].join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `glowup-inventory-${dayjs().format('YYYYMMDD-HHmm')}.xls`
+    anchor.download = `glowup-inventory-${dayjs().format('YYYYMMDD-HHmm')}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+    messageApi.info('Đã xuất dữ liệu của trang hiện tại. Các trang khác chưa được bao gồm.')
   }
 
   const columns: ColumnsType<InventoryItem> = useMemo(() => [
