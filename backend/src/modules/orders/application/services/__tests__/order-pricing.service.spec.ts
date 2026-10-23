@@ -129,6 +129,24 @@ describe('OrderPricingService (TDD)', () => {
       expect(res.discountAmount).toBe(50000);
       expect(res.totalAmount).toBe(180000); // 200k - 50k + 30k ship
     });
+
+    it('should apply FIXED discount type from schema docs', () => {
+      const res = pricingService.calculatePricing({
+        items: [{ unitPrice: 200000, quantity: 1 }],
+        coupon: {
+          id: 'cpn-3',
+          code: 'GIAM30K',
+          discountType: 'FIXED',
+          discountValue: 30000,
+          startDate: new Date(Date.now() - 86400000),
+          endDate: new Date(Date.now() + 86400000),
+          isActive: true,
+        } as any,
+        customerCouponUsageCount: 0,
+      });
+
+      expect(res.discountAmount).toBe(30000);
+    });
   });
 
   describe('Loyalty Points Redemption', () => {

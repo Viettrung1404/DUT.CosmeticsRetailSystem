@@ -4,7 +4,12 @@ import {
   PosPromotionRule,
   PosSaleVariant,
 } from '../../../domain/entities/pos-sale.entity';
-import { allocateProportionally, buildPosPricing, pickBestPromotion } from '../pos-pricing.util';
+import {
+  allocateProportionally,
+  buildPosPricing,
+  calculateCouponDiscount,
+  pickBestPromotion,
+} from '../pos-pricing.util';
 
 const variant = (over: Partial<PosSaleVariant>): PosSaleVariant => ({
   variantId: 'v',
@@ -210,5 +215,13 @@ describe('buildPosPricing - đơn chị Hoa', () => {
         availablePoints: 100000,
       }),
     ).toThrow('tối đa 50%');
+  });
+});
+
+describe('calculateCouponDiscount - loại FIXED theo tài liệu 04', () => {
+  it('giảm cứng đúng giá trị, không vượt tổng', () => {
+    const fixed = coupon({ discountType: 'FIXED', discountValue: 40000 });
+    expect(calculateCouponDiscount(fixed, 200000, 'kh', 0, NOW)).toBe(40000);
+    expect(calculateCouponDiscount(fixed, 30000, 'kh', 0, NOW)).toBe(30000);
   });
 });

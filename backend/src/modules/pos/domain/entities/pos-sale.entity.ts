@@ -1,5 +1,5 @@
 export type PosPaymentMethod = 'CASH' | 'CARD' | 'TRANSFER';
-export type PosDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+export type PosDiscountType = 'PERCENTAGE' | 'FIXED' | 'FIXED_AMOUNT';
 
 export interface PosSaleVariant {
   variantId: string;

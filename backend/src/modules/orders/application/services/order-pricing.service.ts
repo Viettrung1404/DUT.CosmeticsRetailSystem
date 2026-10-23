@@ -9,7 +9,7 @@ export interface PricingItemInput {
 export interface CouponInput {
   id: string;
   code: string;
-  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountType: 'PERCENTAGE' | 'FIXED' | 'FIXED_AMOUNT';
   discountValue: number;
   minOrderAmount?: number | null;
   maxDiscountAmount?: number | null;
@@ -121,7 +121,7 @@ export class OrderPricingService {
       if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
         discount = coupon.maxDiscountAmount;
       }
-    } else if (coupon.discountType === 'FIXED_AMOUNT') {
+    } else if (coupon.discountType === 'FIXED' || coupon.discountType === 'FIXED_AMOUNT') {
       discount = coupon.discountValue;
     }
 
