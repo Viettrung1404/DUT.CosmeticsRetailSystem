@@ -19,7 +19,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 function readStoredUser(): AuthUser | null {
   const raw = localStorage.getItem('glowup_user')
-  if (!raw) return null
+  if (!raw || !localStorage.getItem('glowup_access_token')) return null
 
   try {
     return JSON.parse(raw) as AuthUser
@@ -44,13 +44,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const logout = async () => {
     const refreshToken = localStorage.getItem('glowup_refresh_token')
 
-    try {
-      if (refreshToken) await logoutRequest(refreshToken)
-    } finally {
-      localStorage.removeItem('glowup_access_token')
-      localStorage.removeItem('glowup_refresh_token')
-      localStorage.removeItem('glowup_user')
-      setUser(null)
+    // End the local session immediately, even if the backend is slow or unavailable.
+    localStorage.removeItem('glowup_access_token')
+    localStorage.removeItem('glowup_refresh_token')
+    localStorage.removeItem('glowup_user')
+    setUser(null)
+
+    if (refreshToken) {
+      try {
+        await logoutRequest(refreshToken)
+      } catch {
+        // The local logout is complete; a network failure must not block navigation.
+      }
     }
   }
 
