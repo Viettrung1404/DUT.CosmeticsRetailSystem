@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { parseUuidVi } from '../pipes/parse-uuid-vi.pipe';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -76,7 +77,7 @@ export class PosOrderController {
   async receipt(
     @CurrentUser('userId') userId: string,
     @CurrentUser('permissionCodes') permissionCodes: string[],
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', parseUuidVi) id: string,
   ) {
     const receipt = await this.getPosOrderReceiptUseCase.execute(userId, permissionCodes ?? [], id);
     return PosReceiptResponseDto.fromDomain(receipt);
