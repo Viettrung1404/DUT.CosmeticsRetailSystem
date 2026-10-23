@@ -1,7 +1,7 @@
 import { ReloadOutlined, SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Input, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { getCurrentPosSession, getPosInventory } from '../../api/operationsApi'
 import type { InventoryItem, PosSession } from '../../types/operations'
 
@@ -17,6 +17,7 @@ export default function PosPage() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(20)
   const [total, setTotal] = useState(0)
+  const requestId = useRef(0)
 
   const loadWorkspace = async (nextPage = page, nextLimit = limit) => {
     const id = storeId.trim()
@@ -25,6 +26,7 @@ export default function PosPage() {
       return
     }
 
+    const currentRequest = ++requestId.current
     setLoading(true)
     try {
       const [currentSession, inventory] = await Promise.all([
@@ -37,18 +39,20 @@ export default function PosPage() {
           search: keyword.trim() || undefined,
         }),
       ])
+      if (currentRequest !== requestId.current) return
       setSession(currentSession)
       setRows(inventory.data ?? [])
       setTotal(Number(inventory.meta?.itemCount ?? 0))
       setPage(nextPage)
       setLimit(nextLimit)
     } catch {
+      if (currentRequest !== requestId.current) return
       setSession(null)
       setRows([])
       setTotal(0)
       messageApi.error('Không thể tải POS. Kiểm tra Store UUID, quyền truy cập và backend Sprint 3.')
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }
 
@@ -113,7 +117,7 @@ export default function PosPage() {
           <Input
             placeholder="Store UUID"
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
+            onChange={(e) => { requestId.current += 1; setLoading(false); setSession(null); setRows([]); setTotal(0); setStoreId(e.target.value) }}
             onPressEnter={() => void loadWorkspace(1, limit)}
             style={{ width: 310 }}
           />
