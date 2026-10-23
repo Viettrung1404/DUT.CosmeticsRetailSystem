@@ -43,7 +43,7 @@ const context = (over: Partial<PosSaleContext> = {}): PosSaleContext => ({
 
 const createdSale: PosCreatedSale = {
   orderId: 'o1',
-  orderNumber: 'ORD202610230001',
+  orderNumber: 'POS202610230001',
   createdAt: new Date(),
   pointsEarned: 0,
   pointsNote: null,
