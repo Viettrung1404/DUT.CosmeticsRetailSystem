@@ -534,6 +534,7 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
       discountAmount: Number(i.discountAmount),
       pointsDiscount: Number(i.pointsDiscount),
       lineTotal: Number(i.totalPrice),
+      lineNetTotal: Number(i.totalPrice) - Number(i.pointsDiscount),
     }));
     const couponDiscount = Number(order.couponUsage?.discountAmount ?? 0);
     const itemDiscounts = items.reduce((s, i) => s + i.discountAmount, 0);
