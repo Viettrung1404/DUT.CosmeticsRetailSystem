@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><title>Giỏ Hàng - GlowUp Cosmetics</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#F9ECEE;color:#281811;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}*{-ms-overflow-style:none;scrollbar-width:none;}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-error-container": "#93000a", "primary-container": "#bc5167", "on-primary-container": "#fffbff", "on-tertiary-container": "#fffbff", "primary-fixed": "#ffd9dd", "on-background": "#281811", "secondary-container": "#fad9cd", "background": "#fff8f6", "background-canvas": "#F9ECEE", "on-secondary-fixed": "#291710", "tertiary-fixed": "#e3dfff", "on-tertiary": "#ffffff", "on-secondary": "#ffffff", "surface-dim": "#f2d4c9", "on-surface-variant": "#554244", "tertiary-fixed-dim": "#c4c0ff", "error": "#ba1a1a", "inverse-on-surface": "#ffede7", "surface-variant": "#fbdcd1", "on-tertiary-fixed-variant": "#3a2eb7", "inverse-surface": "#3f2c25", "on-primary-fixed-variant": "#81243b", "surface-bright": "#fff8f6", "on-secondary-container": "#765d54", "secondary-fixed-dim": "#e0c0b4", "secondary-fixed": "#fddbd0", "surface-tint": "#a03b52", "surface-container-high": "#ffe2d8", "surface-container": "#ffe9e2", "on-error": "#ffffff", "surface": "#fff8f6", "secondary": "#725950", "surface-card": "#FFFFFF", "error-container": "#ffdad6", "surface-subtle": "#FEFAFC", "on-primary": "#ffffff", "tertiary-container": "#6a62e7", "on-surface": "#281811", "outline-variant": "#dbc0c3", "inverse-primary": "#ffb2bd", "on-primary-fixed": "#400013", "text-muted": "#AD9F9C", "primary": "#9d394f", "rose-berry": "#C85A70", "surface-container-lowest": "#ffffff", "surface-container-highest": "#fbdcd1", "tertiary": "#5047cd", "border-subtle": "#EFE5E7", "outline": "#887174", "primary-fixed-dim": "#ffb2bd", "on-secondary-fixed-variant": "#584239", "on-tertiary-fixed": "#110068", "surface-container-low": "#fff1ec" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-lg": "1rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "gutter-lg": "1.5rem", "space-xl": "1.5rem", "margin-lg": "2rem", "margin-md": "1.5rem", "space-md": "0.75rem", "gutter": "0.75rem", "gutter-md": "1rem", "space-2xl": "2rem", "margin": "1rem" }, fontFamily: { "headline-md": ["Playfair Display"], "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-lg": ["Playfair Display"], "label-sm": ["Plus Jakarta Sans"], "display-lg": ["Playfair Display"], "body-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "display-lg-mobile": ["Playfair Display"], "label-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "title-md": ["Plus Jakarta Sans"] }, fontSize: { "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}], "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "700"}], "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}], "headline-lg": ["26px", {"lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600"}], "label-sm": ["10px", {"lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700"}], "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "600"}], "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}], "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}], "display-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}], "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}], "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}], "title-md": ["15px", {"lineHeight": "22px", "fontWeight": "600"}] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head><body class="bg-background-canvas min-h-screen text-on-surface antialiased flex flex-col selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- 1. Header -->
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl border-b border-border-subtle/80 shadow-[0_1px_8px_rgba(200,90,112,0.06)]">
+<div class="h-16 max-w-[430px] mx-auto px-margin flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<img alt="GlowUp Cosmetics Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs"/>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">Giỏ Hàng</span>
+<span class="px-1.5 py-0.5 rounded-full bg-primary-fixed text-primary font-label-sm text-[11px] font-bold">(2 món)</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-text-muted mt-0.5">Rose Berry Elegance</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 rounded-full bg-surface-subtle text-primary border border-primary/20 font-label-md text-label-md font-semibold hover:bg-primary-fixed/30 active:scale-95 transition-all" id="btn-edit-mode" onclick="toggleEditMode()">
+          Sửa / Chọn tất cả
+        </button>
+</div>
+</div>
+</header>
+<main class="flex-1 flex flex-col relative w-full max-w-[430px] mx-auto px-margin pt-20 pb-36 bg-background-canvas">
+<div class="flex flex-col w-full space-y-space-md">
+<!-- 2. Thanh Tiến trình Quà tặng & Freeship Delight -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-sm border border-border-subtle relative overflow-hidden">
+<div class="flex items-start justify-between gap-2 mb-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[20px] text-primary" style="font-variation-settings: 'FILL' 1;">redeem</span>
+<p class="font-label-md text-label-md text-on-surface font-medium leading-snug">
+              Mua thêm <span class="font-bold text-primary">155.000đ</span> để nhận <span class="font-semibold text-primary">Freeship Silk-Drop</span> &amp; <span class="font-semibold text-primary">Túi quà Minisize GlowUp</span>
+</p>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted shrink-0 font-semibold">84%</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden relative">
+<div class="bg-gradient-to-r from-primary to-[#E27389] h-full rounded-full transition-all duration-500" style="width: 84.5%;"></div>
+</div>
+<div class="flex justify-between items-center mt-2 text-[11px] text-text-muted font-label-sm">
+<span>Đơn hiện tại: 845.000đ</span>
+<span class="text-primary font-medium">Mục tiêu: 1.000.000đ</span>
+</div>
+</div>
+<!-- 3. Danh sách Sản phẩm trong Giỏ hàng -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-sm border border-border-subtle space-y-space-md">
+<!-- Select All Header Row -->
+<div class="flex items-center justify-between pb-2 border-b border-border-subtle">
+<label class="flex items-center gap-2.5 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded-full text-primary border-outline-variant focus:ring-primary/20 focus:ring-offset-0 cursor-pointer accent-[#9d394f]" id="check-all-top" onchange="toggleSelectAll(this)" type="checkbox"/>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Chọn tất cả (2 món)</span>
+</label>
+<button class="text-text-muted hover:text-error text-body-sm font-label-sm flex items-center gap-0.5 transition-colors" onclick="clearSelectedItems()">
+<span class="material-symbols-outlined text-[16px]">delete_sweep</span>
+            Xóa đã chọn
+          </button>
+</div>
+<!-- Sản phẩm 1 -->
+<div class="flex gap-space-sm items-start py-2 border-b border-border-subtle/50" id="cart-item-1">
+<div class="pt-5">
+<input checked="" class="item-checkbox w-4 h-4 rounded-full text-primary border-outline-variant focus:ring-primary/20 accent-[#9d394f] cursor-pointer" onchange="updateCartTotal()" type="checkbox"/>
+</div>
+<div class="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-surface-subtle p-1 border border-border-subtle relative">
+<img class="w-full h-full rounded-lg object-cover" data-alt="Serum Phục Hồi B5 Hyaluronic Ampoule" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5P7TX50NLIipWTBP1O2VCAIwcAdrfbWcu-G0Q6QBJYSYa3ndtCASprYs7N7-eGF1huyFWhTnxv19xyF3UICkSPAfQvS78EoXk7ghrsc8Mu2esECQ7evpp08kcluzLcOdLuj_GK3pqKKfIqdlj11LynAdIhxsDBuolmn21x8XjuXPJ1uakZBs4sLgI_vfxIiSFVUvloN6RNLpcm31FhEFq38l_vq1Gw3podsJvFTtv3KzeJRsVywOtQA"/>
+<span class="absolute top-1 left-1 px-1 rounded bg-primary text-on-primary font-label-sm text-[9px] font-bold uppercase shadow-sm">Bán chạy</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface font-semibold line-clamp-1">Serum Phục Hồi B5 Hyaluronic Ampoule</h4>
+<p class="font-body-sm text-body-sm text-text-muted">Phân loại: 50ml tinh chất</p>
+</div>
+<button class="text-text-muted hover:text-error transition-colors p-0.5 ml-1" onclick="removeItem('cart-item-1')" title="Xóa">
+<span class="material-symbols-outlined text-[18px]">delete_outline</span>
+</button>
+</div>
+<div class="flex items-baseline gap-1.5 mt-1">
+<span class="font-label-lg text-label-lg text-primary font-bold">520.000đ</span>
+<span class="font-body-sm text-body-sm text-text-muted line-through">650.000đ</span>
+<span class="font-label-sm text-label-sm text-error bg-error-container/60 px-1 py-0.2 rounded font-semibold">-20%</span>
+</div>
+<div class="flex justify-between items-center mt-2.5">
+<button class="text-text-muted hover:text-primary font-label-sm text-[11px] underline underline-offset-2 transition-colors flex items-center gap-0.5" onclick="saveForLater('cart-item-1', 'Serum Phục Hồi B5 Hyaluronic Ampoule', '520.000đ')">
+<span class="material-symbols-outlined text-[14px]">bookmark_border</span>
+                Lưu mua sau
+              </button>
+<div class="flex items-center bg-surface-container rounded-lg p-0.5 border border-border-subtle">
+<button class="w-6 h-6 flex items-center justify-center rounded text-on-surface active:bg-surface-card text-xs font-bold transition-colors" onclick="changeQty('qty-1', -1)">-</button>
+<span class="w-7 text-center font-label-md text-label-md font-semibold text-on-surface" id="qty-1">1</span>
+<button class="w-6 h-6 flex items-center justify-center rounded text-on-surface active:bg-surface-card text-xs font-bold transition-colors" onclick="changeQty('qty-1', 1)">+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Sản phẩm 2 -->
+<div class="flex gap-space-sm items-start py-2" id="cart-item-2">
+<div class="pt-5">
+<input checked="" class="item-checkbox w-4 h-4 rounded-full text-primary border-outline-variant focus:ring-primary/20 accent-[#9d394f] cursor-pointer" onchange="updateCartTotal()" type="checkbox"/>
+</div>
+<div class="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-surface-subtle p-1 border border-border-subtle relative">
+<img class="w-full h-full rounded-lg object-cover" data-alt="Son Kem Lì Velvet Petal Tint" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3s3hqBA9CaAKCziMz82FM0YgiltuT_MvD6HiRMFhlDwxOeG7dTMVBLkbA89zUw-Ba7s4qNMxEx4j-CW3ZXizhv1Cp7B4WbCQVLAJ2Ki6wLFbQ49spnfKM9nNzNMcHoNLrzVLHHXAgGrD8mvtbVLW5rWAoy6R3JphtZT3hO11hboBGaOfPk7vi-RBWb0SrZBMfMf8VrkisO5PdM76xIxrd6i3x18FyQw1MJWVkkkGZPrFfpmfcZ7Nwxg"/>
+<span class="absolute top-1 left-1 px-1 rounded bg-[#C85A70] text-on-primary font-label-sm text-[9px] font-bold uppercase shadow-sm">Màu hot</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface font-semibold line-clamp-1">Son Kem Lì Velvet Petal Tint</h4>
+<p class="font-body-sm text-body-sm text-text-muted">Màu: #04 Rosewood</p>
+</div>
+<button class="text-text-muted hover:text-error transition-colors p-0.5 ml-1" onclick="removeItem('cart-item-2')" title="Xóa">
+<span class="material-symbols-outlined text-[18px]">delete_outline</span>
+</button>
+</div>
+<div class="flex items-baseline gap-1.5 mt-1">
+<span class="font-label-lg text-label-lg text-primary font-bold">325.000đ</span>
+</div>
+<div class="flex justify-between items-center mt-2.5">
+<button class="text-text-muted hover:text-primary font-label-sm text-[11px] underline underline-offset-2 transition-colors flex items-center gap-0.5" onclick="saveForLater('cart-item-2', 'Son Kem Lì Velvet Petal Tint #04', '325.000đ')">
+<span class="material-symbols-outlined text-[14px]">bookmark_border</span>
+                Lưu mua sau
+              </button>
+<div class="flex items-center bg-surface-container rounded-lg p-0.5 border border-border-subtle">
+<button class="w-6 h-6 flex items-center justify-center rounded text-on-surface active:bg-surface-card text-xs font-bold transition-colors" onclick="changeQty('qty-2', -1)">-</button>
+<span class="w-7 text-center font-label-md text-label-md font-semibold text-on-surface" id="qty-2">1</span>
+<button class="w-6 h-6 flex items-center justify-center rounded text-on-surface active:bg-surface-card text-xs font-bold transition-colors" onclick="changeQty('qty-2', 1)">+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Thẻ Quà tặng kèm 0đ -->
+<div class="flex gap-space-sm items-center p-3 bg-gradient-to-r from-surface-container-low to-primary-fixed/20 border border-primary-fixed rounded-xl">
+<div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-surface-card p-1 border border-border-subtle">
+<img class="w-full h-full rounded object-cover" data-alt="Mặt nạ sinh học Collagen GlowUp Mask" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNBPAkRSsQnnjpt3mvib6e28iR24XmNd0K7KXjlXzPOvHc-HvY-3dM0ZRCd7fHBseSs3BSHC6ELDXWczXLX1RjWsFOVpE-OeCy0BhWMa0e86MvWXowjCjxLgmXhATBhpTmxiUnGKY3r7fqPJVnreV4aazR31gZELFJDuy3ZjqQkeCxQvRDD13EOaNDOJqhvOF39zWrsYB-M2-ILxepkWKy6k3EtV9o8EkbWf6O2qh5TOLOjFWdi-ZdNQ"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="px-1.5 py-0.5 rounded-full bg-primary text-on-primary font-label-sm text-[9px] tracking-wider uppercase font-bold">QUÀ TẶNG 0đ</span>
+<h4 class="font-label-md text-label-md text-on-surface font-semibold truncate">Mặt nạ sinh học Collagen GlowUp Mask x1</h4>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted mt-0.5">Tặng kèm cho đơn hàng từ 500k</p>
+<div class="flex items-center gap-2 mt-1">
+<span class="font-label-sm text-label-sm text-primary font-bold">0đ</span>
+<span class="font-body-sm text-[11px] line-through text-text-muted">65.000đ</span>
+</div>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]">featured_seasonal_and_gifts</span>
+</div>
+</div>
+</div>
+<!-- 4. Khối "Lưu Mua Sau (Saved For Later)" -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-sm border border-border-subtle space-y-space-sm" id="saved-section">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[20px]">bookmark</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Lưu Mua Sau (Saved For Later)</span>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted" id="saved-count">1 sản phẩm</span>
+</div>
+<!-- Thẻ sản phẩm đang lưu -->
+<div class="flex gap-space-sm items-center p-3 bg-surface-subtle rounded-xl border border-border-subtle" id="saved-item-1">
+<div class="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-surface-card p-1 border border-border-subtle">
+<img class="w-full h-full rounded object-cover" data-alt="Kem Chống Nắng Phổ Rộng Tone-Up UV Barrier" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdWYLHb_5ZepaU1sDBlcL_NqUksR_UT9jMk0SnQaUpVnDQ_CTdzs7tv_OXKX2W2UuSQxAeZH-D4fL2oMywHD-rq9xItHARbttxSzWzXPRgjLmw7-ONGtjt8lsZH0vFoOKPUxiPzArQYFBK404oqa4OVaxRMeRO6Efha-t56O1khCnknkkNGdQgZGqcSWFAzOpNJo6636D7i2YAoK8voHwdX6EX1fbmnzScux-5ovDKg3rqVSU2WZKvWA"/>
+</div>
+<div class="flex-1 min-w-0">
+<h4 class="font-label-md text-label-md text-on-surface font-semibold truncate">Kem Chống Nắng Tone-Up UV Barrier</h4>
+<p class="font-body-sm text-body-sm text-text-muted truncate">SPF50+ PA++++ (50ml)</p>
+<span class="font-label-md text-label-md text-primary font-bold mt-0.5 inline-block">380.000đ</span>
+</div>
+<div class="flex flex-col items-end gap-1.5 shrink-0">
+<button class="px-2.5 py-1.5 rounded-lg bg-primary-fixed text-primary hover:bg-primary hover:text-on-primary transition-all font-label-sm text-[11px] font-semibold flex items-center gap-1 active:scale-95 shadow-sm" onclick="moveToCart('saved-item-1')">
+<span class="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+              Chuyển vào giỏ
+            </button>
+<button class="text-text-muted hover:text-error p-1 transition-colors" onclick="removeSavedItem('saved-item-1')" title="Xóa">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 5. Khối Voucher & Ưu Đãi -->
+<div class="bg-surface-card rounded-2xl p-space-md shadow-sm border border-border-subtle space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[20px]">confirmation_number</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Voucher &amp; Ưu Đãi</span>
+</div>
+<button class="font-label-sm text-label-sm text-primary font-semibold hover:underline flex items-center gap-0.5">
+            Xem tất cả mã
+            <span class="material-symbols-outlined text-[14px]">arrow_forward_ios</span>
+</button>
+</div>
+<!-- Ô nhập mã coupon -->
+<div class="flex items-center gap-2">
+<div class="relative flex-1">
+<span class="material-symbols-outlined text-text-muted absolute left-3 top-1/2 -translate-y-1/2 text-[18px]">sell</span>
+<input class="w-full h-10 pl-9 pr-3 rounded-xl bg-surface-subtle border border-border-subtle text-body-sm text-on-surface placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-xs uppercase tracking-wider" placeholder="Nhập mã ưu đãi GlowUp" type="text"/>
+</div>
+<button class="h-10 px-4 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-semibold hover:opacity-95 active:scale-95 transition-all shrink-0">
+            Áp dụng
+          </button>
+</div>
+<!-- Quick Badges -->
+<div class="flex items-center gap-2 overflow-x-auto pt-1 pb-0.5">
+<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary-fixed/30 border border-primary-fixed text-primary shrink-0 cursor-pointer hover:bg-primary-fixed/50 transition-colors">
+<span class="material-symbols-outlined text-[16px]">loyalty</span>
+<span class="font-label-sm text-label-sm font-bold">Voucher VIP -50.000đ</span>
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-container-high border border-border-subtle text-on-surface-variant shrink-0 cursor-pointer hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-[16px] text-tertiary">local_shipping</span>
+<span class="font-label-sm text-label-sm font-semibold">Freeship Silk-Drop</span>
+<span class="material-symbols-outlined text-[14px] text-primary">add</span>
+</div>
+</div>
+</div>
+<!-- Trust signals -->
+<div class="flex items-center justify-center gap-4 py-2 text-text-muted">
+<div class="flex items-center gap-1 font-label-sm text-[11px]">
+<span class="material-symbols-outlined text-[15px] text-primary">verified</span>
+          100% Mỹ Phẩm Chính Hãng
+        </div>
+<span class="w-1 h-1 rounded-full bg-text-muted/40"></span>
+<div class="flex items-center gap-1 font-label-sm text-[11px]">
+<span class="material-symbols-outlined text-[15px] text-primary">security</span>
+          Bảo mật thanh toán
+        </div>
+</div>
+</div>
+</main>
+<!-- 7. Thanh Sticky Bottom Bar (Nằm ngay trên Bottom Tab Bar) -->
+<div class="fixed bottom-16 left-0 right-0 z-40 bg-surface-card/95 backdrop-blur-xl border-t border-border-subtle px-margin py-3 shadow-[0_-8px_24px_rgba(200,90,112,0.12)]">
+<div class="max-w-[430px] mx-auto flex items-center justify-between gap-3">
+<!-- Checkbox & Subtotal -->
+<div class="flex items-center gap-2.5 min-w-0">
+<label class="flex items-center gap-1.5 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded-full text-primary border-outline-variant focus:ring-primary/20 accent-[#9d394f] cursor-pointer" id="check-all-bottom" onchange="toggleSelectAll(this)" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold whitespace-nowrap">Tất cả (2)</span>
+</label>
+<div class="flex flex-col min-w-0 pl-1 border-l border-border-subtle">
+<div class="flex items-baseline gap-1">
+<span class="font-headline-md text-headline-md text-primary font-bold leading-tight" id="cart-total-price">845.000đ</span>
+</div>
+<span class="font-body-sm text-[11px] text-primary leading-none font-medium">Tiết kiệm 130.000đ</span>
+</div>
+</div>
+<!-- Large CTA Rose Berry Button -->
+<button class="flex-1 max-w-[210px] h-12 bg-rose-berry hover:bg-[#b0485d] text-on-primary rounded-xl font-label-lg text-label-lg font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all text-[13px] tracking-wide uppercase" onclick="handleProceedCheckout()">
+<span>TIẾN HÀNH ĐẶT HÀNG (2)</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- 8. Bottom Tab Bar Di Động -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-card/95 backdrop-blur-xl border-t border-border-subtle" data-active-classes="text-primary font-semibold [&amp;_.active-dot]:opacity-100">
+<div class="h-16 max-w-[430px] mx-auto px-space-xs grid grid-cols-5 items-center">
+<a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="trang-chu" href="#">
+<span class="material-symbols-outlined text-[24px]">home</span>
+<span class="font-label-sm text-label-sm mt-0.5">Trang chủ</span>
+<span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span>
+</a>
+<a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="kham-pha" href="#">
+<span class="material-symbols-outlined text-[24px]">explore</span>
+<span class="font-label-sm text-label-sm mt-0.5">Khám phá</span>
+<span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span>
+</a>
+<!-- Active Cart Tab with badge 2 -->
+<a class="flex flex-col items-center justify-center h-full min-h-[44px] text-primary font-semibold group relative" data-path="gio-hang" href="#">
+<div class="relative flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">shopping_bag</span>
+<span class="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-primary text-on-primary font-label-sm text-[10px] leading-tight flex items-center justify-center ring-2 ring-surface-card font-bold">2</span>
+</div>
+<span class="font-label-sm text-label-sm mt-0.5">Giỏ hàng</span>
+<span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-100 transition-opacity"></span>
+</a>
+<a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="don-hang" href="#">
+<span class="material-symbols-outlined text-[24px]">local_shipping</span>
+<span class="font-label-sm text-label-sm mt-0.5">Đơn hàng</span>
+<span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span>
+</a>
+<a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="tai-khoan" href="#">
+<span class="material-symbols-outlined text-[24px]">person</span>
+<span class="font-label-sm text-label-sm mt-0.5">Tài khoản</span>
+<span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span>
+</a>
+</div>
+</nav>
+<script>
+    function toggleSelectAll(master) {
+      const isChecked = master.checked;
+      document.getElementById('check-all-top').checked = isChecked;
+      document.getElementById('check-all-bottom').checked = isChecked;
+      const items = document.querySelectorAll('.item-checkbox');
+      items.forEach(cb => cb.checked = isChecked);
+      updateCartTotal();
+    }
+
+    function updateCartTotal() {
+      const checkboxes = document.querySelectorAll('.item-checkbox');
+      let count = 0;
+      checkboxes.forEach(cb => {
+        if (cb.checked) count++;
+      });
+
+      const totalDisplay = document.getElementById('cart-total-price');
+      if (count === 2) {
+        totalDisplay.innerText = '845.000đ';
+      } else if (count === 1) {
+        totalDisplay.innerText = '520.000đ';
+      } else {
+        totalDisplay.innerText = '0đ';
+      }
+    }
+
+    function changeQty(id, delta) {
+      const el = document.getElementById(id);
+      let val = parseInt(el.innerText) + delta;
+      if (val < 1) val = 1;
+      el.innerText = val;
+    }
+
+    function removeItem(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.remove();
+        updateCartTotal();
+      }
+    }
+
+    function saveForLater(itemId, title, price) {
+      removeItem(itemId);
+      const savedSection = document.getElementById('saved-section');
+      const countEl = document.getElementById('saved-count');
+      countEl.innerText = '2 sản phẩm';
+      
+      const newCard = document.createElement('div');
+      newCard.className = "flex gap-space-sm items-center p-3 bg-surface-subtle rounded-xl border border-border-subtle mt-2";
+      newCard.innerHTML = `
+        <div class="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-surface-card p-1 border border-border-subtle flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[24px]">spa</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h4 class="font-label-md text-label-md text-on-surface font-semibold truncate">${title}</h4>
+          <span class="font-label-md text-label-md text-primary font-bold mt-0.5 inline-block">${price}</span>
+        </div>
+        <div class="flex flex-col items-end gap-1.5 shrink-0">
+          <button onclick="this.parentElement.parentElement.remove()" class="px-2.5 py-1.5 rounded-lg bg-primary-fixed text-primary hover:bg-primary hover:text-on-primary transition-all font-label-sm text-[11px] font-semibold flex items-center gap-1 active:scale-95 shadow-sm">
+            <span class="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+            Chuyển vào giỏ
+          </button>
+        </div>
+      `;
+      savedSection.appendChild(newCard);
+    }
+
+    function moveToCart(savedId) {
+      const item = document.getElementById(savedId);
+      if (item) {
+        item.remove();
+        const countEl = document.getElementById('saved-count');
+        countEl.innerText = '0 sản phẩm';
+        alert('Đã chuyển sản phẩm vào giỏ hàng thành công!');
+      }
+    }
+
+    function removeSavedItem(savedId) {
+      const item = document.getElementById(savedId);
+      if (item) {
+        item.remove();
+        const countEl = document.getElementById('saved-count');
+        countEl.innerText = '0 sản phẩm';
+      }
+    }
+
+    function clearSelectedItems() {
+      const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+      checkboxes.forEach(cb => {
+        const row = cb.closest('[id^="cart-item-"]');
+        if (row) row.remove();
+      });
+      updateCartTotal();
+    }
+
+    function toggleEditMode() {
+      const btn = document.getElementById('btn-edit-mode');
+      const allCb = document.getElementById('check-all-top');
+      if (btn.innerText.includes('Xong')) {
+        btn.innerText = 'Sửa / Chọn tất cả';
+      } else {
+        btn.innerText = 'Xong';
+        allCb.checked = !allCb.checked;
+        toggleSelectAll(allCb);
+      }
+    }
+
+    function handleProceedCheckout() {
+      // Directs to checkout screen flow
+      window.location.hash = '#thanh-toan';
+    }
+  </script>
+</body></html>

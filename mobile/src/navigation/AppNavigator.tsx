@@ -7,6 +7,8 @@ import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import ProductDetailScreen from '../screens/product/ProductDetailScreen';
 import SearchScreen from '../screens/search/SearchScreen';
+import CheckoutScreen from '../screens/cart/CheckoutScreen';
+import OrderSuccessScreen from '../screens/cart/OrderSuccessScreen';
 import { COLORS } from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
@@ -34,6 +36,8 @@ export default function AppNavigator() {
                         <Stack.Screen name="MainTabs" component={MainTabs} />
                         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
                         <Stack.Screen name="Search" component={SearchScreen} />
+                        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                        <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
                     </>
                 ) : (
                     <Stack.Screen name="AuthStack" component={AuthStack} />

@@ -1,57 +1,79 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 
 export default function OrderSuccessScreen({ route, navigation }: any) {
   const { orderCode, totalAmount, paymentMethod } = route.params || {
-    orderCode: 'GLOW-123456',
-    totalAmount: 0,
-    paymentMethod: 'COD',
+    orderCode: 'GLOW-89241',
+    totalAmount: 770000,
+    paymentMethod: 'Thanh toán khi nhận hàng (COD)',
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeContainer}>
       <View style={styles.content}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="checkmark" size={60} color="#FFF" />
+        {/* Animated Celebration Icon */}
+        <View style={styles.successIconCircle}>
+          <Ionicons name="checkmark" size={48} color="#FFF" />
         </View>
 
-        <Text style={styles.title}>Đặt hàng thành công!</Text>
+        <Text style={styles.title}>Đặt Hàng Thành Công!</Text>
         <Text style={styles.subtitle}>
-          Cảm ơn bạn đã mua sắm tại GlowUp Cosmetics. Đơn hàng của bạn đang được xử lý.
+          Cảm ơn bạn đã lựa chọn GlowUp Cosmetics. Kiện hàng đang được chuyển đến bộ phận đóng gói niêm phong.
         </Text>
 
-        {/* Thẻ thông tin đơn hàng */}
+        {/* Order Card Preview */}
         <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mã đơn hàng:</Text>
-            <Text style={styles.infoValue}>{orderCode}</Text>
+          <View style={styles.cardHeader}>
+            <View style={styles.rowAlign}>
+              <Ionicons name="receipt-outline" size={18} color={theme.colors.primary} />
+              <Text style={styles.orderCodeText}>#{orderCode}</Text>
+            </View>
+            <View style={styles.badgeSuccess}>
+              <Text style={styles.badgeSuccessText}>Chờ xác nhận</Text>
+            </View>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Tổng tiền:</Text>
+          <View style={styles.infoLine}>
+            <Text style={styles.infoLabel}>Tổng thanh toán:</Text>
             <Text style={styles.totalValue}>{totalAmount.toLocaleString('vi-VN')} đ</Text>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Hình thức:</Text>
-            <Text style={styles.infoValue}>{paymentMethod}</Text>
+          <View style={styles.infoLine}>
+            <Text style={styles.infoLabel}>Phương thức:</Text>
+            <Text style={styles.infoVal}>{paymentMethod}</Text>
+          </View>
+
+          <View style={styles.infoLine}>
+            <Text style={styles.infoLabel}>Dự kiến giao hàng:</Text>
+            <Text style={[styles.infoVal, { color: theme.colors.primary, fontWeight: '700' }]}>
+              Hôm nay (16:00 - 17:30)
+            </Text>
+          </View>
+
+          <View style={styles.pointsEarnedBox}>
+            <Ionicons name="sparkles" size={16} color={theme.colors.tertiary} />
+            <Text style={styles.pointsEarnedText}>
+              +145 GlowPoints tích lũy vào thẻ VIP của bạn!
+            </Text>
           </View>
         </View>
 
-        {/* Các nút hành động */}
+        {/* Action Buttons */}
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => navigation.navigate('OrderTab')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Đơn hàng' })}
         >
-          <Text style={styles.primaryBtnText}>Xem lịch sử đơn hàng</Text>
+          <Ionicons name="cube-outline" size={18} color="#FFF" />
+          <Text style={styles.primaryBtnText}>Theo dõi tiến trình đơn hàng</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.secondaryBtn}
-          onPress={() => navigation.navigate('HomeTab')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Trang chủ' })}
         >
+          <Ionicons name="arrow-back" size={16} color={theme.colors.textDark} />
           <Text style={styles.secondaryBtnText}>Tiếp tục mua sắm</Text>
         </TouchableOpacity>
       </View>
@@ -60,62 +82,145 @@ export default function OrderSuccessScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
+  safeContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.backgroundCanvas,
+  },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: theme.spacing.lg,
   },
-  iconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#4CAF50',
+  successIconCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    ...theme.shadows.card,
   },
-  title: { fontSize: 22, fontWeight: '800', color: theme.colors.textDark, marginBottom: 8 },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+    marginBottom: 8,
+  },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
     marginBottom: 24,
+    paddingHorizontal: 10,
   },
   infoCard: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.rounded.xl,
+    padding: theme.spacing.md,
     width: '100%',
-    marginBottom: 30,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: theme.colors.borderSubtle,
+    ...theme.shadows.card,
+    gap: 10,
   },
-  infoRow: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 6,
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
   },
-  infoLabel: { fontSize: 13, color: theme.colors.textMuted },
-  infoValue: { fontSize: 13, fontWeight: '700', color: theme.colors.textDark },
-  totalValue: { fontSize: 15, fontWeight: '800', color: theme.colors.primary },
+  rowAlign: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  orderCodeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  badgeSuccess: {
+    backgroundColor: theme.colors.surfaceContainerLow,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  badgeSuccessText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+  infoLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  infoVal: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textDark,
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  pointsEarnedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.tertiaryFixed,
+    padding: 10,
+    borderRadius: theme.rounded.md,
+    marginTop: 4,
+  },
+  pointsEarnedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.tertiary,
+  },
   primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: theme.colors.primary,
     width: '100%',
     paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
+    borderRadius: theme.rounded.lg,
     marginBottom: 12,
+    ...theme.shadows.soft,
   },
-  primaryBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  primaryBtnText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   secondaryBtn: {
-    backgroundColor: '#F5F5F5',
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.surfaceCard,
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: theme.rounded.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
   },
-  secondaryBtnText: { color: theme.colors.textDark, fontSize: 14, fontWeight: '600' },
+  secondaryBtnText: {
+    color: theme.colors.textDark,
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });

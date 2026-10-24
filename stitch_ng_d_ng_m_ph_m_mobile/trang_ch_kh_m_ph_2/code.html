@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><title>GlowUp Cosmetics</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#F9ECEE;color:#281811;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}*{-ms-overflow-style:none;scrollbar-width:none;}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-error-container": "#93000a", "primary-container": "#bc5167", "on-primary-container": "#fffbff", "on-tertiary-container": "#fffbff", "primary-fixed": "#ffd9dd", "on-background": "#281811", "secondary-container": "#fad9cd", "background": "#fff8f6", "background-canvas": "#F9ECEE", "on-secondary-fixed": "#291710", "tertiary-fixed": "#e3dfff", "on-tertiary": "#ffffff", "on-secondary": "#ffffff", "surface-dim": "#f2d4c9", "on-surface-variant": "#554244", "tertiary-fixed-dim": "#c4c0ff", "error": "#ba1a1a", "inverse-on-surface": "#ffede7", "surface-variant": "#fbdcd1", "on-tertiary-fixed-variant": "#3a2eb7", "inverse-surface": "#3f2c25", "on-primary-fixed-variant": "#81243b", "surface-bright": "#fff8f6", "on-secondary-container": "#765d54", "secondary-fixed-dim": "#e0c0b4", "secondary-fixed": "#fddbd0", "surface-tint": "#a03b52", "surface-container-high": "#ffe2d8", "surface-container": "#ffe9e2", "on-error": "#ffffff", "surface": "#fff8f6", "secondary": "#725950", "surface-card": "#FFFFFF", "error-container": "#ffdad6", "surface-subtle": "#FEFAFC", "on-primary": "#ffffff", "tertiary-container": "#6a62e7", "on-surface": "#281811", "outline-variant": "#dbc0c3", "inverse-primary": "#ffb2bd", "on-primary-fixed": "#400013", "text-muted": "#AD9F9C", "primary": "#9d394f", "surface-container-lowest": "#ffffff", "surface-container-highest": "#fbdcd1", "tertiary": "#5047cd", "border-subtle": "#EFE5E7", "outline": "#887174", "primary-fixed-dim": "#ffb2bd", "on-secondary-fixed-variant": "#584239", "on-tertiary-fixed": "#110068", "surface-container-low": "#fff1ec" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-lg": "1rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "gutter-lg": "1.5rem", "space-xl": "1.5rem", "margin-lg": "2rem", "margin-md": "1.5rem", "space-md": "0.75rem", "gutter": "0.75rem", "gutter-md": "1rem", "space-2xl": "2rem", "margin": "1rem" }, fontFamily: { "headline-md": ["Playfair Display"], "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-lg": ["Playfair Display"], "label-sm": ["Plus Jakarta Sans"], "display-lg": ["Playfair Display"], "body-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "display-lg-mobile": ["Playfair Display"], "label-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "title-md": ["Plus Jakarta Sans"] }, fontSize: { "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}], "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "700"}], "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}], "headline-lg": ["26px", {"lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600"}], "label-sm": ["10px", {"lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700"}], "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "600"}], "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}], "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}], "display-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}], "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}], "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}], "title-md": ["15px", {"lineHeight": "22px", "fontWeight": "600"}] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-background-canvas min-h-screen text-on-surface antialiased flex flex-col selection:bg-primary-fixed selection:text-on-primary-fixed"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(200,90,112,0.06)]"><div class="h-16 max-w-[430px] mx-auto px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="GlowUp Cosmetics Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">GlowUp</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-text-muted mt-0.5">Trang Chủ</span></div></div><div class="flex items-center gap-space-xs"><button aria-label="Tìm kiếm" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-subtle transition-colors"><span class="material-symbols-outlined text-[22px]">search</span></button><button aria-label="Thông báo" class="relative w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-subtle transition-colors"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-primary ring-2 ring-surface"></span></button><button aria-label="Hồ sơ cá nhân" class="w-11 h-11 flex items-center justify-center pl-1"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdWYLHb_5ZepaU1sDBlcL_NqUksR_UT9jMk0SnQaUpVnDQ_CTdzs7tv_OXKX2W2UuSQxAeZH-D4fL2oMywHD-rq9xItHARbttxSzWzXPRgjLmw7-ONGtjt8lsZH0vFoOKPUxiPzArQYFBK404oqa4OVaxRMeRO6Efha-t56O1khCnknkkNGdQgZGqcSWFAzOpNJo6636D7i2YAoK8voHwdX6EX1fbmnzScux-5ovDKg3rqVSU2WZKvWA"/></button></div></div></header><main class="flex-1 flex flex-col relative w-full max-w-[430px] mx-auto px-margin pt-16 pb-24 bg-background-canvas"><div class="flex flex-col w-full gap-space-lg select-none">
+<!-- 1. Thanh tìm kiếm thông minh & Gợi ý xu hướng -->
+<section class="flex flex-col w-full gap-space-sm pt-space-xs">
+<div class="relative flex items-center w-full bg-surface-subtle rounded-xl shadow-sm px-space-md h-12">
+<span class="material-symbols-outlined text-primary text-[22px] shrink-0 mr-space-sm">search</span>
+<input class="w-full bg-transparent font-body-sm text-body-sm text-on-surface placeholder:text-text-muted focus:outline-none truncate" placeholder="Tìm serum dưỡng sáng, son kem, kem chống nắng..." type="text"/>
+<button aria-label="Tìm kiếm giọng nói" class="w-8 h-8 flex items-center justify-center text-text-muted hover:text-primary transition-colors shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+</div>
+<!-- Xu hướng tìm kiếm chips -->
+<div class="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-0.5">
+<span class="flex items-center gap-1 font-label-sm text-label-sm text-primary uppercase shrink-0 pr-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> Hot:
+      </span>
+<button class="px-space-md py-1 rounded-full bg-surface-card shadow-sm font-label-md text-label-md text-on-surface whitespace-nowrap active:scale-95 transition-transform hover:text-primary">
+        Serum B5
+      </button>
+<button class="px-space-md py-1 rounded-full bg-surface-card shadow-sm font-label-md text-label-md text-on-surface whitespace-nowrap active:scale-95 transition-transform hover:text-primary">
+        Son lì Rose Berry
+      </button>
+<button class="px-space-md py-1 rounded-full bg-surface-card shadow-sm font-label-md text-label-md text-on-surface whitespace-nowrap active:scale-95 transition-transform hover:text-primary">
+        Tẩy trang dịu nhẹ
+      </button>
+</div>
+</section>
+<!-- 2. Slider Hero Banner -->
+<section class="relative w-full rounded-2xl overflow-hidden shadow-md bg-gradient-to-br from-primary-fixed to-surface-variant">
+<div class="relative w-full h-[175px] flex items-center overflow-hidden">
+<!-- Background cosmetic vibe image -->
+<div class="absolute inset-0 bg-cover bg-center w-full h-full mix-blend-multiply opacity-35" data-alt="Luxurious high-end pink cosmetic bottles, serum dropper and soft rose petals arranged gracefully on a powdery blush satin fabric with warm editorial natural sunlight and deep shadows." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDi6Assej-3gk8Td1fGGSnkFSCURih9JiDVJW9oEjvBjnKZzHTzgzjFJgIDZ-MTTzMpCSKyw6sP-HfPaAwA2tnEA25Gz1kYbWO88duUwQu8qeMg9ZR9reJ4kgESWOmbqkx-bsJ08M_lYsMcHw4G1VIXE4FY74AzI9bszCI1Ugg06jA3fuWKK16oTpiLVd2cOtXaWe9WoHXP3HQHCDV68J8cxs-av_nawPsN1NMmWTZwKoAGMMMn3qS--g')"></div>
+<!-- Scrim overlay -->
+<div class="absolute inset-0 bg-gradient-to-r from-background-canvas via-background-canvas/80 to-transparent"></div>
+<!-- Banner Content -->
+<div class="relative z-10 flex flex-col justify-center max-w-[65%] pl-space-lg pr-space-xs py-space-md">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 w-fit mb-1.5">
+<span class="material-symbols-outlined text-primary text-[12px]">auto_awesome</span>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider">Summer Glow 2024</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface leading-tight drop-shadow-sm">
+          Đại tiệc làm đẹp Mùa Hè
+        </h2>
+<p class="font-title-md text-title-md text-primary font-bold mt-0.5">
+          Giảm tới 45% <span class="font-body-sm text-body-sm text-text-muted font-normal">+ Quà 250k</span>
+</p>
+<button class="mt-space-md px-space-lg h-9 rounded-xl bg-primary text-on-primary font-label-md text-label-md flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all w-fit">
+<span>Khám phá ngay</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+<!-- Hero Product Floating Graphic -->
+<div class="absolute -right-3 bottom-0 w-[42%] h-[150px] flex items-end justify-center pointer-events-none">
+<img class="h-full w-auto object-contain filter drop-shadow-xl" data-alt="Editorial close-up of a frosted luxury glass cosmetics dropper bottle and premium lipstick in shade Rose Berry on a glowing warm pedestals with botanical shadows." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCruhmnRWI32Hd37MlTnTq2pD1ADW7uvRnOTXOYEoeKIVw2RHUvd_IatGippZqK7unuAqKlzc9U2BH-RGDtkIB7q7qFNxWAZ6U_jLyCMy5-pcJKa4Wh83CIQbBHveIr_xtDPA1XjiH_epCwXFCS3cPCj06t57WEN9SsbRhlNJ9y4Rq9UdM0sZA13Zd1SPvhRubjE04jpKClM1iDfAL1xWzJzohCfeo0AmrjFYuccd2sP3kFOSnvHPSlpg"/>
+</div>
+</div>
+<!-- Dots Pagination Indicator -->
+<div class="absolute bottom-2 left-0 right-0 flex justify-center items-center gap-1.5 z-20">
+<span class="w-5 h-1.5 rounded-full bg-primary transition-all"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface/20"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface/20"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface/20"></span>
+</div>
+</section>
+<!-- 3. Danh mục nhanh (Quick Categories dạng tròn cuộn ngang) -->
+<section class="flex flex-col w-full">
+<div class="flex items-center justify-between mb-space-sm px-0.5">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Danh mục nổi bật</h3>
+<a class="font-label-md text-label-md text-primary flex items-center" href="#">Xem thêm <span class="material-symbols-outlined text-[16px]">chevron_right</span></a>
+</div>
+<div class="flex items-start gap-space-md overflow-x-auto no-scrollbar pb-1 pt-0.5 px-0.5">
+<!-- Item: Skincare -->
+<div class="flex flex-col items-center gap-1.5 shrink-0 group cursor-pointer">
+<div class="relative w-16 h-16 rounded-full bg-surface-card p-1 shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center">
+<div class="w-full h-full rounded-full overflow-hidden bg-primary-fixed/40 flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Modern minimalist aesthetic serum droplet skincare bottle isolated clean background soft pink tones studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_iJjHfAAesJaLMwDwMWdY3QBREPRKDfrlV6e5XeVZpB0sJWAY_JADDRbQsxiwWFLUNyn3kceHyKeKsPKTxDuL411bJb0w2XhhZlg4K1aPVKdLBRC5IxAhTpu-WeDuFrpyLS4mhJCJaAzS-XCN_ko89RTB-1YeFCgxeWid1Ptzir9pj-g2lqoJbwIHU9HsHH_VTyK7np8nb225ao8cilr00rKOVT0jqJunQi2XqpXGBYObEMA253RFZw"/>
+</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface text-center whitespace-nowrap">Chăm sóc da</span>
+</div>
+<!-- Item: Makeup -->
+<div class="flex flex-col items-center gap-1.5 shrink-0 group cursor-pointer">
+<div class="relative w-16 h-16 rounded-full bg-surface-card p-1 shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center">
+<div class="w-full h-full rounded-full overflow-hidden bg-secondary-container/50 flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Luxury matte lipstick open tube rich berry pigment velvet texture cosmetics studio photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoQFwlRHH6dX9rdvqXkJYtua2p3tZqQivWGg-NITpZD_fw1aY5mgySDKG6Wzbm9SqYMDvszHWM4KGBiTd1aRMBep8Hji3Sf9I-VeeyXS8S62kipKs8MV_mD1BY8tir5f3MbpXmF4RXqitpLw_Wtu2UMI90zptYC8tUKkVW3LIhCOe2aOlPdKb0PH2wPNRYzw08_N4bwnscJPeBxGfBfBbGeqcwt3iit2DTNQkKFyFzLFCd8Nzkgaaqwg"/>
+</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface text-center whitespace-nowrap">Trang điểm</span>
+</div>
+<!-- Item: Bodycare -->
+<div class="flex flex-col items-center gap-1.5 shrink-0 group cursor-pointer">
+<div class="relative w-16 h-16 rounded-full bg-surface-card p-1 shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center">
+<div class="w-full h-full rounded-full overflow-hidden bg-surface-variant flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Clean aesthetic body lotion pump dispenser tube surrounded by botanical ingredients soft pastel pink background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWbmjZgt9bLyEI-f2-PGVfxWTEabuSOTV91dNlRExypBfhin9MDCPZWVTwo_qfRC8wyFPo2kjcxvVVw5FPzqam43lGV0x_qyu5KZyOCB9bPd3B4GC5RoxL768DzYuigyXW-pKh5r9HiUY6qnvcC2s8q9iiJ3zX9S5D5dBaW6S7KcTBm2TLiWr9Fj9GqzqYy5bUtcnReFK2sXfGgUtcuoKHaGJbbxfe6HGMS5q-JN6UlxHHXfo6cW0fhQ"/>
+</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface text-center whitespace-nowrap">Dưỡng thể</span>
+</div>
+<!-- Item: Perfume -->
+<div class="flex flex-col items-center gap-1.5 shrink-0 group cursor-pointer">
+<div class="relative w-16 h-16 rounded-full bg-surface-card p-1 shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center">
+<div class="w-full h-full rounded-full overflow-hidden bg-tertiary-fixed/40 flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Crystal luxury perfume bottle with golden sprayer reflections on wet glass surface elegant Parisian style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBL2c1RzeJjyKvBSART9yLhRiZsqT8-W_u4bhBtDaMhXRMqOGfRMiz4U04ovfvzuHYVZsowgCG1gl7GKzwA5fKlL9Xd4thU0vs5eoaY-wDTkJ5qyoyzR6BxArKwIhaJVAwF1Q9tYg8_t3396Q9Fr-Tf15-RoHeeTiIM5bOLdB8LYQcy3PQayq3582IwFcXa9NVl9y8pPuWXIzqNCJJFMBYja8cBDm_5yCKJu1xE6J2hDmYk_MKs3Hq0xQ"/>
+</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface text-center whitespace-nowrap">Nước hoa</span>
+</div>
+<!-- Item: Sunscreen -->
+<div class="flex flex-col items-center gap-1.5 shrink-0 group cursor-pointer">
+<div class="relative w-16 h-16 rounded-full bg-surface-card p-1 shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center">
+<div class="w-full h-full rounded-full overflow-hidden bg-surface-container flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Sunscreen protective lotion tube with water droplets warm summer sunlight aesthetic background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDb_VhmccJbyRFS2wQp6JTjaikKI8QZFpPWag-9TYM0T_I4NJ30Ho5teyWfQMsSHsKtGrUJM_u9WLMk28xqaZqZ3yxOBFGIWBOT0U4k6J5DdyeCEkLTAcgYlxrQRbuFOssyfwODL6fFUW1ZmDLFxiSkhgdNUGeZ-NAdLvlST6PQkLN2qDyqY2UC0kCumZ6ulpt4ZwPoem4w7aXl1rLnDRjkcNJeBnpO_68ECi6Rk35Jv97y7pbfl5cc-w"/>
+</div>
+</div>
+<span class="font-label-md text-label-md text-on-surface text-center whitespace-nowrap">Chống nắng</span>
+</div>
+</div>
+</section>
+<!-- 4. Flash Sale siêu ưu đãi -->
+<section class="flex flex-col w-full bg-surface-card rounded-2xl p-space-md shadow-sm">
+<!-- Flash sale header -->
+<div class="flex items-center justify-between pb-space-sm">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-on-surface">Flash Sale</span>
+<!-- Countdown timer -->
+<div class="flex items-center gap-1 ml-1" id="flash-sale-timer">
+<span class="px-1.5 py-0.5 bg-primary text-on-primary font-label-sm text-label-sm rounded" id="timer-h">02</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">:</span>
+<span class="px-1.5 py-0.5 bg-primary text-on-primary font-label-sm text-label-sm rounded" id="timer-m">45</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">:</span>
+<span class="px-1.5 py-0.5 bg-primary text-on-primary font-label-sm text-label-sm rounded" id="timer-s">18</span>
+</div>
+</div>
+<a class="font-label-md text-label-md text-primary flex items-center" href="#">
+        Xem tất cả <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</a>
+</div>
+<!-- Flash sale items horizontal carousel -->
+<div class="flex items-stretch gap-space-md overflow-x-auto no-scrollbar pt-1">
+<!-- Card 1 (Detailed in prompt) -->
+<div class="flex flex-col w-[170px] shrink-0 bg-surface-subtle rounded-xl p-space-sm shadow-sm relative group">
+<!-- Floating discount badge -->
+<div class="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-primary text-on-primary font-label-sm text-label-sm shadow-sm">
+          -40%
+        </div>
+<!-- Product Image -->
+<div class="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-card mb-2">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Centella Asiatica calming skincare serum bottle with green organic leaf botanical extract drops studio product photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDp4YoOk91zJv9XHMILplK3O5nld1jvKGpK_xK38Dqpf9Q2jPlLVMmONwpqZQZaY2RDJOj8_hgB_-XBLRKG9ejE8PGdZcUxcirzrsimxEOKaoiuV0jui2pDWP6iYrKFmVwvCZydCRhMSVvvXI-qLV4jRo0vnnlHAZuBGNF48xvjqU144ovSoa5riTWK1jBx7fGb1iwwwSI02KL-7RRYvUxmKZGtgn2mE55qRUVJJX3qtSIBBA94kcrhvg"/>
+</div>
+<!-- Info -->
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-tight min-h-[44px]">
+          Serum Phục Hồi Rau Má Centella 50ml
+        </h4>
+<div class="flex items-baseline gap-1.5 mt-1.5">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">285.000₫</span>
+<span class="font-body-sm text-body-sm text-text-muted line-through text-[11px]">475.000₫</span>
+</div>
+<!-- Progress bar -->
+<div class="mt-2 flex flex-col gap-1">
+<div class="w-full bg-primary-fixed/50 h-3 rounded-full overflow-hidden relative flex items-center">
+<div class="bg-primary h-full rounded-full w-[78%] transition-all duration-500"></div>
+<span class="absolute inset-0 flex items-center justify-center font-label-sm text-[9px] text-on-primary font-semibold">Đã bán 78%</span>
+</div>
+</div>
+</div>
+<!-- Card 2 Flash Sale Extra -->
+<div class="flex flex-col w-[170px] shrink-0 bg-surface-subtle rounded-xl p-space-sm shadow-sm relative group">
+<div class="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-primary text-on-primary font-label-sm text-label-sm shadow-sm">
+          -35%
+        </div>
+<div class="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-card mb-2">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Exquisite frosted luxury pink facial mist spray bottle splashing crystalline water dew drops cosmetics photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1-7gu-3F8AKcFACcv2ZHRfEbK7y70qa2xMzVfeOeGCj2pt63oPz4Ji4Pkuc7K6PCgtXNWD40EykEeALJf0jE_CT3XmPMYlWKOYhh3lasT4MxcpeR85xUteuKLniTeGYgSwdpvcPJqsrjVDBWBp8UsSlapy5T8MmiIdV0-epXZSsoCT8qE7LktRFgGpsDYN9QdwaQAK73M4wrAcpl-hd5Kk1DaaFzsDdGA980-crT4huijd0McJUe3Eg"/>
+</div>
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-tight min-h-[44px]">
+          Xịt Khoáng Dưỡng Cấp Ẩm Rose Water 150ml
+        </h4>
+<div class="flex items-baseline gap-1.5 mt-1.5">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">165.000₫</span>
+<span class="font-body-sm text-body-sm text-text-muted line-through text-[11px]">255.000₫</span>
+</div>
+<div class="mt-2 flex flex-col gap-1">
+<div class="w-full bg-primary-fixed/50 h-3 rounded-full overflow-hidden relative flex items-center">
+<div class="bg-primary h-full rounded-full w-[91%] transition-all duration-500"></div>
+<span class="absolute inset-0 flex items-center justify-center font-label-sm text-[9px] text-on-primary font-semibold">Đã bán 91%</span>
+</div>
+</div>
+</div>
+<!-- Card 3 Flash Sale Extra -->
+<div class="flex flex-col w-[170px] shrink-0 bg-surface-subtle rounded-xl p-space-sm shadow-sm relative group">
+<div class="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-primary text-on-primary font-label-sm text-label-sm shadow-sm">
+          -50%
+        </div>
+<div class="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-card mb-2">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Golden retinol revitalizing eye cream squeeze tube on a warm marble stand surrounded by soft warm beauty lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8ZmdVTKfQ2kTBmcvEdQer6cz7wHVc0W2aWd4BUUFzLwB8gWsSS3bImndT86m_OyPw7gymFrUzA8G9Wg3Y2D52kDd0sixStajhC42NyWCgJ34XYReqwE5JYUc4bJeJX8tFjrS5Q-qBQQMWUPR_bLR2Ssxn307_e5pIbOzbtl1iuUjHvn5V-cIhErg-KXqq9nmunAS787wUHNPHk2evYrKBepQ50J4qlHOSvsEtxGPNpx_FwwX74J_jGQ"/>
+</div>
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-tight min-h-[44px]">
+          Kem Mắt Trẻ Hóa Giảm Quầng Thâm 20g
+        </h4>
+<div class="flex items-baseline gap-1.5 mt-1.5">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">210.000₫</span>
+<span class="font-body-sm text-body-sm text-text-muted line-through text-[11px]">420.000₫</span>
+</div>
+<div class="mt-2 flex flex-col gap-1">
+<div class="w-full bg-primary-fixed/50 h-3 rounded-full overflow-hidden relative flex items-center">
+<div class="bg-primary h-full rounded-full w-[65%] transition-all duration-500"></div>
+<span class="absolute inset-0 flex items-center justify-center font-label-sm text-[9px] text-on-primary font-semibold">Đã bán 65%</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Bộ sưu tập Gợi ý hôm nay (2-column Product Grid) -->
+<section class="flex flex-col w-full pb-space-sm">
+<div class="flex items-center justify-between mb-space-sm px-0.5">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">spa</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Gợi ý hôm nay</h3>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Dành riêng cho bạn</span>
+</div>
+<!-- 2-Column Grid -->
+<div class="grid grid-cols-2 gap-gutter">
+<!-- Sản phẩm 1: Son Kem Lì Velvet Tint #04 Rose Berry -->
+<div class="flex flex-col w-full bg-surface-card rounded-2xl p-space-sm shadow-sm relative group">
+<!-- Wishlist Button -->
+<button aria-label="Thêm vào yêu thích" class="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-surface-card/90 backdrop-blur-md shadow-sm flex items-center justify-center text-text-muted hover:text-primary transition-all active:scale-90" onclick="toggleWishlist(this)" type="button">
+<span class="material-symbols-outlined text-[18px] wishlist-icon">favorite</span>
+</button>
+<!-- New Drop Tag -->
+<div class="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-full bg-tertiary text-on-tertiary font-label-sm text-[10px] shadow-sm">
+          Mới
+        </div>
+<!-- Product Image -->
+<div class="relative w-full aspect-square rounded-xl overflow-hidden bg-surface-subtle mb-space-sm">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Editorial product shot of Velvet Tint matte liquid lipstick shade Rose Berry in clear luxury acrylic bottle with deep rose red smear swatch beside it" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA178am8Inxb5XJx0Mi-so1UAW027KzGWbdEL5hYtLneWh5uJkiDZUaksVq0snLR8K8kc8K63RqGDX1znv-iQKraDzAWrakPGQPIVc-OLO5eOGd9wdbA1dvLZ-HAqwfAM4CsgN2Aedl1ppCye3YVRbsYHy9_Ieon2mU6DMn-BUXvU2gpieA2frt701Jg5rkjiqlIk69HBkANdWYJSoLJuGzIJhafKSvlwYDLVvD6JBgh2aZFoFEPKYPvQ"/>
+</div>
+<!-- Product Category & Title -->
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-0.5">Trang điểm môi</span>
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-snug min-h-[42px]">
+          Son Kem Lì Velvet Tint #04 Rose Berry
+        </h4>
+<!-- Rating -->
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[15px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">4.9</span>
+<span class="font-body-sm text-body-sm text-text-muted text-[11px]">(1.2k)</span>
+</div>
+<!-- Price & Quick Add Button -->
+<div class="flex items-center justify-between mt-space-sm pt-1">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">245.000₫</span>
+<button aria-label="Thêm vào giỏ hàng" class="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+</button>
+</div>
+</div>
+<!-- Sản phẩm 2: Kem Dưỡng Ẩm Trắng Da Niacinamide 50g -->
+<div class="flex flex-col w-full bg-surface-card rounded-2xl p-space-sm shadow-sm relative group">
+<!-- Wishlist Button -->
+<button aria-label="Thêm vào yêu thích" class="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-surface-card/90 backdrop-blur-md shadow-sm flex items-center justify-center text-text-muted hover:text-primary transition-all active:scale-90" onclick="toggleWishlist(this)" type="button">
+<span class="material-symbols-outlined text-[18px] wishlist-icon">favorite</span>
+</button>
+<!-- Product Image -->
+<div class="relative w-full aspect-square rounded-xl overflow-hidden bg-surface-subtle mb-space-sm">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Luxury cosmetic cream jar with white textured whipped moisturizer cream and silver lid on light rose marble pedestal" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBzUdPjIX3Gwxz_HiO68gnWTkj-FmKxOGp8XwtKv2IYnsXuW-m83ypUTUtwJ9XtUaJ6GinNYEm4esEj6G07WYqLSGyvtIhi9ODqBApo0Vz8BiauYBAIODWoNQM6h_k303jvhITNS4mSpODkVrE1BU9SU-UkjI6TcRkgOEiicDr104zU1TwTvuVnG3ws9d_Mp6u5bIda7XHdNo8TftC2AC-C62HfmQ3BrBuFnfoTyB87a0GsAjTIeiVX6w"/>
+</div>
+<!-- Product Category & Title -->
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-0.5">Dưỡng da mặt</span>
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-snug min-h-[42px]">
+          Kem Dưỡng Ẩm Trắng Da Niacinamide 50g
+        </h4>
+<!-- Rating -->
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[15px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">5.0</span>
+<span class="font-body-sm text-body-sm text-text-muted text-[11px]">(860)</span>
+</div>
+<!-- Price & Quick Add Button -->
+<div class="flex items-center justify-between mt-space-sm pt-1">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">390.000₫</span>
+<button aria-label="Thêm vào giỏ hàng" class="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+</button>
+</div>
+</div>
+<!-- Sản phẩm 3: Nước Tẩy Trang Micellar Water Dịu Nhẹ 400ml -->
+<div class="flex flex-col w-full bg-surface-card rounded-2xl p-space-sm shadow-sm relative group">
+<!-- Wishlist Button -->
+<button aria-label="Thêm vào yêu thích" class="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-surface-card/90 backdrop-blur-md shadow-sm flex items-center justify-center text-text-muted hover:text-primary transition-all active:scale-90" onclick="toggleWishlist(this)" type="button">
+<span class="material-symbols-outlined text-[18px] wishlist-icon">favorite</span>
+</button>
+<!-- Product Image -->
+<div class="relative w-full aspect-square rounded-xl overflow-hidden bg-surface-subtle mb-space-sm">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Clear micellar cleansing water bottle with soft water ripple splashes and pink cotton pad beauty skincare concept" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAUJ-yo20ShDfavPsk8cm4RTXBM1iPC2MwPbBBKMhy4uZASdgfPgEUWHvo_rwMCj40fd9Xhmn07MmM8DzveWWf3_l7MH75zprGLk6WnYZvBWWel5CJiZw7njwxm-NE83ejxqK2jTYDCFJ0JQAPmcbaXkGp0NG1mU26eB0tSwT04l4cVRuQxuqJmBlss62pGJH7yQTASJyBO2BAzmIwNX1XBH8VjFAgZv_KlT_WYl8MjXo0QfQX4LMYT2w"/>
+</div>
+<!-- Product Category & Title -->
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-0.5">Làm sạch sâu</span>
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-snug min-h-[42px]">
+          Nước Tẩy Trang Micellar Water Dịu Nhẹ 400ml
+        </h4>
+<!-- Rating -->
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[15px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">4.8</span>
+<span class="font-body-sm text-body-sm text-text-muted text-[11px]">(540)</span>
+</div>
+<!-- Price & Quick Add Button -->
+<div class="flex items-center justify-between mt-space-sm pt-1">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">195.000₫</span>
+<button aria-label="Thêm vào giỏ hàng" class="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+</button>
+</div>
+</div>
+<!-- Sản phẩm 4: Kem Chống Nắng Phổ Rộng SPF50+ PA++++ -->
+<div class="flex flex-col w-full bg-surface-card rounded-2xl p-space-sm shadow-sm relative group">
+<!-- Wishlist Button -->
+<button aria-label="Thêm vào yêu thích" class="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-surface-card/90 backdrop-blur-md shadow-sm flex items-center justify-center text-text-muted hover:text-primary transition-all active:scale-90" onclick="toggleWishlist(this)" type="button">
+<span class="material-symbols-outlined text-[18px] wishlist-icon">favorite</span>
+</button>
+<!-- Product Image -->
+<div class="relative w-full aspect-square rounded-xl overflow-hidden bg-surface-subtle mb-space-sm">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Sunscreen lotion tube elegant minimalist presentation with bright warm sunbeams and palm leaf shadow reflections" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8uJkDdtnfrxWmai5E1Ny8_CHHazYuhmz_ScpxNExF6qeGLxJVqMJI0hLHT4fnsxrk6zUnE6Gd-RbzuAKun7hGAvVGIcT75od-t-o2r3VTh6xBObpbje1SrlATbLQyV30e2xP49BfxANMjBMHh4snTwy_ModJ_I7V9HkcnkU5mXhyX0Nm6oiU23c04z_3UvpmLAFqHyPscrHOc6qHXSmeQfIXMgqv_Bt0xW4995qAY2rkjVnTw9aH8DQ"/>
+</div>
+<!-- Product Category & Title -->
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-0.5">Bảo vệ da</span>
+<h4 class="font-title-md text-title-md text-on-surface line-clamp-2 leading-snug min-h-[42px]">
+          Kem Chống Nắng Phổ Rộng SPF50+ PA++++
+        </h4>
+<!-- Rating -->
+<div class="flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[15px] text-amber-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">4.9</span>
+<span class="font-body-sm text-body-sm text-text-muted text-[11px]">(2.1k)</span>
+</div>
+<!-- Price & Quick Add Button -->
+<div class="flex items-center justify-between mt-space-sm pt-1">
+<span class="font-headline-sm text-headline-sm text-primary font-bold">320.000₫</span>
+<button aria-label="Thêm vào giỏ hàng" class="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Countdown Timer Micro-interaction
+  (function() {
+    let totalSeconds = 2 * 3600 + 45 * 60 + 18;
+    const hEl = document.getElementById('timer-h');
+    const mEl = document.getElementById('timer-m');
+    const sEl = document.getElementById('timer-s');
+
+    if (hEl && mEl && sEl) {
+      setInterval(function() {
+        if (totalSeconds <= 0) totalSeconds = 3 * 3600;
+        totalSeconds--;
+
+        const hrs = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+
+        hEl.textContent = hrs < 10 ? '0' + hrs : hrs;
+        mEl.textContent = mins < 10 ? '0' + mins : mins;
+        sEl.textContent = secs < 10 ? '0' + secs : secs;
+      }, 1000);
+    }
+  })();
+
+  // Wishlist toggle interaction
+  function toggleWishlist(btn) {
+    const icon = btn.querySelector('.wishlist-icon');
+    if (!icon) return;
+    const isFilled = icon.style.fontVariationSettings && icon.style.fontVariationSettings.includes("'FILL' 1");
+    if (isFilled) {
+      icon.style.fontVariationSettings = "'FILL' 0";
+      btn.classList.remove('text-primary');
+      btn.classList.add('text-text-muted');
+    } else {
+      icon.style.fontVariationSettings = "'FILL' 1";
+      btn.classList.remove('text-text-muted');
+      btn.classList.add('text-primary');
+    }
+  }
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-card/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(200,90,112,0.12)]" data-active-classes="text-primary font-semibold [&amp;_.active-dot]:opacity-100"><div class="h-16 max-w-[430px] mx-auto px-space-xs grid grid-cols-5 items-center"><a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="trang-chu" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-label-sm text-label-sm mt-0.5">Trang chủ</span><span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span></a><a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="danh-muc" href="#"><span class="material-symbols-outlined text-[24px]">category</span><span class="font-label-sm text-label-sm mt-0.5">Danh mục</span><span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span></a><a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary relative group" data-path="gio-hang" href="#"><div class="relative flex items-center justify-center"><span class="material-symbols-outlined text-[24px]">shopping_bag</span><span class="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-primary text-on-primary font-label-sm text-[10px] leading-tight flex items-center justify-center ring-2 ring-surface-card">3</span></div><span class="font-label-sm text-label-sm mt-0.5">Giỏ hàng</span><span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span></a><a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="don-hang" href="#"><span class="material-symbols-outlined text-[24px]">local_shipping</span><span class="font-label-sm text-label-sm mt-0.5">Đơn hàng</span><span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span></a><a class="flex flex-col items-center justify-center h-full min-h-[44px] text-text-muted transition-colors hover:text-primary group" data-path="ca-nhan" href="#"><span class="material-symbols-outlined text-[24px]">person</span><span class="font-label-sm text-label-sm mt-0.5">Cá nhân</span><span class="active-dot w-1 h-1 rounded-full bg-primary mt-0.5 opacity-0 transition-opacity"></span></a></div></nav></body></html>

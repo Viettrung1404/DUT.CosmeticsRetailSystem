@@ -4,11 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../../constants/theme';
 import apiClient from '../../api/apiClient';
 
+import { useCartStore } from '../../store/useCartStore';
+
 export default function ProductDetailScreen({ route, navigation }: any) {
     const { slug } = route.params || {};
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [selectedVariant, setSelectedVariant] = useState('30ml');
+    const { addItem } = useCartStore();
 
     useEffect(() => {
         fetchDetail();
@@ -22,6 +25,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         } catch {
             // Mock Fallback
             setProduct({
+                id: 'prod-vc',
                 name: 'GlowUp Vitamin C Glow Serum',
                 brand: 'GlowUp Beauty',
                 rating: 4.9,
@@ -30,11 +34,36 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 original_price: 450000,
                 description: 'Serum dưỡng sáng da GlowUp với 10% Vitamin C nguyên chất kết hợp Niacinamide và Hyaluronic Acid giúp làm mờ vết thâm, cấp ẩm và mang lại làn da căng bóng ngậm nước.',
                 variants: ['30ml', '50ml'],
+                image_url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
                 ingredients: ['Vitamin C 10%', 'Niacinamide 5%', 'Hyaluronic Acid', 'Chiết xuất hoa hồng Rose Berry'],
             });
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleAddToCart = () => {
+        if (!product) return;
+        addItem({
+            id: `item-${Date.now()}`,
+            variantId: `var-${selectedVariant}`,
+            productId: product.id || 'prod-custom',
+            productName: product.name,
+            variantName: `Dung tích ${selectedVariant}`,
+            price: product.price,
+            originalPrice: product.original_price,
+            imageUrl: product.image_url || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+            stock: 20,
+        }, 1);
+
+        Alert.alert(
+            'Thêm thành công',
+            `Đã thêm "${product.name} (${selectedVariant})" vào giỏ hàng!`,
+            [
+                { text: 'Tiếp tục xem', style: 'cancel' },
+                { text: 'Xem giỏ hàng', onPress: () => navigation.navigate('MainTabs', { screen: 'Giỏ hàng' }) }
+            ]
+        );
     };
 
     if (loading) {
@@ -60,7 +89,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 
                 {/* Product Image */}
                 <Image
-                    source={{ uri: product?.image_url || 'https://via.placeholder.com/300' }}
+                    source={{ uri: product?.image_url || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400' }}
                     style={styles.image}
                 />
 
@@ -111,7 +140,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             <View style={styles.bottomBar}>
                 <TouchableOpacity
                     style={styles.addToCartBtn}
-                    onPress={() => Alert.alert('Thông báo', 'Đã thêm sản phẩm vào giỏ hàng!')}
+                    onPress={handleAddToCart}
                 >
                     <Ionicons name="bag-handle-outline" size={20} color={COLORS.surface} style={{ marginRight: 8 }} />
                     <Text style={styles.btnText}>Thêm vào giỏ hàng</Text>

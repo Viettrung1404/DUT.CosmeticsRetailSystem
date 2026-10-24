@@ -1,8 +1,8 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// ⚠️ Nếu quét QR chạy Điện thoại thật qua Wi-Fi: Thay IP máy tính của bạn (VD: 'http://192.168.1.15:5000/api/v1')
-export const BASE_URL = 'http://192.168.1.18:5000/api/v1';
+// ⚠️ Thay IP máy tính của bạn khi đổi mạng Wi-Fi (Kiểm tra bằng lệnh ipconfig)
+export const BASE_URL = 'http://192.168.11.174:3000/api/v1';
 
 const apiClient = axios.create({
     baseURL: BASE_URL,

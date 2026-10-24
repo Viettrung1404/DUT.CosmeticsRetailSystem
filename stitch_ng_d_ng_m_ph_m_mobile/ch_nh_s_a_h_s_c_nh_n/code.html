@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "secondary": "#725950", "secondary-container": "#fad9cd", "on-error-container": "#93000a", "inverse-surface": "#3f2c25", "secondary-fixed": "#fddbd0", "secondary-fixed-dim": "#e0c0b4", "border-subtle": "#EFE5E7", "surface-container-lowest": "#ffffff", "surface-subtle": "#FEFAFC", "inverse-primary": "#ffb2bd", "primary-fixed-dim": "#ffb2bd", "surface-variant": "#fbdcd1", "surface-tint": "#a03b52", "outline": "#887174", "tertiary": "#5047cd", "on-primary-container": "#fffbff", "on-tertiary": "#ffffff", "on-secondary-container": "#765d54", "on-tertiary-container": "#fffbff", "text-muted": "#AD9F9C", "surface-container-high": "#ffe2d8", "error": "#ba1a1a", "on-tertiary-fixed": "#110068", "on-surface": "#281811", "surface-container-highest": "#fbdcd1", "surface-dim": "#f2d4c9", "tertiary-fixed": "#e3dfff", "tertiary-container": "#6a62e7", "outline-variant": "#dbc0c3", "on-error": "#ffffff", "on-background": "#281811", "on-secondary": "#ffffff", "surface": "#fff8f6", "error-container": "#ffdad6", "primary": "#9d394f", "on-primary-fixed": "#400013", "on-secondary-fixed-variant": "#584239", "background-canvas": "#F9ECEE", "on-primary": "#ffffff", "inverse-on-surface": "#ffede7", "background": "#fff8f6", "on-surface-variant": "#554244", "surface-card": "#FFFFFF", "primary-fixed": "#ffd9dd", "on-secondary-fixed": "#291710", "surface-container-low": "#fff1ec", "surface-container": "#ffe9e2", "surface-bright": "#fff8f6", "primary-container": "#bc5167", "on-primary-fixed-variant": "#81243b", "tertiary-fixed-dim": "#c4c0ff", "on-tertiary-fixed-variant": "#3a2eb7" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "margin": "1rem", "space-xl": "1.5rem", "gutter": "0.75rem", "gutter-lg": "1.5rem", "space-sm": "0.5rem", "space-2xl": "2rem", "space-md": "0.75rem", "margin-md": "1.5rem", "space-xs": "0.25rem", "gutter-md": "1rem", "margin-lg": "2rem", "space-lg": "1rem" }, fontFamily: { "display-lg-mobile": ["Playfair Display"], "headline-md": ["Playfair Display"], "headline-lg": ["Playfair Display"], "headline-sm": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "display-lg": ["Playfair Display"], "body-sm": ["Plus Jakarta Sans"], "title-md": ["Plus Jakarta Sans"] }, fontSize: { "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "headline-lg": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "700" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "title-md": ["15px", { "lineHeight": "22px", "fontWeight": "600" }] } } } }</script><style>@layer base { html, body { width: 100vw; margin: 0; padding: 0; min-height: 100%; } body { overscroll-behavior-y: none; } .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); } .pt-safe { padding-top: env(safe-area-inset-top, 0px); } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style></head><body class="bg-surface text-on-surface font-body-md antialiased selection:bg-secondary-fixed selection:text-on-secondary-fixed"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(200,90,112,0.06)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-xs"><button aria-label="Quay lại" class="w-11 h-11 -ml-space-xs flex items-center justify-center rounded-full text-on-surface hover:bg-surface-variant/40 active:scale-95 transition-transform" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><div class="flex items-center gap-space-xs"><img alt="Brand logo. - Primary color: #c85a70
+- Font: playfairDisplay
+- Mode: light
+- Roundness: rounded-md
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1Ub-0NmImVEdDYvKg3acLy6FpOvTbX8sW0TB9lYM99M5pl_YecDRMBLcj8nTEFPhs1Yu6Vxmwd6Wpek01eB1f2RWIecKPEenxqvm88rAMhnFmU7LLOQ0lxElIcK514Wif5rIVMZPpbHV_ZpR7T0ceCegZ-dxqwXRoeBA0EBPODWvrNc89emekHm0471jOVIZnMjonvAjB7mKnMZgBOfDWPLCzOcb8kZ7wBtJYaunwLwVpxzsY42OXQb3tk"/><span class="font-headline-md text-headline-md text-primary tracking-tight hidden xs:inline">GlowUp</span></div></div><div class="absolute left-1/2 -translate-x-1/2 pointer-events-none text-center max-w-[50%] truncate"><h1 class="font-headline-md text-headline-md text-on-surface font-semibold truncate">Chinh Sua Ho So</h1></div><div class="flex items-center gap-space-sm"><button class="h-11 px-space-md flex items-center justify-center rounded-xl bg-primary text-on-primary font-label-lg text-label-lg hover:bg-primary-container active:scale-95 transition-all shadow-[0_4px_16px_rgba(200,90,112,0.18)]" form="edit-profile-form" type="submit">Lưu</button><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida/AEtjO1XUtazgyFvMTCdJkJ2m8If11JNwaSfiriZ6_PQApYlUH_oY8WEfPdQ4EHbbiYHacNAFGc_-Tc6tjTS8RYcZBGEuciEDP79KOoCXSaBSZ-kbgoIUU5LMIqi4D2O-rTv79lcYVXwaSBgxHBAng379YtFfPXqtIljRiXWwNBrsUOm1rYrLQTianTfkLnj0CdS95aaGi_MP-UchT7GusevVeIiD-tvffq3Q9IjZ4cqCgZTi9t258NsDgcCvyPD_"/></div></div></header><main class="flex flex-col relative w-full pt-16 bg-surface min-h-screen pb-safe"><div class="flex flex-col w-full pb-32">
+<form class="flex flex-col gap-space-lg px-margin" id="edit-profile-form" onsubmit="event.preventDefault();">
+<!-- Avatar & Profile Photo Section -->
+<section class="flex flex-col items-center pt-space-md">
+<div class="relative group">
+<!-- Ambient Glow Backing -->
+<div class="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-primary/30 via-primary/10 to-tertiary/20 blur-md opacity-90 transition duration-500"></div>
+<!-- Double-layered Ring Border Frame -->
+<div class="relative p-1.5 bg-surface-card rounded-full shadow-[0_8px_24px_rgba(200,90,112,0.18)]">
+<div class="p-1 rounded-full bg-surface-container-low">
+<img alt="Ảnh đại diện Thảo Linh" class="w-28 h-28 rounded-full object-cover shadow-inner" src="https://lh3.googleusercontent.com/aida/AEtjO1XUtazgyFvMTCdJkJ2m8If11JNwaSfiriZ6_PQApYlUH_oY8WEfPdQ4EHbbiYHacNAFGc_-Tc6tjTS8RYcZBGEuciEDP79KOoCXSaBSZ-kbgoIUU5LMIqi4D2O-rTv79lcYVXwaSBgxHBAng379YtFfPXqtIljRiXWwNBrsUOm1rYrLQTianTfkLnj0CdS95aaGi_MP-UchT7GusevVeIiD-tvffq3Q9IjZ4cqCgZTi9t258NsDgcCvyPD_"/>
+</div>
+</div>
+<!-- Camera Edit Floating Action Trigger -->
+<button aria-label="Đổi ảnh đại diện" class="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-[0_4px_12px_rgba(157,57,79,0.35)] hover:scale-105 active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[19px]">photo_camera</span>
+</button>
+</div>
+<!-- Quick Action Buttons for Photo -->
+<div class="flex items-center gap-space-sm mt-space-md">
+<button class="h-9 px-space-md rounded-full bg-surface-card text-primary font-label-md text-label-md flex items-center gap-1.5 shadow-[0_2px_8px_rgba(200,90,112,0.08)] hover:bg-surface-container-low active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">add_a_photo</span>
+<span>Chụp ảnh mới</span>
+</button>
+<button class="h-9 px-space-md rounded-full bg-surface-card text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5 shadow-[0_2px_8px_rgba(200,90,112,0.08)] hover:bg-surface-container-low active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">photo_library</span>
+<span>Chọn từ thư viện</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted mt-space-xs text-center">
+        Dung lượng tối đa 5MB • Định dạng JPG/PNG sắc nét
+      </p>
+</section>
+<!-- VIP Status Membership Banner -->
+<section class="bg-gradient-to-r from-surface-card via-surface-subtle to-surface-container-low p-space-md rounded-xl shadow-[0_4px_16px_rgba(200,90,112,0.08)] relative overflow-hidden">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-primary">Hội viên Diamond ★</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-tertiary font-label-sm text-label-sm font-semibold">Tier 4</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary mt-0.5">Điểm khả dụng: <span class="font-semibold text-on-surface">1,250 GlowPoints</span></p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-semibold tracking-wider uppercase bg-primary/10 px-2.5 py-1 rounded-full">VIP Club</span>
+</div>
+<!-- Tier Maintenance Progress Bar -->
+<div class="mt-space-md">
+<div class="flex justify-between items-center text-text-muted font-label-sm text-label-sm mb-1.5">
+<span>Tiến trình duy trì hạng Diamond</span>
+<span class="text-on-surface font-semibold">82%</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-variant/70 overflow-hidden">
+<div class="h-full bg-gradient-to-r from-primary to-primary-container rounded-full w-[82%] transition-all duration-700"></div>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted mt-1.5">Còn 250 điểm để tự động gia hạn đặc quyền VIP năm 2025</p>
+</div>
+</section>
+<!-- Primary Personal Identification Fields -->
+<section class="bg-surface-card p-space-lg rounded-xl shadow-[0_4px_16px_rgba(200,90,112,0.08)] flex flex-col gap-space-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Thông tin định danh</h2>
+<!-- Full Name -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant" for="fullname">Họ và tên</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined text-[20px] text-text-muted absolute left-3.5 pointer-events-none">person</span>
+<input class="w-full h-12 pl-11 pr-11 bg-surface-subtle rounded-xl text-on-surface font-body-lg text-body-lg focus:outline-none focus:bg-surface-card transition-all placeholder:text-text-muted" id="fullname" type="text" value="Thảo Linh"/>
+<span class="material-symbols-outlined text-[20px] text-primary absolute right-3.5" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- Skincare Community Nickname -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface-variant" for="nickname">Biệt danh cộng đồng GlowUp</label>
+<span class="font-label-sm text-label-sm text-text-muted">Hiển thị trong Review Skincare</span>
+</div>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined text-[20px] text-text-muted absolute left-3.5 pointer-events-none">alternate_email</span>
+<input class="w-full h-12 pl-11 pr-4 bg-surface-subtle rounded-xl text-on-surface font-body-lg text-body-lg focus:outline-none focus:bg-surface-card transition-all placeholder:text-text-muted" id="nickname" type="text" value="thaolinh_glowup"/>
+</div>
+</div>
+<!-- Phone Number -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant" for="phone">Số điện thoại liên kết</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined text-[20px] text-text-muted absolute left-3.5 pointer-events-none">call</span>
+<input class="w-full h-12 pl-11 pr-24 bg-surface-subtle rounded-xl text-on-surface font-body-lg text-body-lg cursor-not-allowed select-none" id="phone" readonly="" type="tel" value="+84 0938 123 921"/>
+<div class="absolute right-2 flex items-center gap-1">
+<span class="px-2 py-0.5 rounded-md bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">OTP OK</span>
+<button class="text-primary font-label-md text-label-md px-1.5 py-1 hover:underline" type="button">Đổi</button>
+</div>
+</div>
+</div>
+<!-- Email Address -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface-variant" for="email">Hộp thư điện tử</label>
+<span class="font-label-sm text-label-sm text-secondary">Nhận e-VAT &amp; đơn hàng</span>
+</div>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined text-[20px] text-text-muted absolute left-3.5 pointer-events-none">mail</span>
+<input class="w-full h-12 pl-11 pr-24 bg-surface-subtle rounded-xl text-on-surface font-body-lg text-body-lg focus:outline-none focus:bg-surface-card transition-all" id="email" type="email" value="thaolinh.beauty@gmail.com"/>
+<div class="absolute right-3.5 flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-sm text-label-sm font-semibold">Đã xác minh</span>
+</div>
+</div>
+</div>
+<!-- Gender Selector -->
+<div class="flex flex-col gap-2">
+<span class="font-label-md text-label-md text-on-surface-variant">Giới tính</span>
+<div aria-label="Chọn giới tính" class="grid grid-cols-3 gap-space-xs p-1 bg-surface-subtle rounded-xl" role="radiogroup">
+<button aria-checked="true" class="h-10 rounded-lg bg-primary text-on-primary font-label-md text-label-md font-semibold flex items-center justify-center gap-1 shadow-sm transition-all" role="radio" type="button">
+<span class="material-symbols-outlined text-[16px]">female</span>
+<span>Nữ</span>
+</button>
+<button aria-checked="false" class="h-10 rounded-lg text-secondary font-label-md text-label-md flex items-center justify-center gap-1 hover:text-on-surface transition-all" role="radio" type="button">
+<span class="material-symbols-outlined text-[16px]">male</span>
+<span>Nam</span>
+</button>
+<button aria-checked="false" class="h-10 rounded-lg text-secondary font-label-md text-label-md flex items-center justify-center gap-1 hover:text-on-surface transition-all" role="radio" type="button">
+<span>Khác</span>
+</button>
+</div>
+</div>
+<!-- Date of Birth with VIP Perk Info -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant" for="birthday">Ngày sinh nhật</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined text-[20px] text-primary absolute left-3.5 pointer-events-none">cake</span>
+<input class="w-full h-12 pl-11 pr-11 bg-surface-subtle rounded-xl text-on-surface font-body-lg text-body-lg focus:outline-none focus:bg-surface-card transition-all" id="birthday" type="text" value="18 / 10 / 1996"/>
+<span class="material-symbols-outlined text-[20px] text-text-muted absolute right-3.5 pointer-events-none">calendar_today</span>
+</div>
+<!-- Birthday Gift Callout Card -->
+<div class="p-space-sm rounded-xl bg-secondary-container/50 flex items-start gap-2.5 mt-1">
+<span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-0.5" style="font-variation-settings: 'FILL' 1;">redeem</span>
+<p class="font-body-sm text-body-sm text-on-secondary-container">
+<span class="font-semibold text-primary">Voucher sinh nhật 30% VIP:</span> Tự động kích hoạt vào ví ưu đãi vào tháng sinh nhật của bạn. (Chỉ được cập nhật 1 lần/năm để bảo mật).
+          </p>
+</div>
+</div>
+</section>
+<!-- Skincare Profile & AI Diagnostics -->
+<section class="bg-surface-card p-space-lg rounded-xl shadow-[0_4px_16px_rgba(200,90,112,0.08)] flex flex-col gap-space-md">
+<!-- Section Header with Editorial Sparkle Badge -->
+<div class="flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Hồ sơ da cá nhân hóa</h2>
+<p class="font-body-sm text-body-sm text-secondary">Tối ưu gợi ý Routine dưỡng &amp; thành phần mỹ phẩm</p>
+</div>
+</div>
+<!-- Skin Type Chips (Single Select) -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant">Loại da hiện tại</label>
+<div class="flex flex-wrap gap-2">
+<button class="h-9 px-3.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Da hỗn hợp thiên dầu</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-surface-subtle text-secondary hover:text-on-surface font-label-md text-label-md active:scale-95 transition-all" type="button">
+<span>Da dầu</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-surface-subtle text-secondary hover:text-on-surface font-label-md text-label-md active:scale-95 transition-all" type="button">
+<span>Da khô</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-surface-subtle text-secondary hover:text-on-surface font-label-md text-label-md active:scale-95 transition-all" type="button">
+<span>Da nhạy cảm</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-surface-subtle text-secondary hover:text-on-surface font-label-md text-label-md active:scale-95 transition-all" type="button">
+<span>Da thường</span>
+</button>
+</div>
+</div>
+<!-- Skin Concerns (Multi Select) -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface-variant">Vấn đề da quan tâm nhất</label>
+<span class="font-label-sm text-label-sm text-primary font-semibold">Đã chọn: 3</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<!-- Active Concerns -->
+<button class="h-9 px-3.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Lỗ chân lông to &amp; Sợi bã nhờn</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Phục hồi màng ẩm B5</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Chống lão hóa &amp; Nếp nhăn</span>
+</button>
+<!-- Inactive Concerns -->
+<button class="h-9 px-3.5 rounded-full bg-surface-subtle text-secondary hover:text-on-surface font-label-md text-label-md active:scale-95 transition-all" type="button">
+<span>Thâm mụn &amp; Tàn nhang</span>
+</button>
+<button class="h-9 px-3.5 rounded-full bg-surface-subtle text-secondary hover:text-on-surface font-label-md text-label-md active:scale-95 transition-all" type="button">
+<span>Nhạy cảm, ửng đỏ</span>
+</button>
+</div>
+</div>
+<!-- Allergens & Sensitive Ingredients to Exclude -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-label-md text-on-surface-variant">Thành phần dị ứng / Cần tránh</label>
+<div class="flex flex-wrap items-center gap-2">
+<div class="h-9 pl-3.5 pr-2 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center gap-1">
+<span>Cồn khô (Alcohol Denat)</span>
+<button aria-label="Xóa Cồn khô" class="w-5 h-5 rounded-full hover:bg-surface-variant flex items-center justify-center text-text-muted" type="button">
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+</div>
+<div class="h-9 pl-3.5 pr-2 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center gap-1">
+<span>Paraben</span>
+<button aria-label="Xóa Paraben" class="w-5 h-5 rounded-full hover:bg-surface-variant flex items-center justify-center text-text-muted" type="button">
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+</div>
+<button class="h-9 px-3.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label-md text-label-md flex items-center gap-1 hover:bg-tertiary-fixed-dim active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Thêm thành phần</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Security & Smart Notifications -->
+<section class="bg-surface-card p-space-lg rounded-xl shadow-[0_4px_16px_rgba(200,90,112,0.08)] flex flex-col gap-space-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Bảo mật &amp; Cá nhân hóa</h2>
+<!-- Biometric Login Toggle -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[24px] text-primary shrink-0 mt-0.5">fingerprint</span>
+<div>
+<p class="font-title-md text-title-md text-on-surface">Sinh trắc học (FaceID / TouchID)</p>
+<p class="font-body-sm text-body-sm text-text-muted">Đăng nhập siêu tốc và xác thực thanh toán bảo mật</p>
+</div>
+</div>
+<!-- Toggle Switch ON -->
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-primary p-0.5 flex items-center justify-end shadow-inner transition-colors" role="switch" type="button">
+<span class="w-6 h-6 rounded-full bg-white shadow-sm block transition-transform"></span>
+</button>
+</div>
+<div class="w-full h-px bg-surface-subtle"></div>
+<!-- Personalized Skincare Cycle Alerts -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-[24px] text-tertiary shrink-0 mt-0.5">notifications_active</span>
+<div>
+<p class="font-title-md text-title-md text-on-surface">Thông báo chu kỳ chăm sóc da</p>
+<p class="font-body-sm text-body-sm text-text-muted">Nhắc nhở routine ngày/đêm và ưu đãi bổ sung serum</p>
+</div>
+</div>
+<!-- Toggle Switch ON -->
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-primary p-0.5 flex items-center justify-end shadow-inner transition-colors" role="switch" type="button">
+<span class="w-6 h-6 rounded-full bg-white shadow-sm block transition-transform"></span>
+</button>
+</div>
+</section>
+<!-- Privacy & Export Link -->
+<div class="flex flex-col items-center justify-center gap-1 text-center py-space-sm">
+<button class="font-body-sm text-body-sm text-text-muted hover:text-on-surface transition-colors flex items-center gap-1 hover:underline" type="button">
+<span class="material-symbols-outlined text-[16px]">shield</span>
+<span>Yêu cầu xuất dữ liệu cá nhân (GDPR) hoặc khóa tài khoản</span>
+</button>
+<p class="font-label-sm text-label-sm text-text-muted">Phiên bản ứng dụng GlowUp v3.4.1 (Build 2025)</p>
+</div>
+</form>
+<!-- Sticky Bottom Floating Action Container -->
+<div class="fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-xl px-margin py-3 pb-safe shadow-[0_-4px_20px_rgba(200,90,112,0.12)]">
+<div class="max-w-md mx-auto flex flex-col gap-2">
+<button class="w-full h-12 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(157,57,79,0.3)] hover:bg-primary-container active:scale-[0.98] transition-all" form="edit-profile-form" type="submit">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">save</span>
+<span>LƯU THAY ĐỔI HỒ SƠ</span>
+</button>
+</div>
+</div>
+</div></main></body></html>

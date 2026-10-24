@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&amp;family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "inverse-on-surface": "#ffede7", "surface-tint": "#a03b52", "primary-fixed-dim": "#ffb2bd", "secondary-fixed": "#fddbd0", "on-secondary-container": "#765d54", "background-canvas": "#F9ECEE", "on-secondary-fixed-variant": "#584239", "surface-container-low": "#fff1ec", "border-subtle": "#EFE5E7", "tertiary-fixed-dim": "#c4c0ff", "surface-container-high": "#ffe2d8", "background": "#fff8f6", "surface-bright": "#fff8f6", "surface-container-highest": "#fbdcd1", "surface-dim": "#f2d4c9", "on-surface": "#281811", "secondary-container": "#fad9cd", "primary-fixed": "#ffd9dd", "on-primary-fixed": "#400013", "error": "#ba1a1a", "primary": "#9d394f", "tertiary-fixed": "#e3dfff", "on-surface-variant": "#554244", "surface-variant": "#fbdcd1", "inverse-primary": "#ffb2bd", "on-primary-fixed-variant": "#81243b", "on-primary": "#ffffff", "secondary-fixed-dim": "#e0c0b4", "on-tertiary": "#ffffff", "tertiary-container": "#6a62e7", "surface-subtle": "#FEFAFC", "error-container": "#ffdad6", "on-background": "#281811", "primary-container": "#bc5167", "surface-card": "#FFFFFF", "on-error": "#ffffff", "surface": "#fff8f6", "on-error-container": "#93000a", "on-primary-container": "#fffbff", "on-tertiary-fixed-variant": "#3a2eb7", "on-tertiary-container": "#fffbff", "outline": "#887174", "on-tertiary-fixed": "#110068", "text-muted": "#AD9F9C", "on-secondary-fixed": "#291710", "inverse-surface": "#3f2c25", "outline-variant": "dbc0c3", "surface-container": "#ffe9e2", "on-secondary": "#ffffff", "secondary": "#725950", "tertiary": "#5047cd", "surface-container-lowest": "#ffffff" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "margin": "1rem", "space-2xl": "2rem", "space-lg": "1rem", "space-md": "0.75rem", "gutter-md": "1rem", "margin-lg": "2rem", "space-xl": "1.5rem", "gutter": "0.75rem", "margin-md": "1.5rem", "gutter-lg": "1.5rem", "space-sm": "0.5rem", "space-xs": "0.25rem" }, "fontFamily": { "label-md": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "headline-md": ["Playfair Display"], "label-sm": ["Plus Jakarta Sans"], "display-lg-mobile": ["Playfair Display"], "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-lg": ["Playfair Display"], "display-lg": ["Playfair Display"], "label-lg": ["Plus Jakarta Sans"], "title-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"] }, "fontSize": { "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "700" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "headline-lg": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "title-md": ["15px", { "lineHeight": "22px", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-background-canvas font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 pt-safe bg-background-canvas/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(200,90,112,0.06)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm min-w-0"><button aria-label="Back" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container/60 transition-colors shrink-0" onclick="history.back()"><span class="material-symbols-outlined text-[22px]">arrow_back_ios_new</span></button><img alt="Brand logo. - Primary color: #c85a70
+- Font: playfairDisplay
+- Mode: light
+- Roundness: rounded-md
+" class="h-8 w-auto object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1Ub-0NmImVEdDYvKg3acLy6FpOvTbX8sW0TB9lYM99M5pl_YecDRMBLcj8nTEFPhs1Yu6Vxmwd6Wpek01eB1f2RWIecKPEenxqvm88rAMhnFmU7LLOQ0lxElIcK514Wif5rIVMZPpbHV_ZpR7T0ceCegZ-dxqwXRoeBA0EBPODWvrNc89emekHm0471jOVIZnMjonvAjB7mKnMZgBOfDWPLCzOcb8kZ7wBtJYaunwLwVpxzsY42OXQb3tk"/><div class="flex flex-col min-w-0"><span class="font-label-sm text-label-sm text-text-muted uppercase tracking-widest leading-none truncate">GlowUp Cosmetics</span><h1 class="font-headline-md text-headline-md text-on-surface truncate">Product Details</h1></div></div><div class="flex items-center gap-space-xs shrink-0"><a aria-label="Customer Support" class="w-11 h-11 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 transition-colors" data-path="customer-support" href="#"><span class="material-symbols-outlined text-[24px]">support_agent</span></a><img alt="Profile" class="w-8 h-8 rounded-full object-cover shrink-0 ml-space-xs" src="https://lh3.googleusercontent.com/aida/AEtjO1XUtazgyFvMTCdJkJ2m8If11JNwaSfiriZ6_PQApYlUH_oY8WEfPdQ4EHbbiYHacNAFGc_-Tc6tjTS8RYcZBGEuciEDP79KOoCXSaBSZ-kbgoIUU5LMIqi4D2O-rTv79lcYVXwaSBgxHBAng379YtFfPXqtIljRiXWwNBrsUOm1rYrLQTianTfkLnj0CdS95aaGi_MP-UchT7GusevVeIiD-tvffq3Q9IjZ4cqCgZTi9t258NsDgcCvyPD_"/></div></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-background-canvas min-h-screen"><div class="flex flex-col w-full pb-32">
+<!-- Top Trust & Guarantee Micro-Banner -->
+<section class="px-margin pt-space-md">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md text-primary uppercase tracking-wide">Cam Kết Hài Lòng 100%</span>
+<span class="material-symbols-outlined text-primary text-[14px]">arrow_back_ios_new</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5 leading-snug">
+          Đổi trả miễn phí 7 ngày cho sản phẩm lỗi, kích ứng hoặc không đúng mô tả. GlowUp hoàn tiền 100% qua tài khoản gốc hoặc GlowPoints.
+        </p>
+</div>
+</div>
+</section>
+<!-- Order Reference Pill Card -->
+<section class="px-margin pt-space-md">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-title-md text-title-md text-on-surface font-semibold">Đơn hàng #GU-89241</span>
+</div>
+<span class="font-body-sm text-body-sm text-text-muted">Giao ngày 15/05/2024</span>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-full text-primary shrink-0">
+<span class="material-symbols-outlined text-[14px]">hourglass_top</span>
+<span class="font-label-sm text-label-sm">Còn 4 ngày</span>
+</div>
+</div>
+</section>
+<!-- Step 1: Select Products for RMA -->
+<section class="px-margin pt-space-lg">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">1</span>
+<h2 class="font-title-md text-title-md text-on-surface font-bold">Chọn sản phẩm cần đổi trả</h2>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted">Chọn ít nhất 1 món</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Item 1: Selected -->
+<label class="relative bg-surface-card rounded-xl p-space-md shadow-sm flex items-center gap-space-md cursor-pointer transition-all">
+<div class="shrink-0 flex items-center justify-center">
+<input checked="" class="sr-only peer" id="item-1" type="checkbox"/>
+<div class="w-6 h-6 rounded-lg bg-primary flex items-center justify-center text-on-primary peer-checked:bg-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+</div>
+<div class="relative w-16 h-16 rounded-xl overflow-hidden bg-surface-container shrink-0">
+<img class="w-full h-full object-cover" data-alt="High-end skincare bottle of Rose Berry B5 recovery serum on a soft blush velvet background with gentle studio lighting and glass textures" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCs6GDGP4L2qGdLYgFavyIG8sl4uGq10ekZfAuVTPH1onr_G4CWTOyIh-UygGmvPjpAKlOrki04fs_NZlI4hMz6KP31wy6V6aIe41OnTNMd4yPCKZDuQb11zEN2ttbQH9sSLUfP5K1Nemx9PSImwBxKUgqEtfcO0FD5l2Fh_5iJhgLezzcBeJsftg_8wof5wFO-QT9mVJIUr3eytKGLXwWPXeuZB04U4GxU1wOahgb9SBZlARuWD3vvNQ"/>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Serum Phục Hồi</span>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold truncate">Serum Tinh Chất Rose Berry B5 Tái Tạo 30ml</h3>
+<div class="flex items-center justify-between mt-1">
+<span class="font-body-sm text-body-sm text-text-muted">Phân loại: 30ml • SL: 1</span>
+<span class="font-title-md text-title-md text-primary font-bold">345.000đ</span>
+</div>
+</div>
+</label>
+<!-- Item 2: Unselected -->
+<label class="relative bg-surface-card rounded-xl p-space-md shadow-sm flex items-center gap-space-md cursor-pointer opacity-85 hover:opacity-100 transition-opacity">
+<div class="shrink-0 flex items-center justify-center">
+<input class="sr-only peer" id="item-2" type="checkbox"/>
+<div class="w-6 h-6 rounded-lg bg-surface-subtle flex items-center justify-center text-transparent peer-checked:text-on-primary peer-checked:bg-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+</div>
+<div class="relative w-16 h-16 rounded-xl overflow-hidden bg-surface-container shrink-0">
+<img class="w-full h-full object-cover" data-alt="Minimalist luxury cosmetic moisturizer jar with frosted pink glass and gold lid on polished ceramic surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAW8p-FN4_UzmVGjv3d7__pC5Viu2FGtrl1BSO5dJyfJ-bHjIN7-4w6n2AzBFInjDVADOsj6hlnlfHfoj_OkV3YauS9OCvnecHieONaIxnyOHGq6HN22EbUXhwsDGh2li6QQMCysM0kgWzay-a0EiCUb2oS0i1x7NlJDv8BkERCGwawRcbO5z0IpH1U7IWA0Hwnm_s0ZtM4ELuzpSioDQQ9dy_oyQrvf_RAgo2-MLmy9_SzWdFFMKr4dA"/>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Kem Khóa Ẩm</span>
+<h3 class="font-title-md text-title-md text-on-surface font-semibold truncate">Kem Glass Skin Barrier Cream 50g</h3>
+<div class="flex items-center justify-between mt-1">
+<span class="font-body-sm text-body-sm text-text-muted">Phân loại: 50g • SL: 1</span>
+<span class="font-title-md text-title-md text-on-surface-variant font-medium">390.000đ</span>
+</div>
+</div>
+</label>
+</div>
+</section>
+<!-- Step 2: Reason for RMA -->
+<section class="px-margin pt-space-lg">
+<div class="flex items-center gap-space-xs mb-space-sm">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">2</span>
+<h2 class="font-title-md text-title-md text-on-surface font-bold">Lý do đổi trả hàng</h2>
+</div>
+<div class="bg-surface-card rounded-xl p-space-sm shadow-sm flex flex-col gap-1">
+<!-- Option 1: Selected -->
+<label class="flex items-center justify-between p-space-sm rounded-lg bg-primary/5 cursor-pointer">
+<div class="flex items-center gap-space-sm">
+<div class="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-semibold">Sản phẩm bị rỉ / nứt vỡ khi vận chuyển</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px]">verified</span>
+</label>
+<!-- Option 2 -->
+<label class="flex items-center justify-between p-space-sm rounded-lg hover:bg-surface-subtle cursor-pointer transition-colors">
+<div class="flex items-center gap-space-sm">
+<div class="w-5 h-5 rounded-full bg-surface-container flex items-center justify-center text-transparent">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Gây kích ứng đỏ da / mẫn cảm khi dùng</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary-container px-2 py-0.5 rounded-full bg-primary-fixed">Bác sĩ da liễu</span>
+</label>
+<!-- Option 3 -->
+<label class="flex items-center justify-between p-space-sm rounded-lg hover:bg-surface-subtle cursor-pointer transition-colors">
+<div class="flex items-center gap-space-sm">
+<div class="w-5 h-5 rounded-full bg-surface-container flex items-center justify-center text-transparent">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Giao sai chủng loại / dung tích</span>
+</div>
+</label>
+<!-- Option 4 -->
+<label class="flex items-center justify-between p-space-sm rounded-lg hover:bg-surface-subtle cursor-pointer transition-colors">
+<div class="flex items-center gap-space-sm">
+<div class="w-5 h-5 rounded-full bg-surface-container flex items-center justify-center text-transparent">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Lỗi vòi xịt / tem niêm phong rách</span>
+</div>
+</label>
+</div>
+</section>
+<!-- Step 3: Detailed Description -->
+<section class="px-margin pt-space-lg">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">3</span>
+<h2 class="font-title-md text-title-md text-on-surface font-bold">Mô tả chi tiết vấn đề</h2>
+</div>
+<span class="font-label-sm text-label-sm text-text-muted" id="char-counter">128/300 ký tự</span>
+</div>
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm">
+<textarea class="w-full bg-surface-subtle rounded-xl p-space-md font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-text-muted resize-none" maxlength="300" placeholder="Chia sẻ rõ hơn về tình trạng sản phẩm để GlowUp kiểm tra và hỗ trợ nhanh nhất..." rows="3">Hộp ngoài bình thường nhưng khi mở ra thì đầu bơm serum bị nứt nhẹ làm rỉ một ít tinh chất ra nắp chai, mong shop hỗ trợ đổi chai mới giúp mình nhé.</textarea>
+<div class="flex items-center gap-1.5 mt-2 text-primary">
+<span class="material-symbols-outlined text-[16px]">info</span>
+<span class="font-label-sm text-label-sm">Bộ phận CSKH cam kết phản hồi trong vòng 2 giờ làm việc</span>
+</div>
+</div>
+</section>
+<!-- Step 4: Photo & Video Proof -->
+<section class="px-margin pt-space-lg">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">4</span>
+<h2 class="font-title-md text-title-md text-on-surface font-bold">Hình ảnh &amp; Video bằng chứng</h2>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-medium">Bắt buộc</span>
+</div>
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+<!-- Native Action Buttons -->
+<div class="grid grid-cols-2 gap-space-sm">
+<button class="h-12 bg-surface-subtle rounded-xl flex items-center justify-center gap-space-xs text-primary font-label-md text-label-md hover:bg-primary/5 active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">photo_camera</span>
+<span>Chụp ảnh ngay</span>
+</button>
+<button class="h-12 bg-surface-subtle rounded-xl flex items-center justify-center gap-space-xs text-primary font-label-md text-label-md hover:bg-primary/5 active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+<span>Tải từ thư viện</span>
+</button>
+</div>
+<!-- Uploaded Thumbnails Row -->
+<div class="flex items-center gap-space-sm overflow-x-auto pb-1">
+<!-- Thumbnail 1 (Damaged Cap) -->
+<div class="relative w-20 h-20 rounded-xl overflow-hidden bg-surface-container shrink-0 shadow-sm group">
+<img class="w-full h-full object-cover" data-alt="Close up view of luxury serum bottle pump with tiny crack and liquid droplet proof under bright daylight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFpu_CtQO8wtEO8vEN06TnVCkeWlNQWBAJzH0lwmKWDDSPrQJHsc2qAGvREsZpFLY_vKNQVn62vON7QIOVpyO6ZsmAHtbrAbfKdICyy7O0Z9GPfSnhX1NeCtJx9CQgUajkPpC4C40Ru-2-osQohIAnZoimx1FPW5FS9bgUXAJD-Y3mrcntoPT14y34sqhQKBfkBIe2LdPWMfc5ngH_MdXtrljC2HGtcbOln_VTP30-gz4Iu-Hag_1yQw"/>
+<button aria-label="Remove image" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-on-surface/70 text-on-primary flex items-center justify-center backdrop-blur-sm" type="button">
+<span class="material-symbols-outlined text-[13px]">close</span>
+</button>
+<div class="absolute bottom-0 inset-x-0 bg-on-surface/50 text-[9px] text-center text-on-primary py-0.5 backdrop-blur-xs font-label-sm">
+            Nắp bị nứt
+          </div>
+</div>
+<!-- Thumbnail 2 (Seal Tag) -->
+<div class="relative w-20 h-20 rounded-xl overflow-hidden bg-surface-container shrink-0 shadow-sm group">
+<img class="w-full h-full object-cover" data-alt="Cosmetics box holographic security authentic seal sticker close up on pastel background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUkTrpUQPMwUSeeTQ4Wecc0RsrolQEGThQ3Jfs_B6Bo0AFlCot7xJAVddHGsCrZ-6kKSRlukNT9RxBsyYSeuwreVZiVlnBSMaqLCVRga-NT3OI9dmurwK-lZi-g0HjXZuoK3OE8QgpytiYIj9JhNwOpCY_aOx0Zm0BncFtJL-Ou82GKcyZKiwpOGbiE4VHZOASkDAT0cjyC_mVSaG0_kCc8lLu2J2ZQH3YXNH3J0Uzr4BUBeDec2hFjw"/>
+<button aria-label="Remove image" class="absolute top-1 right-1 w-5 h-5 rounded-full bg-on-surface/70 text-on-primary flex items-center justify-center backdrop-blur-sm" type="button">
+<span class="material-symbols-outlined text-[13px]">close</span>
+</button>
+<div class="absolute bottom-0 inset-x-0 bg-on-surface/50 text-[9px] text-center text-on-primary py-0.5 backdrop-blur-xs font-label-sm">
+            Tem seal
+          </div>
+</div>
+<!-- Add More Slot -->
+<div class="w-20 h-20 rounded-xl bg-surface-subtle flex flex-col items-center justify-center text-center p-1 shrink-0 cursor-pointer hover:bg-primary/5 transition-colors">
+<span class="material-symbols-outlined text-primary text-[22px]">add_circle</span>
+<span class="font-label-sm text-[9px] text-text-muted mt-1 leading-tight">+ Thêm ảnh</span>
+<span class="text-[8px] text-text-muted/80">Tối đa 5 ảnh</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted">
+        Vui lòng chụp rõ mã vạch hộp, vị trí bị rỉ hoặc phản ứng trên da để được duyệt tự động nhanh chóng.
+      </p>
+</div>
+</section>
+<!-- Step 5: Resolution Method -->
+<section class="px-margin pt-space-lg">
+<div class="flex items-center gap-space-xs mb-space-sm">
+<span class="w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">5</span>
+<h2 class="font-title-md text-title-md text-on-surface font-bold">Phương thức giải quyết mong muốn</h2>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Resolution 1: Exchange (Selected) -->
+<label class="bg-surface-card rounded-xl p-space-md shadow-sm flex items-start gap-space-md cursor-pointer transition-all">
+<div class="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-on-primary shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-title-md text-title-md text-on-surface font-semibold">Đổi sản phẩm mới nguyên seal</span>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-2 py-0.5 rounded-full">Khuyên dùng</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-snug">
+            Shipper mang chai mới đến tận nhà đổi và nhận lại chai cũ, hoàn toàn miễn phí vận chuyển 2 chiều.
+          </p>
+</div>
+</label>
+<!-- Resolution 2: GlowPoints -->
+<label class="bg-surface-card rounded-xl p-space-md shadow-sm flex items-start gap-space-md cursor-pointer opacity-90 hover:opacity-100 transition-all">
+<div class="w-5 h-5 rounded-full bg-surface-container flex items-center justify-center text-transparent shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-title-md text-title-md text-on-surface font-semibold">Hoàn tiền vào ví GlowPoints</span>
+<span class="font-label-sm text-label-sm bg-tertiary-fixed text-tertiary font-bold px-2 py-0.5 rounded-full">+20.000đ Voucher</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-snug">
+            Nhận ngay 345.000 điểm dùng ngay lập tức kèm coupon bồi thường trải nghiệm.
+          </p>
+</div>
+</label>
+<!-- Resolution 3: Original Bank Account -->
+<label class="bg-surface-card rounded-xl p-space-md shadow-sm flex items-start gap-space-md cursor-pointer opacity-90 hover:opacity-100 transition-all">
+<div class="w-5 h-5 rounded-full bg-surface-container flex items-center justify-center text-transparent shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="font-title-md text-title-md text-on-surface font-semibold">Hoàn về tài khoản ngân hàng gốc</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-snug">
+            Tiền chuyển thẳng vào thẻ Techcombank •••• 6828 đã thanh toán (1 - 3 ngày làm việc).
+          </p>
+</div>
+</label>
+</div>
+</section>
+<!-- Step 6: Pickup & Return Address -->
+<section class="px-margin pt-space-lg mb-space-lg">
+<div class="bg-surface-card rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
+<span class="font-title-md text-title-md text-on-surface font-semibold">Địa chỉ thu hồi hàng tận nơi</span>
+</div>
+<button class="font-label-sm text-label-sm text-primary font-bold hover:underline" type="button">Thay đổi</button>
+</div>
+<div class="bg-surface-subtle p-space-sm rounded-lg flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-text-muted text-[18px] shrink-0 mt-0.5">pin_drop</span>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-space-xs">
+<span class="font-title-md text-title-md text-on-surface font-bold">Thảo Linh</span>
+<span class="text-text-muted text-body-sm">•</span>
+<span class="font-body-md text-body-md text-on-surface">0938 ••• 921</span>
+<span class="font-label-sm text-label-sm bg-surface-container text-on-secondary-container px-1.5 py-0.2 rounded">Mặc định</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+            Căn hộ Landmark 4, Vinhomes Central Park, 208 Nguyễn Hữu Cảnh, Phường 22, Q. Bình Thạnh, TP. Hồ Chí Minh
+          </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Sticky Bottom CTA Action Bar -->
+<aside class="fixed bottom-0 inset-x-0 z-40 bg-surface-card/95 backdrop-blur-md shadow-xl px-margin py-space-md pb-safe">
+<div class="max-w-md mx-auto flex flex-col gap-space-xs">
+<div class="flex items-center justify-between text-body-sm font-body-sm text-text-muted px-1">
+<span>Tổng giá trị hoàn/đổi:</span>
+<span class="font-headline-sm text-headline-sm text-primary font-bold">345.000đ</span>
+</div>
+<button class="w-full h-12 bg-primary hover:bg-primary-container active:scale-[0.98] text-on-primary font-label-lg text-label-lg rounded-xl flex items-center justify-center gap-space-xs shadow-md transition-all" id="submit-rma-btn" type="button">
+<span class="material-symbols-outlined text-[20px]">assignment_turned_in</span>
+<span>GỬI YÊU CẦU ĐỔI TRẢ &amp; HOÀN TIỀN</span>
+</button>
+</div>
+</aside>
+<!-- Interactive Feedback Script -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const submitBtn = document.getElementById('submit-rma-btn');
+      if (submitBtn) {
+        submitBtn.addEventListener('click', () => {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = `
+            <span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+            <span>ĐANG XỬ LÝ YÊU CẦU...</span>
+          `;
+          setTimeout(() => {
+            submitBtn.classList.remove('bg-primary');
+            submitBtn.classList.add('bg-tertiary-container');
+            submitBtn.innerHTML = `
+              <span class="material-symbols-outlined text-[20px]">done_all</span>
+              <span>ĐÃ TẠO YÊU CẦU RMA THÀNH CÔNG!</span>
+            `;
+          }, 1200);
+        });
+      }
+    });
+  </script>
+</div></main></body></html>
