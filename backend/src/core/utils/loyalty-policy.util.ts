@@ -2,9 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 
 // BR-02: 1 điểm = 1đ khi dùng
 export const POINT_VALUE_VND = 1;
-// P20: số dư quy đổi phải đạt mức này mới được dùng điểm
+// Số dư quy đổi phải đạt mức này mới được dùng điểm
 export const MIN_REDEEM_BALANCE_VND = 50000;
-// P20: chỉ dùng theo bội số của mức này
+// Chỉ dùng theo bội số của mức này
 export const REDEEM_STEP_VND = 10000;
 // BR-03: dùng điểm tối đa 50% giá trị đơn
 export const MAX_REDEEM_RATIO = 0.5;
