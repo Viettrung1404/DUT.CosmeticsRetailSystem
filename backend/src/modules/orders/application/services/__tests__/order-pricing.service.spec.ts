@@ -129,16 +129,34 @@ describe('OrderPricingService (TDD)', () => {
       expect(res.discountAmount).toBe(50000);
       expect(res.totalAmount).toBe(180000); // 200k - 50k + 30k ship
     });
+
+    it('should apply FIXED discount type from schema docs', () => {
+      const res = pricingService.calculatePricing({
+        items: [{ unitPrice: 200000, quantity: 1 }],
+        coupon: {
+          id: 'cpn-3',
+          code: 'GIAM30K',
+          discountType: 'FIXED',
+          discountValue: 30000,
+          startDate: new Date(Date.now() - 86400000),
+          endDate: new Date(Date.now() + 86400000),
+          isActive: true,
+        } as any,
+        customerCouponUsageCount: 0,
+      });
+
+      expect(res.discountAmount).toBe(30000);
+    });
   });
 
   describe('Loyalty Points Redemption', () => {
-    it('should redeem loyalty points at 1 point = 1,000 VND up to customer balance and order limit', () => {
-      const items = [{ unitPrice: 300000, quantity: 1 }]; // subtotal 300k + 30k ship = 330k
+    it('should redeem loyalty points at 1 point = 1 VND within threshold, step and 50% limit', () => {
+      const items = [{ unitPrice: 300000, quantity: 1 }]; // subtotal 300k + 30k ship
 
       const res = pricingService.calculatePricing({
         items,
-        pointsToUse: 50, // 50 points = 50,000 VND
-        customerAvailablePoints: 100,
+        pointsToUse: 50000,
+        customerAvailablePoints: 100000,
       });
 
       expect(res.pointsDiscount).toBe(50000);
@@ -151,24 +169,30 @@ describe('OrderPricingService (TDD)', () => {
       expect(() =>
         pricingService.calculatePricing({
           items,
-          pointsToUse: 150,
-          customerAvailablePoints: 100,
+          pointsToUse: 150000,
+          customerAvailablePoints: 100000,
         }),
       ).toThrow(new BadRequestException('Số điểm thưởng sử dụng vượt quá số điểm hiện có của bạn'));
     });
 
-    it('should cap points discount so total order value does not drop below 0', () => {
-      const items = [{ unitPrice: 100000, quantity: 1 }];
+    it('should reject points when balance is below the 50,000 threshold', () => {
+      expect(() =>
+        pricingService.calculatePricing({
+          items: [{ unitPrice: 300000, quantity: 1 }],
+          pointsToUse: 10000,
+          customerAvailablePoints: 40000,
+        }),
+      ).toThrow(BadRequestException);
+    });
 
-      const res = pricingService.calculatePricing({
-        items,
-        pointsToUse: 200, // 200k
-        customerAvailablePoints: 200,
-      });
-
-      // Subtotal is 100k, points discount is capped at subtotal (100k)
-      expect(res.pointsDiscount).toBe(100000);
-      expect(res.totalAmount).toBe(30000); // 100k - 100k + 30k ship
+    it('should reject points that exceed 50% of order value (BR-03)', () => {
+      expect(() =>
+        pricingService.calculatePricing({
+          items: [{ unitPrice: 100000, quantity: 1 }],
+          pointsToUse: 60000,
+          customerAvailablePoints: 100000,
+        }),
+      ).toThrow(BadRequestException);
     });
   });
 });

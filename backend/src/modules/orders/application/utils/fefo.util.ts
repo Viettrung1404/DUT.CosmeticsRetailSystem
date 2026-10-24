@@ -1,3 +1,5 @@
+import { nearExpiryThreshold } from '@core/utils/expiry-policy.util';
+
 export interface FefoBatch {
   id: string;
   quantity: number;
@@ -9,13 +11,8 @@ export interface FefoAllocation {
   quantity: number;
 }
 
-const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
-
 // BR-04: hàng còn hạn dưới 3 tháng là "cận date", không xuất cho đơn online (hạn tính theo ngày Việt Nam)
-export const minExpiryForOnline = (now: Date): Date => {
-  const vn = new Date(now.getTime() + VN_OFFSET_MS);
-  return new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth() + 3, vn.getUTCDate()));
-};
+export const minExpiryForOnline = (now: Date): Date => nearExpiryThreshold(now);
 
 // BR-08 FEFO: lô hết hạn sớm hơn xuất trước
 export const allocateFefo = (
