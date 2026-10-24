@@ -21,7 +21,7 @@ export class GetPosOrderReceiptUseCase {
       throw new NotFoundException('Không tìm thấy đơn bán tại quầy');
     }
 
-    // V3: nhân viên bán hàng chỉ xem đơn trong ca của chính mình; quản lý / kế toán (có quyền đối soát) xem theo phạm vi
+    // Nhân viên bán hàng chỉ xem đơn trong ca của chính mình; quản lý / kế toán (có quyền đối soát) xem theo phạm vi
     if (receipt.session?.cashierId === userId) {
       return receipt;
     }

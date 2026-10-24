@@ -26,7 +26,7 @@ export interface PosPricingInput {
 
 const sum = (values: number[]): number => values.reduce((a, b) => a + b, 0);
 
-// Chia amount theo tỷ lệ weights, phần lẻ dồn vào phần tử lớn nhất (S2) nên tổng các phần luôn bằng amount
+// Chia amount theo tỷ lệ weights, phần lẻ dồn vào phần tử lớn nhất nên tổng các phần luôn bằng amount
 export const allocateProportionally = (amount: number, weights: number[]): number[] => {
   const totalWeight = sum(weights);
   if (amount <= 0 || totalWeight <= 0) {
@@ -74,7 +74,7 @@ const promotionDiscount = (promotion: PosPromotionRule, unitPrice: number, quant
   return Math.min(promotion.value * quantity, gross);
 };
 
-// P10: nhiều khuyến mãi cùng áp một dòng thì lấy mức giảm lớn nhất, không cộng dồn (M1)
+// Nhiều khuyến mãi cùng áp một dòng thì lấy mức giảm lớn nhất, không cộng dồn
 export const pickBestPromotion = (
   promotions: PosPromotionRule[],
   variant: PosSaleVariant,
@@ -121,7 +121,7 @@ export const calculateCouponDiscount = (
   return Math.min(raw, base);
 };
 
-// Thứ tự P10: khuyến mãi tự động -> tối đa 1 voucher (BR-11) -> điểm. Voucher và điểm được chia xuống từng dòng (S2)
+// Thứ tự: khuyến mãi tự động -> tối đa 1 voucher (BR-11) -> điểm. Voucher và điểm được chia xuống từng dòng
 export const buildPosPricing = (input: PosPricingInput): PosPricing => {
   const grossList = input.lines.map((l) => l.variant.price * l.quantity);
   const subtotal = sum(grossList);

@@ -118,7 +118,7 @@ const ROLES = [
   },
 ];
 
-// Hệ số nhân điểm theo hạng chốt ở quyết định P3; % giảm giá theo hạng giữ mặc định của bảng (0)
+// Hệ số nhân điểm theo hạng; % giảm giá theo hạng giữ mặc định của bảng (0)
 const LOYALTY_TIERS = [
   { name: 'Bronze', minPoints: 0, pointMultiplier: 1 },
   { name: 'Silver', minPoints: 1000, pointMultiplier: 1.2 },

@@ -34,7 +34,7 @@ export class CreatePosOrderUseCase {
     const now = new Date();
     const plan = await this.planner.plan(userId, permissionCodes, input, now);
 
-    // V14: chỉ bán khi chính mình đang có ca mở tại đúng cửa hàng này
+    // Chỉ bán khi chính mình đang có ca mở tại đúng cửa hàng này
     const session = await this.sessionRepository.findOpenByCashier(userId);
     if (!session || session.storeId !== input.storeId) {
       throw new ConflictException('Bạn chưa mở ca tại cửa hàng này, hãy mở ca trước khi bán');

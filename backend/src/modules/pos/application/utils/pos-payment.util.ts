@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { PosPaymentInput, PosSettlement } from '../../domain/entities/pos-sale.entity';
 
-// P12: tổng thu >= phải trả; chỉ tiền mặt được thu dư (tiền thừa), chuyển khoản / thẻ phải vừa đúng số
+// Tổng thu >= phải trả; chỉ tiền mặt được thu dư (tiền thừa), chuyển khoản / thẻ phải vừa đúng số
 export const settlePayments = (total: number, inputs: PosPaymentInput[]): PosSettlement => {
   const methods = new Set(inputs.map((p) => p.method));
   if (methods.size !== inputs.length) {
