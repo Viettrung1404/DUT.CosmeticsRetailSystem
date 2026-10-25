@@ -6,10 +6,17 @@ import {
   ParseIntPipe,
   ParseUUIDPipe,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { Public } from '@core/decorators/public.decorator';
+import { WishlistEnrichmentInterceptor } from '@modules/customer-commerce/presentation/wishlist-enrichment.interceptor';
 import { GetProductsUseCase } from '../../application/use-cases/get-products.use-case';
 import { GetProductDetailUseCase } from '../../application/use-cases/get-product-detail.use-case';
 import { SearchProductsUseCase } from '../../application/use-cases/search-products.use-case';
@@ -23,6 +30,7 @@ import { SuggestProductsQueryDto } from '../dtos/suggest-products-query.dto';
 
 @ApiTags('Customer - Products (Việt Trung)')
 @Controller('customer/products')
+@UseInterceptors(WishlistEnrichmentInterceptor)
 export class ProductCustomerController {
   constructor(
     private readonly getProductsUseCase: GetProductsUseCase,
@@ -34,8 +42,14 @@ export class ProductCustomerController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách sản phẩm hiển thị trên Web/Mobile (phân trang, lọc, sắp xếp)' })
-  @ApiOkResponse({ description: 'Danh sách sản phẩm thành công', type: PageDto })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách sản phẩm hiển thị trên Web/Mobile (phân trang, lọc, sắp xếp)',
+  })
+  @ApiOkResponse({
+    description: 'Danh sách sản phẩm thành công',
+    type: PageDto,
+  })
   async getProducts(@Query() filter: ProductFilterDto) {
     const { items, total } = await this.getProductsUseCase.execute(filter);
 
@@ -49,19 +63,32 @@ export class ProductCustomerController {
 
   @Public()
   @Get('search')
-  @ApiOperation({ summary: 'Tìm kiếm sản phẩm theo từ khóa (Elasticsearch + fallback DB)' })
+  @ApiOperation({
+    summary: 'Tìm kiếm sản phẩm theo từ khóa (Elasticsearch + fallback DB)',
+  })
   @ApiOkResponse({ description: 'Kết quả tìm kiếm sản phẩm', type: PageDto })
   async searchProducts(@Query() queryDto: SearchProductsQueryDto) {
-    const { items, total } = await this.searchProductsUseCase.execute(queryDto.q, queryDto);
+    const { items, total } = await this.searchProductsUseCase.execute(
+      queryDto.q,
+      queryDto,
+    );
     const data = items.map((product) => ProductResponseDto.fromDomain(product));
-    const meta = new PageMetaDto({ pageOptionsDto: queryDto, itemCount: total });
+    const meta = new PageMetaDto({
+      pageOptionsDto: queryDto,
+      itemCount: total,
+    });
     return new PageDto(data, meta);
   }
 
   @Public()
   @Get('suggest')
-  @ApiOperation({ summary: 'Gợi ý tìm kiếm nhanh / autocomplete (tối đa 20 kết quả)' })
-  @ApiOkResponse({ type: [ProductSuggestionDto], description: 'Danh sách gợi ý sản phẩm' })
+  @ApiOperation({
+    summary: 'Gợi ý tìm kiếm nhanh / autocomplete (tối đa 20 kết quả)',
+  })
+  @ApiOkResponse({
+    type: [ProductSuggestionDto],
+    description: 'Danh sách gợi ý sản phẩm',
+  })
   async suggestProducts(
     @Query() queryDto: SuggestProductsQueryDto,
   ): Promise<ProductSuggestionDto[]> {
@@ -70,7 +97,9 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':slug')
-  @ApiOperation({ summary: 'Xem chi tiết sản phẩm theo slug (URL thân thiện SEO)' })
+  @ApiOperation({
+    summary: 'Xem chi tiết sản phẩm theo slug (URL thân thiện SEO)',
+  })
   @ApiOkResponse({ type: ProductResponseDto, description: 'Chi tiết sản phẩm' })
   async getProductBySlug(@Param('slug') slug: string) {
     const product = await this.getProductDetailUseCase.executeBySlug(slug);
@@ -79,9 +108,20 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':id/related')
-  @ApiOperation({ summary: 'Lấy danh sách sản phẩm liên quan (cùng danh mục hoặc thương hiệu)' })
-  @ApiQuery({ name: 'limit', required: false, example: 8, description: 'Số lượng sản phẩm liên quan (1 - 20)' })
-  @ApiOkResponse({ type: [ProductResponseDto], description: 'Danh sách sản phẩm liên quan' })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách sản phẩm liên quan (cùng danh mục hoặc thương hiệu)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: 8,
+    description: 'Số lượng sản phẩm liên quan (1 - 20)',
+  })
+  @ApiOkResponse({
+    type: [ProductResponseDto],
+    description: 'Danh sách sản phẩm liên quan',
+  })
   async getRelatedProducts(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('limit', new DefaultValuePipe(8), ParseIntPipe) limit: number,
@@ -91,4 +131,3 @@ export class ProductCustomerController {
     return items.map((p) => ProductResponseDto.fromDomain(p));
   }
 }
-

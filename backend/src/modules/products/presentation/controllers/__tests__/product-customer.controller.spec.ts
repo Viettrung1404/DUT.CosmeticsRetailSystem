@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { WishlistEnrichmentInterceptor } from '@modules/customer-commerce/presentation/wishlist-enrichment.interceptor';
 import { NotFoundException } from '@nestjs/common';
 import { ProductCustomerController } from '../product-customer.controller';
 import { GetProductsUseCase } from '../../../application/use-cases/get-products.use-case';
@@ -14,7 +15,10 @@ import { SuggestProductsQueryDto } from '../../dtos/suggest-products-query.dto';
 describe('ProductCustomerController', () => {
   let controller: ProductCustomerController;
   let getProductsUseCase: { execute: jest.Mock };
-  let getProductDetailUseCase: { executeBySlug: jest.Mock; executeById: jest.Mock };
+  let getProductDetailUseCase: {
+    executeBySlug: jest.Mock;
+    executeById: jest.Mock;
+  };
   let searchProductsUseCase: { execute: jest.Mock };
   let suggestProductsUseCase: { execute: jest.Mock };
   let getRelatedProductsUseCase: { execute: jest.Mock };
@@ -53,7 +57,10 @@ describe('ProductCustomerController', () => {
 
   beforeEach(async () => {
     getProductsUseCase = { execute: jest.fn() };
-    getProductDetailUseCase = { executeBySlug: jest.fn(), executeById: jest.fn() };
+    getProductDetailUseCase = {
+      executeBySlug: jest.fn(),
+      executeById: jest.fn(),
+    };
     searchProductsUseCase = { execute: jest.fn() };
     suggestProductsUseCase = { execute: jest.fn() };
     getRelatedProductsUseCase = { execute: jest.fn() };
@@ -65,11 +72,19 @@ describe('ProductCustomerController', () => {
         { provide: GetProductDetailUseCase, useValue: getProductDetailUseCase },
         { provide: SearchProductsUseCase, useValue: searchProductsUseCase },
         { provide: SuggestProductsUseCase, useValue: suggestProductsUseCase },
-        { provide: GetRelatedProductsUseCase, useValue: getRelatedProductsUseCase },
+        {
+          provide: GetRelatedProductsUseCase,
+          useValue: getRelatedProductsUseCase,
+        },
       ],
-    }).compile();
+    })
+      .overrideInterceptor(WishlistEnrichmentInterceptor)
+      .useValue({ intercept: (_context: unknown, next: any) => next.handle() })
+      .compile();
 
-    controller = module.get<ProductCustomerController>(ProductCustomerController);
+    controller = module.get<ProductCustomerController>(
+      ProductCustomerController,
+    );
   });
 
   describe('getProducts', () => {
@@ -111,7 +126,10 @@ describe('ProductCustomerController', () => {
 
       expect(result.data.length).toBe(1);
       expect(result.meta.itemCount).toBe(1);
-      expect(searchProductsUseCase.execute).toHaveBeenCalledWith('black rouge', queryDto);
+      expect(searchProductsUseCase.execute).toHaveBeenCalledWith(
+        'black rouge',
+        queryDto,
+      );
     });
   });
 
@@ -142,11 +160,15 @@ describe('ProductCustomerController', () => {
     it('nên trả về chi tiết sản phẩm theo slug', async () => {
       getProductDetailUseCase.executeBySlug.mockResolvedValue(mockProduct);
 
-      const result = await controller.getProductBySlug('son-kem-li-black-rouge');
+      const result = await controller.getProductBySlug(
+        'son-kem-li-black-rouge',
+      );
 
       expect(result.id).toBe('prod-uuid-1');
       expect(result.slug).toBe('son-kem-li-black-rouge');
-      expect(getProductDetailUseCase.executeBySlug).toHaveBeenCalledWith('son-kem-li-black-rouge');
+      expect(getProductDetailUseCase.executeBySlug).toHaveBeenCalledWith(
+        'son-kem-li-black-rouge',
+      );
     });
 
     it('nên ném NotFoundException nếu use case báo không tìm thấy hoặc sản phẩm bị ẩn', async () => {
@@ -154,7 +176,9 @@ describe('ProductCustomerController', () => {
         new NotFoundException('Không tìm thấy sản phẩm với slug: an-san-pham'),
       );
 
-      await expect(controller.getProductBySlug('an-san-pham')).rejects.toThrow(NotFoundException);
+      await expect(controller.getProductBySlug('an-san-pham')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -166,7 +190,10 @@ describe('ProductCustomerController', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].id).toBe('prod-uuid-1');
-      expect(getRelatedProductsUseCase.execute).toHaveBeenCalledWith('prod-uuid-1', 8);
+      expect(getRelatedProductsUseCase.execute).toHaveBeenCalledWith(
+        'prod-uuid-1',
+        8,
+      );
     });
   });
 });

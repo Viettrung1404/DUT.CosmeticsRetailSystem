@@ -71,6 +71,8 @@ export class ProductIngredientResponseDto {
 }
 
 export class ProductResponseDto {
+  @ApiProperty({ default: false })
+  isWishlisted?: boolean;
   @ApiProperty({ example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
   id: string;
 
@@ -182,7 +184,7 @@ export class ProductResponseDto {
     // Filter variants: if onlyActiveVariants is true (default for customer), filter out inactive variants
     const rawVariants = options.onlyActiveVariants
       ? (entity.variants || []).filter((v) => v.isActive !== false)
-      : (entity.variants || []);
+      : entity.variants || [];
 
     // Sanitize variants: remove costPrice to prevent sensitive data leak to clients
     dto.variants = rawVariants.map((v) => ({
@@ -207,4 +209,3 @@ export class ProductResponseDto {
     return dto;
   }
 }
-

@@ -1,4 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { notifyCustomer } from '@core/services/customer-events';
+import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
+import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { OrderStatus } from '@core/domain/orders/order-status.enum';
@@ -21,7 +29,10 @@ import {
   findStockShortages,
   formatShortages,
 } from '../../application/utils/stock-check.util';
-import { allocateFefo, minExpiryForOnline } from '../../application/utils/fefo.util';
+import {
+  allocateFefo,
+  minExpiryForOnline,
+} from '../../application/utils/fefo.util';
 import {
   calculateCommission,
   calculateEarnedPoints,
@@ -39,7 +50,9 @@ const CUSTOMER_SELECT = {
   user: { select: { fullName: true, phone: true, email: true } },
 } satisfies Prisma.CustomerSelect;
 
-type CustomerRow = Prisma.CustomerGetPayload<{ select: typeof CUSTOMER_SELECT }>;
+type CustomerRow = Prisma.CustomerGetPayload<{
+  select: typeof CUSTOMER_SELECT;
+}>;
 
 interface LockedOrderRow {
   id: string;
@@ -80,7 +93,11 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
         store: { select: { id: true, name: true, code: true } },
         coupon: { select: { code: true } },
         salesStaff: {
-          select: { id: true, employeeCode: true, user: { select: { fullName: true } } },
+          select: {
+            id: true,
+            employeeCode: true,
+            user: { select: { fullName: true } },
+          },
         },
         items: {
           orderBy: { createdAt: 'asc' },
@@ -88,7 +105,11 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
             variant: {
               select: {
                 sku: true,
-                images: { select: { imageUrl: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
+                images: {
+                  select: { imageUrl: true },
+                  orderBy: { sortOrder: 'asc' },
+                  take: 1,
+                },
                 product: {
                   select: {
                     images: {
@@ -147,7 +168,9 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
         variantName: item.variantName,
         // Ưu tiên ảnh riêng của biến thể, không có thì lấy ảnh chính của sản phẩm
         imageUrl:
-          item.variant.images[0]?.imageUrl ?? item.variant.product.images[0]?.imageUrl ?? null,
+          item.variant.images[0]?.imageUrl ??
+          item.variant.product.images[0]?.imageUrl ??
+          null,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         discountAmount: Number(item.discountAmount),
@@ -202,7 +225,12 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
 
       const items = await tx.orderItem.findMany({
         where: { orderId: order.id },
-        select: { productVariantId: true, productName: true, variantName: true, quantity: true },
+        select: {
+          productVariantId: true,
+          productName: true,
+          variantName: true,
+          quantity: true,
+        },
       });
       const inventories = await this.lockInventories(
         tx,
@@ -217,7 +245,7 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           quantity: inv.quantity,
           reservedQuantity: inv.reserved_quantity,
         })),
-        order.order_type === 'ONLINE',
+        ['ONLINE', 'STORE_PICKUP'].includes(order.order_type),
       );
       if (shortages.length > 0) {
         throw new BadRequestException(
@@ -235,142 +263,202 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     });
   }
 
-  async updateStatus(input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult> {
+  async updateStatus(
+    input: UpdateOrderStatusInput,
+  ): Promise<OrderStatusChangeResult> {
     // Xuất kho nhiều dòng tốn nhiều câu lệnh, mặc định 5 giây của Prisma dễ hết giờ với Neon
-    return this.prisma.$transaction(async (tx) => {
-      const order = await this.lockOrder(tx, input.orderId);
-      const target = input.target as OrderStatus;
-      OrderStateMachine.assertValidTransition(order.status as OrderStatus, target, 'ADMIN');
-
-      const result: OrderStatusChangeResult = {
-        stockDeducted: false,
-        codPaymentsCompleted: 0,
-        loyalty: null,
-        commissionAmount: null,
-      };
-
-      if (target === OrderStatus.SHIPPING) {
-        await this.deductStockForShipping(tx, order, input.changedBy);
-        result.stockDeducted = true;
-      }
-
-      if (target === OrderStatus.DELIVERED) {
-        const paid = await tx.payment.updateMany({
-          where: { orderId: order.id, paymentMethod: 'COD', status: 'PENDING' },
-          data: { status: 'COMPLETED', paidAt: new Date() },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const order = await this.lockOrder(tx, input.orderId);
+        const target = input.target as OrderStatus;
+        OrderStateMachine.assertValidTransition(
+          order.status as OrderStatus,
+          target,
+          'ADMIN',
+        );
+        const exchange = await tx.exchangeSettlement.findUnique({
+          where: { replacementOrderId: order.id },
         });
-        result.codPaymentsCompleted = paid.count;
-      }
+        if (exchange) {
+          const paid = await tx.payment.aggregate({
+            where: { orderId: order.id, status: 'COMPLETED' },
+            _sum: { amount: true },
+          });
+          const cod = await tx.payment.aggregate({
+            where: {
+              orderId: order.id,
+              status: 'PENDING',
+              paymentMethod: 'COD',
+            },
+            _sum: { amount: true },
+          });
+          const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
+            .add(exchange.creditApplied)
+            .add(target === OrderStatus.SHIPPING ? (cod._sum.amount ?? 0) : 0);
+          if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
+            throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
+        }
 
-      if (target === OrderStatus.COMPLETED) {
-        result.loyalty = await this.rewardCustomer(tx, order);
-        result.commissionAmount = await this.createCommission(tx, order);
-      }
+        const result: OrderStatusChangeResult = {
+          stockDeducted: false,
+          codPaymentsCompleted: 0,
+          loyalty: null,
+          commissionAmount: null,
+        };
 
-      await this.changeStatus(
-        tx,
-        order.id,
-        target,
-        input.changedBy,
-        input.note || `Chuyển trạng thái sang ${target}`,
-      );
-      return result;
-    }, { timeout: 15000 });
+        if (target === OrderStatus.SHIPPING) {
+          await this.deductStockForShipping(tx, order, input.changedBy);
+          result.stockDeducted = true;
+        }
+
+        if (target === OrderStatus.DELIVERED) {
+          const paid = await tx.payment.updateMany({
+            where: {
+              orderId: order.id,
+              paymentMethod: 'COD',
+              status: 'PENDING',
+            },
+            data: { status: 'COMPLETED', paidAt: new Date() },
+          });
+          result.codPaymentsCompleted = paid.count;
+        }
+
+        if (target === OrderStatus.COMPLETED) {
+          result.loyalty = await this.rewardCustomer(tx, order);
+          result.commissionAmount = await this.createCommission(tx, order);
+        }
+
+        await this.changeStatus(
+          tx,
+          order.id,
+          target,
+          input.changedBy,
+          input.note || `Chuyển trạng thái sang ${target}`,
+        );
+        return result;
+      },
+      { timeout: 15000 },
+    );
   }
 
   // FR-04.05: hoàn giữ hàng, hoàn coupon, hoàn điểm; đã thu tiền thì tạo phiếu hoàn tiền chờ xử lý
-  async cancelByAdmin(input: CancelOrderByAdminInput): Promise<OrderCancelResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const order = await this.lockOrder(tx, input.orderId);
-      OrderStateMachine.assertValidTransition(
-        order.status as OrderStatus,
-        OrderStatus.CANCELLED,
-        'ADMIN',
-      );
-
-      const result: OrderCancelResult = {
-        reservationReleased: false,
-        couponReleased: false,
-        pointsRefunded: 0,
-        refundAmount: 0,
-      };
-
-      // Chỉ hủy được trước SHIPPING nên hàng vẫn đang giữ, chưa trừ khỏi kho
-      if (order.order_type === 'ONLINE') {
-        const items = await tx.orderItem.findMany({
-          where: { orderId: order.id },
-          select: { productVariantId: true, quantity: true },
-        });
-        const inventories = await this.lockInventories(
-          tx,
-          order.store_id,
-          items.map((i) => i.productVariantId),
+  async cancelByAdmin(
+    input: CancelOrderByAdminInput,
+  ): Promise<OrderCancelResult> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const order = await this.lockOrder(tx, input.orderId);
+        OrderStateMachine.assertValidTransition(
+          order.status as OrderStatus,
+          OrderStatus.CANCELLED,
+          'ADMIN',
         );
-        for (const item of items) {
-          const inv = inventories.find((i) => i.product_variant_id === item.productVariantId);
-          if (inv) {
-            await tx.inventory.update({
-              where: { id: inv.id },
-              data: { reservedQuantity: { decrement: item.quantity } },
+
+        const result: OrderCancelResult = {
+          reservationReleased: false,
+          couponReleased: false,
+          pointsRefunded: 0,
+          refundAmount: 0,
+        };
+        await cancelReplacementCredit(tx, order.id);
+        if (order.customer_id)
+          await tx.$queryRaw`SELECT id FROM customers WHERE id=${order.customer_id}::uuid FOR UPDATE`;
+        if (order.coupon_id)
+          await tx.$queryRaw`SELECT id FROM coupons WHERE id=${order.coupon_id}::uuid FOR UPDATE`;
+
+        // Chỉ hủy được trước SHIPPING nên hàng vẫn đang giữ, chưa trừ khỏi kho
+        if (['ONLINE', 'STORE_PICKUP'].includes(order.order_type)) {
+          const items = await tx.orderItem.findMany({
+            where: { orderId: order.id },
+            select: { productVariantId: true, quantity: true },
+          });
+          const inventories = await this.lockInventories(
+            tx,
+            order.store_id,
+            items.map((i) => i.productVariantId),
+          );
+          for (const item of items) {
+            const inv = inventories.find(
+              (i) => i.product_variant_id === item.productVariantId,
+            );
+            if (inv) {
+              await tx.inventory.update({
+                where: { id: inv.id },
+                data: { reservedQuantity: { decrement: item.quantity } },
+              });
+            }
+          }
+          result.reservationReleased = items.length > 0;
+        }
+
+        if (order.coupon_id) {
+          const usage = await tx.couponUsage.deleteMany({
+            where: { orderId: order.id },
+          });
+          if (usage.count > 0) {
+            await tx.coupon.update({
+              where: { id: order.coupon_id },
+              data: { usedCount: { decrement: 1 } },
+            });
+            result.couponReleased = true;
+          }
+        }
+
+        if (order.loyalty_points_used > 0 && order.customer_id) {
+          await tx.customer.update({
+            where: { id: order.customer_id },
+            data: { totalPoints: { increment: order.loyalty_points_used } },
+          });
+          await tx.loyaltyPointsTransaction.create({
+            data: {
+              customerId: order.customer_id,
+              orderId: order.id,
+              points: order.loyalty_points_used,
+              type: 'REFUND',
+              eventKey: `ORDER:${order.id}:CANCEL_POINTS`,
+              description: `Hoàn điểm do hủy đơn hàng ${order.order_number}`,
+            },
+          });
+          result.pointsRefunded = order.loyalty_points_used;
+          await evaluateTier(tx, order.customer_id);
+        }
+
+        const payments = await tx.payment.findMany({
+          where: { orderId: order.id },
+          select: { id: true, amount: true, status: true },
+        });
+        for (const payment of payments) {
+          if (payment.status === 'COMPLETED') {
+            await tx.refund.create({
+              data: {
+                orderId: order.id,
+                paymentId: payment.id,
+                amount: payment.amount,
+                reason: input.reason,
+                status: 'PENDING',
+              },
+            });
+            result.refundAmount += Number(payment.amount);
+          } else if (payment.status === 'PENDING') {
+            // Cùng giá trị với luồng khách tự hủy (CancelOrderUseCase) để báo cáo đọc thống nhất
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { status: 'CANCELLED' },
             });
           }
         }
-        result.reservationReleased = items.length > 0;
-      }
 
-      if (order.coupon_id) {
-        const usage = await tx.couponUsage.deleteMany({ where: { orderId: order.id } });
-        if (usage.count > 0) {
-          await tx.coupon.update({
-            where: { id: order.coupon_id },
-            data: { usedCount: { decrement: 1 } },
-          });
-          result.couponReleased = true;
-        }
-      }
-
-      if (order.loyalty_points_used > 0 && order.customer_id) {
-        await tx.customer.update({
-          where: { id: order.customer_id },
-          data: { totalPoints: { increment: order.loyalty_points_used } },
-        });
-        await tx.loyaltyPointsTransaction.create({
-          data: {
-            customerId: order.customer_id,
-            orderId: order.id,
-            points: order.loyalty_points_used,
-            type: 'REFUND',
-            description: `Hoàn điểm do hủy đơn hàng ${order.order_number}`,
-          },
-        });
-        result.pointsRefunded = order.loyalty_points_used;
-      }
-
-      const payments = await tx.payment.findMany({
-        where: { orderId: order.id },
-        select: { id: true, amount: true, status: true },
-      });
-      for (const payment of payments) {
-        if (payment.status === 'COMPLETED') {
-          await tx.refund.create({
-            data: {
-              orderId: order.id,
-              paymentId: payment.id,
-              amount: payment.amount,
-              reason: input.reason,
-              status: 'PENDING',
-            },
-          });
-          result.refundAmount += Number(payment.amount);
-        } else if (payment.status === 'PENDING') {
-          // Cùng giá trị với luồng khách tự hủy (CancelOrderUseCase) để báo cáo đọc thống nhất
-          await tx.payment.update({ where: { id: payment.id }, data: { status: 'CANCELLED' } });
-        }
-      }
-
-      await this.changeStatus(tx, order.id, OrderStatus.CANCELLED, input.changedBy, input.reason);
-      return result;
-    }, { timeout: 15000 });
+        await this.changeStatus(
+          tx,
+          order.id,
+          OrderStatus.CANCELLED,
+          input.changedBy,
+          input.reason,
+        );
+        return result;
+      },
+      { timeout: 15000 },
+    );
   }
 
   // Tài liệu 04 mục 7: xuất kho giao vận trừ cả quantity lẫn reserved_quantity, trừ lô theo FEFO và ghi order_item_batches
@@ -381,26 +469,38 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
   ): Promise<void> {
     const items = await tx.orderItem.findMany({
       where: { orderId: order.id },
-      select: { id: true, productVariantId: true, productName: true, variantName: true, quantity: true },
+      select: {
+        id: true,
+        productVariantId: true,
+        productName: true,
+        variantName: true,
+        quantity: true,
+      },
     });
     const inventories = await this.lockInventories(
       tx,
       order.store_id,
       items.map((i) => i.productVariantId),
     );
-    const reservedByOrder = order.order_type === 'ONLINE';
+    const reservedByOrder = ['ONLINE', 'STORE_PICKUP'].includes(
+      order.order_type,
+    );
     const minExpiry = minExpiryForOnline(new Date());
     const note = `Xuất kho giao đơn ${order.order_number}`;
 
     for (const item of items) {
-      const inv = inventories.find((i) => i.product_variant_id === item.productVariantId);
+      const inv = inventories.find(
+        (i) => i.product_variant_id === item.productVariantId,
+      );
       if (!inv || inv.quantity < item.quantity) {
         throw new BadRequestException(
           `Không đủ tồn kho để xuất: ${item.productName} (${item.variantName}), cần ${item.quantity}, còn ${inv?.quantity ?? 0}`,
         );
       }
 
-      const batches = await tx.$queryRaw<{ id: string; quantity: number; expiry_date: Date }[]>`
+      const batches = await tx.$queryRaw<
+        { id: string; quantity: number; expiry_date: Date }[]
+      >`
         SELECT id, quantity, expiry_date
         FROM batches
         WHERE store_id = ${order.store_id}::uuid
@@ -426,7 +526,11 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
         });
       } else {
         const { allocations, shortfall } = allocateFefo(
-          batches.map((b) => ({ id: b.id, quantity: b.quantity, expiryDate: b.expiry_date })),
+          batches.map((b) => ({
+            id: b.id,
+            quantity: b.quantity,
+            expiryDate: b.expiry_date,
+          })),
           item.quantity,
           minExpiry,
         );
@@ -436,9 +540,16 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           );
         }
         for (const a of allocations) {
-          await tx.batch.update({ where: { id: a.batchId }, data: { quantity: { decrement: a.quantity } } });
+          await tx.batch.update({
+            where: { id: a.batchId },
+            data: { quantity: { decrement: a.quantity } },
+          });
           await tx.orderItemBatch.create({
-            data: { orderItemId: item.id, batchId: a.batchId, quantity: a.quantity },
+            data: {
+              orderItemId: item.id,
+              batchId: a.batchId,
+              quantity: a.quantity,
+            },
           });
           await tx.inventoryTransaction.create({
             data: {
@@ -460,7 +571,9 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
         where: { id: inv.id },
         data: {
           quantity: { decrement: item.quantity },
-          ...(reservedByOrder ? { reservedQuantity: { decrement: item.quantity } } : {}),
+          ...(reservedByOrder
+            ? { reservedQuantity: { decrement: item.quantity } }
+            : {}),
         },
       });
     }
@@ -475,20 +588,30 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     }
 
     const totalAmount = Number(order.total_amount);
+    await tx.$queryRaw`SELECT id FROM customers WHERE id=${order.customer_id}::uuid FOR UPDATE`;
     const [customer, setting, tiers] = await Promise.all([
       tx.customer.findUniqueOrThrow({
         where: { id: order.customer_id },
-        select: { totalPoints: true, loyaltyTierId: true, loyaltyTier: { select: { pointMultiplier: true } } },
+        select: {
+          totalPoints: true,
+          loyaltyTierId: true,
+          loyaltyTier: { select: { pointMultiplier: true } },
+        },
       }),
       tx.setting.findUnique({ where: { key: LOYALTY_SETTING_KEY } }),
-      tx.loyaltyTier.findMany({ select: { id: true, name: true, minPoints: true } }),
+      tx.loyaltyTier.findMany({
+        select: { id: true, name: true, minPoints: true },
+      }),
     ]);
 
     const pointRate = readPointRate(setting?.value);
     const multiplier = Number(customer.loyaltyTier?.pointMultiplier ?? 1);
-    const pointsEarned = pointRate ? calculateEarnedPoints(totalAmount, pointRate, multiplier) : 0;
+    const pointsEarned = pointRate
+      ? calculateEarnedPoints(totalAmount, pointRate, multiplier)
+      : 0;
     const newTier = resolveTier(tiers, customer.totalPoints + pointsEarned);
-    const tierChanged = newTier !== null && newTier.id !== customer.loyaltyTierId;
+    const tierChanged =
+      newTier !== null && newTier.id !== customer.loyaltyTierId;
 
     await tx.customer.update({
       where: { id: order.customer_id },
@@ -507,9 +630,18 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           orderId: order.id,
           points: pointsEarned,
           type: 'EARN',
+          eventKey: `ORDER:${order.id}:EARN`,
           description: `Tích điểm đơn hàng ${order.order_number}`,
         },
       });
+      await notifyCustomer(
+        tx,
+        order.customer_id,
+        `LOYALTY:ORDER:${order.id}:EARN`,
+        'Đã tích điểm cho đơn hàng hoàn tất',
+        'LOYALTY',
+        { orderId: order.id, points: pointsEarned },
+      );
     }
 
     return {
@@ -551,7 +683,10 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
   }
 
   // SELECT ... FOR UPDATE: giữ khóa dòng đơn tới hết transaction, hai người thao tác cùng lúc sẽ phải xếp hàng
-  private async lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<LockedOrderRow> {
+  private async lockOrder(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<LockedOrderRow> {
     const rows = await tx.$queryRaw<LockedOrderRow[]>`
       SELECT id, status, store_id, order_type, order_number, customer_id, sales_staff_id,
              coupon_id, loyalty_points_used, total_amount
@@ -592,7 +727,21 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     note: string,
   ): Promise<void> {
     await tx.order.update({ where: { id: orderId }, data: { status } });
-    await tx.orderStatusHistory.create({ data: { orderId, status, note, changedBy } });
+    await tx.orderStatusHistory.create({
+      data: { orderId, status, note, changedBy },
+    });
+    const owner = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { customerId: true },
+    });
+    await notifyCustomer(
+      tx,
+      owner.customerId,
+      `ORDER:${orderId}:${status}`,
+      `Trạng thái đơn hàng: ${status}`,
+      'ORDER',
+      { orderId, status },
+    );
   }
 
   async findMany(
@@ -654,7 +803,9 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
       conditions.push({ createdAt: { gte: query.from, lt: query.to } });
     }
     if (query.search) {
-      conditions.push({ orderNumber: { contains: query.search, mode: 'insensitive' } });
+      conditions.push({
+        orderNumber: { contains: query.search, mode: 'insensitive' },
+      });
     }
 
     return { AND: conditions };
@@ -667,7 +818,9 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     return where;
   }
 
-  private toCustomerSummary(customer: CustomerRow | null): OrderCustomerSummary | null {
+  private toCustomerSummary(
+    customer: CustomerRow | null,
+  ): OrderCustomerSummary | null {
     if (!customer) {
       return null;
     }

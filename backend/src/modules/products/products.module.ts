@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { ProductCustomerController } from './presentation/controllers/product-customer.controller';
 import { ProductAdminController } from './presentation/controllers/product-admin.controller';
 import { ProductVariantAdminController } from './presentation/controllers/product-variant-admin.controller';
@@ -23,7 +24,12 @@ import { ElasticsearchProductService } from './infrastructure/search/elasticsear
 import { ProductSearchSyncService } from './infrastructure/search/product-search-sync.service';
 
 @Module({
-  controllers: [ProductCustomerController, ProductAdminController, ProductVariantAdminController],
+  imports: [CustomerCommerceModule],
+  controllers: [
+    ProductCustomerController,
+    ProductAdminController,
+    ProductVariantAdminController,
+  ],
   providers: [
     // Use Cases
     GetProductsUseCase,

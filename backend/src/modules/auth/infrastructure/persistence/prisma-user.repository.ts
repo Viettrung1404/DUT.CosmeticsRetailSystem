@@ -48,6 +48,17 @@ export class PrismaUserRepository implements IUserRepository {
         extraPermissions: data.extraPermissions,
         revokedPermissions: data.revokedPermissions,
         lastLoginAt: data.lastLoginAt,
+        ...(data.roleId === 6
+          ? {
+              customer: {
+                create: {
+                  fullName: data.fullName,
+                  // A typed phone number alone is not evidence of ownership of a POS profile.
+                  phone: data.phoneVerified ? data.phone : null,
+                },
+              },
+            }
+          : {}),
       },
       include: { role: true },
     });
@@ -84,7 +95,10 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
-  async createCustomerForUser(userId: string, phone?: string | null): Promise<void> {
+  async createCustomerForUser(
+    userId: string,
+    phone?: string | null,
+  ): Promise<void> {
     await this.prisma.customer.create({
       data: {
         userId,
@@ -93,7 +107,9 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
-  async findCustomerByPhone(phone: string): Promise<{ id: string; userId: string | null } | null> {
+  async findCustomerByPhone(
+    phone: string,
+  ): Promise<{ id: string; userId: string | null } | null> {
     return this.prisma.customer.findUnique({
       where: { phone },
       select: { id: true, userId: true },

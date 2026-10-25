@@ -1,9 +1,17 @@
-import { Injectable, Inject, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import {
   ORDER_REPOSITORY,
   IOrderRepository,
 } from '../../domain/repositories/order.repository.interface';
-import { OrderEntity, ShippingAddressVo } from '../../domain/entities/order.entity';
+import {
+  OrderEntity,
+  ShippingAddressVo,
+} from '../../domain/entities/order.entity';
 import { OrderPricingService } from '../services/order-pricing.service';
 import { StoreResolverService } from '../services/store-resolver.service';
 import {
@@ -16,6 +24,8 @@ import {
 } from '../../../cart/domain/repositories/cart.repository.interface';
 import { formatOrderNumber } from '../utils/order-number.util';
 import { createVariantNameSnapshot } from '../utils/variant-name-snapshot.util';
+import { allocateMoney } from '@modules/customer-commerce/domain/money';
+import { Prisma } from '@prisma/client';
 
 export interface CreateOrderItemRequest {
   variantId: string;
@@ -60,7 +70,6 @@ export class CreateOrderUseCase {
     } = input;
 
     // 1. Determine items to order
-    let isFromCart = false;
     let cartIdToClear: string | null = null;
     let itemsToOrder = input.items || [];
 
@@ -69,12 +78,20 @@ export class CreateOrderUseCase {
       if (!cart || !cart.items || cart.items.length === 0) {
         throw new BadRequestException('Giỏ hàng của bạn đang trống');
       }
-      itemsToOrder = cart.items.map((i) => ({
-        variantId: i.productVariantId,
-        quantity: i.quantity,
-      }));
-      isFromCart = true;
+      itemsToOrder = cart.items
+        .filter((i) => i.isSelected !== false)
+        .map((i) => ({
+          variantId: i.productVariantId,
+          quantity: i.quantity,
+        }));
       cartIdToClear = cart.id;
+    }
+
+    if (
+      !itemsToOrder.length ||
+      new Set(itemsToOrder.map((i) => i.variantId)).size !== itemsToOrder.length
+    ) {
+      throw new BadRequestException('EMPTY_OR_DUPLICATE_ORDER_ITEMS');
     }
 
     // 2. Fetch Variant details
@@ -120,12 +137,17 @@ export class CreateOrderUseCase {
       };
     });
 
+    const pointsValueVnd = usePoints
+      ? await this.pricingService.configuredPointValue()
+      : 0;
     const pricing = this.pricingService.calculatePricing({
       items: pricingItems,
       coupon,
       customerCouponUsageCount,
       pointsToUse: usePoints,
       customerAvailablePoints: customerPoints,
+      pointsValueVnd,
+      customerId,
     });
 
     // 7. Format Order Number: ORDYYYYMMDDXXXX
@@ -134,7 +156,21 @@ export class CreateOrderUseCase {
     const orderNumber = formatOrderNumber(now, nextSeq);
 
     // 8. Prepare snapshot items
-    const snapshotItems = itemsToOrder.map((item) => {
+    const weights = pricingItems.map((item) => item.unitPrice * item.quantity);
+    const couponShares = allocateMoney(pricing.discountAmount, weights);
+    const pointsShares = allocateMoney(
+      pricing.pointsDiscount,
+      weights.map((weight, index) =>
+        new Prisma.Decimal(weight).minus(couponShares[index]),
+      ),
+    );
+    const pointsUsed = pointsValueVnd
+      ? Math.round(pricing.pointsDiscount / pointsValueVnd)
+      : 0;
+    const pointUnits = allocateMoney(pointsUsed / 100, pointsShares).map((n) =>
+      Math.round(n * 100),
+    );
+    const snapshotItems = itemsToOrder.map((item, index) => {
       const variant = variantMap.get(item.variantId)!;
       const variantName = createVariantNameSnapshot({
         option1Value: variant.option1Value,
@@ -150,8 +186,23 @@ export class CreateOrderUseCase {
         quantity: item.quantity,
         unitPrice: variant.unitPrice,
         unitCost: variant.unitCost,
-        discountAmount: 0,
-        totalPrice: variant.unitPrice * item.quantity,
+        discountAmount: couponShares[index] + pointsShares[index],
+        totalPrice: new Prisma.Decimal(variant.unitPrice)
+          .mul(item.quantity)
+          .minus(couponShares[index])
+          .minus(pointsShares[index])
+          .toNumber(),
+        pricingSnapshot: {
+          version: 1,
+          cashValue: new Prisma.Decimal(variant.unitPrice)
+            .mul(item.quantity)
+            .minus(couponShares[index])
+            .minus(pointsShares[index])
+            .toNumber(),
+          couponDiscount: couponShares[index],
+          pointsValue: pointsShares[index],
+          pointsUsed: pointUnits[index],
+        },
       };
     });
 
@@ -169,19 +220,25 @@ export class CreateOrderUseCase {
       shippingAddress,
       note,
       couponId: coupon ? coupon.id : null,
-      loyaltyPointsUsed: usePoints || 0,
+      loyaltyPointsUsed: pointsUsed,
+      couponDiscount: pricing.discountAmount,
+      pointsDiscount: pricing.pointsDiscount,
+      pointsValueVnd,
+      cartId: cartIdToClear ?? undefined,
+      pricingSnapshot: {
+        version: 1,
+        couponDiscount: pricing.discountAmount,
+        pointsDiscount: pricing.pointsDiscount,
+        pointsValueVnd,
+      },
       paymentMethod,
       items: snapshotItems,
     });
 
-    // 10. Clear cart if order placed from cart
-    if (isFromCart && cartIdToClear) {
-      await this.cartRepo.clearCart(cartIdToClear);
-    }
+    // Purchased cart rows are removed by the repository in the order transaction.
 
-    // 11. Notification (Postponed to Sprint 3 per specification)
     this.logger.log(
-      `[ORDER_CREATED] Order ${orderNumber} created for customer ${customerId}. Notification deferred to Sprint 3.`,
+      `[ORDER_CREATED] Order ${orderNumber} created with durable notification.`,
     );
 
     return createdOrder;
