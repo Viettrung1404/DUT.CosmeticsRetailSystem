@@ -1,7 +1,7 @@
 # Sprint 6 — Việt Trung — Backend End-user
 
 **Chủ đề:** Hoàn thiện backend end-user, OAuth, SEO, hiệu năng và bàn giao.  
-**Ngày lập:** 2026-10-24. **Trạng thái:** Kế hoạch triển khai; ưu tiên hoàn tất P0/P1/P2 trước P3.  
+**Ngày lập:** 2026-10-24. **Trạng thái:** Đã triển khai phần backend ngày 2026-10-25; còn gate provider/Web/Mobile/payment và nghiệm thu production, chưa đóng toàn bộ DoD. Xem [báo cáo triển khai](../../backend/docs/sprint-6.md).
 **Lập kế hoạch theo:** thứ tự công việc, phụ thuộc và tiêu chí nghiệm thu; không ước lượng ngày công theo yêu cầu người dùng.  
 **Liên kết:** [Roadmap](08_sprint_plan.md) · [FR](../1-requirement/07_functional_requirements.md) · [Thiết kế DB](../2-design/04_thiet_ke_csdl.md) · [Sprint 4](09_sprint_4_viet_trung_backend_enduser.md) · [Sprint 5](10_sprint_5_viet_trung_backend_enduser.md).
 

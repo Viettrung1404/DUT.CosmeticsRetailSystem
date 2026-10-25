@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RefreshTokenUseCase } from '../refresh-token.use-case';
-import { USER_REPOSITORY, IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../../domain/repositories/user.repository.interface';
 import {
   USER_SESSION_REPOSITORY,
   IUserSessionRepository,
@@ -36,12 +39,14 @@ describe('RefreshTokenUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
     };
 
     jwtService = {
       generateAccessToken: jest.fn().mockReturnValue('new-access-token'),
+      refreshExpiresAt: jest.fn().mockImplementation(() => new Date(Date.now() + 7 * 86400000)),
       generateRefreshToken: jest.fn().mockReturnValue('new-refresh-token'),
       verifyAccessToken: jest.fn(),
     } as any;
@@ -61,7 +66,10 @@ describe('RefreshTokenUseCase', () => {
         { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo },
         { provide: UNIT_OF_WORK, useValue: unitOfWork },
         { provide: JwtTokenService, useValue: jwtService },
-        { provide: GetUserEffectivePermissionsUseCase, useValue: getPermissionsUseCase },
+        {
+          provide: GetUserEffectivePermissionsUseCase,
+          useValue: getPermissionsUseCase,
+        },
       ],
     }).compile();
 
@@ -96,7 +104,7 @@ describe('RefreshTokenUseCase', () => {
 
     expect(result.accessToken).toBe('new-access-token');
     expect(result.refreshToken).toBe('new-refresh-token');
-    expect(sessionRepo.revokeById).toHaveBeenCalledWith('session-1');
+    expect(sessionRepo.consume).toHaveBeenCalledWith('session-1');
     expect(sessionRepo.create).toHaveBeenCalled();
     expect(getPermissionsUseCase.execute).toHaveBeenCalledWith('user-1');
   });
@@ -125,4 +133,3 @@ describe('RefreshTokenUseCase', () => {
     await expect(useCase.execute('expired-token')).rejects.toThrow(UnauthorizedException);
   });
 });
-

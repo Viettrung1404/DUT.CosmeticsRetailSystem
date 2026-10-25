@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResetPasswordUseCase } from '../reset-password.use-case';
-import { USER_REPOSITORY, IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../../domain/repositories/user.repository.interface';
 import {
   VERIFICATION_TOKEN_REPOSITORY,
   IVerificationTokenRepository,
@@ -47,6 +50,7 @@ describe('ResetPasswordUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
     };
@@ -116,8 +120,8 @@ describe('ResetPasswordUseCase', () => {
   it('should throw BadRequestException if token is invalid or expired', async () => {
     tokenRepo.findByTokenHash.mockResolvedValue(null);
 
-    await expect(
-      useCase.execute('invalid-token', 'NewStrongPassword@2026'),
-    ).rejects.toThrow(BadRequestException);
+    await expect(useCase.execute('invalid-token', 'NewStrongPassword@2026')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });

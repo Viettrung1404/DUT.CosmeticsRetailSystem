@@ -18,6 +18,7 @@ export interface IUserSessionRepository {
   } | null>;
 
   revokeById(id: string): Promise<void>;
+  consume(id: string): Promise<boolean>;
 
   /** Revoke all active sessions of a user (force re-login on all devices) */
   revokeAllByUserId(userId: string): Promise<void>;

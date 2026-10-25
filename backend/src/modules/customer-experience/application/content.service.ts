@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { VersionedPublicCacheService } from '@core/cache/versioned-public-cache.service';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { BlogQueryDto } from '../presentation/experience.dto';
 import { publicHtml, publicUrl } from '../domain/public-content';
@@ -18,8 +19,16 @@ const blogSelect = {
 } as const;
 @Injectable()
 export class ContentService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    @Optional() private readonly cache?: VersionedPublicCacheService,
+  ) {}
   async page(slug: string) {
+    return this.cache
+      ? this.cache.remember(`page:${encodeURIComponent(slug)}`, () => this.loadPage(slug))
+      : this.loadPage(slug);
+  }
+  private async loadPage(slug: string) {
     const row = await this.db.page.findFirst({
       where: { slug, isPublished: true },
       select: {
@@ -93,16 +102,16 @@ export class ContentService {
     });
   }
   async faqs() {
+    return this.cache ? this.cache.remember('faqs', () => this.loadFaqs()) : this.loadFaqs();
+  }
+  private async loadFaqs() {
     const rows = await this.db.faq.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
       take: 200,
       select: { id: true, question: true, answer: true, category: true },
     });
-    const groups = new Map<
-      string,
-      { id: string; question: string; answer: string }[]
-    >();
+    const groups = new Map<string, { id: string; question: string; answer: string }[]>();
     for (const row of rows) {
       const category = row.category ?? 'Chung';
       const items = groups.get(category) ?? [];

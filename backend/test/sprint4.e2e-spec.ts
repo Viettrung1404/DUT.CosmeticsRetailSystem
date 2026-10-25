@@ -12,6 +12,7 @@ import { NotificationsService } from '../src/modules/customer-commerce/applicati
 import { CustomerCommands } from '../src/modules/customer-commerce/infrastructure/commands';
 import { CustomerEventIntegration } from '../src/modules/customer-commerce/application/admin-integration.service';
 import { JwtAuthGuard } from '../src/core/guards/jwt-auth.guard';
+import { PermissionsModule } from '../src/modules/permissions/permissions.module';
 import { AllExceptionsFilter } from '../src/core/filters/http-exception.filter';
 import { PrismaOrderRepository } from '../src/modules/orders/infrastructure/repositories/prisma-order.repository';
 import { randomUUID } from 'crypto';
@@ -47,23 +48,21 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       !['localhost', '127.0.0.1'].includes(url.hostname) ||
       !url.searchParams.get('schema')?.startsWith('sprint4_')
     ) {
-      throw new Error(
-        'Refusing to write outside an explicit local sprint4_* schema',
-      );
+      throw new Error('Refusing to write outside an explicit local sprint4_* schema');
     }
     process.env.DATABASE_URL = value;
     process.env.JWT_SECRET = secret;
     process.env.NOTIFICATION_DELIVERY_ENABLED = 'false';
-    execFileSync(
-      process.execPath,
-      ['node_modules/prisma/build/index.js', 'migrate', 'deploy'],
-      { env: process.env, stdio: 'pipe' },
-    );
+    execFileSync(process.execPath, ['node_modules/prisma/build/index.js', 'migrate', 'deploy'], {
+      env: process.env,
+      stdio: 'pipe',
+    });
     const module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
         ThrottlerModule.forRoot([{ ttl: 60000, limit: 1000 }]),
         CustomerCommerceModule,
+        PermissionsModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
     }).compile();
@@ -132,8 +131,22 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
     });
     customer = a.customer!.id;
     otherCustomer = b.customer!.id;
-    token = jwt.sign({ userId: owner }, secret);
-    otherToken = jwt.sign({ userId: other }, secret);
+    const ownerSession = await db.userSession.create({
+      data: {
+        userId: owner,
+        refreshToken: randomUUID(),
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+    token = jwt.sign({ userId: owner, sessionId: ownerSession.id }, secret);
+    const otherSession = await db.userSession.create({
+      data: {
+        userId: other,
+        refreshToken: randomUUID(),
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+    otherToken = jwt.sign({ userId: other, sessionId: otherSession.id }, secret);
     store = (
       await db.store.create({
         data: {
@@ -306,9 +319,7 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       returns.create(owner, randomUUID(), input),
       returns.create(owner, randomUUID(), input),
     ]);
-    expect(
-      outcomes.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
+    expect(outcomes.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
   });
   it('uses COMPLETED history rather than recently updated order time', async () => {
     const original = await order(1, new Date(Date.now() - 8 * 86400000));
@@ -323,9 +334,20 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
   });
   it('does not create customer profiles for staff or a user without CRM profile', async () => {
     const user = await db.user.create({
-      data: { email: `${randomUUID()}@test.local`, fullName: 'Unlinked' },
+      data: {
+        email: `${randomUUID()}@test.local`,
+        fullName: 'Unlinked',
+        emailVerified: true,
+      },
     });
-    const auth = jwt.sign({ userId: user.id }, secret);
+    const session = await db.userSession.create({
+      data: {
+        userId: user.id,
+        refreshToken: randomUUID(),
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+    const auth = jwt.sign({ userId: user.id, sessionId: session.id }, secret);
     await request(app.getHttpServer())
       .get('/api/v1/wishlists')
       .set('Authorization', `Bearer ${auth}`)
@@ -337,13 +359,9 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       loyalty.redeem(owner, 'redemption-first', 'TEST'),
       loyalty.redeem(owner, 'redemption-other', 'TEST'),
     ]);
-    const success = results.findIndex(
-      (result) => result.status === 'fulfilled',
-    );
+    const success = results.findIndex((result) => result.status === 'fulfilled');
     expect(success).toBeGreaterThanOrEqual(0);
-    expect(
-      results.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     const result = (results[success] as PromiseFulfilledResult<any>).value;
     const repeated = await loyalty.redeem(
       owner,
@@ -351,13 +369,8 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       'TEST',
     );
     expect(repeated.coupon.id).toBe(result.coupon.id);
-    expect(
-      (await db.customer.findUniqueOrThrow({ where: { id: customer } }))
-        .totalPoints,
-    ).toBe(0);
-    expect(
-      await db.loyaltyRedemption.count({ where: { customerId: customer } }),
-    ).toBe(1);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customer } })).totalPoints).toBe(0);
+    expect(await db.loyaltyRedemption.count({ where: { customerId: customer } })).toBe(1);
   });
   it('wishlist toggle is idempotent and owner scoped', async () => {
     const [a, b] = await Promise.all([
@@ -367,9 +380,7 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
     expect(a).toEqual(b);
     expect(a.isWishlisted).toBe(true);
     expect((await wishlist.list(otherCustomer, 1, 20)).items).toHaveLength(0);
-    expect((await wishlist.list(customer, 1, 20)).items[0].isWishlisted).toBe(
-      true,
-    );
+    expect((await wishlist.list(customer, 1, 20)).items[0].isWishlisted).toBe(true);
   });
   it('exchange acceptance reserves stock and creates exactly one replacement order', async () => {
     const original = await order();
@@ -428,9 +439,7 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
         paymentMethod: 'COD',
       }),
     ).rejects.toThrow('QUOTE_PRICE_CHANGED');
-    expect(
-      await db.exchangeSettlement.count({ where: { returnOrderId: rma.id } }),
-    ).toBe(0);
+    expect(await db.exchangeSettlement.count({ where: { returnOrderId: rma.id } })).toBe(0);
     await db.productVariant.update({
       where: { id: variant },
       data: { price: 100000 },
@@ -480,27 +489,16 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
   it('rolls back a failed command together with its receipt', async () => {
     const commands = app.get(CustomerCommands);
     await expect(
-      commands.execute(
-        owner,
-        'TEST_ROLLBACK',
-        'rollback-key-1',
-        {},
-        async (tx) => {
-          await tx.customer.update({
-            where: { id: customer },
-            data: { totalPoints: { increment: 50 } },
-          });
-          throw new Error('rollback');
-        },
-      ),
+      commands.execute(owner, 'TEST_ROLLBACK', 'rollback-key-1', {}, async (tx) => {
+        await tx.customer.update({
+          where: { id: customer },
+          data: { totalPoints: { increment: 50 } },
+        });
+        throw new Error('rollback');
+      }),
     ).rejects.toThrow('rollback');
-    expect(
-      await db.commandReceipt.count({ where: { operation: 'TEST_ROLLBACK' } }),
-    ).toBe(0);
-    expect(
-      (await db.customer.findUniqueOrThrow({ where: { id: customer } }))
-        .totalPoints,
-    ).toBe(0);
+    expect(await db.commandReceipt.count({ where: { operation: 'TEST_ROLLBACK' } })).toBe(0);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customer } })).totalPoints).toBe(0);
   });
   it('handles cheaper/more expensive exchange and compensates cancellation without fake payments', async () => {
     const original = await order();
@@ -528,14 +526,9 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       quoteVersion: 1,
     });
     expect(Number(accepted.settlement.refundDue)).toBe(20000);
-    expect(
-      await db.refund.findMany({ where: { returnOrderId: rma.id } }),
-    ).toHaveLength(1);
+    expect(await db.refund.findMany({ where: { returnOrderId: rma.id } })).toHaveLength(1);
     const repository = new PrismaOrderRepository(db);
-    await repository.cancelOrderWithTransaction(
-      accepted.replacementOrderId,
-      customer,
-    );
+    await repository.cancelOrderWithTransaction(accepted.replacementOrderId, customer);
     const amounts = await db.refund.aggregate({
       where: { returnOrderId: rma.id },
       _sum: { amount: true },
@@ -568,15 +561,11 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       where: { returnOrderId: expensive.id },
       data: { condition: 'DAMAGED' },
     });
-    await db.$transaction((tx) =>
-      returns.prepareExchangeQuote(tx, expensive.id),
-    );
-    const replacement = await returns.accept(
-      owner,
-      expensive.id,
-      randomUUID(),
-      { quoteVersion: 1, paymentMethod: 'COD' },
-    );
+    await db.$transaction((tx) => returns.prepareExchangeQuote(tx, expensive.id));
+    const replacement = await returns.accept(owner, expensive.id, randomUUID(), {
+      quoteVersion: 1,
+      paymentMethod: 'COD',
+    });
     expect(Number(replacement.settlement.additionalDue)).toBe(50000);
     expect(
       Number(
@@ -648,13 +637,8 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       repository.createOrderWithTransaction(input(customer, points)),
       repository.createOrderWithTransaction(input(customer, points)),
     ]);
-    expect(
-      pointResults.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
-    expect(
-      (await db.customer.findUniqueOrThrow({ where: { id: customer } }))
-        .totalPoints,
-    ).toBe(0);
+    expect(pointResults.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customer } })).totalPoints).toBe(0);
     const coupon = await db.coupon.create({
       data: {
         code: randomUUID(),
@@ -675,13 +659,8 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       repository.createOrderWithTransaction(input(customer, couponInput)),
       repository.createOrderWithTransaction(input(otherCustomer, couponInput)),
     ]);
-    expect(
-      couponResults.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
-    expect(
-      (await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } }))
-        .usedCount,
-    ).toBe(1);
+    expect(couponResults.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect((await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount).toBe(1);
     const last = await db.productVariant.create({
       data: {
         productId: product,
@@ -701,9 +680,7 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       repository.createOrderWithTransaction(input(customer, lastItem)),
       repository.createOrderWithTransaction(input(otherCustomer, lastItem)),
     ]);
-    expect(
-      stockResults.filter((result) => result.status === 'fulfilled'),
-    ).toHaveLength(1);
+    expect(stockResults.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(
       (
         await db.inventory.findUniqueOrThrow({
@@ -730,9 +707,9 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
     const refund = await db.refund.findFirstOrThrow({
       where: { returnOrderId: rma.id },
     });
-    await expect(
-      db.$transaction((tx) => bridge.refundCompleted(tx, refund.id)),
-    ).rejects.toThrow('REFUND_NOT_COMPLETED');
+    await expect(db.$transaction((tx) => bridge.refundCompleted(tx, refund.id))).rejects.toThrow(
+      'REFUND_NOT_COMPLETED',
+    );
     await db.refund.update({
       where: { id: refund.id },
       data: {
@@ -830,10 +807,9 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       _sum: { pointsToRestore: true },
     });
     expect(restored._sum.pointsToRestore).toBe(1);
-    expect(
-      (await db.customer.findUniqueOrThrow({ where: { id: customer } }))
-        .totalPoints,
-    ).toBe(-198);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customer } })).totalPoints).toBe(
+      -198,
+    );
   });
   it('traces replacement returns to real source payments without minting credit', async () => {
     const original = await order();
@@ -857,9 +833,9 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
       quoteVersion: 1,
     });
     const bridge = app.get(CustomerEventIntegration);
-    await expect(
-      db.$transaction((tx) => bridge.reserveRefund(tx, rma.id, 100000)),
-    ).rejects.toThrow('REFUND_EXCEEDS_AVAILABLE_PAYMENTS');
+    await expect(db.$transaction((tx) => bridge.reserveRefund(tx, rma.id, 100000))).rejects.toThrow(
+      'REFUND_EXCEEDS_AVAILABLE_PAYMENTS',
+    );
     const replacement = await db.order.update({
       where: { id: accepted.replacementOrderId },
       data: {
@@ -882,9 +858,7 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
     expect(refunds).toHaveLength(1);
     expect(refunds[0].payment!.orderId).toBe(original.id);
     expect(Number(refunds[0].amount)).toBe(100000);
-    expect(await db.payment.count({ where: { orderId: replacement.id } })).toBe(
-      0,
-    );
+    expect(await db.payment.count({ where: { orderId: replacement.id } })).toBe(0);
   });
   it('preserves handwritten inventory invariants after the new migration', async () => {
     const columns = await db.$queryRaw<
@@ -906,24 +880,37 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
   });
   it('wires the complete application and documents the real routes without contacting providers', async () => {
     const { AppModule } = await import('../src/app.module');
-    const { ElasticsearchProductService } = await import('../src/modules/products/infrastructure/search/elasticsearch-product.service');
-    const { NotificationWorker } = await import('../src/modules/customer-commerce/infrastructure/notification.worker');
-    const { ReturnImageStorage } = await import('../src/modules/customer-commerce/infrastructure/return-image.storage');
-    const { S3FileStorageService } = await import('../src/modules/uploads/infrastructure/adapters/s3-file-storage.service');
+    const { ElasticsearchProductService } =
+      await import('../src/modules/products/infrastructure/search/elasticsearch-product.service');
+    const { NotificationWorker } =
+      await import('../src/modules/customer-commerce/infrastructure/notification.worker');
+    const { ReturnImageStorage } =
+      await import('../src/modules/customer-commerce/infrastructure/return-image.storage');
+    const { S3FileStorageService } =
+      await import('../src/modules/uploads/infrastructure/adapters/s3-file-storage.service');
     const { SwaggerModule, DocumentBuilder } = await import('@nestjs/swagger');
     const module = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(ElasticsearchProductService).useValue({ isAvailable: false })
-      .overrideProvider(NotificationWorker).useValue({})
-      .overrideProvider(ReturnImageStorage).useValue({})
-      .overrideProvider(S3FileStorageService).useValue({})
+      .overrideProvider(ElasticsearchProductService)
+      .useValue({ isAvailable: false })
+      .overrideProvider(NotificationWorker)
+      .useValue({})
+      .overrideProvider(ReturnImageStorage)
+      .useValue({})
+      .overrideProvider(S3FileStorageService)
+      .useValue({})
       .compile();
     const application = module.createNestApplication();
     application.setGlobalPrefix('api/v1');
     try {
-      const spec = SwaggerModule.createDocument(application, new DocumentBuilder().setTitle('Sprint 4').setVersion('1').build());
+      const spec = SwaggerModule.createDocument(
+        application,
+        new DocumentBuilder().setTitle('Sprint 4').setVersion('1').build(),
+      );
       expect(spec.paths['/api/v1/returns'].post).toBeDefined();
       expect(spec.paths['/api/v1/orders/{id}/tracking'].get).toBeDefined();
       expect(spec.paths['/api/v1/customer/products'].get).toBeDefined();
-    } finally { await application.close(); }
+    } finally {
+      await application.close();
+    }
   });
 });

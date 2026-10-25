@@ -10,10 +10,8 @@ import {
   Post,
   Put,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../../core/guards/jwt-auth.guard';
 import { CustomerContextService } from '../../../../core/services/customer-context.service';
 import { GetCustomerProfileUseCase } from '../../application/use-cases/get-customer-profile.use-case';
 import { UpdateCustomerProfileUseCase } from '../../application/use-cases/update-customer-profile.use-case';
@@ -27,8 +25,7 @@ import { UpdateCustomerProfileDto } from '../dtos/customer-profile.dto';
 
 @ApiTags('Customers')
 @Controller('customers')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class CustomerController {
   constructor(
     private readonly getCustomerProfileUseCase: GetCustomerProfileUseCase,
@@ -44,13 +41,17 @@ export class CustomerController {
   private async getRequiredCustomerId(userId: string): Promise<string> {
     const customerId = await this.customerContext.getCustomerIdFromUserId(userId);
     if (!customerId) {
-      throw new NotFoundException('Không tìm thấy thông tin khách hàng tương ứng với tài khoản này');
+      throw new NotFoundException(
+        'Không tìm thấy thông tin khách hàng tương ứng với tài khoản này',
+      );
     }
     return customerId;
   }
 
   @Get('me')
-  @ApiOperation({ summary: 'Xem hồ sơ cá nhân của khách hàng (hạng thành viên, điểm thưởng, tổng chi tiêu)' })
+  @ApiOperation({
+    summary: 'Xem hồ sơ cá nhân của khách hàng (hạng thành viên, điểm thưởng, tổng chi tiêu)',
+  })
   async getProfile(@Req() req: any) {
     const userId = req.user.userId;
     return this.getCustomerProfileUseCase.execute(userId);

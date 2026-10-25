@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { DistributedThrottlerStorage } from '@core/cache/distributed-throttler.storage';
+import { validateRuntimeConfig } from '@core/config/runtime-config';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { CacheModule } from '@core/cache/cache.module';
@@ -19,16 +21,26 @@ import { CustomersModule } from '@modules/customers/customers.module';
 import { OrdersModule } from '@modules/orders/orders.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
+import { SeoModule } from '@modules/seo/seo.module';
+import { HealthModule } from '@core/health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env'],
+      validate: validateRuntimeConfig,
     }),
     ScheduleModule.forRoot(),
     {
-      ...ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+      ...ThrottlerModule.forRootAsync({
+        imports: [CacheModule],
+        inject: [DistributedThrottlerStorage],
+        useFactory: (storage: DistributedThrottlerStorage) => ({
+          throttlers: [{ ttl: 60000, limit: 100 }],
+          storage,
+        }),
+      }),
       global: true,
     },
     PrismaModule,
@@ -45,8 +57,11 @@ import { CustomerCommerceModule } from '@modules/customer-commerce/customer-comm
     CustomersModule,
     OrdersModule,
     CustomerCommerceModule,
+    SeoModule,
+    HealthModule,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

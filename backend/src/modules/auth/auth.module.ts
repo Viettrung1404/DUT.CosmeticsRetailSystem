@@ -20,13 +20,18 @@ import { BcryptService } from './infrastructure/adapters/bcrypt.service';
 import { JwtTokenService } from './infrastructure/adapters/jwt.service';
 import { NodemailerEmailService } from './infrastructure/adapters/nodemailer-email.service';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
+import { OAuthController } from './presentation/controllers/oauth.controller';
+import { OAuthService } from './application/oauth.service';
+import { OAuthProviderService } from './infrastructure/adapters/oauth-provider.service';
 
 @Module({
   imports: [PermissionsModule],
-  controllers: [AuthController],
+  controllers: [AuthController, OAuthController],
   providers: [
     // Use Cases
     RegisterUseCase,
+    OAuthService,
+    OAuthProviderService,
     LoginUseCase,
     VerifyEmailUseCase,
     ResendOtpUseCase,
@@ -70,4 +75,3 @@ import { PermissionsModule } from '@modules/permissions/permissions.module';
   ],
 })
 export class AuthModule {}
-

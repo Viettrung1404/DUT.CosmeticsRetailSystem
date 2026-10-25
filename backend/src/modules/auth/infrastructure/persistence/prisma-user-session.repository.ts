@@ -51,6 +51,14 @@ export class PrismaUserSessionRepository implements IUserSessionRepository {
     });
   }
 
+  async consume(id: string): Promise<boolean> {
+    const result = await this.prisma.userSession.updateMany({
+      where: { id, isRevoked: false, expiresAt: { gt: new Date() } },
+      data: { isRevoked: true },
+    });
+    return result.count === 1;
+  }
+
   async revokeAllByUserId(userId: string): Promise<void> {
     await this.prisma.userSession.updateMany({
       where: {

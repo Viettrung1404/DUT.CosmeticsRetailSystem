@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
@@ -67,14 +68,7 @@ export class CreateReturnDto {
 export class ReturnQueryDto extends PageOptionsDto {
   @ApiPropertyOptional()
   @IsOptional()
-  @IsIn([
-    'REQUESTED',
-    'APPROVED',
-    'RECEIVED',
-    'INSPECTED',
-    'COMPLETED',
-    'REJECTED',
-  ])
+  @IsIn(['REQUESTED', 'APPROVED', 'RECEIVED', 'INSPECTED', 'COMPLETED', 'REJECTED'])
   status?: string;
 }
 export class AcceptExchangeDto {
@@ -97,7 +91,17 @@ export class WishlistStateDto {
   selected: boolean;
 }
 export class DeviceDto {
-  @ApiProperty() @IsString() @MinLength(8) @MaxLength(255) deviceToken: string;
+  @ApiProperty({
+    description:
+      'Native FCM registration token, not ExpoPushToken/ExponentPushToken or an APNs token',
+  })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(255)
+  @Matches(/^(?!(?:ExpoPushToken|ExponentPushToken)\[).+$/, {
+    message: 'FCM_REGISTRATION_TOKEN_REQUIRED',
+  })
+  deviceToken: string;
   @ApiProperty({ enum: ['IOS', 'ANDROID', 'WEB'] })
   @IsIn(['IOS', 'ANDROID', 'WEB'])
   platform: string;

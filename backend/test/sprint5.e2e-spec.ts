@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
@@ -45,9 +46,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
   beforeAll(async () => {
     const value = process.env.SPRINT5_TEST_DATABASE_URL;
     if (!value)
-      throw new Error(
-        'SPRINT5_TEST_DATABASE_URL must name an isolated local sprint5_* schema',
-      );
+      throw new Error('SPRINT5_TEST_DATABASE_URL must name an isolated local sprint5_* schema');
     const url = new URL(value);
     if (
       !['localhost', '127.0.0.1'].includes(url.hostname) ||
@@ -59,12 +58,13 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     process.env.NOTIFICATION_DELIVERY_ENABLED = 'false';
     process.env.CATALOG_INDEX_WORKER_ENABLED = 'false';
     process.env.BROADCAST_WORKER_ENABLED = 'false';
-    execFileSync(
-      process.execPath,
-      ['node_modules/prisma/build/index.js', 'migrate', 'deploy'],
-      { env: process.env, stdio: 'pipe' },
-    );
+    execFileSync(process.execPath, ['node_modules/prisma/build/index.js', 'migrate', 'deploy'], {
+      env: process.env,
+      stdio: 'pipe',
+    });
     const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ConfigService)
+      .useValue(new ConfigService())
       .overrideProvider(ElasticsearchProductService)
       .useValue(es)
       .overrideProvider(UpstashRedisService)
@@ -121,7 +121,18 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     customerId = a.customer!.id;
     otherUser = b.id;
     otherId = b.customer!.id;
-    token = jwt.sign({ userId }, secret);
+    await db.user.update({
+      where: { id: userId },
+      data: { emailVerified: true },
+    });
+    const session = await db.userSession.create({
+      data: {
+        userId,
+        refreshToken: randomUUID(),
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+    token = jwt.sign({ userId, sessionId: session.id }, secret);
     storeId = (
       await db.store.create({
         data: {
@@ -133,9 +144,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
         },
       })
     ).id;
-    categoryId = (
-      await db.category.create({ data: { name: 'S5', slug: randomUUID() } })
-    ).id;
+    categoryId = (await db.category.create({ data: { name: 'S5', slug: randomUUID() } })).id;
     await db.setting.upsert({
       where: { key: 'loyalty_config' },
       create: {
@@ -192,12 +201,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     });
     return { product, variant };
   }
-  async function promotion(
-    productId: string,
-    variantId: string,
-    quota = 1,
-    value = 20,
-  ) {
+  async function promotion(productId: string, variantId: string, quota = 1, value = 20) {
     return db.promotion.create({
       data: {
         name: 'Flash test',
@@ -256,8 +260,14 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     expect(Number(rows[0].price)).toBe(80000);
     const active = await request(app.getHttpServer()).get('/api/v1/promotions/active').expect(200);
     expect(active.body.data.total).toBe(1);
-    const flash = await request(app.getHttpServer()).get('/api/v1/promotions/flash-sale').expect(200);
-    expect(flash.body.data.items[0].variants[0]).toMatchObject({ variantId: variant.id, remaining: 1, effectivePrice: 80000 });
+    const flash = await request(app.getHttpServer())
+      .get('/api/v1/promotions/flash-sale')
+      .expect(200);
+    expect(flash.body.data.items[0].variants[0]).toMatchObject({
+      variantId: variant.id,
+      remaining: 1,
+      effectivePrice: 80000,
+    });
   });
   it('keeps SQL catalog pricing equal to the shared engine for single-unit tier/campaign/cap combinations', async () => {
     const tier = await db.loyaltyTier.create({
@@ -368,9 +378,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       where: { id: promo.quotas[0].id },
     });
     expect(quota.reservedQuantity).toBe(1);
-    expect(
-      await db.promotionAllocation.count({ where: { promotionId: promo.id } }),
-    ).toBe(1);
+    expect(await db.promotionAllocation.count({ where: { promotionId: promo.id } })).toBe(1);
   });
   it('replays checkout once and rejects changed payload under the same key', async () => {
     const { variant } = await fixture();
@@ -384,14 +392,11 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       quoteVersion: quote.quoteVersion,
       idempotencyKey: randomUUID(),
     };
-    const [first, replay] = await Promise.all([
-      checkout.create(input),
-      checkout.create(input),
-    ]);
+    const [first, replay] = await Promise.all([checkout.create(input), checkout.create(input)]);
     expect(first.id).toBe(replay.id);
-    await expect(
-      checkout.create({ ...input, note: 'changed' }),
-    ).rejects.toThrow('IDEMPOTENCY_PAYLOAD_MISMATCH');
+    await expect(checkout.create({ ...input, note: 'changed' })).rejects.toThrow(
+      'IDEMPOTENCY_PAYLOAD_MISMATCH',
+    );
   });
   it('consumes on confirmation and releases once for cancellation, including consumed quota', async () => {
     const { product, variant } = await fixture();
@@ -419,19 +424,13 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
         where: { id: p.quotas[0].id },
       }),
     ).toMatchObject({ reservedQuantity: 0, consumedQuantity: 0 });
-    expect(
-      (await db.promotion.findUniqueOrThrow({ where: { id: p.id } })).usedCount,
-    ).toBe(0);
+    expect((await db.promotion.findUniqueOrThrow({ where: { id: p.id } })).usedCount).toBe(0);
   });
   it('connects real customer/cron cancellation to quota, coupon and inventory release', async () => {
     const { product, variant } = await fixture();
     const p = await promotion(product.id, variant.id);
     const order = await purchase(variant.id);
-    await new PrismaOrderRepository(db).cancelOrderWithTransaction(
-      order.id,
-      customerId,
-      'Test',
-    );
+    await new PrismaOrderRepository(db).cancelOrderWithTransaction(order.id, customerId, 'Test');
     expect(
       await db.promotionVariantQuota.findUnique({
         where: { id: p.quotas[0].id },
@@ -490,9 +489,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
         quoteVersion: quote.quoteVersion,
       }),
     ).rejects.toThrow();
-    expect(
-      await db.promotionAllocation.count({ where: { promotionId: p.id } }),
-    ).toBe(0);
+    expect(await db.promotionAllocation.count({ where: { promotionId: p.id } })).toBe(0);
   });
   it('keeps private coupons private and records only coupon money, separately from points', async () => {
     const { variant } = await fixture();
@@ -516,8 +513,20 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
         couponCode: coupon.code,
       }),
     ).rejects.toThrow('COUPON_NOT_AVAILABLE');
-    const validation = await request(app.getHttpServer()).post('/api/v1/coupons/validate').set('Authorization', `Bearer ${token}`).send({ code: coupon.code, items: [{ variantId: variant.id, quantity: 1 }], usePoints: 5 }).expect(200);
-    expect(validation.body.data).toMatchObject({ valid: true, couponDiscount: 20000, pointsDiscount: 5000 });
+    const validation = await request(app.getHttpServer())
+      .post('/api/v1/coupons/validate')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        code: coupon.code,
+        items: [{ variantId: variant.id, quantity: 1 }],
+        usePoints: 5,
+      })
+      .expect(200);
+    expect(validation.body.data).toMatchObject({
+      valid: true,
+      couponDiscount: 20000,
+      pointsDiscount: 5000,
+    });
     const order = await purchase(variant.id, customerId, {
       couponCode: coupon.code,
       usePoints: 5,
@@ -586,10 +595,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       }),
     ]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    expect(
-      (await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } }))
-        .usedCount,
-    ).toBe(1);
+    expect((await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount).toBe(1);
   });
   it('serializes concurrent spending of the same point balance without losing excess points', async () => {
     const { variant } = await fixture(10000);
@@ -615,10 +621,9 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       ),
     );
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    expect(
-      (await db.customer.findUniqueOrThrow({ where: { id: customerId } }))
-        .totalPoints,
-    ).toBe(0);
+    expect((await db.customer.findUniqueOrThrow({ where: { id: customerId } })).totalPoints).toBe(
+      0,
+    );
     await db.customer.update({
       where: { id: customerId },
       data: { totalPoints: 100 },
@@ -649,9 +654,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
           idempotencyKey: 'sprint5_rollback_key',
         }),
       ).rejects.toThrow();
-      expect(
-        await db.promotionAllocation.count({ where: { promotionId: p.id } }),
-      ).toBe(0);
+      expect(await db.promotionAllocation.count({ where: { promotionId: p.id } })).toBe(0);
       expect(
         (
           await db.promotionVariantQuota.findUniqueOrThrow({
@@ -659,10 +662,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
           })
         ).reservedQuantity,
       ).toBe(0);
-      expect(
-        (await db.promotion.findUniqueOrThrow({ where: { id: p.id } }))
-          .usedCount,
-      ).toBe(0);
+      expect((await db.promotion.findUniqueOrThrow({ where: { id: p.id } })).usedCount).toBe(0);
       expect(
         (
           await db.inventory.findUniqueOrThrow({
@@ -675,33 +675,17 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
           })
         ).reservedQuantity,
       ).toBe(0);
-      expect(
-        await db.orderItem.count({ where: { productVariantId: variant.id } }),
-      ).toBe(0);
+      expect(await db.orderItem.count({ where: { productVariantId: variant.id } })).toBe(0);
     } finally {
-      await db.$executeRawUnsafe(
-        'DROP TRIGGER sprint5_test_failure ON command_receipts',
-      );
-      await db.$executeRawUnsafe(
-        'DROP FUNCTION sprint5_test_receipt_failure()',
-      );
+      await db.$executeRawUnsafe('DROP TRIGGER sprint5_test_failure ON command_receipts');
+      await db.$executeRawUnsafe('DROP FUNCTION sprint5_test_receipt_failure()');
     }
   });
   it('prices EXCHANGE with the shared engine, preserves historical cash credit and reserves new quota', async () => {
     const original = await fixture(),
       replacement = await fixture(120000);
-    const oldPromotion = await promotion(
-      original.product.id,
-      original.variant.id,
-      1,
-      20,
-    );
-    const newPromotion = await promotion(
-      replacement.product.id,
-      replacement.variant.id,
-      1,
-      30,
-    );
+    const oldPromotion = await promotion(original.product.id, original.variant.id, 1, 20);
+    const newPromotion = await promotion(replacement.product.id, replacement.variant.id, 1, 30);
     const order = await purchase(original.variant.id);
     await db.order.update({
       where: { id: order.id },
@@ -775,9 +759,9 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
   });
   it('requires purchase proof, unique review, and approved-only aggregates under repeated moderation', async () => {
     const { product, variant } = await fixture();
-    await expect(
-      reviews.create(userId, { productId: product.id, rating: 5 }),
-    ).rejects.toThrow('VERIFIED_PURCHASE_REQUIRED');
+    await expect(reviews.create(userId, { productId: product.id, rating: 5 })).rejects.toThrow(
+      'VERIFIED_PURCHASE_REQUIRED',
+    );
     const order = await purchase(variant.id);
     await expect(
       reviews.create(userId, {
@@ -801,30 +785,23 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     const review = await db.review.findFirstOrThrow({
       where: { productId: product.id },
     });
-    expect(
-      (await reviews.list(product.id, { page: 1, limit: 20, sort: 'newest' }))
-        .total,
-    ).toBe(0);
+    expect((await reviews.list(product.id, { page: 1, limit: 20, sort: 'newest' })).total).toBe(0);
     await db.$transaction((tx) => reviews.moderate(tx, review.id, true));
     await db.$transaction((tx) => reviews.moderate(tx, review.id, true));
-    expect(
-      (await db.product.findUniqueOrThrow({ where: { id: product.id } }))
-        .totalReviews,
-    ).toBe(1);
+    expect((await db.product.findUniqueOrThrow({ where: { id: product.id } })).totalReviews).toBe(
+      1,
+    );
     const listed = await reviews.list(product.id, {
       page: 1,
       limit: 20,
       sort: 'newest',
     });
     expect(listed.totalReviews).toBe(1);
-    expect(JSON.stringify(listed)).not.toMatch(
-      /email|phone|orderId|customerId/,
-    );
+    expect(JSON.stringify(listed)).not.toMatch(/email|phone|orderId|customerId/);
     await db.$transaction((tx) => reviews.moderate(tx, review.id, false));
-    expect(
-      (await db.product.findUniqueOrThrow({ where: { id: product.id } }))
-        .totalReviews,
-    ).toBe(0);
+    expect((await db.product.findUniqueOrThrow({ where: { id: product.id } })).totalReviews).toBe(
+      0,
+    );
     await expect(
       reviews.create(otherUser, {
         productId: product.id,
@@ -860,10 +837,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       data: { publishedAt: new Date(Date.now() - 1000) },
     });
     await Promise.all([content.post(post.slug), content.post(post.slug)]);
-    expect(
-      (await db.blogPost.findUniqueOrThrow({ where: { id: post.id } }))
-        .viewsCount,
-    ).toBe(2);
+    expect((await db.blogPost.findUniqueOrThrow({ where: { id: post.id } })).viewsCount).toBe(2);
     await db.banner.createMany({
       data: [
         {
@@ -906,9 +880,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     const filtered = await request(app.getHttpServer())
       .get(`/api/v1/customer/products?tag=${tag}&maxPrice=70000`)
       .expect(200);
-    expect(filtered.body.data.data.map((p: { id: string }) => p.id)).toEqual([
-      b.product.id,
-    ]);
+    expect(filtered.body.data.data.map((p: { id: string }) => p.id)).toEqual([b.product.id]);
     await db.product.update({
       where: { id: b.product.id },
       data: { isActive: false },
@@ -952,9 +924,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       }),
     ).toBe(1);
     await expect(
-      db.$transaction((tx) =>
-        broadcasts.freeze(tx, { ...input, message: 'changed' }),
-      ),
+      db.$transaction((tx) => broadcasts.freeze(tx, { ...input, message: 'changed' })),
     ).rejects.toThrow('BROADCAST_PAYLOAD_MISMATCH');
   });
   it('retains indexing jobs across ES failure and fences a stale version after a concurrent DB update', async () => {

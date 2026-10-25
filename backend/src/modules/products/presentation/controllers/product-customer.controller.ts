@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   Controller,
   DefaultValuePipe,
@@ -10,12 +11,7 @@ import {
   Optional,
   Req,
 } from '@nestjs/common';
-import {
-  ApiOkResponse,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { Public } from '@core/decorators/public.decorator';
 import { WishlistEnrichmentInterceptor } from '@modules/customer-commerce/presentation/wishlist-enrichment.interceptor';
@@ -47,17 +43,22 @@ export class ProductCustomerController {
   @Public()
   @Get()
   @ApiOperation({
-    summary:
-      'Lấy danh sách sản phẩm hiển thị trên Web/Mobile (phân trang, lọc, sắp xếp)',
+    summary: 'Lấy danh sách sản phẩm hiển thị trên Web/Mobile (phân trang, lọc, sắp xếp)',
   })
   @ApiOkResponse({
     description: 'Danh sách sản phẩm thành công',
     type: PageDto,
   })
-  async getProducts(@Query() filter: ProductFilterDto, @Req() req?: { user?: { userId?: string } }) {
+  async getProducts(
+    @Query() filter: ProductFilterDto,
+    @Req() req?: { user?: { userId?: string } },
+  ) {
     if (this.catalog) {
       const result = await this.catalog.list(filter, req?.user?.userId);
-      return new PageDto(result.items, new PageMetaDto({ pageOptionsDto: filter, itemCount: result.total }));
+      return new PageDto(
+        result.items,
+        new PageMetaDto({ pageOptionsDto: filter, itemCount: result.total }),
+      );
     }
     const { items, total } = await this.getProductsUseCase.execute(filter);
 
@@ -71,20 +72,24 @@ export class ProductCustomerController {
 
   @Public()
   @Get('search')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({
     summary: 'Tìm kiếm sản phẩm theo từ khóa (Elasticsearch + fallback DB)',
   })
   @ApiOkResponse({ description: 'Kết quả tìm kiếm sản phẩm', type: PageDto })
-  async searchProducts(@Query() queryDto: SearchProductsQueryDto, @Req() req?: { user?: { userId?: string } }) {
+  async searchProducts(
+    @Query() queryDto: SearchProductsQueryDto,
+    @Req() req?: { user?: { userId?: string } },
+  ) {
     if (this.catalog) {
       const filter = Object.assign(new ProductFilterDto(), queryDto);
       const result = await this.catalog.list(filter, req?.user?.userId, queryDto.q);
-      return new PageDto(result.items, new PageMetaDto({ pageOptionsDto: filter, itemCount: result.total }));
+      return new PageDto(
+        result.items,
+        new PageMetaDto({ pageOptionsDto: filter, itemCount: result.total }),
+      );
     }
-    const { items, total } = await this.searchProductsUseCase.execute(
-      queryDto.q,
-      queryDto,
-    );
+    const { items, total } = await this.searchProductsUseCase.execute(queryDto.q, queryDto);
     const data = items.map((product) => ProductResponseDto.fromDomain(product));
     const meta = new PageMetaDto({
       pageOptionsDto: queryDto,
@@ -95,6 +100,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get('suggest')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({
     summary: 'Gợi ý tìm kiếm nhanh / autocomplete (tối đa 20 kết quả)',
   })
@@ -106,7 +112,8 @@ export class ProductCustomerController {
     @Query() queryDto: SuggestProductsQueryDto,
     @Req() req?: { user?: { userId?: string } },
   ): Promise<ProductSuggestionDto[]> {
-    if (this.catalog) return this.catalog.suggest(queryDto.q, queryDto.limit ?? 8, req?.user?.userId);
+    if (this.catalog)
+      return this.catalog.suggest(queryDto.q, queryDto.limit ?? 8, req?.user?.userId);
     return this.suggestProductsUseCase.execute(queryDto.q, queryDto.limit ?? 8);
   }
 
@@ -125,8 +132,7 @@ export class ProductCustomerController {
   @Public()
   @Get(':id/related')
   @ApiOperation({
-    summary:
-      'Lấy danh sách sản phẩm liên quan (cùng danh mục hoặc thương hiệu)',
+    summary: 'Lấy danh sách sản phẩm liên quan (cùng danh mục hoặc thương hiệu)',
   })
   @ApiQuery({
     name: 'limit',

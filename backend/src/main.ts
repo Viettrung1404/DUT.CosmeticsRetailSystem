@@ -1,19 +1,24 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
+import { corsOptions } from '@core/config/runtime-config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from '@core/filters/http-exception.filter';
 import { TransformResponseInterceptor } from '@core/interceptors/transform-response.interceptor';
+import { documentResponseEnvelopes } from '@core/common/openapi';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
   // CORS configuration
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
+  app.enableCors(corsOptions(app.get(ConfigService)));
+  const trustedProxies = process.env.TRUSTED_PROXIES?.split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (trustedProxies?.length) app.getHttpAdapter().getInstance().set('trust proxy', trustedProxies);
+  app.enableShutdownHooks();
 
   // Global Prefix: /api/v1
   const globalPrefix = process.env.API_PREFIX || 'api/v1';
@@ -55,13 +60,19 @@ async function bootstrap() {
       },
       'JWT-auth',
     )
-    .addTag('Auth (Xác thực & Người dùng)', 'API đăng ký, đăng nhập, xác thực email, OTP, JWT token')
+    .addTag(
+      'Auth (Xác thực & Người dùng)',
+      'API đăng ký, đăng nhập, xác thực email, OTP, JWT token',
+    )
     .addTag('Customer - Products (Việt Trung)', 'API phục vụ Website / Mobile cho khách hàng')
-    .addTag('Customer - Categories (Việt Trung)', 'API phục vụ menu điều hướng danh mục Web / Mobile')
+    .addTag(
+      'Customer - Categories (Việt Trung)',
+      'API phục vụ menu điều hướng danh mục Web / Mobile',
+    )
     .addTag('Admin - Products (Thành Lập)', 'API phục vụ Dashboard quản trị cho Admin & Nhân viên')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = documentResponseEnvelopes(SwaggerModule.createDocument(app, config));
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,

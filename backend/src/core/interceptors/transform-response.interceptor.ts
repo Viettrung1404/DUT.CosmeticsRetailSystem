@@ -1,21 +1,16 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiResponseDto } from '../common/api-response.dto';
+import { Reflector } from '@nestjs/core';
+import { RAW_RESPONSE } from '../decorators/raw-response.decorator';
 
 @Injectable()
-export class TransformResponseInterceptor<T>
-  implements NestInterceptor<T, ApiResponseDto<T>>
-{
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<ApiResponseDto<T>> {
+export class TransformResponseInterceptor<T> implements NestInterceptor<T, ApiResponseDto<T>> {
+  constructor(private readonly reflector = new Reflector()) {}
+  intercept(context: ExecutionContext, next: CallHandler): Observable<ApiResponseDto<T>> {
+    if (this.reflector.getAllAndOverride(RAW_RESPONSE, [context.getHandler(), context.getClass()]))
+      return next.handle();
     const ctx = context.switchToHttp();
     const response = ctx.getResponse();
     const statusCode = response.statusCode || 200;
@@ -27,12 +22,7 @@ export class TransformResponseInterceptor<T>
           return new ApiResponseDto(statusCode, true, data.message, data.data);
         }
 
-        return new ApiResponseDto(
-          statusCode,
-          true,
-          'Thao tác thành công',
-          data,
-        );
+        return new ApiResponseDto(statusCode, true, 'Thao tác thành công', data);
       }),
     );
   }

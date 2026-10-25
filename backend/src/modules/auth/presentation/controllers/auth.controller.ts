@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -15,7 +6,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { Public } from '@core/decorators/public.decorator';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
@@ -45,7 +36,6 @@ import {
 
 @ApiTags('Auth (Xác thực & Người dùng)')
 @Controller('auth')
-@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(
     private readonly registerUseCase: RegisterUseCase,
@@ -64,7 +54,10 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Đăng ký tài khoản khách hàng mới' })
-  @ApiCreatedResponse({ description: 'Đăng ký thành công, vui lòng kiểm tra email', type: MessageResponseDto })
+  @ApiCreatedResponse({
+    description: 'Đăng ký thành công, vui lòng kiểm tra email',
+    type: MessageResponseDto,
+  })
   async register(@Body() dto: RegisterDto) {
     return this.registerUseCase.execute(dto);
   }
@@ -74,12 +67,12 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập vào hệ thống' })
-  @ApiOkResponse({ description: 'Đăng nhập thành công', type: LoginResponseDto })
+  @ApiOkResponse({
+    description: 'Đăng nhập thành công',
+    type: LoginResponseDto,
+  })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    const forwarded = req.headers['x-forwarded-for'];
-    const ipAddress =
-      (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip) ||
-      undefined;
+    const ipAddress = req.ip || undefined;
     const deviceInfo = req.headers['user-agent'] || undefined;
 
     return this.loginUseCase.execute({
@@ -94,7 +87,10 @@ export class AuthController {
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xác thực tài khoản qua email token' })
-  @ApiOkResponse({ description: 'Xác thực thành công', type: MessageResponseDto })
+  @ApiOkResponse({
+    description: 'Xác thực thành công',
+    type: MessageResponseDto,
+  })
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.verifyEmailUseCase.execute(dto.token);
   }
@@ -104,7 +100,10 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Gửi lại email xác thực (giới hạn 3 lần/giờ)' })
-  @ApiOkResponse({ description: 'Đã gửi lại email xác thực', type: MessageResponseDto })
+  @ApiOkResponse({
+    description: 'Đã gửi lại email xác thực',
+    type: MessageResponseDto,
+  })
   async resendVerification(@Body() dto: ResendOtpDto) {
     return this.resendOtpUseCase.execute(dto.email);
   }
@@ -112,8 +111,13 @@ export class AuthController {
   @Public()
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Làm mới Access Token bằng Refresh Token (Token Rotation)' })
-  @ApiOkResponse({ description: 'Lấy token mới thành công', type: RefreshTokenResponseDto })
+  @ApiOperation({
+    summary: 'Làm mới Access Token bằng Refresh Token (Token Rotation)',
+  })
+  @ApiOkResponse({
+    description: 'Lấy token mới thành công',
+    type: RefreshTokenResponseDto,
+  })
   async refreshToken(@Body() dto: RefreshTokenDto) {
     return this.refreshTokenUseCase.execute(dto.refreshToken);
   }
@@ -122,7 +126,10 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất khỏi phiên hiện tại' })
-  @ApiOkResponse({ description: 'Đăng xuất thành công', type: MessageResponseDto })
+  @ApiOkResponse({
+    description: 'Đăng xuất thành công',
+    type: MessageResponseDto,
+  })
   async logout(@Body() dto: LogoutDto) {
     return this.logoutUseCase.execute(dto.refreshToken);
   }
@@ -131,7 +138,10 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Yêu cầu link đặt lại mật khẩu qua email' })
-  @ApiOkResponse({ description: 'Nếu email tồn tại, link đã được gửi', type: MessageResponseDto })
+  @ApiOkResponse({
+    description: 'Nếu email tồn tại, link đã được gửi',
+    type: MessageResponseDto,
+  })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.forgotPasswordUseCase.execute(dto.email);
   }
@@ -140,7 +150,10 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đặt lại mật khẩu mới bằng token xác nhận' })
-  @ApiOkResponse({ description: 'Đổi mật khẩu thành công', type: MessageResponseDto })
+  @ApiOkResponse({
+    description: 'Đổi mật khẩu thành công',
+    type: MessageResponseDto,
+  })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.resetPasswordUseCase.execute(dto.token, dto.newPassword);
   }
@@ -153,4 +166,3 @@ export class AuthController {
     return this.getMeUseCase.execute(currentUser.userId);
   }
 }
-

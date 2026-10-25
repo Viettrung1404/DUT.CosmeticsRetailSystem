@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   Body,
   Controller,
@@ -23,7 +24,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { CustomerOnlyGuard } from './customer-only.guard';
 import {
@@ -50,13 +50,12 @@ interface CustomerRequest {
 const keyHeader = {
   name: 'Idempotency-Key',
   required: true,
-  description:
-    '8–128 ký tự; retry cùng payload trả cùng kết quả; payload khác trả 409',
+  description: '8–128 ký tự; retry cùng payload trả cùng kết quả; payload khác trả 409',
 };
 @ApiTags('Customer - Sprint 4')
 @ApiBearerAuth('JWT-auth')
 @CommerceErrors()
-@UseGuards(CustomerOnlyGuard, ThrottlerGuard)
+@UseGuards(CustomerOnlyGuard)
 @Controller()
 export class CommerceController {
   constructor(
@@ -68,10 +67,10 @@ export class CommerceController {
     private readonly images: ReturnImageStorage,
   ) {}
   @Post('returns')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiHeader(keyHeader)
   @ApiOperation({
-    summary:
-      'Tạo yêu cầu REFUND/EXCHANGE cho đơn của tôi trong 7 ngày từ COMPLETED',
+    summary: 'Tạo yêu cầu REFUND/EXCHANGE cho đơn của tôi trong 7 ngày từ COMPLETED',
   })
   @CommerceResponse('returnCreated', 201)
   createReturn(
@@ -85,29 +84,21 @@ export class CommerceController {
   @ApiOperation({ summary: 'Danh sách yêu cầu đổi trả của tôi' })
   @CommerceResponse('returns')
   listReturns(@Req() req: CustomerRequest, @Query() query: ReturnQueryDto) {
-    return this.returns.list(
-      req.customerId,
-      query.page!,
-      query.limit!,
-      query.status,
-    );
+    return this.returns.list(req.customerId, query.page!, query.limit!, query.status);
   }
   @Get('returns/:id')
   @ApiOperation({
     summary: 'Chi tiết đổi trả, quote, settlement và trạng thái hoàn tiền',
   })
   @CommerceResponse('returnDetail')
-  returnDetail(
-    @Req() req: CustomerRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  returnDetail(@Req() req: CustomerRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.returns.detail(req.customerId, id);
   }
   @Post('returns/:id/exchange/accept')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiHeader(keyHeader)
   @ApiOperation({
-    summary:
-      'Chấp nhận quote đổi hàng đã kiểm định; giữ tồn và tạo đơn thay thế',
+    summary: 'Chấp nhận quote đổi hàng đã kiểm định; giữ tồn và tạo đơn thay thế',
   })
   @CommerceResponse('exchange', 201)
   accept(
@@ -127,6 +118,7 @@ export class CommerceController {
     return this.tracking.get(req.customerId, id);
   }
   @Post('uploads/return-images')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -141,14 +133,10 @@ export class CommerceController {
     }),
   )
   @ApiOperation({
-    summary:
-      'Upload bằng chứng vào private bucket; tối đa 5 MB, trả attachmentId',
+    summary: 'Upload bằng chứng vào private bucket; tối đa 5 MB, trả attachmentId',
   })
   @CommerceResponse('image', 201)
-  upload(
-    @Req() req: CustomerRequest,
-    @UploadedFile() file?: { buffer: Buffer },
-  ) {
+  upload(@Req() req: CustomerRequest, @UploadedFile() file?: { buffer: Buffer }) {
     return this.images.upload(req.user.userId, file?.buffer!);
   }
   @Get('uploads/return-images/:id')
@@ -172,6 +160,7 @@ export class CommerceController {
     return this.loyalty.rewards();
   }
   @Post('customers/me/loyalty/redeem')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiHeader(keyHeader)
   @ApiOperation({
     summary: 'Đổi rewardCode lấy voucher riêng trong transaction',
@@ -218,10 +207,7 @@ export class CommerceController {
   @Get('notifications')
   @ApiOperation({ summary: 'Thông báo của tôi và số chưa đọc' })
   @CommerceResponse('notifications')
-  listNotifications(
-    @Req() req: CustomerRequest,
-    @Query() query: PageOptionsDto,
-  ) {
+  listNotifications(@Req() req: CustomerRequest, @Query() query: PageOptionsDto) {
     return this.notifications.list(req.user.userId, query.page!, query.limit!);
   }
   @Put('notifications/:id/read')
@@ -241,10 +227,7 @@ export class CommerceController {
     summary: 'Hủy đăng ký thiết bị và ngừng delivery trước logout',
   })
   @CommerceResponse('device')
-  unregister(
-    @Req() req: CustomerRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  unregister(@Req() req: CustomerRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.notifications.unregister(req.user.userId, id);
   }
 }
