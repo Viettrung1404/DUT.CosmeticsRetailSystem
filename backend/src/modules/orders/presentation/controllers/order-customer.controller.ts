@@ -10,8 +10,9 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  Headers,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/guards/jwt-auth.guard';
 import { CustomerContextService } from '../../../../core/services/customer-context.service';
 import { PreviewOrderUseCase } from '../../application/use-cases/preview-order.use-case';
@@ -61,12 +62,15 @@ export class CustomerOrderController {
   @Post('orders')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Khởi tạo đơn hàng mới' })
-  async createOrder(@Req() req: any, @Body() dto: CreateOrderDto) {
+  @ApiHeader({ name: 'Idempotency-Key', required: true, description: '8–128 ký tự, retry cùng payload trả cùng đơn hàng' })
+  async createOrder(@Req() req: any, @Body() dto: CreateOrderDto, @Headers('idempotency-key') idempotencyKey?: string) {
     const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.createOrderUseCase.execute({
       customerId,
       shippingAddress: dto.shippingAddress,
+      idempotencyKey,
+      quoteVersion: dto.quoteVersion,
       paymentMethod: dto.paymentMethod,
       items: dto.items,
       couponCode: dto.couponCode,

@@ -5,6 +5,7 @@ import {
   Inject,
   BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import {
   ORDER_REPOSITORY,
@@ -28,6 +29,7 @@ import { formatOrderNumber } from '../utils/order-number.util';
 import { createVariantNameSnapshot } from '../utils/variant-name-snapshot.util';
 import { allocateMoney } from '@modules/customer-commerce/domain/money';
 import { Prisma } from '@prisma/client';
+import { CommerceCheckoutService } from '../services/commerce-checkout.service';
 
 export interface CreateOrderItemRequest {
   variantId: string;
@@ -35,6 +37,8 @@ export interface CreateOrderItemRequest {
 }
 
 export interface CreateOrderInput {
+  idempotencyKey?: string;
+  quoteVersion?: string;
   customerId: string;
   shippingAddress: ShippingAddressVo;
   paymentMethod?: string;
@@ -58,9 +62,11 @@ export class CreateOrderUseCase {
     private readonly catalogProvider: IVariantCatalogProvider,
     @Inject(CART_REPOSITORY)
     private readonly cartRepo: ICartRepository,
+    @Optional() private readonly commerce?: CommerceCheckoutService,
   ) {}
 
   async execute(input: CreateOrderInput): Promise<OrderEntity> {
+    if (this.commerce) return this.commerce.create(input);
     const {
       customerId,
       shippingAddress,

@@ -6,6 +6,9 @@ import {
   IsString,
   IsUUID,
   Min,
+  Max,
+  ArrayMaxSize,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -17,18 +20,21 @@ export class OrderItemDto {
 
   @IsInt({ message: 'Số lượng phải là số nguyên' })
   @Min(1, { message: 'Số lượng phải lớn hơn hoặc bằng 1' })
+  @Max(10000)
   quantity: number;
 }
 
 export class PreviewOrderDto {
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items?: OrderItemDto[];
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   couponCode?: string;
 
   @IsOptional()

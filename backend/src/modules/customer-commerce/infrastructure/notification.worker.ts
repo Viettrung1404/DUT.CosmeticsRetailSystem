@@ -153,6 +153,8 @@ export class NotificationWorker {
                       'refundId',
                       'shipmentId',
                       'redemptionId',
+                      'resourceId',
+                      'route',
                     ].includes(key) && typeof value === 'string',
                 ),
               ) as Record<string, string>)

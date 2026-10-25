@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CommercePricingModule } from '@modules/customer-experience/commerce-pricing.module';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { CustomerCommands } from './infrastructure/commands';
 import { CustomerOnlyGuard } from './presentation/customer-only.guard';
@@ -14,7 +15,7 @@ import { WishlistEnrichmentInterceptor } from './presentation/wishlist-enrichmen
 import { CustomerEventIntegration } from './application/admin-integration.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, CommercePricingModule],
   controllers: [CommerceController],
   providers: [
     CustomerCommands,
@@ -30,6 +31,7 @@ import { CustomerEventIntegration } from './application/admin-integration.servic
     CustomerEventIntegration,
   ],
   exports: [
+    CustomerOnlyGuard,
     CustomerCommands,
     ReturnsService,
     WishlistEnrichmentInterceptor,

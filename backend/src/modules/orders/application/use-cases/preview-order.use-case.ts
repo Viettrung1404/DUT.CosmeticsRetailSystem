@@ -1,4 +1,5 @@
-import { Injectable, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, Optional } from '@nestjs/common';
+import { CommerceCheckoutService } from '../services/commerce-checkout.service';
 import {
   ORDER_REPOSITORY,
   IOrderRepository,
@@ -58,9 +59,11 @@ export class PreviewOrderUseCase {
     private readonly catalogProvider: IVariantCatalogProvider,
     @Inject(CART_REPOSITORY)
     private readonly cartRepo: ICartRepository,
+    @Optional() private readonly commerce?: CommerceCheckoutService,
   ) {}
 
   async execute(input: PreviewOrderInput): Promise<PreviewOrderResult> {
+    if (this.commerce) return this.commerce.preview(input);
     const { customerId, couponCode, usePoints, storeId } = input;
 
     // 1. Determine items from input or cart

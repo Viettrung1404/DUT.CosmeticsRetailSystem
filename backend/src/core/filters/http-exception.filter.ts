@@ -37,6 +37,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
             max: exceptionResponse['max'],
           };
       }
+      if (code === 'ORDER_PRICE_CHANGED' && typeof exceptionResponse === 'object') {
+        const changed = exceptionResponse as { pricing?: unknown; quoteVersion?: unknown };
+        details = { pricing: changed.pricing, quoteVersion: changed.quoteVersion };
+      }
       message =
         typeof exceptionResponse === 'object' && 'message' in exceptionResponse
           ? (exceptionResponse as any).message
