@@ -39,6 +39,7 @@ describe('LoginUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
       rotateActive: jest
@@ -53,6 +54,7 @@ describe('LoginUseCase', () => {
 
     jwtService = {
       generateAccessToken: jest.fn().mockReturnValue('mock-access-token'),
+      refreshExpiresAt: jest.fn().mockImplementation(() => new Date(Date.now() + 7 * 86400000)),
       generateRefreshToken: jest.fn().mockReturnValue('mock-refresh-token'),
       verifyAccessToken: jest.fn(),
     } as any;

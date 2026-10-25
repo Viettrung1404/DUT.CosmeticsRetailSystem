@@ -1,9 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  UnauthorizedException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import {
   USER_REPOSITORY,
   IUserRepository,
@@ -66,16 +61,11 @@ export class LoginUseCase {
 
     // 3. Check email verified
     if (!user.isEmailVerified()) {
-      throw new ForbiddenException(
-        'Email chưa được xác thực. Vui lòng kiểm tra email.',
-      );
+      throw new ForbiddenException('Email chưa được xác thực. Vui lòng kiểm tra email.');
     }
 
     // 4. Verify password
-    const isPasswordValid = await this.bcryptService.compare(
-      input.password,
-      user.passwordHash,
-    );
+    const isPasswordValid = await this.bcryptService.compare(input.password, user.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
@@ -87,7 +77,7 @@ export class LoginUseCase {
     const refreshToken = this.jwtService.generateRefreshToken(user.id!);
 
     // 7. Persist refresh token session
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = this.jwtService.refreshExpiresAt();
     const session = await this.sessionRepo.create({
       userId: user.id!,
       refreshToken,
@@ -98,6 +88,7 @@ export class LoginUseCase {
     });
     const accessToken = this.jwtService.generateAccessToken({
       userId: user.id!,
+      sessionId: session.id,
       sid: session.id,
       roleId: user.roleId,
       roleName: user.roleName || 'Customer',

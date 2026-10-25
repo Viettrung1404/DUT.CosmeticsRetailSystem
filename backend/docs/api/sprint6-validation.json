@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-25",
+  "unit": {
+    "suites": 72,
+    "passed": 446,
+    "failed": 0
+  },
+  "postgresHttp": {
+    "suites": 3,
+    "passed": 54,
+    "failed": 0
+  },
+  "redis": {
+    "checkedAt": "2026-10-25T09:34:21.188Z",
+    "cacheRoundTrip": true,
+    "twoInstanceAtomicRateLimit": true,
+    "expiry": true,
+    "temporaryKeysDeleted": true
+  },
+  "upgrade": {
+    "checkedAt": "2026-10-25T09:48:57.536Z",
+    "upgradeFromSprint5WithExistingData": true,
+    "blogTimestampBackfilled": true,
+    "existingCustomerPreserved": true,
+    "generatedInventoryPreserved": true
+  },
+  "dependencyAudit": {
+    "info": 0,
+    "low": 3,
+    "moderate": 16,
+    "high": 14,
+    "critical": 0,
+    "total": 33
+  },
+  "catalogBenchmark": {
+    "dataset": {
+      "products": 10000,
+      "variants": 10000,
+      "categories": 100,
+      "blogPosts": 10000,
+      "orders": 0,
+      "reviews": 0,
+      "notifications": 0
+    },
+    "workload": "Local PostgreSQL catalog service, guest, price_asc, pages 1-5, limit 20, DB-only; no HTTP/Redis/ES",
+    "concurrency": 4,
+    "requests": 20,
+    "p50Ms": 293.35369999999966,
+    "p95Ms": 494.5121999999974,
+    "errors": 0,
+    "queriesPerRequest": 9,
+    "queriesForPage100": 9
+  },
+  "blogQuery": {
+    "before": {
+      "executionMs": 2.628,
+      "scan": "Sort"
+    },
+    "after": {
+      "executionMs": 0.042,
+      "scan": "Index Scan",
+      "index": "blog_posts_public_feed_idx"
+    }
+  },
+  "pending": [
+    "Apply reviewed pending migrations on configured database",
+    "Configure SMTP and test real email delivery",
+    "Configure private return-evidence bucket and FCM credentials",
+    "Next.js and Expo real SDK login and user token exchange",
+    "Facebook Limited Login on iOS and native push-token flow",
+    "Online payment module sandbox/recovery",
+    "Production workload/SLO and remaining dependency advisories"
+  ],
+  "checkedAt": "2026-10-25T10:18:31.370Z",
+  "clientContractChecks": {
+    "nextjsCorsPreflight": true,
+    "nativeStyleBearerWithoutOrigin": true,
+    "retryAfterExposed": true,
+    "rejectExpoPushServiceTokens": true,
+    "googleFacebookResponseUnion": true,
+    "realBrowserOrDeviceLogin": false
+  },
+  "runtimeProbe": "client-readiness.json"
+}

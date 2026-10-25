@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-10-25T10:17:25.169Z",
+  "readyForEndToEndSignOff": false,
+  "scope": "Read-only configuration/provider probes; no real client login, no database migration or writes",
+  "website": {
+    "publicWebUrl": "http://localhost:3001",
+    "emailLinkOrigin": "http://localhost:3001",
+    "allowedOrigins": [
+      "http://localhost:5173",
+      "http://localhost:3001",
+      "http://127.0.0.1:3001"
+    ]
+  },
+  "database": {
+    "status": "migration_required",
+    "requiredTables": {
+      "users": true,
+      "sessions": true,
+      "oauthPending": false,
+      "cacheRevision": false
+    },
+    "migrationHistoryAvailable": true,
+    "pendingMigrations": [
+      "20261007132710_add_pos_inventory_constraints",
+      "20261024000000_customer_sprint4",
+      "20261025000000_customer_sprint5",
+      "20261025000000_sprint6_identity_seo"
+    ]
+  },
+  "google": {
+    "status": "keys_reachable",
+    "audienceCount": 1,
+    "clientRegistrationVerified": false,
+    "realUserLoginVerified": false
+  },
+  "facebook": {
+    "status": "app_credentials_accepted",
+    "httpStatus": 200,
+    "realUserLoginVerified": false,
+    "limitedLoginSupported": false
+  },
+  "email": {
+    "smtpConfigured": false,
+    "realDeliveryVerified": false
+  },
+  "push": {
+    "fcmServiceAccountConfigured": false,
+    "deliveryEnabled": false,
+    "realDeviceDeliveryVerified": false
+  },
+  "storage": {
+    "publicConfigured": true,
+    "returnEvidenceConfigured": false
+  },
+  "missingClientEvidence": [
+    "Next.js UI/browser login",
+    "Expo development build and Android/iOS provider registration",
+    "Real provider token exchange",
+    "Email delivery/onboarding/link",
+    "Client repositories not present in workspace"
+  ]
+}

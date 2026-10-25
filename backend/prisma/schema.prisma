@@ -113,7 +113,26 @@ model UserOAuthAccount {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
+  @@index([userId])
   @@map("user_oauth_accounts")
+}
+
+model OAuthPendingIdentity {
+  id               String    @id @default(uuid()) @db.Uuid
+  provider         String    @db.VarChar(50)
+  subject          String    @db.VarChar(255)
+  fullName         String    @map("full_name") @db.VarChar(100)
+  email            String?   @db.VarChar(255)
+  targetUserId     String?   @map("target_user_id") @db.Uuid
+  challengeHash    String    @unique @map("challenge_hash") @db.VarChar(64)
+  clientHash       String    @map("client_hash") @db.VarChar(64)
+  verificationHash String?   @map("verification_hash") @db.VarChar(64)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  usedAt           DateTime? @map("used_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([expiresAt])
+  @@map("oauth_pending_identities")
 }
 
 model VerificationToken {
@@ -1365,26 +1384,28 @@ model Page {
 }
 
 model BlogPost {
-  id              String    @id @default(uuid()) @db.Uuid
-  title           String    @db.VarChar(255)
-  slug            String    @unique @db.VarChar(255)
-  content         String    @db.Text
-  excerpt         String?   @db.Text
-  featuredImage   String?   @map("featured_image") @db.Text
-  blogCategoryId  String?   @map("blog_category_id") @db.Uuid
-  authorId        String?   @map("author_id") @db.Uuid
-  status          String    @default("DRAFT") @db.VarChar(20)
-  publishedAt     DateTime? @map("published_at") @db.Timestamptz
-  metaTitle       String?   @map("meta_title") @db.VarChar(255)
-  metaDescription String?   @map("meta_description") @db.Text
-  viewsCount      Int       @default(0) @map("views_count")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id               String    @id @default(uuid()) @db.Uuid
+  title            String    @db.VarChar(255)
+  slug             String    @unique @db.VarChar(255)
+  content          String    @db.Text
+  excerpt          String?   @db.Text
+  featuredImage    String?   @map("featured_image") @db.Text
+  blogCategoryId   String?   @map("blog_category_id") @db.Uuid
+  authorId         String?   @map("author_id") @db.Uuid
+  status           String    @default("DRAFT") @db.VarChar(20)
+  publishedAt      DateTime? @map("published_at") @db.Timestamptz
+  metaTitle        String?   @map("meta_title") @db.VarChar(255)
+  metaDescription  String?   @map("meta_description") @db.Text
+  contentUpdatedAt DateTime  @default(now()) @map("content_updated_at") @db.Timestamptz
+  viewsCount       Int       @default(0) @map("views_count")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   category BlogCategory? @relation(fields: [blogCategoryId], references: [id])
   author   User?         @relation(fields: [authorId], references: [id])
 
   @@index([status, publishedAt, id])
+  @@index([status, publishedAt(sort: Desc), id], map: "blog_posts_public_feed_idx")
   @@index([blogCategoryId, status, publishedAt, id])
   @@map("blog_posts")
 }
@@ -1723,4 +1744,12 @@ model PushDelivery {
   @@unique([notificationId, deviceId])
   @@index([status, nextAttemptAt, leaseUntil])
   @@map("push_deliveries")
+}
+
+// Monotonic namespace for public metadata; incremented by transactional DB triggers.
+model PublicCacheRevision {
+  id         Int    @id
+  generation BigInt @default(0)
+
+  @@map("public_cache_revision")
 }

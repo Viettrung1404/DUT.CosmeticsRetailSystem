@@ -17,8 +17,8 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    const raw = await this.prisma.user.findUnique({
-      where: { email },
+    const raw = await this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
       include: { role: true },
     });
     return raw ? UserMapper.toDomain(raw) : null;
@@ -86,21 +86,15 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
-  async createCustomerForUser(
-    userId: string,
-    phone?: string | null,
-  ): Promise<void> {
-    await this.prisma.customer.create({
-      data: {
-        userId,
-        phone: phone || null,
-      },
+  async createCustomerForUser(userId: string, phone?: string | null): Promise<void> {
+    await this.prisma.customer.upsert({
+      where: { userId },
+      create: { userId, phone: null },
+      update: {},
     });
   }
 
-  async findCustomerByPhone(
-    phone: string,
-  ): Promise<{ id: string; userId: string | null } | null> {
+  async findCustomerByPhone(phone: string): Promise<{ id: string; userId: string | null } | null> {
     return this.prisma.customer.findUnique({
       where: { phone },
       select: { id: true, userId: true },

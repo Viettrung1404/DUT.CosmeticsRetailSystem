@@ -1,9 +1,12 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
+import { corsOptions } from '@core/config/runtime-config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from '@core/filters/http-exception.filter';
 import { TransformResponseInterceptor } from '@core/interceptors/transform-response.interceptor';
+import { documentResponseEnvelopes } from '@core/common/openapi';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -11,10 +14,11 @@ async function bootstrap() {
   app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
 
   // CORS configuration
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
+  app.enableCors(corsOptions(app.get(ConfigService)));
+  const trustedProxies = process.env.TRUSTED_PROXIES?.split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (trustedProxies?.length) app.getHttpAdapter().getInstance().set('trust proxy', trustedProxies);
 
   // Global Prefix: /api/v1
   const globalPrefix = process.env.API_PREFIX || 'api/v1';
@@ -74,7 +78,7 @@ async function bootstrap() {
     )
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = documentResponseEnvelopes(SwaggerModule.createDocument(app, config));
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,

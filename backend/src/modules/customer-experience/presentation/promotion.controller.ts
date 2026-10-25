@@ -32,7 +32,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { Public } from '@core/decorators/public.decorator';
 import { UpstashRedisService } from '@core/cache/upstash-redis.service';
@@ -84,10 +84,7 @@ export class PromotionsService {
       isActive: true,
       startDate: { lte: now },
       endDate: { gt: now },
-      OR: [
-        { usageLimit: null },
-        { usedCount: { lt: this.db.promotion.fields.usageLimit } },
-      ],
+      OR: [{ usageLimit: null }, { usedCount: { lt: this.db.promotion.fields.usageLimit } }],
       ...(flash && { isFlashSale: true }),
     };
     const rows = await this.db.promotion.findMany({
@@ -146,8 +143,7 @@ export class PromotionsService {
           .map((q) => ({
             variantId: q.productVariantId,
             remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
-            effectivePrice: prices.find((v) => v.id === q.productVariantId)
-              ?.price,
+            effectivePrice: prices.find((v) => v.id === q.productVariantId)?.price,
             conditional: Number(p.minOrderAmount) > 0,
           })),
       })),
@@ -161,7 +157,6 @@ export class PromotionsService {
 }
 @ApiTags('Customer - Promotions')
 @CommerceErrors()
-@UseGuards(ThrottlerGuard)
 @Controller()
 export class PromotionController {
   constructor(
@@ -172,8 +167,7 @@ export class PromotionController {
   @Public()
   @Get('promotions/active')
   @ApiOperation({
-    summary:
-      'Campaign đang hoạt động và điều kiện áp dụng, không trả mã coupon riêng',
+    summary: 'Campaign đang hoạt động và điều kiện áp dụng, không trả mã coupon riêng',
   })
   @ExperienceResponse('promotions')
   active(@Query() query: PublicListDto) {
@@ -182,8 +176,7 @@ export class PromotionController {
   @Public()
   @Get('promotions/flash-sale')
   @ApiOperation({
-    summary:
-      'Flash Sale và quota còn lại; checkout xác nhận lại giá và giữ quota',
+    summary: 'Flash Sale và quota còn lại; checkout xác nhận lại giá và giữ quota',
   })
   @ExperienceResponse('promotions')
   flash(@Query() query: PublicListDto) {
@@ -195,8 +188,7 @@ export class PromotionController {
   @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({
-    summary:
-      'Kiểm tra coupon bằng cùng pricing engine; không giữ quota/điểm/lượt coupon',
+    summary: 'Kiểm tra coupon bằng cùng pricing engine; không giữ quota/điểm/lượt coupon',
   })
   @ExperienceResponse('quote')
   async validate(
@@ -204,18 +196,9 @@ export class PromotionController {
     @Body() input: CouponValidationDto,
   ) {
     if (this.redis.configured) {
-      const userAllowed = await this.redis.rateLimit(
-        `coupon:user:${req.user.userId}`,
-        10,
-        60000,
-      );
-      const ipAllowed = await this.redis.rateLimit(
-        `coupon:ip:${req.ip}`,
-        30,
-        60000,
-      );
-      if (!userAllowed || !ipAllowed)
-        throw new HttpException('COUPON_RATE_LIMITED', 429);
+      const userAllowed = await this.redis.rateLimit(`coupon:user:${req.user.userId}`, 10, 60000);
+      const ipAllowed = await this.redis.rateLimit(`coupon:ip:${req.ip}`, 30, 60000);
+      if (!userAllowed || !ipAllowed) throw new HttpException('COUPON_RATE_LIMITED', 429);
     }
     try {
       const { variants: _, ...quote } = await this.pricing.quote({

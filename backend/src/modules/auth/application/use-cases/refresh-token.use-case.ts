@@ -49,7 +49,7 @@ export class RefreshTokenUseCase {
 
     // 4. Look up user
     const user = await this.userRepo.findById(session.userId);
-    if (!user || !user.canLogin()) {
+    if (!user || !user.canLogin() || !user.isEmailVerified()) {
       throw new UnauthorizedException('Tài khoản không hợp lệ');
     }
 
@@ -58,28 +58,28 @@ export class RefreshTokenUseCase {
 
     // 6. Generate new token pair
     const newRefreshToken = this.jwtService.generateRefreshToken(user.id!);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const expiresAt = this.jwtService.refreshExpiresAt();
 
     // 7. Token Rotation: Revoke old session and persist new session in atomic transaction
-    await this.unitOfWork.runInTransaction(async () => {
-      const rotated = await this.sessionRepo.rotateActive(
-        oldRefreshToken,
-        newRefreshToken,
+    const replacement = await this.unitOfWork.runInTransaction(async () => {
+      if (!(await this.sessionRepo.consume(session.id)))
+        throw new UnauthorizedException('REFRESH_TOKEN_ALREADY_USED');
+      return this.sessionRepo.create({
+        userId: user.id!,
+        refreshToken: newRefreshToken,
         expiresAt,
-      );
-      if (!rotated || rotated.id !== session.id)
-        throw new UnauthorizedException(
-          'Refresh token đã được sử dụng hoặc thu hồi',
-        );
+      });
     });
     const accessToken = this.jwtService.generateAccessToken({
       userId: user.id!,
-      sid: session.id,
+      sessionId: replacement.id,
+      sid: replacement.id,
       roleId: user.roleId,
       roleName: user.roleName || 'Customer',
       dataScope: user.dataScope || 'SELF',
       permissionCodes,
     });
+
     return { accessToken, refreshToken: newRefreshToken };
   }
 }

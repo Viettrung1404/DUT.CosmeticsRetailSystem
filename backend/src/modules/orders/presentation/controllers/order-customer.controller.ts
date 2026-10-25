@@ -6,14 +6,12 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   Req,
   HttpCode,
   HttpStatus,
   Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../../core/guards/jwt-auth.guard';
 import { CustomerContextService } from '../../../../core/services/customer-context.service';
 import { PreviewOrderUseCase } from '../../application/use-cases/preview-order.use-case';
 import { CreateOrderUseCase } from '../../application/use-cases/create-order.use-case';
@@ -25,8 +23,7 @@ import { CreateOrderDto } from '../dtos/create-order.dto';
 import { OrderQueryDto, CancelOrderDto } from '../dtos/order-query.dto';
 
 @ApiTags('Orders')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 @Controller()
 export class CustomerOrderController {
   constructor(
@@ -40,7 +37,9 @@ export class CustomerOrderController {
 
   @Post('orders/preview')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Xem trước chi phí đơn hàng, khuyến mãi, điểm thưởng và kho xử lý' })
+  @ApiOperation({
+    summary: 'Xem trước chi phí đơn hàng, khuyến mãi, điểm thưởng và kho xử lý',
+  })
   async previewOrder(@Req() req: any, @Body() dto: PreviewOrderDto) {
     const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
@@ -62,8 +61,16 @@ export class CustomerOrderController {
   @Post('orders')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Khởi tạo đơn hàng mới' })
-  @ApiHeader({ name: 'Idempotency-Key', required: true, description: '8–128 ký tự, retry cùng payload trả cùng đơn hàng' })
-  async createOrder(@Req() req: any, @Body() dto: CreateOrderDto, @Headers('idempotency-key') idempotencyKey?: string) {
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: '8–128 ký tự, retry cùng payload trả cùng đơn hàng',
+  })
+  async createOrder(
+    @Req() req: any,
+    @Body() dto: CreateOrderDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
     const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.createOrderUseCase.execute({
@@ -121,11 +128,7 @@ export class CustomerOrderController {
 
   @Put('orders/:id/cancel')
   @ApiOperation({ summary: 'Hủy đơn hàng đang ở trạng thái PENDING' })
-  async cancelOrder(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body() dto: CancelOrderDto,
-  ) {
+  async cancelOrder(@Req() req: any, @Param('id') id: string, @Body() dto: CancelOrderDto) {
     const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
 
     const result = await this.cancelOrderUseCase.execute({

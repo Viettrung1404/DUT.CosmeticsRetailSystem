@@ -10,23 +10,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '@core/decorators/public.decorator';
 import { CustomerOnlyGuard } from '@modules/customer-commerce/presentation/customer-only.guard';
 import { ReviewsService } from '../application/reviews.service';
 import { ContentService } from '../application/content.service';
-import {
-  BannerQueryDto,
-  BlogQueryDto,
-  CreateReviewDto,
-  ReviewQueryDto,
-} from './experience.dto';
+import { BannerQueryDto, BlogQueryDto, CreateReviewDto, ReviewQueryDto } from './experience.dto';
 import { ExperienceResponse } from './experience.responses';
 import { CommerceErrors } from '@modules/customer-commerce/presentation/commerce.responses';
 
 @ApiTags('Customer - Reviews and Content')
 @CommerceErrors()
-@UseGuards(ThrottlerGuard)
 @Controller()
 export class ExperienceController {
   constructor(
@@ -37,21 +31,16 @@ export class ExperienceController {
   @UseGuards(CustomerOnlyGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary:
-      'Đánh giá sản phẩm đã mua trong đơn COMPLETED; một review/product/customer',
+    summary: 'Đánh giá sản phẩm đã mua trong đơn COMPLETED; một review/product/customer',
   })
   @ExperienceResponse('review', 201)
-  create(
-    @Req() req: { user: { userId: string } },
-    @Body() input: CreateReviewDto,
-  ) {
+  create(@Req() req: { user: { userId: string } }, @Body() input: CreateReviewDto) {
     return this.reviews.create(req.user.userId, input);
   }
   @Public()
   @Get('customer/products/:id/reviews')
   @ApiOperation({
-    summary:
-      'Review đã duyệt, histogram và aggregate, không trả thông tin riêng của khách',
+    summary: 'Review đã duyệt, histogram và aggregate, không trả thông tin riêng của khách',
   })
   @ExperienceResponse('reviews')
   list(@Param('id', ParseUUIDPipe) id: string, @Query() query: ReviewQueryDto) {
