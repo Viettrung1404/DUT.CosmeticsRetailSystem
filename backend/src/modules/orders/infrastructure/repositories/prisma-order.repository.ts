@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { OrderPricingService } from '../../application/services/order-pricing.service';
 import { notifyCustomer } from '@core/services/customer-events';
 import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
+import { transitionPromotionAllocations } from '@core/services/promotion-lifecycle';
 import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import {
@@ -91,6 +92,7 @@ export class PrismaOrderRepository implements IOrderRepository {
                 ...coupon,
                 discountValue: Number(coupon.discountValue),
                 minOrderAmount: Number(coupon.minOrderAmount),
+                maxDiscountAmount: coupon.maxDiscountAmount === null ? null : Number(coupon.maxDiscountAmount),
                 discountType:
                   coupon.discountType === 'FIXED'
                     ? 'FIXED_AMOUNT'
@@ -376,6 +378,7 @@ export class PrismaOrderRepository implements IOrderRepository {
       const items = await tx.orderItem.findMany({
         where: { orderId: existingRow.id },
       });
+      await transitionPromotionAllocations(tx, existingRow.id, 'CANCELLED');
       const ids = items.map((item) => item.productVariantId);
       await tx.$queryRaw`SELECT id FROM inventory WHERE store_id=${existingRow.store_id}::uuid
         AND product_variant_id=ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
@@ -587,7 +590,6 @@ export class PrismaOrderRepository implements IOrderRepository {
             variantName: i.variantName,
             quantity: i.quantity,
             unitPrice: Number(i.unitPrice),
-            unitCost: Number(i.unitCost),
             discountAmount: Number(i.discountAmount),
             totalPrice: Number(i.totalPrice),
             createdAt: i.createdAt,

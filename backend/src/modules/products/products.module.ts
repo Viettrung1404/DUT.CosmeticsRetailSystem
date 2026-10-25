@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { PublicCatalogService } from './application/services/public-catalog.service';
+import { CatalogIndexWorker } from './infrastructure/search/catalog-index.worker';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { ProductCustomerController } from './presentation/controllers/product-customer.controller';
 import { ProductAdminController } from './presentation/controllers/product-admin.controller';
@@ -31,6 +33,8 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     ProductVariantAdminController,
   ],
   providers: [
+    PublicCatalogService,
+    CatalogIndexWorker,
     // Use Cases
     GetProductsUseCase,
     GetProductDetailUseCase,

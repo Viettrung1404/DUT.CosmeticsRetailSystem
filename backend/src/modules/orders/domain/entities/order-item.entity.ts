@@ -6,7 +6,7 @@ export class OrderItemEntity {
   variantName: string;
   quantity: number;
   unitPrice: number;
-  unitCost: number;
+  unitCost?: number;
   discountAmount: number;
   totalPrice: number;
   createdAt?: Date;

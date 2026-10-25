@@ -6,10 +6,14 @@ import {
   IsString,
   IsUUID,
   Min,
+  Matches,
+  ArrayMaxSize,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { OrderItemDto } from './preview-order.dto';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ShippingAddressDto {
   @IsNotEmpty({ message: 'Tên người nhận không được để trống' })
@@ -38,6 +42,10 @@ export class ShippingAddressDto {
 }
 
 export class CreateOrderDto {
+  @ApiProperty({ description: 'SHA256 quoteVersion từ POST /orders/preview; cần xác nhận lại nếu giá đổi' })
+  @IsOptional()
+  @Matches(/^[a-f0-9]{64}$/)
+  quoteVersion?: string;
   @IsNotEmpty({ message: 'Địa chỉ giao hàng không được để trống' })
   @ValidateNested()
   @Type(() => ShippingAddressDto)
@@ -49,12 +57,14 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items?: OrderItemDto[];
 
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   couponCode?: string;
 
   @IsOptional()

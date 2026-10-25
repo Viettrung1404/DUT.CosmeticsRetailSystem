@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -22,6 +23,8 @@ import {
 } from '../presentation/commerce.dto';
 import { CustomerEventIntegration } from './admin-integration.service';
 import { transferFunding } from '../infrastructure/exchange-funding';
+import { CommercePricingService } from '@modules/customer-experience/application/commerce-pricing.service';
+import { reservePromotionBenefits } from '@core/services/promotion-lifecycle';
 
 const ACTIVE_RETURNS = [
   'REQUESTED',
@@ -31,6 +34,13 @@ const ACTIVE_RETURNS = [
   'COMPLETED',
 ];
 interface QuoteLine {
+  originalPrice?: number;
+  cashValue?: number;
+  lineDiscount?: number;
+  promotionId?: string | null;
+  quotaId?: string | null;
+  tierDiscount?: number;
+  promotionDiscount?: number;
   variantId: string;
   quantity: number;
   price: number;
@@ -39,6 +49,7 @@ interface QuoteLine {
   sku: string;
 }
 interface Quote {
+  pricingVersion?: string;
   policyVersion: string;
   lines: QuoteLine[];
   fee: number;
@@ -59,6 +70,7 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     private readonly commands: CustomerCommands,
     private readonly integration: CustomerEventIntegration,
+    @Optional() private readonly pricing?: CommercePricingService,
   ) {}
   async policy(tx: Tx) {
     const row = await tx.setting.findUnique({
@@ -373,12 +385,25 @@ export class ReturnsService {
   private async calculateQuote(
     tx: Tx,
     row: {
+      customerId?: string;
       items: { refundAmount: Prisma.Decimal }[];
       exchangeItems: { productVariantId: string; quantity: number }[];
     },
-  ) {
+    lock = false,
+  ): Promise<Quote> {
     const policy = await this.policy(tx);
     const lines: QuoteLine[] = [];
+    if (this.pricing && row.customerId) {
+      const price = await this.pricing.quote({ customerId: row.customerId, items: [...row.exchangeItems].sort((a, b) => a.productVariantId.localeCompare(b.productVariantId)).map(i => ({ variantId: i.productVariantId, quantity: i.quantity })) }, tx, lock);
+      return {
+        pricingVersion: price.quoteVersion,
+        policyVersion: policy.version,
+        lines: price.items.map(line => { const v = price.variants.find(v => v.id === line.variantId)!; return { ...line, price: line.effectivePrice, cost: Number(v.costPrice), name: v.product.name, sku: v.sku }; }),
+        fee: policy.exchangeShippingFee,
+        credit: row.items.reduce((sum, item) => sum.add(item.refundAmount), new Prisma.Decimal(0)).toNumber(),
+        payable: new Prisma.Decimal(price.subtotal).minus(price.lineDiscount).add(policy.exchangeShippingFee).toNumber(),
+      } satisfies Quote;
+    }
     for (const item of [...row.exchangeItems].sort((a, b) =>
       a.productVariantId.localeCompare(b.productVariantId),
     )) {
@@ -458,14 +483,13 @@ export class ReturnsService {
         const variantIds = row.exchangeItems.map(
           (item) => item.productVariantId,
         );
-        await tx.$queryRaw`SELECT v.id FROM product_variants v JOIN products p ON p.id=v.product_id
-        WHERE v.id=ANY(${variantIds}::uuid[]) ORDER BY v.id FOR SHARE OF v,p`;
-        const quote = await this.calculateQuote(tx, row);
+        const quote = await this.calculateQuote(tx, row, true);
         if (JSON.stringify(quote) !== JSON.stringify(row.quoteSnapshot)) {
           // JSONB normalizes key order; compare canonical value below instead.
           const old = row.quoteSnapshot as unknown as Quote;
           if (
             old?.policyVersion !== quote.policyVersion ||
+            (old.pricingVersion ?? null) !== (quote.pricingVersion ?? null) ||
             old.fee !== quote.fee ||
             old.credit !== quote.credit ||
             old.payable !== quote.payable ||
@@ -522,7 +546,8 @@ export class ReturnsService {
             storeId: row.storeId,
             orderType: 'ONLINE',
             status: 'PENDING',
-            subtotal: quote.payable - quote.fee,
+            subtotal: quote.lines.reduce((sum, line) => sum + (line.originalPrice ?? line.price) * line.quantity, 0),
+            discountAmount: quote.lines.reduce((sum, line) => sum + (line.lineDiscount ?? 0), 0),
             totalAmount: quote.payable,
             shippingFee: quote.fee,
             shippingAddress: row.order.shippingAddress as Prisma.InputJsonValue,
@@ -533,14 +558,17 @@ export class ReturnsService {
                 productName: line.name,
                 variantName: line.sku,
                 quantity: line.quantity,
-                unitPrice: line.price,
+                unitPrice: line.originalPrice ?? line.price,
+                promotionId: line.promotionId,
                 unitCost: line.cost,
-                totalPrice: new Prisma.Decimal(line.price).mul(line.quantity),
+                discountAmount: line.lineDiscount ?? 0,
+                totalPrice: line.cashValue ?? new Prisma.Decimal(line.price).mul(line.quantity),
                 pricingSnapshot: {
                   version: 1,
-                  cashValue: new Prisma.Decimal(line.price)
-                    .mul(line.quantity)
-                    .toNumber(),
+                  cashValue: line.cashValue ?? new Prisma.Decimal(line.price).mul(line.quantity).toNumber(),
+                  originalPrice: line.originalPrice ?? line.price,
+                  promotionDiscount: line.promotionDiscount ?? 0,
+                  tierDiscount: line.tierDiscount ?? 0,
                   pointsUsed: 0,
                   pointsValue: 0,
                   couponDiscount: 0,
@@ -562,6 +590,7 @@ export class ReturnsService {
                 : undefined,
           },
         });
+        await reservePromotionBenefits(tx, replacement.id, quote.lines);
         const result = await tx.exchangeSettlement.create({
           data: {
             returnOrderId: id,

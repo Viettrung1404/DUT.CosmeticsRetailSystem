@@ -321,9 +321,7 @@ export class PrismaProductRepository implements IProductRepository {
 
     const domainEntity = ProductMapper.toDomain(created);
 
-    if (this.esService) {
-      await this.esService.indexProduct(ProductMapper.toSearchDocument(domainEntity));
-    }
+    // Database triggers enqueue a durable, versioned indexing job in the write transaction.
 
     return domainEntity;
   }
@@ -354,9 +352,7 @@ export class PrismaProductRepository implements IProductRepository {
 
     const domainEntity = ProductMapper.toDomain(updated);
 
-    if (this.esService) {
-      await this.esService.indexProduct(ProductMapper.toSearchDocument(domainEntity));
-    }
+    // Database triggers enqueue a durable, versioned indexing job in the write transaction.
 
     return domainEntity;
   }
@@ -366,9 +362,6 @@ export class PrismaProductRepository implements IProductRepository {
       where: { id },
     });
 
-    if (this.esService) {
-      await this.esService.deleteProduct(id);
-    }
   }
 
   async findAllForAdmin(

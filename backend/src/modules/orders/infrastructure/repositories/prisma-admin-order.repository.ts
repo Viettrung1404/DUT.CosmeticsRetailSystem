@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { notifyCustomer } from '@core/services/customer-events';
 import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
+import { transitionPromotionAllocations } from '@core/services/promotion-lifecycle';
 import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
@@ -232,6 +233,7 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           quantity: true,
         },
       });
+      await transitionPromotionAllocations(tx, order.id, 'CONFIRMED');
       const inventories = await this.lockInventories(
         tx,
         order.store_id,
@@ -365,6 +367,7 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           await tx.$queryRaw`SELECT id FROM customers WHERE id=${order.customer_id}::uuid FOR UPDATE`;
         if (order.coupon_id)
           await tx.$queryRaw`SELECT id FROM coupons WHERE id=${order.coupon_id}::uuid FOR UPDATE`;
+          await transitionPromotionAllocations(tx, order.id, 'CANCELLED');
 
         // Chỉ hủy được trước SHIPPING nên hàng vẫn đang giữ, chưa trừ khỏi kho
         if (['ONLINE', 'STORE_PICKUP'].includes(order.order_type)) {

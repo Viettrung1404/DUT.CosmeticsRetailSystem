@@ -1,7 +1,7 @@
 # Sprint 5 — Việt Trung — Backend End-user
 
 **Chủ đề:** Review, CMS public, khuyến mãi/coupon, Flash Sale, push và search.  
-**Ngày lập:** 2026-10-24. **Trạng thái:** Kế hoạch triển khai dựa trên repository, chưa nghiệm thu tính năng.  
+**Ngày lập:** 2026-10-24. **Trạng thái:** Đã triển khai backend local trên `feat/be-sprint5`; xem [runbook và phạm vi kiểm chứng](../../backend/docs/sprint-5.md). Còn chờ nghiệm thu Admin/POS, FE/Mobile và provider thực.
 **Cách lập kế hoạch:** Theo thứ tự công việc, phụ thuộc và tiêu chí nghiệm thu; không ước lượng ngày công theo yêu cầu người dùng.  
 **Liên kết:** [Roadmap](08_sprint_plan.md) · [FR](../1-requirement/07_functional_requirements.md) · [Thiết kế DB](../2-design/04_thiet_ke_csdl.md) · [Sprint 4](09_sprint_4_viet_trung_backend_enduser.md) · [Sprint 6](11_sprint_6_viet_trung_backend_enduser.md).
 

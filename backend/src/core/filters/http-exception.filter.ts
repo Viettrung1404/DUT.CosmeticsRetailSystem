@@ -20,6 +20,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | object = 'Internal server error';
     let code: string | undefined;
+    let details: unknown;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -30,6 +31,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         'code' in exceptionResponse
       )
         code = String(exceptionResponse.code);
+      if (code === 'ORDER_PRICE_CHANGED' && typeof exceptionResponse === 'object') {
+        const changed = exceptionResponse as { pricing?: unknown; quoteVersion?: unknown };
+        details = { pricing: changed.pricing, quoteVersion: changed.quoteVersion };
+      }
       message =
         typeof exceptionResponse === 'object' && 'message' in exceptionResponse
           ? (exceptionResponse as any).message
@@ -57,6 +62,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
           : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
+      ...(details ? { details } : {}),
     });
   }
 }
