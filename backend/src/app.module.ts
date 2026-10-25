@@ -21,6 +21,7 @@ import { CustomersModule } from '@modules/customers/customers.module';
 import { OrdersModule } from '@modules/orders/orders.module';
 import { PaymentsModule } from '@modules/payments/payments.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CustomersModule,
     OrdersModule,
     PaymentsModule,
+    CustomerCommerceModule,
   ],
   providers: [
     {
@@ -62,4 +64,3 @@ import { ScheduleModule } from '@nestjs/schedule';
   ],
 })
 export class AppModule {}
-

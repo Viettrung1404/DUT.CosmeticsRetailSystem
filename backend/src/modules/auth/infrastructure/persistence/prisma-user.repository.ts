@@ -48,6 +48,17 @@ export class PrismaUserRepository implements IUserRepository {
         extraPermissions: data.extraPermissions,
         revokedPermissions: data.revokedPermissions,
         lastLoginAt: data.lastLoginAt,
+        ...(data.roleId === 6
+          ? {
+              customer: {
+                create: {
+                  fullName: data.fullName,
+                  // A typed phone number alone is not evidence of ownership of a POS profile.
+                  phone: data.phoneVerified ? data.phone : null,
+                },
+              },
+            }
+          : {}),
       },
       include: { role: true },
     });

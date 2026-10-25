@@ -70,10 +70,12 @@ export class PreviewOrderUseCase {
       if (!cart || !cart.items || cart.items.length === 0) {
         throw new BadRequestException('Giỏ hàng của bạn đang trống');
       }
-      requestedItems = cart.items.map((i) => ({
-        variantId: i.productVariantId,
-        quantity: i.quantity,
-      }));
+      requestedItems = cart.items
+        .filter((i) => i.isSelected !== false)
+        .map((i) => ({
+          variantId: i.productVariantId,
+          quantity: i.quantity,
+        }));
     }
 
     // 2. Fetch Variant details
@@ -119,12 +121,17 @@ export class PreviewOrderUseCase {
       };
     });
 
+    const pointsValueVnd = usePoints
+      ? await this.pricingService.configuredPointValue()
+      : 0;
     const pricing = this.pricingService.calculatePricing({
       items: pricingItems,
       coupon,
       customerCouponUsageCount,
       pointsToUse: usePoints,
       customerAvailablePoints: customerPoints,
+      pointsValueVnd,
+      customerId,
     });
 
     // 7. Map Items with Snapshot

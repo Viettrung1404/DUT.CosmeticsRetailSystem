@@ -74,7 +74,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       success: false,
       message: formattedMessage,
-      ...(code ? { code } : {}),
+      ...(code
+        ? { code }
+        : typeof formattedMessage === 'string' &&
+            /^[A-Z][A-Z0-9_]+$/.test(formattedMessage)
+          ? { code: formattedMessage }
+          : {}),
       ...(details ? { details } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),

@@ -1,8 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { notifyCustomer } from '@core/services/customer-events';
+import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
+import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { enqueueOrderEvent } from '@core/services/order-events';
@@ -284,6 +288,28 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           target,
           'ADMIN',
         );
+        const exchange = await tx.exchangeSettlement.findUnique({
+          where: { replacementOrderId: order.id },
+        });
+        if (exchange) {
+          const paid = await tx.payment.aggregate({
+            where: { orderId: order.id, status: 'COMPLETED' },
+            _sum: { amount: true },
+          });
+          const cod = await tx.payment.aggregate({
+            where: {
+              orderId: order.id,
+              status: 'PENDING',
+              paymentMethod: 'COD',
+            },
+            _sum: { amount: true },
+          });
+          const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
+            .add(exchange.creditApplied)
+            .add(target === OrderStatus.SHIPPING ? (cod._sum.amount ?? 0) : 0);
+          if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
+            throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
+        }
 
         const result: OrderStatusChangeResult = {
           stockDeducted: false,
@@ -346,6 +372,11 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           pointsRefunded: 0,
           refundAmount: 0,
         };
+        await cancelReplacementCredit(tx, order.id);
+        if (order.customer_id)
+          await tx.$queryRaw`SELECT id FROM customers WHERE id=${order.customer_id}::uuid FOR UPDATE`;
+        if (order.coupon_id)
+          await tx.$queryRaw`SELECT id FROM coupons WHERE id=${order.coupon_id}::uuid FOR UPDATE`;
 
         // Chỉ hủy được trước SHIPPING nên hàng vẫn đang giữ, chưa trừ khỏi kho
         if (['ONLINE', 'STORE_PICKUP'].includes(order.order_type)) {
@@ -396,10 +427,12 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
               orderId: order.id,
               points: order.loyalty_points_used,
               type: 'REFUND',
+              eventKey: `ORDER:${order.id}:CANCEL_POINTS`,
               description: `Hoàn điểm do hủy đơn hàng ${order.order_number}`,
             },
           });
           result.pointsRefunded = order.loyalty_points_used;
+          await evaluateTier(tx, order.customer_id);
         }
 
         const payments = await tx.payment.findMany({
@@ -430,7 +463,7 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
               },
             });
             result.refundAmount += Number(payment.amount);
-          } else {
+          } else if (payment.status === 'PENDING') {
             // Cùng giá trị với luồng khách tự hủy (CancelOrderUseCase) để báo cáo đọc thống nhất
             await tx.payment.update({
               where: { id: payment.id },
@@ -579,6 +612,7 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     }
 
     const totalAmount = Number(order.total_amount);
+    await tx.$queryRaw`SELECT id FROM customers WHERE id=${order.customer_id}::uuid FOR UPDATE`;
     const [customer, setting, tiers] = await Promise.all([
       tx.customer.findUniqueOrThrow({
         where: { id: order.customer_id },
@@ -620,9 +654,18 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           orderId: order.id,
           points: pointsEarned,
           type: 'EARN',
+          eventKey: `ORDER:${order.id}:EARN`,
           description: `Tích điểm đơn hàng ${order.order_number}`,
         },
       });
+      await notifyCustomer(
+        tx,
+        order.customer_id,
+        `LOYALTY:ORDER:${order.id}:EARN`,
+        'Đã tích điểm cho đơn hàng hoàn tất',
+        'LOYALTY',
+        { orderId: order.id, points: pointsEarned },
+      );
     }
 
     return {
@@ -711,7 +754,18 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     await tx.orderStatusHistory.create({
       data: { orderId, status, note, changedBy },
     });
-    await enqueueOrderEvent(tx, orderId, status);
+    const owner = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { customerId: true },
+    });
+    await notifyCustomer(
+      tx,
+      owner.customerId,
+      `ORDER:${orderId}:${status}`,
+      `Trạng thái đơn hàng: ${status}`,
+      'ORDER',
+      { orderId, status },
+    );
   }
 
   async findMany(
