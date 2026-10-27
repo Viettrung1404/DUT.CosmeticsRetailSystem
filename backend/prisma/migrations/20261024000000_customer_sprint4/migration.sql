@@ -20,8 +20,8 @@ ALTER TABLE "refunds" ADD COLUMN     "event_key" VARCHAR(160);
 -- AlterTable
 ALTER TABLE "loyalty_points_transactions" ADD COLUMN     "event_key" VARCHAR(160);
 
--- AlterTable
-ALTER TABLE "notifications" ADD COLUMN     "event_key" VARCHAR(160);
+-- Notification event keys and email_outbox are owned by the Sprint 3 migration.
+-- Reuse its indexes and cascading user foreign key instead of recreating them.
 
 -- CreateTable
 CREATE TABLE "command_receipts" (
@@ -114,26 +114,6 @@ CREATE TABLE "loyalty_redemptions" (
 );
 
 -- CreateTable
-CREATE TABLE "email_outbox" (
-    "id" UUID NOT NULL,
-    "user_id" UUID NOT NULL,
-    "event_key" VARCHAR(160) NOT NULL,
-    "recipient" VARCHAR(255) NOT NULL,
-    "subject" VARCHAR(255) NOT NULL,
-    "text" TEXT NOT NULL,
-    "status" VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    "attempts" INTEGER NOT NULL DEFAULT 0,
-    "next_attempt_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lease_until" TIMESTAMPTZ,
-    "claim_token" UUID,
-    "last_error" VARCHAR(100),
-    "sent_at" TIMESTAMPTZ,
-    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "email_outbox_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "push_deliveries" (
     "id" UUID NOT NULL,
     "notification_id" UUID NOT NULL,
@@ -183,12 +163,6 @@ CREATE UNIQUE INDEX "loyalty_redemptions_coupon_id_key" ON "loyalty_redemptions"
 CREATE INDEX "loyalty_redemptions_customer_id_created_at_id_idx" ON "loyalty_redemptions"("customer_id", "created_at", "id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "email_outbox_event_key_key" ON "email_outbox"("event_key");
-
--- CreateIndex
-CREATE INDEX "email_outbox_status_next_attempt_at_lease_until_idx" ON "email_outbox"("status", "next_attempt_at", "lease_until");
-
--- CreateIndex
 CREATE INDEX "push_deliveries_status_next_attempt_at_lease_until_idx" ON "push_deliveries"("status", "next_attempt_at", "lease_until");
 
 -- CreateIndex
@@ -220,12 +194,6 @@ CREATE INDEX "loyalty_points_transactions_customer_id_created_at_id_idx" ON "loy
 
 -- CreateIndex
 CREATE INDEX "wishlists_customer_id_created_at_id_idx" ON "wishlists"("customer_id", "created_at", "id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "notifications_event_key_key" ON "notifications"("event_key");
-
--- CreateIndex
-CREATE INDEX "notifications_user_id_is_read_created_at_idx" ON "notifications"("user_id", "is_read", "created_at");
 
 -- AddForeignKey
 ALTER TABLE "command_receipts" ADD CONSTRAINT "command_receipts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -259,9 +227,6 @@ ALTER TABLE "loyalty_redemptions" ADD CONSTRAINT "loyalty_redemptions_customer_i
 
 -- AddForeignKey
 ALTER TABLE "loyalty_redemptions" ADD CONSTRAINT "loyalty_redemptions_coupon_id_fkey" FOREIGN KEY ("coupon_id") REFERENCES "coupons"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "email_outbox" ADD CONSTRAINT "email_outbox_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "push_deliveries" ADD CONSTRAINT "push_deliveries_notification_id_fkey" FOREIGN KEY ("notification_id") REFERENCES "notifications"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
