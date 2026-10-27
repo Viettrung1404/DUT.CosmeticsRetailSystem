@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f9ecee;
+  --foreground: #412e27;
+  --card: #ffffff;
+  --card-foreground: #412e27;
+  --popover: #ffffff;
+  --popover-foreground: #412e27;
+  --primary: #c85a70;
+  --primary-foreground: #ffffff;
+  /* White on brand is below 4.5:1; use action for small button text. */
+  --action: #9d394f;
+  --action-foreground: #ffffff;
+  --secondary: #f5dce2;
+  --secondary-foreground: #412e27;
+  --muted: #f7f2f3;
+  --muted-foreground: #705b55;
+  --accent: #f5dce2;
+  --accent-foreground: #412e27;
+  --destructive: #b42318;
+  --border: #e5cdd3;
+  --input: #b38b96;
+  --ring: #9d394f;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-montserrat);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-action: var(--action);
+  --color-action-foreground: var(--action-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --breakpoint-xl: 80rem;
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-body), sans-serif; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
