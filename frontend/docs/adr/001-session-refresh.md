@@ -1,6 +1,6 @@
 # ADR-001 — Opaque web session và refresh broker
 
-Ngày: 26/10/2026. Trạng thái: chọn cho triển khai FE-01; FE-00 chỉ khóa thiết kế, chưa có auth runtime.
+Ngày: 26/10/2026; cập nhật 27/10/2026. Trạng thái: runtime FE-01 đã triển khai, đã test trên Upstash thật; gate backend/provider còn mở. Xem [checklist FE-01](../fe-01-checklist.md).
 
 ## Bối cảnh và quyết định
 
@@ -36,3 +36,10 @@ Thêm Redis availability/latency và recovery khi upstream rotate rồi crash tr
 Gate FE-01: test hai instance/hai tab refresh cùng phiên, lock expiry, CAS stale, logout trong lúc refresh, 401/403/429/503/network timeout, user A → B cache isolation, CSRF, redirect và store unavailable. Backend authoritative cho ownership. Health/live không chứng minh session store/provider sẵn sàng.
 
 Tham chiếu: [kiến trúc](../../../docs/3-planning/fe/01_architecture.md), [Next authentication](https://nextjs.org/docs/app/guides/authentication).
+
+## Ghi nhận triển khai
+
+- Dùng chung Upstash với backend theo yêu cầu người dùng, prefix riêng và TLS; Redis client chỉ ở server. Chưa có ACL user riêng, nên namespace hiện là cơ chế tránh collision, không được mô tả như isolation quyền.
+- Backend chưa có refresh expiry trong JSON; cấu hình bắt buộc `SESSION_MAX_AGE_SECONDS` tạo fixed deadline không vượt TTL backend. Refresh không gia hạn deadline này.
+- Pending state được CAS trước refresh. Owner crash/lock expiry hoặc refresh outcome không xác định chuyển recovery, không gửi lại refresh token cũ. 429 có persisted backoff; refresh 503/network được xử lý bảo thủ như outcome chưa xác định cho tới khi có contract rõ hơn.
+- React request memoization cho current user không chia sẻ giữa request. Upstash chỉ chứa session kỹ thuật; public data caching vẫn theo ADR-002.

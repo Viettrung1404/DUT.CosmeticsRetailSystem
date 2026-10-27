@@ -1,6 +1,6 @@
 # Kế hoạch frontend end-user GlowUp — Next.js
 
-Ngày lập/cập nhật: **26/10/2026**. Trạng thái: **đã triển khai foundation FE-00 trong `frontend/`**; FE-01–07 chưa triển khai, backend không thay đổi. Xem [checklist FE-00](../../../frontend/docs/fe-00-checklist.md) và [README chạy app](../../../frontend/README.md). Kết nối backend thật vẫn cần kiểm chứng khi dịch vụ cổng 3000 sẵn sàng.
+Ngày cập nhật: **27/10/2026**. Trạng thái: **đã triển khai FE-00 và code shell/auth/session FE-01 trong `frontend/`**; FE-01 còn gate backend/SMTP/OAuth thật, FE-02–07 chưa triển khai. Xem [checklist FE-01](../../../frontend/docs/fe-01-checklist.md), [checklist FE-00](../../../frontend/docs/fe-00-checklist.md) và [README chạy app](../../../frontend/README.md). Frontend dùng chung Upstash với backend bằng namespace phiên riêng, đã kiểm tra lock/CAS trên Upstash thật; source backend không thay đổi.
 
 ## 1. Phạm vi và quyết định đã chốt
 
