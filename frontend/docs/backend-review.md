@@ -12,6 +12,8 @@ Ngày: 26/10/2026. Đây là backlog để review, không phải issue đã giao
 | BE-FE-05 / G02/G03 | BE + Admin/content | Public brand/store reads hoặc nguồn được duyệt, logo/slug/coordinates/active states | FE-06 | Chưa chốt endpoint/nguồn |
 | ENV-01 / O09 | BE/deployment | SMTP/OAuth/storage/migrations, origin 3001, trusted proxy/IP, Redis sessions và refresh outcome khi timeout | FE-01 và staging | Cần kiểm chứng môi trường |
 
+Cập nhật FE-01 ngày 27/10: web session broker đã kiểm chứng 14 ca trên Upstash thật, dùng chung database theo yêu cầu người dùng nhưng namespace riêng. Backend cổng 3000 chưa phản hồi probe; SMTP/OAuth thật, refresh expiry/outcome contract và trusted proxy/IP vẫn cần bàn giao. Xem [checklist FE-01](fe-01-checklist.md); kết quả fixture không đóng ENV-01/O02.
+
 Mỗi bàn giao cần: OpenAPI cập nhật, request/response fixture đã loại PII, negative cases, test ownership, pagination/headers, endpoint readiness. FE chạy `contracts:generate`, review diff và cập nhật capability/integration riêng; không bật tính năng chỉ vì enum/type tồn tại.
 
 Chi tiết và bằng chứng source: [03 API contracts](../../docs/3-planning/fe/03_api_contracts_and_gaps.md). CTA thiếu API bỏ theo D06; page brand/store vẫn thuộc phạm vi. VNPAY không bị biến thành optional flag.

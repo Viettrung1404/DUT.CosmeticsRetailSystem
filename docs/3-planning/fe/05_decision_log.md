@@ -70,3 +70,9 @@ Nếu cần thêm tính năng đã bỏ (MoMo, pickup, change-password, newslett
 - Generated types lấy spec hiện tại; schema generic/O02 và các blocker BE vẫn giữ nguyên. Asset manifest không đồng nghĩa ảnh đã được duyệt xuất bản.
 
 Chi tiết: [ADR session](../../../frontend/docs/adr/001-session-refresh.md), [ADR runtime/contracts/cache](../../../frontend/docs/adr/002-runtime-contracts-cache.md).
+
+## 6. Triển khai FE-01 — 27/10/2026
+
+- Người dùng yêu cầu dùng chung Upstash hiện có của backend, thay Redis local. Frontend sử dụng kết nối TLS qua `SESSION_REDIS_URL`, namespace runtime/test riêng; credentials trong file env bị gitignore, không dùng biến NEXT_PUBLIC.
+- Upstash FE-01 là session store phía server Next/BFF. Giữ upstream/private response no-store và cache tương tác TanStack Query trong memory có scope user; chưa bật persistent public data cache trong FE-01.
+- Opaque refresh token chưa có expiry trong response. Web session dùng deadline cấu hình không vượt TTL backend; chưa sửa backend. Nhánh refresh outcome không xác định giữ recovery record, không replay refresh token cũ; gate môi trường còn mở.
