@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
+import { SiteHeader, SiteFooter } from "@/widgets/site-shell";
 
-// FE-01 adds the shared home header/footer here, once for every site route group.
 export default function SiteLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+  return <><SiteHeader/>{children}<SiteFooter/></>;
 }

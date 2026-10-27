@@ -1,6 +1,6 @@
-# GlowUp frontend — FE-00
+# GlowUp frontend — FE-00 / FE-01
 
-Next.js App Router cho Guest/Customer, cổng **3001**; backend NestJS cổng **3000**. FE-00 là foundation, chưa triển khai storefront/auth hoặc các route nghiệp vụ FE-01–07. Trang `/` hiện là trang chờ có brand tokens; không phải home S39 đã hoàn tất.
+Next.js App Router cho Guest/Customer, cổng **3001**; backend NestJS cổng **3000**. Đã có foundation, shell dùng chung, các trang xác thực, account/sidebar, address adapter và session broker FE-01. Xem [checklist FE-01](docs/fe-01-checklist.md) để phân biệt kết quả kiểm thử và gate backend/provider. Trang `/` vẫn là trang chờ; các section home thuộc FE-02/06.
 
 ## Chạy local
 
@@ -12,7 +12,9 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Mở http://localhost:3001. `BACKEND_API_BASE_URL` gồm prefix `/api/v1`; `SITE_URL` là origin frontend, không có path. Env backend/session luôn server-only. FE-01 mới dùng Redis sessions, không cần secret/session store để chạy foundation.
+Mở http://localhost:3001. `BACKEND_API_BASE_URL` gồm prefix `/api/v1`; `SITE_URL` là origin frontend, không có path. Cấu hình `SESSION_REDIS_URL` trong `.env.local` bằng kết nối TLS Upstash (có thể dùng chung database với backend), với prefix riêng `glowup:frontend:local:session:`. Không commit `.env.local`. Shell/auth UI có thể render khi backend/store offline; đăng nhập và trang private cần cả hai dịch vụ.
+
+`SESSION_MAX_AGE_SECONDS` bắt buộc, không vượt thời hạn refresh của backend. Backend hiện trả opaque refresh token không kèm expiry; mặc định mẫu là 7 ngày, phải đối chiếu `JWT_REFRESH_EXPIRES_IN` khi triển khai. Cookie và record có cùng deadline cố định, refresh không kéo dài deadline web. Không có fallback session trong memory.
 
 `/dev/backend` chỉ mở ở development với `FE_DIAGNOSTICS=true`; RSC gọi thẳng `GET /api/v1/health/live` bằng server client. Backend offline sẽ hiện lỗi kết nối, không mock thành công. Production luôn trả 404 cho diagnostic. Liveness không chứng minh DB/provider readiness.
 
@@ -20,12 +22,16 @@ Mở http://localhost:3001. `BACKEND_API_BASE_URL` gồm prefix `/api/v1`; `SITE
 
 ```powershell
 npm run check
+npm run test:sessions
 npx playwright install chromium
 npm run test:e2e
 npm run test:production
+npm run test:maintenance
 ```
 
-`check`: OpenAPI drift, route/asset inventory, ESLint, Next route types + strict TypeScript, Vitest, production build. `test:e2e` cần cổng 3001 và 3100 trống; tự khởi tạo app và health fixture riêng, test desktop/mobile. Đây là contract fixture, không phải bằng chứng backend thật online. Không dùng fixture ngoài tests.
+`check`: OpenAPI drift, route/asset inventory, ESLint, Next route types + strict TypeScript, Vitest, production build. `test:sessions` dùng Redis/Upstash thật từ `.env.local`, tạo namespace ngẫu nhiên `glowup:test:*`, kiểm tra refresh/CAS/logout/TTL và xóa các record đã tạo. Có thể đặt `TEST_SESSION_REDIS_URL` để dùng database kiểm thử riêng; lệnh này không duyệt hoặc xóa key backend. Các test Redis được tách khỏi `npm test` để kiểm tra code không bắt buộc network.
+
+`test:e2e` cần cổng 3001 và 3100 trống, dùng session store từ `.env.local` (hoặc `TEST_SESSION_REDIS_URL`) với prefix riêng `glowup:e2e:*`. Tự bật Next dev và backend fixture cho auth/address/health, chạy desktop/mobile. Record test có TTL tối đa một giờ. Fixture không chứng minh SMTP/OAuth/backend thật hoạt động. Chạy các lệnh tạo type/build tuần tự với E2E để tránh Next dev và `typegen` cùng thay artifact `.next`.
 
 `test:production` chạy sau build, cần cổng 3001 trống, tự bật/tắt Next production và xác nhận home/noindex/404 cùng diagnostic không public. ESLint 9 hiện deprecated nhưng còn cần cho peer compatibility của Next plugins; xem ADR-002, không dùng force/legacy-peer-deps để ép ESLint 10.
 
@@ -35,14 +41,15 @@ Build tải font qua next/font; cần network đến Google Fonts ở build time
 
 - `npm run contracts:generate` lấy `../backend/docs/api/openapi.json`, pin snapshot SHA256 trong `src/shared/api/generated/openapi.d.ts`. `contracts:check` fail khi spec/types drift. Không chỉnh generated bằng tay.
 - Runtime schema Zod cho mỗi endpoint; generic schemas trong spec chưa đủ làm integration. Envelope chỉ unwrap một lần. Lỗi giữ status/code/details/Retry-After, không hiển thị upstream body.
-- `server.ts` có `server-only`, fixed health allowlist, no-store, bounded timeout, redirect:error; browser chỉ dùng BFF same-origin. Chưa có auth/token broker hoặc mutation BFF.
+- Các server client có `server-only`, endpoint allowlist, no-store, timeout và redirect:error. Browser dùng BFF same-origin; mutation kiểm tra Origin/content-type/body size. Không forward Authorization/cookie/IP do browser chọn sang backend.
 - API backend thiếu giữ blocker trong `capabilities.ts`; toàn bộ integration status vẫn false. VNPAY bắt buộc, không được bật giả khi thiếu G01.
-- Hướng import: app → widgets/features → entities/shared. Chỉ tạo folder khi dùng. `(site)` là nơi FE-01 thêm navbar/footer chung; account layout sẽ dùng menu Sổ địa chỉ ở `navigation.ts`.
+- Hướng import: app → widgets/features → entities/shared. `(site)` dùng chung navbar/footer; account layout xác thực qua backend và dùng menu Sổ địa chỉ ở `navigation.ts`.
 - Route inventory được sinh từ kế hoạch: S01–S41 + B01–B05, S24 là overlay, S28 có hai route, lỗi là boundary. Registry không tự tạo 46 trang rỗng. CMS cần published allowlist + reserved slug guard.
 
 ## Handoff
 
 - [Checklist và kết quả FE-00](docs/fe-00-checklist.md)
+- [Checklist, cache policy và kết quả FE-01](docs/fe-01-checklist.md)
 - [ADR session/refresh](docs/adr/001-session-refresh.md)
 - [ADR runtime/cache/contracts](docs/adr/002-runtime-contracts-cache.md)
 - [Asset inventory và quyền sử dụng](docs/assets.md)
@@ -50,3 +57,5 @@ Build tải font qua next/font; cần network đến Google Fonts ở build time
 - [Kế hoạch toàn bộ frontend](../docs/3-planning/fe/README.md)
 
 Mặc định noindex; chưa có sitemap/robots proxy production. Trước public release cần origin/callback, image hosts, nội dung chính thức, session infra, provider tests và FE-07 gate. Deploy rollback dùng artifact/lockfile phiên bản trước; thay schema/migrations do backend quản lý.
+
+`MAINTENANCE_MODE=true` trả 503 cho site/BFF và `Retry-After`; `/maintenance` luôn trả 503. Restart server sau khi đổi cờ. Lỗi backend thông thường dùng error boundary và nút thử lại, không tự bật bảo trì. OAuth continuation giữ challenge/nonce trong store có TTL; provider exchange chỉ được bật sau smoke test thật. Chưa có provider SDK/CTA công khai khi gate này chưa đạt.

@@ -1,0 +1,1 @@
+export default function Loading() { return <main id="main-content" className="site-container loading-state" role="status" aria-label="Đang tải nội dung"><div className="skeleton"/><div className="skeleton"/><div className="skeleton"/><span className="sr-only">Đang tải…</span></main>; }
