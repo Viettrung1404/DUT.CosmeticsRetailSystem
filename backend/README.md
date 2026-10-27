@@ -107,3 +107,14 @@ npm run start:prod
 ### 3.5 Tài liệu API (Swagger UI)
 Sau khi khởi động server, truy cập Swagger UI tại:
 👉 `http://localhost:3000/api/docs`
+
+### 3.6 Xuất schema database hiện tại
+
+```sh
+npm run db:schema:export
+```
+
+Xuất SQL đầy đủ cấu trúc database đang kết nối vào `prisma/schema.current.sql`,
+bao gồm function, trigger và các ràng buộc viết tay.
+Xem [hướng dẫn xuất schema](docs/database-schema-export.md) để đổi đường dẫn,
+chọn chế độ portable và cấu hình `pg_dump`/Docker.
