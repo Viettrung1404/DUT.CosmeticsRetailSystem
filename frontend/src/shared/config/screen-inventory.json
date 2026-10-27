@@ -1,0 +1,671 @@
+[
+  {
+    "id": "S01",
+    "label": "404",
+    "source": "404_kh_ng_t_m_th_y_trang_glowup",
+    "kind": "boundary",
+    "routes": [],
+    "phase": "FE-01",
+    "dependencies": [],
+    "status": "TODO"
+  },
+  {
+    "id": "S02",
+    "label": "Bảo mật tài khoản",
+    "source": "b_o_m_t_t_i_kho_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/security"
+    ],
+    "phase": "FE-04",
+    "dependencies": [
+      "A01",
+      "G04"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S03",
+    "label": "FAQ",
+    "source": "c_u_h_i_th_ng_g_p_faq_glowup",
+    "kind": "page",
+    "routes": [
+      "/faq"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A10"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S04",
+    "label": "Danh sách khuyến mãi",
+    "source": "ch_ng_tr_nh_khuy_n_m_i_glowup",
+    "kind": "page",
+    "routes": [
+      "/promotions"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A09",
+      "O03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S05",
+    "label": "Chính sách đổi trả/hoàn tiền",
+    "source": "ch_nh_s_ch_i_tr_ho_n_ti_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/[pageSlug]"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A10"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S06",
+    "label": "Chi tiết đổi trả/báo giá",
+    "source": "chi_ti_t_i_tr_b_o_gi_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/returns/[id]"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S07",
+    "label": "Chi tiết khuyến mãi",
+    "source": "chi_ti_t_khuy_n_m_i_glowup",
+    "kind": "page",
+    "routes": [
+      "/promotions/[id]"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A09",
+      "G07",
+      "O03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S08",
+    "label": "Chi tiết đơn hàng",
+    "source": "chi_ti_t_n_h_ng_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/orders/[id]"
+    ],
+    "phase": "FE-04",
+    "dependencies": [
+      "A05",
+      "A07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S09",
+    "label": "Chi tiết sản phẩm",
+    "source": "chi_ti_t_s_n_ph_m_pdp_glowup",
+    "kind": "page",
+    "routes": [
+      "/products/[slug]"
+    ],
+    "phase": "FE-02",
+    "dependencies": [
+      "A02",
+      "A03",
+      "A06",
+      "A07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S10",
+    "label": "Chi tiết showroom",
+    "source": "chi_ti_t_showroom_ng_kh_i_glowup",
+    "kind": "page",
+    "routes": [
+      "/stores/[id]"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "G02"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S11",
+    "label": "Danh mục chăm sóc da",
+    "source": "danh_m_c_ch_m_s_c_da_glowup",
+    "kind": "page",
+    "routes": [
+      "/categories/[slug]"
+    ],
+    "phase": "FE-02",
+    "dependencies": [
+      "A02",
+      "O04"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S12",
+    "label": "Danh sách đổi trả",
+    "source": "danh_s_ch_i_tr_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/returns"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S13",
+    "label": "Flash sale",
+    "source": "flash_sale_glowup",
+    "kind": "page",
+    "routes": [
+      "/flash-sale"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A09",
+      "O03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S14",
+    "label": "Giỏ hàng",
+    "source": "gi_h_ng_glowup_beauty_retail",
+    "kind": "page",
+    "routes": [
+      "/cart"
+    ],
+    "phase": "FE-03",
+    "dependencies": [
+      "A03",
+      "A05"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S15",
+    "label": "Hàng mới về",
+    "source": "h_ng_m_i_v_glowup",
+    "kind": "page",
+    "routes": [
+      "/new-arrivals"
+    ],
+    "phase": "FE-02",
+    "dependencies": [
+      "A02"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S16",
+    "label": "Thông báo",
+    "source": "h_p_th_th_ng_b_o_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/notifications"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A08",
+      "G08"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S17",
+    "label": "Bảo trì",
+    "source": "h_th_ng_ang_b_o_tr_glowup",
+    "kind": "page",
+    "routes": [
+      "/maintenance"
+    ],
+    "phase": "FE-01/07",
+    "dependencies": [
+      "G10"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S18",
+    "label": "Danh sách showroom",
+    "source": "h_th_ng_showroom_glowup",
+    "kind": "page",
+    "routes": [
+      "/stores"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "G02"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S19",
+    "label": "Điểm thưởng/hạng",
+    "source": "i_m_th_ng_h_ng_th_nh_vi_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/loyalty"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A06"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S20",
+    "label": "Đổi ưu đãi",
+    "source": "i_u_i_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/loyalty/rewards"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A06",
+      "G06"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S21",
+    "label": "Kết quả tìm kiếm",
+    "source": "k_t_qu_t_m_ki_m_glowup",
+    "kind": "page",
+    "routes": [
+      "/search"
+    ],
+    "phase": "FE-02",
+    "dependencies": [
+      "A02"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S22",
+    "label": "Kết quả thanh toán",
+    "source": "k_t_qu_thanh_to_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/payment/return"
+    ],
+    "phase": "FE-03",
+    "dependencies": [
+      "G01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S23",
+    "label": "Lịch sử đơn hàng",
+    "source": "l_ch_s_n_h_ng_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/orders"
+    ],
+    "phase": "FE-04",
+    "dependencies": [
+      "A05",
+      "O07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S24",
+    "label": "Mini cart drawer",
+    "source": "mini_cart_drawer_glowup",
+    "kind": "overlay",
+    "routes": [],
+    "phase": "FE-03",
+    "dependencies": [
+      "A03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S25",
+    "label": "Đăng ký",
+    "source": "ng_k_th_nh_vi_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/register"
+    ],
+    "phase": "FE-01",
+    "dependencies": [
+      "A01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S26",
+    "label": "Đăng nhập",
+    "source": "ng_nh_p_glowup_beauty_retail",
+    "kind": "page",
+    "routes": [
+      "/login"
+    ],
+    "phase": "FE-01",
+    "dependencies": [
+      "A01",
+      "A03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S27",
+    "label": "OAuth challenge/link",
+    "source": "oauth_challenge_li_n_k_t_t_i_kho_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/oauth/continue"
+    ],
+    "phase": "FE-01",
+    "dependencies": [
+      "A01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S28",
+    "label": "Quên và đặt lại mật khẩu",
+    "source": "qu_n_t_l_i_m_t_kh_u_glowup",
+    "kind": "page",
+    "routes": [
+      "/forgot-password",
+      "/reset-password"
+    ],
+    "phase": "FE-01",
+    "dependencies": [
+      "A01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S29",
+    "label": "Sổ địa chỉ — chuẩn sidebar",
+    "source": "s_a_ch_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/addresses"
+    ],
+    "phase": "FE-01/04",
+    "dependencies": [
+      "A04",
+      "G05",
+      "O06"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S30",
+    "label": "Lỗi kết nối",
+    "source": "s_c_k_t_n_i_glowup",
+    "kind": "boundary",
+    "routes": [],
+    "phase": "FE-01/07",
+    "dependencies": [],
+    "status": "TODO"
+  },
+  {
+    "id": "S31",
+    "label": "Wishlist",
+    "source": "s_n_ph_m_y_u_th_ch_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/wishlist"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A06",
+      "A03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S32",
+    "label": "Đặt hàng thành công",
+    "source": "t_h_ng_th_nh_c_ng_glowup",
+    "kind": "page",
+    "routes": [
+      "/order-success/[id]"
+    ],
+    "phase": "FE-03",
+    "dependencies": [
+      "A05",
+      "G01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S33",
+    "label": "Tổng quan tài khoản",
+    "source": "t_ng_quan_t_i_kho_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/account"
+    ],
+    "phase": "FE-04",
+    "dependencies": [
+      "A04",
+      "A05",
+      "A06",
+      "A08",
+      "O07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S34",
+    "label": "Tạo yêu cầu đổi trả",
+    "source": "t_o_y_u_c_u_i_tr_m_i_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/returns/new"
+    ],
+    "phase": "FE-05",
+    "dependencies": [
+      "A07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S35",
+    "label": "Tất cả sản phẩm",
+    "source": "t_t_c_s_n_ph_m_glowup",
+    "kind": "page",
+    "routes": [
+      "/products"
+    ],
+    "phase": "FE-02",
+    "dependencies": [
+      "A02",
+      "O04"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S36",
+    "label": "Thông tin cá nhân",
+    "source": "th_ng_tin_c_nh_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/profile"
+    ],
+    "phase": "FE-04",
+    "dependencies": [
+      "A04",
+      "G04"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S37",
+    "label": "Checkout",
+    "source": "thanh_to_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/checkout"
+    ],
+    "phase": "FE-03",
+    "dependencies": [
+      "A04",
+      "A05",
+      "G01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S38",
+    "label": "Theo dõi vận chuyển",
+    "source": "theo_d_i_v_n_chuy_n_glowup",
+    "kind": "page",
+    "routes": [
+      "/account/orders/[id]/tracking"
+    ],
+    "phase": "FE-04",
+    "dependencies": [
+      "A07"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S39",
+    "label": "Trang chủ — chuẩn navbar/footer",
+    "source": "trang_ch_glowup_beauty_retail",
+    "kind": "page",
+    "routes": [
+      "/"
+    ],
+    "phase": "FE-01/02/06",
+    "dependencies": [
+      "A02",
+      "A09",
+      "A10",
+      "G03",
+      "O03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S40",
+    "label": "Trung tâm trợ giúp",
+    "source": "trung_t_m_tr_gi_p_glowup",
+    "kind": "page",
+    "routes": [
+      "/help"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A10",
+      "G10"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "S41",
+    "label": "Xác thực email",
+    "source": "x_c_th_c_email_glowup",
+    "kind": "page",
+    "routes": [
+      "/verify-email"
+    ],
+    "phase": "FE-01",
+    "dependencies": [
+      "A01"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "B01",
+    "label": "§4.4 Brand directory",
+    "source": "design_1.md",
+    "kind": "page",
+    "routes": [
+      "/brands"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "G03"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "B02",
+    "label": "§4.5 Brand collection",
+    "source": "design_1.md",
+    "kind": "page",
+    "routes": [
+      "/brands/[slug]"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "G03",
+      "A02"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "B03",
+    "label": "§7.1 Blog index",
+    "source": "design_1.md",
+    "kind": "page",
+    "routes": [
+      "/blog"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A10"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "B04",
+    "label": "§7.2 Blog topic",
+    "source": "design_1.md",
+    "kind": "page",
+    "routes": [
+      "/blog/category/[slug]"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A10"
+    ],
+    "status": "TODO"
+  },
+  {
+    "id": "B05",
+    "label": "§7.3 Blog article",
+    "source": "design_1.md",
+    "kind": "page",
+    "routes": [
+      "/blog/[slug]"
+    ],
+    "phase": "FE-06",
+    "dependencies": [
+      "A10",
+      "O05"
+    ],
+    "status": "TODO"
+  }
+]
