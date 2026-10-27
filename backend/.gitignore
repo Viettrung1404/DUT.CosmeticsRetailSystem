@@ -41,5 +41,9 @@ Thumbs.db
 !/scripts/sprint6-export-collection.cjs
 !/scripts/sprint6-migration-check.ts
 !/scripts/sprint6-client-readiness.cjs
+!/scripts/export-db-schema.cjs
+
+# Generated database schema snapshot
+/prisma/schema.current.sql
 
 /.agents
