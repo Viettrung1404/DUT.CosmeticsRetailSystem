@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const design = new URL("../docs/4-stitch_design/", root);
 const plan = await readFile(new URL("../docs/3-planning/fe/02_screen_inventory.md", root), "utf8");
+const progress = JSON.parse(await readFile(new URL("docs/screen-progress.json", root), "utf8"));
 const rows = plan.split(/\r?\n/).filter((line) => /^\| [SB]\d{2} \|/.test(line));
 const screens = rows.map((line) => {
   const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
@@ -19,11 +20,12 @@ const screens = rows.map((line) => {
     routes,
     phase: stitch ? cells[5] : "FE-06",
     dependencies: [...new Set(cells[stitch ? 4 : 4].match(/[AGO]\d{2}/g) ?? [])],
-    status: "TODO",
+    status: progress[id] ?? "TODO",
   };
 });
 if (screens.length !== 46 || screens.filter((s) => s.id.startsWith("S")).length !== 41) throw new Error("Screen inventory must contain S01–S41 and B01–B05.");
 if (screens.some((s) => !s.source)) throw new Error("Screen source could not be resolved.");
+if (Object.entries(progress).some(([id, status]) => !screens.some((screen) => screen.id === id) || !["TODO", "UI-ready", "API-ready", "Integrated", "Verified"].includes(status))) throw new Error("Invalid screen progress entry.");
 
 const entries = await readdir(design, { withFileTypes: true }).catch((error) => {
   if (error.code !== "ENOENT" || !process.argv.includes("--check")) throw error;

@@ -121,3 +121,9 @@ Dùng một bảng theo S/B ID hoặc ticket, gồm: `UI | API contract | integr
 Đã tạo app `frontend/` cổng 3001, pin dependency/lockfile, env sample, scripts, API envelope/error/runtime validation, generated OpenAPI + drift check, tokens, route/capability registry, asset inventory và ADR session/refresh/cache. Chi tiết kiểm chứng và phần còn chờ ở [checklist FE-00](../../../frontend/docs/fe-00-checklist.md).
 
 SSR smoke dùng health fixture cô lập trong E2E; probe backend thật `localhost:3000` hiện không kết nối được. Chưa coi runtime backend/provider đã nghiệm thu. Screen S01–S41/B01–B05 vẫn TODO, bao gồm home S39; trang `/` chỉ là bootstrap. O01/O02/O03/O05/G01/G02/G03/ENV-01 tiếp tục theo backlog BE, không có thay đổi source BE trong FE-00.
+
+### FE-01 — cập nhật 27/10/2026
+
+Đã triển khai shell chung, mobile menu/desktop dropdown, sidebar tài khoản, form/auth routes, server-only opaque session broker và các error/loading/maintenance shell. UI nền Sổ địa chỉ có adapter và CRUD theo DTO hiện tại. S01/S17/S25–S30/S41 được theo dõi UI-ready trong `frontend/docs/screen-progress.json`; không đánh dấu Integrated/Verified cho auth/provider/staging bằng fixture. Home S39 vẫn chờ FE-02/06.
+
+Theo yêu cầu người dùng, frontend dùng chung Upstash backend với namespace `glowup:frontend:local:session:`; secret chỉ ở `.env.local`. 14 ca concurrency/CAS/logout/recovery session đã pass trên Upstash thật. Chi tiết, cache policy, kết quả kiểm thử và gate ENV-01/O02 ở [checklist FE-01](../../../frontend/docs/fe-01-checklist.md).

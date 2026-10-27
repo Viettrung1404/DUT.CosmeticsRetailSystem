@@ -7,7 +7,7 @@
     "routes": [],
     "phase": "FE-01",
     "dependencies": [],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S02",
@@ -243,7 +243,7 @@
     "dependencies": [
       "G10"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S18",
@@ -355,7 +355,7 @@
     "dependencies": [
       "A01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S26",
@@ -370,7 +370,7 @@
       "A01",
       "A03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S27",
@@ -384,7 +384,7 @@
     "dependencies": [
       "A01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S28",
@@ -399,7 +399,7 @@
     "dependencies": [
       "A01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S29",
@@ -415,7 +415,7 @@
       "G05",
       "O06"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S30",
@@ -425,7 +425,7 @@
     "routes": [],
     "phase": "FE-01/07",
     "dependencies": [],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S31",
@@ -594,7 +594,7 @@
     "dependencies": [
       "A01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "B01",
