@@ -23,4 +23,4 @@ export function proxy(request: NextRequest) {
   if (/^\/(account|api|login|register|verify-email|reset-password|forgot-password|oauth)(\/|$)/.test(pathname)) response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|images/stitch/).*)"] };

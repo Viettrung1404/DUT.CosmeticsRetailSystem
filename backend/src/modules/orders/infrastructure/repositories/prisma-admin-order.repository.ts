@@ -306,9 +306,16 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
             },
             _sum: { amount: true },
           });
+          // COD is collected by the DELIVERED transition below. Completion
+          // must be covered by collected payments and exchange credit only.
+          const allowsPendingCod = [
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPING,
+            OrderStatus.DELIVERED,
+          ].includes(target);
           const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
             .add(exchange.creditApplied)
-            .add(target === OrderStatus.SHIPPING ? (cod._sum.amount ?? 0) : 0);
+            .add(allowsPendingCod ? (cod._sum.amount ?? 0) : 0);
           if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
             throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
         }

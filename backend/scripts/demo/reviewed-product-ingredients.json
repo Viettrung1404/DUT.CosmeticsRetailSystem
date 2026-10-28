@@ -1,0 +1,37 @@
+[
+  {
+    "productId":"3e0d99ef-5697-537e-a2eb-ee43b7013310",
+    "sourceUrl":"https://cocoonvietnam.com/san-pham/bo-duong-the-ca-phe-dak-lak-200ml",
+    "ingredientHtml":"<h2>Thành phần chính</h2><p>Dầu cà phê: thành phần được hãng công bố.</p><p>Dầu mù u: thành phần được hãng công bố.</p><p>Bơ ca cao: thành phần được hãng công bố.</p>",
+    "scope":"OFFICIAL_KEY_INGREDIENTS",
+    "fullFormulaGuaranteed":false
+  },
+  {
+    "productId":"cda9716f-0f5e-5e42-af9c-5376897c24bf",
+    "sourceUrl":"https://www.eucerin.vn/san-pham/ph5/ph5-lotion",
+    "ingredientHtml":"<h2>Ingredients</h2><p>Dexpanthenol: thành phần chính được hãng công bố.</p><p>Glycerin: thành phần chính được hãng công bố.</p>",
+    "scope":"OFFICIAL_KEY_INGREDIENTS",
+    "fullFormulaGuaranteed":false
+  },
+  {
+    "productId":"89abacb5-41e0-506d-a640-532bd78a7647",
+    "sourceUrl":"https://www.eucerin.vn/san-pham/dermopure-clinical/scrub",
+    "ingredientHtml":"<h2>Thành phần chính</h2><p>Lactic Acid: thành phần được hãng công bố.</p>",
+    "scope":"OFFICIAL_KEY_INGREDIENTS",
+    "fullFormulaGuaranteed":false
+  },
+  {
+    "productId":"cc0c6428-1d6e-5e06-a6f3-c33c492a33d0",
+    "sourceUrl":"https://www.eucerin.vn/van-de-cua-da/da-bi-mun-trung-ca/toner-cho-da-nhay-cam",
+    "ingredientHtml":"<h2>Thành phần chính</h2><p>APG Complex: thành phần được hãng công bố.</p><p>Gluco-Glycerol: thành phần được hãng công bố.</p><p>Hyaluronic Acid: thành phần được hãng công bố.</p>",
+    "scope":"OFFICIAL_KEY_INGREDIENTS",
+    "fullFormulaGuaranteed":false
+  },
+  {
+    "productId":"b3d9e226-bc10-54c0-a3e9-c56284f8579a",
+    "sourceUrl":"https://banilausa.com/products/clean-it-zero-cleansing-balm-nourishing",
+    "ingredientHtml":"<h2>Thành phần chính</h2><p>Chiết xuất rễ nhân sâm: thành phần được hãng công bố.</p><p>Chiết xuất quả nhân sâm: thành phần được hãng công bố.</p><p>Vitamin E: thành phần được hãng công bố.</p><p>Vitamin C: thành phần được hãng công bố.</p>",
+    "scope":"OFFICIAL_KEY_INGREDIENTS",
+    "fullFormulaGuaranteed":false
+  }
+]

@@ -145,13 +145,13 @@
   },
   {
     "id": "S11",
-    "label": "Danh mục chăm sóc da",
+    "label": "Danh mục chăm sóc da — chuẩn navbar",
     "source": "danh_m_c_ch_m_s_c_da_glowup",
     "kind": "page",
     "routes": [
       "/categories/[slug]"
     ],
-    "phase": "FE-02",
+    "phase": "FE-01 (navbar)/FE-02 (nội dung)",
     "dependencies": [
       "A02",
       "O04"
@@ -551,7 +551,7 @@
   },
   {
     "id": "S39",
-    "label": "Trang chủ — chuẩn navbar/footer",
+    "label": "Trang chủ — chuẩn footer",
     "source": "trang_ch_glowup_beauty_retail",
     "kind": "page",
     "routes": [
