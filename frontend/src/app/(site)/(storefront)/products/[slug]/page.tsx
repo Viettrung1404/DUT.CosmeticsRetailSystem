@@ -6,6 +6,7 @@ import { getProduct, getRelated, getReviews } from "@/features/catalog/server";
 import { ProductGrid, SectionTitle } from "@/features/catalog/components";
 import { ProductGallery } from "@/features/catalog/product-gallery";
 import { ProductPurchase } from "@/features/catalog/product-purchase";
+import { ReviewForm } from "@/features/post-purchase/review-form";
 
 function plainText(html: string) {
   return html
@@ -105,6 +106,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         </section>
         <section>
           <SectionTitle title={`Đánh giá sản phẩm (${product.totalReviews})`} />
+          <ReviewForm productId={product.id} />
           {reviews.status === "fulfilled" ? (
             reviews.value.items.length ? (
               reviews.value.items.map((review) => (

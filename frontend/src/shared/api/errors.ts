@@ -37,6 +37,10 @@ export function apiErrorMessage(error: unknown): string {
   if (error.status === 401) return "Vui lòng đăng nhập để tiếp tục.";
   if (error.status === 403) return "Bạn không có quyền thực hiện thao tác này.";
   if (error.status === 404) return "Không tìm thấy nội dung yêu cầu.";
+  if (error.status === 400) return "Thông tin chưa hợp lệ. Vui lòng kiểm tra và thử lại.";
+  if (error.status === 409)
+    return "Dữ liệu đã thay đổi hoặc thao tác bị xung đột. Vui lòng tải lại và thử tiếp.";
+  if (error.status === 413) return "Tệp vượt quá dung lượng cho phép.";
   if (error.status === 429) return "Bạn thao tác quá nhanh. Vui lòng thử lại sau.";
   if (error.code === "INVALID_RESPONSE") return "Chưa thể tải dữ liệu. Vui lòng thử lại sau.";
   return "Chưa thể kết nối dịch vụ. Vui lòng thử lại sau.";

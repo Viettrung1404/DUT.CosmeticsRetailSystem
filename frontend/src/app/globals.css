@@ -3489,6 +3489,41 @@
   padding: 16px;
   margin: 16px 0;
 }
+.benefit-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.benefit-cards article {
+  border: 1px solid #eadde0;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+}
+.benefit-cards img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.benefit-cards h2 {
+  font-size: 16px;
+}
+.account-form textarea {
+  min-height: 115px;
+  padding: 10px;
+  border: 1px solid #d9cacc;
+  border-radius: 7px;
+}
+.account-form fieldset {
+  border: 1px solid #eadde0;
+  border-radius: 9px;
+  padding: 14px;
+}
+.account-pages [aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.45;
+}
 @media (max-width: 700px) {
   .checkout-grid {
     grid-template-columns: 1fr;

@@ -46,6 +46,7 @@ export function ProductPurchase({
   const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [wishlisted, setWishlisted] = useState(false);
   const [stores, setStores] = useState<z.infer<typeof availabilitySchema>>([]);
   const [storeError, setStoreError] = useState(false);
   const variant = variants[selected];
@@ -82,6 +83,27 @@ export function ProductPurchase({
       await queryClient.invalidateQueries({ queryKey: ["cart"] });
       if (buyNow) router.push("/cart");
       else setMessage("Đã thêm vào giỏ hàng.");
+    } catch (error) {
+      setMessage(apiErrorMessage(error));
+    } finally {
+      setPending(false);
+    }
+  }
+  async function saveWishlist() {
+    setPending(true);
+    setMessage("");
+    try {
+      await requestBff(
+        `/api/account/commerce/wishlist/${productId}`,
+        z.object({ productId: z.string(), isWishlisted: z.literal(true) }),
+        {
+          method: "PUT",
+          body: { productId, selected: true, idempotencyKey: crypto.randomUUID() },
+        },
+      );
+      setWishlisted(true);
+      void queryClient.invalidateQueries({ queryKey: ["wishlist"] });
+      setMessage("Đã lưu vào sản phẩm yêu thích.");
     } catch (error) {
       setMessage(apiErrorMessage(error));
     } finally {
@@ -156,6 +178,14 @@ export function ProductPurchase({
           Mua ngay
         </button>
       </div>
+      <button
+        type="button"
+        className="cart-remove"
+        disabled={pending || wishlisted}
+        onClick={() => void saveWishlist()}
+      >
+        {wishlisted ? "Đã yêu thích" : "Lưu vào yêu thích"}
+      </button>
       {message && (
         <p role="status" className="pdp-message">
           {message}
