@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ERROR_MESSAGES_VI } from './error-messages.vi';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -18,7 +19,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message: string | object = 'Internal server error';
+    let message: string | object = 'Đã xảy ra lỗi, vui lòng thử lại sau';
     let code: string | undefined;
     let details: Record<string, unknown> | undefined;
 
@@ -38,15 +39,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
           };
       }
       message =
-        typeof exceptionResponse === 'object' && 'message' in exceptionResponse
+        typeof exceptionResponse === 'object' && exceptionResponse && 'message' in exceptionResponse
           ? (exceptionResponse as any).message
           : exceptionResponse;
+      if (typeof message === 'string' && ERROR_MESSAGES_VI[message]) {
+        code ??= message;
+        message = ERROR_MESSAGES_VI[message];
+      } else if (Array.isArray(message)) {
+        message = message.map((item) =>
+          typeof item === 'string' ? ERROR_MESSAGES_VI[item] ?? item : item,
+        );
+      }
     } else if (exception instanceof Error) {
       this.logger.error(
         `Unhandled Error: ${exception.message}`,
         exception.stack,
       );
-      message = 'Internal server error';
+      message = 'Đã xảy ra lỗi, vui lòng thử lại sau';
     }
 
     const formattedMessage = Array.isArray(message)
@@ -75,9 +84,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       success: false,
       message: formattedMessage,
       ...(code ? { code } : {}),
-      ...(details ? { details } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
+      ...(details ? { details } : {}),
     });
   }
 }

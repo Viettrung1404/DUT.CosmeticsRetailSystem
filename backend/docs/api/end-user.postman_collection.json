@@ -1,0 +1,552 @@
+{
+  "info": {
+    "name": "GlowUp end-user — Sprint 6",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Import into Apidog as Postman v2.1, or import openapi.json. Fill placeholders in a local environment. External provider credentials are never included. Manual sequence: password login → catalog → preview → confirm quoteVersion → COD checkout; RMA requires Admin completion/inspection. Do not bulk-run writes against production."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Auth/session",
+      "item": [
+        {
+          "name": "Password login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const d = pm.response.json().data; if(d.accessToken) pm.environment.set('accessToken',d.accessToken); if(d.refreshToken) pm.environment.set('refreshToken',d.refreshToken); if(d.challenge) pm.environment.set('oauthChallenge',d.challenge); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "Rotate refresh token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh-token",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const d = pm.response.json().data; if(d.accessToken) pm.environment.set('accessToken',d.accessToken); if(d.refreshToken) pm.environment.set('refreshToken',d.refreshToken); if(d.challenge) pm.environment.set('oauthChallenge',d.challenge); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout current session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 OAuth (provider app required)",
+      "item": [
+        {
+          "name": "Google token exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/oauth/google",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"{{googleIdToken}}\",\n  \"clientNonce\": \"{{clientNonce}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const d = pm.response.json().data; if(d.accessToken) pm.environment.set('accessToken',d.accessToken); if(d.refreshToken) pm.environment.set('refreshToken',d.refreshToken); if(d.challenge) pm.environment.set('oauthChallenge',d.challenge); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Facebook classic token exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/oauth/facebook",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accessToken\": \"{{facebookAccessToken}}\",\n  \"clientNonce\": \"{{clientNonce}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const d = pm.response.json().data; if(d.accessToken) pm.environment.set('accessToken',d.accessToken); if(d.refreshToken) pm.environment.set('refreshToken',d.refreshToken); if(d.challenge) pm.environment.set('oauthChallenge',d.challenge); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send email proof",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/oauth/email",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challenge\": \"{{oauthChallenge}}\",\n  \"clientNonce\": \"{{clientNonce}}\",\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Complete new account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/oauth/complete",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challenge\": \"{{oauthChallenge}}\",\n  \"clientNonce\": \"{{clientNonce}}\",\n  \"verificationToken\": \"{{emailVerificationToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const d = pm.response.json().data; if(d.accessToken) pm.environment.set('accessToken',d.accessToken); if(d.refreshToken) pm.environment.set('refreshToken',d.refreshToken); if(d.challenge) pm.environment.set('oauthChallenge',d.challenge); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Link to logged-in owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/oauth/link",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challenge\": \"{{oauthChallenge}}\",\n  \"clientNonce\": \"{{clientNonce}}\",\n  \"verificationToken\": \"{{emailVerificationToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const d = pm.response.json().data; if(d.accessToken) pm.environment.set('accessToken',d.accessToken); if(d.refreshToken) pm.environment.set('refreshToken',d.refreshToken); if(d.challenge) pm.environment.set('oauthChallenge',d.challenge); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Purchase (COD only)",
+      "item": [
+        {
+          "name": "Public catalog",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/customer/products",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Product detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/customer/products/{{productSlug}}",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Preview selected items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/orders/preview",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"usePoints\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(pm.response.code===200) pm.environment.set('quoteVersion',pm.response.json().data.quoteVersion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create COD order after quote confirmation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}",
+                "description": "Generate once per command; keep the same key and body for a retry."
+              }
+            ],
+            "url": "{{baseUrl}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"paymentMethod\": \"COD\",\n  \"quoteVersion\": \"{{quoteVersion}}\",\n  \"shippingAddress\": {\n    \"recipientName\": \"Test recipient\",\n    \"phone\": \"0900000000\",\n    \"addressLine\": \"Synthetic test address\",\n    \"city\": \"Da Nang\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(pm.response.code===201) { const d=pm.response.json().data; pm.environment.set('orderId',d.id || d.orderId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{orderId}}"
+          }
+        },
+        {
+          "name": "My order tracking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/orders/{{orderId}}/tracking"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Return/exchange (requires eligible completed order)",
+      "item": [
+        {
+          "name": "Request REFUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}",
+                "description": "Generate once per command; keep the same key and body for a retry."
+              }
+            ],
+            "url": "{{baseUrl}}/returns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"type\": \"REFUND\",\n  \"reason\": \"DEFECTIVE\",\n  \"items\": [\n    {\n      \"orderItemId\": \"{{orderItemId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Request EXCHANGE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}",
+                "description": "Generate once per command; keep the same key and body for a retry."
+              }
+            ],
+            "url": "{{baseUrl}}/returns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"type\": \"EXCHANGE\",\n  \"reason\": \"WRONG_ITEM\",\n  \"items\": [\n    {\n      \"orderItemId\": \"{{orderItemId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"replacements\": [\n    {\n      \"productVariantId\": \"{{replacementVariantId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "View return and quote",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/returns/{{returnId}}"
+          }
+        },
+        {
+          "name": "Accept inspected exchange quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}",
+                "description": "Generate once per command; keep the same key and body for a retry."
+              }
+            ],
+            "url": "{{baseUrl}}/returns/{{returnId}}/exchange/accept",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quoteVersion\": 1,\n  \"paymentMethod\": \"COD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 SEO/readiness",
+      "item": [
+        {
+          "name": "Sitemap index",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/sitemap.xml",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Robots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/robots.txt",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health/ready",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
