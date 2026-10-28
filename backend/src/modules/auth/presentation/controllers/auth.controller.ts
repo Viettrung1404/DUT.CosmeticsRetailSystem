@@ -16,7 +16,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { Public } from '@core/decorators/public.decorator';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
@@ -48,7 +48,6 @@ import {
 
 @ApiTags('Auth (Xác thực & Người dùng)')
 @Controller('auth')
-@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(
     private readonly registerUseCase: RegisterUseCase,
@@ -86,11 +85,7 @@ export class AuthController {
     type: LoginResponseDto,
   })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    const forwarded = req.headers['x-forwarded-for'];
-    const ipAddress =
-      (typeof forwarded === 'string'
-        ? forwarded.split(',')[0].trim()
-        : req.ip) || undefined;
+    const ipAddress = req.ip || undefined;
     const deviceInfo = req.headers['user-agent'] || undefined;
 
     return this.loginUseCase.execute({

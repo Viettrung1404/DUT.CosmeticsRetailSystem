@@ -3,102 +3,106 @@ import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { JwtAuthGuard } from '../jwt-auth.guard';
-import { IS_PUBLIC_KEY } from '@core/decorators/public.decorator';
 
-describe('JwtAuthGuard', () => {
+describe('JwtAuthGuard live account/session authorization', () => {
   let guard: JwtAuthGuard;
-  let reflector: jest.Mocked<Reflector>;
-  let configService: jest.Mocked<ConfigService>;
-
-  beforeEach(() => {
-    reflector = {
-      getAllAndOverride: jest.fn(),
-    } as any;
-
-    configService = {
-      get: jest.fn().mockReturnValue('test-secret'),
-    } as any;
-
-    guard = new JwtAuthGuard(reflector, configService);
-  });
-
-  const createMockContext = (authHeader?: string): ExecutionContext => {
-    const request = {
-      headers: {
-        authorization: authHeader,
-      },
-      user: null,
+  const reflector = { getAllAndOverride: jest.fn() };
+  const db = { userSession: { findFirst: jest.fn() } };
+  const permissions = { execute: jest.fn() };
+  const context = (token?: string) => {
+    const req = {
+      headers: { authorization: token ? `Bearer ${token}` : undefined },
+      user: undefined,
     };
-
     return {
-      getHandler: jest.fn().mockReturnValue(() => {}),
-      getClass: jest.fn().mockReturnValue(class MockController {}),
-      switchToHttp: jest.fn().mockReturnValue({
-        getRequest: jest.fn().mockReturnValue(request),
-      }),
-    } as any;
+      getHandler: () => () => {},
+      getClass: () => class {},
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as unknown as ExecutionContext;
   };
-
-  it('should return true if route is marked as public', () => {
-    reflector.getAllAndOverride.mockReturnValue(true);
-    const context = createMockContext();
-
-    expect(guard.canActivate(context)).toBe(true);
-    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(IS_PUBLIC_KEY, [
-      expect.anything(),
-      expect.anything(),
-    ]);
-  });
-
-  it('should throw UnauthorizedException if no token is provided on protected route', () => {
+  const token = (data = {}) =>
+    jwt.sign(
+      {
+        userId: 'user-1',
+        sessionId: 'session-1',
+        roleId: 1,
+        permissionCodes: ['STALE_ADMIN'],
+        ...data,
+      },
+      'test-secret',
+    );
+  beforeEach(() => {
+    jest.clearAllMocks();
     reflector.getAllAndOverride.mockReturnValue(false);
-    const context = createMockContext(undefined);
-
-    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+    db.userSession.findFirst.mockResolvedValue({
+      user: {
+        id: 'user-1',
+        roleId: 6,
+        role: { name: 'Customer', dataScope: 'SELF' },
+      },
+    });
+    permissions.execute.mockResolvedValue(['CURRENT_PERMISSION']);
+    guard = new JwtAuthGuard(
+      reflector as unknown as Reflector,
+      { getOrThrow: jest.fn().mockReturnValue('test-secret') } as unknown as ConfigService,
+      db as any,
+      permissions as any,
+    );
   });
-
-  it('should attach user payload to request if token is valid', () => {
-    reflector.getAllAndOverride.mockReturnValue(false);
-
-    const payload = {
-      userId: 'user-123',
-      roleId: 1,
+  it('rejects missing token on protected route', async () => {
+    await expect(guard.canActivate(context())).rejects.toThrow(UnauthorizedException);
+  });
+  it('rejects invalid signature, expired tokens and legacy sessionless tokens', async () => {
+    for (const value of [
+      jwt.sign({ userId: 'user-1' }, 'wrong'),
+      jwt.sign({ userId: 'user-1', sessionId: 'session-1' }, 'test-secret', {
+        expiresIn: -1,
+      }),
+      jwt.sign({ userId: 'user-1' }, 'test-secret'),
+    ]) {
+      await expect(guard.canActivate(context(value))).rejects.toThrow(UnauthorizedException);
+    }
+    expect(db.userSession.findFirst).not.toHaveBeenCalled();
+  });
+  it('replaces stale JWT roles/permissions with current database authorization', async () => {
+    const ctx = context(token());
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(ctx.switchToHttp().getRequest().user).toMatchObject({
+      roleId: 6,
       roleName: 'Customer',
-      dataScope: 'self',
-      permissionCodes: ['READ_PRODUCTS'],
-    };
-    const token = jwt.sign(payload, 'test-secret');
-    const context = createMockContext(`Bearer ${token}`);
-
-    expect(guard.canActivate(context)).toBe(true);
-    const req = context.switchToHttp().getRequest();
-    expect(req.user).toMatchObject({
-      userId: 'user-123',
-      roleName: 'Customer',
+      permissionCodes: ['CURRENT_PERMISSION'],
+    });
+    expect(db.userSession.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: 'session-1',
+      userId: 'user-1',
+      isRevoked: false,
+      user: { status: 'ACTIVE', emailVerified: true },
     });
   });
-
-  it('should throw UnauthorizedException if token is invalid or expired', () => {
-    reflector.getAllAndOverride.mockReturnValue(false);
-    const context = createMockContext('Bearer invalid.token.here');
-
-    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  it('rejects revoked/expired session or disabled/unverified account', async () => {
+    db.userSession.findFirst.mockResolvedValue(null);
+    await expect(guard.canActivate(context(token()))).rejects.toThrow(UnauthorizedException);
   });
-
-  it('should attach user payload on public route when token is valid', () => {
-    reflector.getAllAndOverride.mockReturnValue(true);
-    const token = jwt.sign({ userId: 'user-123', roleId: 6 }, 'test-secret');
-    const context = createMockContext(`Bearer ${token}`);
-
-    expect(guard.canActivate(context)).toBe(true);
-    expect(context.switchToHttp().getRequest().user).toMatchObject({ userId: 'user-123' });
+  it('accepts the sid claim and normalizes both session claim names', async () => {
+    const ctx = context(token({ sessionId: undefined, sid: 'session-1' }));
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(ctx.switchToHttp().getRequest().user).toMatchObject({
+      sessionId: 'session-1',
+      sid: 'session-1',
+    });
+    expect(db.userSession.findFirst.mock.calls[0][0].where.id).toBe('session-1');
   });
-
-  it('should allow public route as guest when token is invalid', () => {
+  it('allows guest public reads but never enriches using revoked identity', async () => {
     reflector.getAllAndOverride.mockReturnValue(true);
-    const context = createMockContext('Bearer invalid.token.here');
-
-    expect(guard.canActivate(context)).toBe(true);
-    expect(context.switchToHttp().getRequest().user).toBeNull();
+    db.userSession.findFirst.mockResolvedValue(null);
+    const ctx = context(token());
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(ctx.switchToHttp().getRequest().user).toBeUndefined();
+  });
+  it('enriches public routes with current account when session is valid', async () => {
+    reflector.getAllAndOverride.mockReturnValue(true);
+    const ctx = context(token());
+    await guard.canActivate(ctx);
+    expect(ctx.switchToHttp().getRequest().user.userId).toBe('user-1');
   });
 });

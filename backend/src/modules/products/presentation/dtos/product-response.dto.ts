@@ -2,6 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductEntity } from '../../domain/entities/product.entity';
 
 export class ProductVariantResponseDto {
+  @ApiPropertyOptional({ description: 'Giá một đơn vị theo engine Sprint 5, chưa áp điều kiện giỏ/coupon/điểm' })
+  effectivePrice?: number;
   @ApiPropertyOptional({ example: 'v1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
   id?: string;
 
@@ -71,6 +73,18 @@ export class ProductIngredientResponseDto {
 }
 
 export class ProductResponseDto {
+  @ApiPropertyOptional({ description: 'Giá thấp nhất của variant active, một đơn vị chưa áp điều kiện giỏ' })
+  effectivePrice?: number | null;
+  @ApiPropertyOptional()
+  effectivePriceMax?: number | null;
+  @ApiPropertyOptional({ description: 'Điều kiện campaign; campaign có minOrderAmount chỉ được xác nhận tại preview/checkout', type: 'array', items: { type: 'object' } })
+  promotions?: object[];
+  @ApiPropertyOptional({ enum: ['SINGLE_UNIT_WITHOUT_CART_CONDITIONS'] })
+  priceBasis?: string;
+  @ApiPropertyOptional({ example: false })
+  reservation?: boolean;
+  @ApiProperty({ default: false })
+  isWishlisted?: boolean;
   @ApiProperty({ example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' })
   id: string;
 
@@ -182,7 +196,7 @@ export class ProductResponseDto {
     // Filter variants: if onlyActiveVariants is true (default for customer), filter out inactive variants
     const rawVariants = options.onlyActiveVariants
       ? (entity.variants || []).filter((v) => v.isActive !== false)
-      : (entity.variants || []);
+      : entity.variants || [];
 
     // Sanitize variants: remove costPrice to prevent sensitive data leak to clients
     dto.variants = rawVariants.map((v) => ({
@@ -207,4 +221,3 @@ export class ProductResponseDto {
     return dto;
   }
 }
-
