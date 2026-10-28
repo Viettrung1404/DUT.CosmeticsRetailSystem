@@ -6,6 +6,7 @@ import { apiErrorMessage } from "@/shared/api/errors";
 import { formatPrice } from "./components";
 import { TryOnCamera } from "./try-on-camera";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Variant {
   id?: string;
@@ -40,6 +41,7 @@ export function ProductPurchase({
   canTryOn?: boolean;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
@@ -77,6 +79,7 @@ export function ProductPurchase({
         method: "POST",
         body: { productVariantId: variant.id, quantity },
       });
+      await queryClient.invalidateQueries({ queryKey: ["cart"] });
       if (buyNow) router.push("/cart");
       else setMessage("Đã thêm vào giỏ hàng.");
     } catch (error) {

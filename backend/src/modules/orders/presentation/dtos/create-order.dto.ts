@@ -64,7 +64,7 @@ export class CreateOrderDto {
   @IsString()
   @ApiPropertyOptional({
     default: 'COD',
-    description: 'Only COD is enabled; online payments require the payment module',
+    description: 'COD or VNPAY when the VNPAY gateway is configured',
   })
   paymentMethod?: string; // Default: 'COD'
 

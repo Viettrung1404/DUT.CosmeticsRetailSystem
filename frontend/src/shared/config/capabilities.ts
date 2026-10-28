@@ -12,7 +12,7 @@ export const capabilities = {
   catalog: { contract: "blocked", blockers: ["O01", "O02"], phase: "FE-02" },
   cart: { contract: "source-present", blockers: ["O02"], phase: "FE-03" },
   cod: { contract: "source-present", blockers: ["O02"], phase: "FE-03" },
-  vnpay: { contract: "blocked", blockers: ["G01"], phase: "FE-03" },
+  vnpay: { contract: "blocked", blockers: ["G01-sandbox", "payment-openapi"], phase: "FE-03" },
   account: { contract: "source-present", blockers: ["O02"], phase: "FE-04" },
   returns: { contract: "source-present", blockers: ["O02", "ENV-01"], phase: "FE-05" },
   loyalty: { contract: "source-present", blockers: ["O02", "reward-policy"], phase: "FE-05" },
