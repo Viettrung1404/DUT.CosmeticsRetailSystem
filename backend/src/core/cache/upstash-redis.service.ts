@@ -1,10 +1,16 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'crypto';
 import { ICacheService } from './cache.service.interface';
+import { redisCommandTimeout } from '../config/runtime-config';
 
 @Injectable()
 export class UpstashRedisService implements ICacheService {
+  private readonly logger = new Logger(UpstashRedisService.name);
   constructor(private readonly config: ConfigService) {}
   get configured() {
     return (
@@ -29,6 +35,10 @@ export class UpstashRedisService implements ICacheService {
       endpoint.password
     )
       throw new ServiceUnavailableException('REDIS_CONFIGURATION_INVALID');
+    const signal = AbortSignal.timeout(
+      redisCommandTimeout(this.config.get('UPSTASH_REDIS_TIMEOUT_MS')),
+    );
+    let reason = 'network';
     try {
       const response = await fetch(endpoint.origin, {
         method: 'POST',
@@ -37,14 +47,26 @@ export class UpstashRedisService implements ICacheService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(command),
-        signal: AbortSignal.timeout(2000),
+        signal,
         redirect: 'error',
       });
-      if (!response.ok) throw new Error('REDIS_HTTP_FAILED');
+      if (!response.ok) {
+        reason = `http_${response.status}`;
+        throw new Error('REDIS_HTTP_FAILED');
+      }
+      reason = 'invalid_response';
       const value = (await response.json()) as { result: T; error?: string };
-      if (value.error) throw new Error('REDIS_COMMAND_FAILED');
+      if (value.error) {
+        reason = 'command_error';
+        throw new Error('REDIS_COMMAND_FAILED');
+      }
       return value.result;
     } catch {
+      // Do not log command arguments, keys, provider response bodies or credentials.
+      this.logger.warn({
+        event: 'redis_command_failed',
+        reason: signal.aborted ? 'timeout' : reason,
+      });
       throw new ServiceUnavailableException('REDIS_UNAVAILABLE');
     }
   }

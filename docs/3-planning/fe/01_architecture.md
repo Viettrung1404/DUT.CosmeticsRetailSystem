@@ -39,8 +39,9 @@ frontend/
 │   │   ├── layout.tsx              # html lang=vi, fonts, global providers
 │   │   ├── providers.tsx           # QueryClient; không bắt cả app thành Client
 │   │   ├── globals.css
+│   │   ├── (auth)/                # login/register/recovery/verify/oauth; không header/footer
 │   │   ├── (site)/
-│   │   │   ├── layout.tsx          # navbar trang chủ + footer dùng chung
+│   │   │   ├── layout.tsx          # navbar Danh mục chăm sóc da + footer dùng chung
 │   │   │   ├── (storefront)/
 │   │   │   │   ├── page.tsx
 │   │   │   │   ├── products/[slug]/page.tsx
@@ -59,7 +60,6 @@ frontend/
 │   │   │   │   ├── payment/return/page.tsx
 │   │   │   │   ├── stores/[id]/page.tsx
 │   │   │   │   └── stores/page.tsx
-│   │   │   ├── (auth)/             # login/register/verify-email/forgot/reset/oauth
 │   │   │   ├── (account)/account/
 │   │   │   │   ├── layout.tsx      # xác thực + sidebar chuẩn Sổ địa chỉ
 │   │   │   │   ├── page.tsx
@@ -116,7 +116,7 @@ frontend/
 └── next.config.ts
 ```
 
-Thêm `(site)` chung bên trên ba route group để navbar dùng đúng một instance và không reset drawer khi chuyển storefront/account. Không đặt header riêng ở mỗi page. Error boundary, loading, not-found đặt thêm theo segment có data độc lập, không chỉ ở root.
+Đặt `(auth)` cùng cấp `(site)`, không có header/footer theo D11. Dùng `(site)` chung cho storefront/account/content để navbar dùng đúng một instance và không reset drawer khi chuyển storefront/account. Không đặt header riêng ở mỗi page. Error boundary, loading, not-found đặt thêm theo segment có data độc lập, không chỉ ở root.
 
 Mỗi feature chỉ tạo thư mục có sử dụng: `api/`, `components/`, `hooks/`, `schemas/`, `index.ts`; dùng `api/server.ts` hoặc entry `server.ts` riêng cho RSC. Không export module `server-only` qua barrel bị Client Component import. Hướng dependency: app → widgets/features → entities/shared. Feature phối hợp tại app/widget; tránh vòng import giữa features. Entity là type/mapper/view, không tự tính giá hay tồn kho.
 
@@ -124,7 +124,8 @@ Mỗi feature chỉ tạo thư mục có sử dụng: `api/`, `components/`, `ho
 
 ### Header
 
-- Theo `trang_ch_glowup_beauty_retail/code.html`: announcement bar, logo/search, tra cứu, wishlist, notification, account, cart; hàng category navigation và mega menu.
+- Theo **`danh_m_c_ch_m_s_c_da_glowup/code.html`** (D00 cập nhật 28/10/2026), đối chiếu thêm ảnh navbar mới do người dùng gửi. Announcement hồng, logo tròn, search có camera, nhóm cửa hàng/tạp chí/more/account/wishlist/cart, pill nhiều màu đúng thứ tự và nút cuộn tiếp. `screen.png` cùng thư mục đã cũ, không dùng làm chuẩn ghi đè HTML.
+- Dùng navbar này trên trang chủ, checkout và account. Auth không có header/footer theo D11. Active state theo route/category hiện tại; không cố định mục “Chăm sóc da” khi đang ở trang khác. Footer tiếp tục lấy nguồn riêng đã chốt trong D09.
 - Guest thấy Đăng nhập/Đăng ký, không tên người dùng giả. Tra cứu dẫn vào lịch sử đơn được bảo vệ; chưa có guest lookup API.
 - Badge/count/subtotal đọc đúng dữ liệu user hiện tại; khi loading dùng skeleton/ẩn badge, không mặc định số demo.
 - Mobile giữ cùng hệ thống điều hướng, thu về menu drawer, search và cart. Đo chiều cao sticky bằng layout/CSS, không copy các `pt-[148px]` khác nhau từ từng HTML.
@@ -133,7 +134,15 @@ Mỗi feature chỉ tạo thư mục có sử dụng: `api/`, `components/`, `ho
 
 Chuẩn hình thức: `s_a_ch_glowup`, desktop khoảng 260px, card trắng bo góc, avatar/tier, nhóm “Quản lý cá nhân” và “Ưu đãi & Tích lũy”, active state nền nhạt/viền trái, logout và hỗ trợ cuối card. Mobile dùng sheet/accordion có mục active và focus rõ. Người dùng đã chốt bổ sung các mục còn thiếu; Ví voucher dẫn tới Đổi ưu đãi. Menu cụ thể ở [02](02_screen_inventory.md).
 
-### Tokens và nội dung
+### Đối chiếu thiết kế khi triển khai
+
+- Với mỗi S/B ID, đọc và render **`code.html`** trước; ghi rõ nguồn trong checklist. HTML là chuẩn hiện tại khi lệch với `screen.png` cũ. Không thay thiết kế bằng layout tự dựng chỉ vì đã dùng đúng màu/font.
+- Giữ composition, tỷ lệ cột, ảnh, hierarchy, khoảng cách, radius và vị trí CTA của từng màn. Chỉ thay thành phần chung theo D00/D02/D09 và nội dung nghiệp vụ theo các quyết định đã chốt.
+- Auth dùng layout riêng không header/footer; nội dung theo từng màn: login/register hai cột; recovery, verify và OAuth card giữa trang theo từng nguồn.
+- Trước khi ghi “UI đã kiểm tra”, render HTML nguồn và chụp desktop/mobile cùng state/viewport, mở ảnh kết quả cạnh bản render HTML và ghi các ngoại lệ có căn cứ. Snapshot của implementation chưa được đối chiếu không phải bằng chứng khớp thiết kế.
+- FE-01 có [bảng đối chiếu cụ thể](../../../frontend/docs/fe-01-design-review.md); dùng cách này cho các phase sau.
+
+### Tokens và nội dung (áp dụng xuyên site)
 
 - Palette đã chốt primary `#C85A70`, ghi đè primary `#9D394F` của HTML/frontmatter cũ; dùng token semantic. Background `#F9ECEE`, surface trắng, text `#412E27`.
 - Montserrat cho heading/nav; Be Vietnam Pro cho body/form/giá. Container khoảng 1280px; product grid 2 cột mobile, 3 tablet, 4–5 desktop tùy sidebar.
@@ -238,7 +247,7 @@ Trong lượt lập kế hoạch đã đọc và dùng `architecture`, `api-desi
 | Quyết định | Trạng thái | Đánh đổi / lúc xem xét lại |
 |---|---|---|
 | Next render/BFF mỏng, backend nghiệp vụ | Đã chốt bởi người dùng | Tránh duplication; API thiếu phải xử lý tại backend |
-| Shared `(site)` layout + sidebar Sổ địa chỉ | Đã chốt, gồm bổ sung menu | Giữ một instance header/sidebar; Ví voucher dẫn rewards |
+| Shared `(site)` layout + sidebar Sổ địa chỉ | Navbar Danh mục chăm sóc da theo D00 (28/10/2026); sidebar gồm bổ sung menu | Giữ một instance header/sidebar; Ví voucher dẫn rewards |
 | Modular features/entities/widgets/shared, không Full FSD | Đề xuất theo cấu trúc người dùng | Có quy tắc import nhưng ít ceremony; tách thêm khi code tăng |
 | Opaque web session + TTL store/refresh lock | Chọn tại FE-00, runtime FE-01 theo ADR-001 | Thêm session infra để giải quyết refresh đa tab/instance |
 | Catalog no-store hiện tại | Chọn baseline FE-00 theo ADR-002 | Chỉ cache khi tách metadata/offer và có invalidation |

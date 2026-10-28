@@ -1,5 +1,8 @@
 node_modules/
 .next/
+.next-e2e/
+.next-build/
+certificates/
 out/
 coverage/
 playwright-report/

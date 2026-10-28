@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { UpstashRedisService } from '../upstash-redis.service';
 describe('Upstash cache and distributed rate limiting', () => {
   const original = global.fetch;
@@ -10,8 +11,12 @@ describe('Upstash cache and distributed rate limiting', () => {
         REDIS_KEY_PREFIX: 'unit:',
       }),
     );
+  beforeEach(() =>
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {}),
+  );
   afterEach(() => {
     global.fetch = original;
+    jest.restoreAllMocks();
   });
   it('sends JSON commands using bearer auth and explicit TTL', async () => {
     const fetchMock = jest
@@ -55,5 +60,37 @@ describe('Upstash cache and distributed rate limiting', () => {
     expect(command[0]).toBe('EVAL');
     expect(command[3]).not.toContain('customer-private-id');
     expect(command[1]).toContain('PEXPIRE');
+  });
+  it('uses a configurable bounded timeout and does not replay an uncertain command', async () => {
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error('network token-secret'));
+    const redis = new UpstashRedisService(
+      new ConfigService({
+        UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
+        UPSTASH_REDIS_REST_TOKEN: 'secret',
+        UPSTASH_REDIS_TIMEOUT_MS: '3500',
+      }),
+    );
+    await expect(redis.rateLimit('private-key', 10, 60000)).rejects.toThrow(
+      'REDIS_UNAVAILABLE',
+    );
+    expect(timeout).toHaveBeenCalledWith(3500);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(Logger.prototype.warn).toHaveBeenCalledWith({
+      event: 'redis_command_failed',
+      reason: 'network',
+    });
+  });
+  it('distinguishes provider HTTP failures without exposing the provider body', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 429 });
+    await expect(service().command(['PING'])).rejects.toThrow(
+      'REDIS_UNAVAILABLE',
+    );
+    expect(Logger.prototype.warn).toHaveBeenCalledWith({
+      event: 'redis_command_failed',
+      reason: 'http_429',
+    });
   });
 });

@@ -6,16 +6,17 @@ import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
 const maintenance = process.argv.includes("--maintenance");
-const origin = "http://127.0.0.1:3001";
+const port = process.env.SMOKE_PORT || "3001";
+const origin = `http://127.0.0.1:${port}`;
 const request = (path) => fetch(`${origin}${path}`, { signal: AbortSignal.timeout(2000), redirect: "manual" });
 const existing = await request("/").catch(() => null);
-if (existing) throw new Error("Port 3001 is occupied; stop the existing app before production smoke.");
+if (existing) throw new Error(`Port ${port} is occupied; choose another SMOKE_PORT.`);
 
-const child = spawn(process.execPath, [fileURLToPath(new URL("node_modules/next/dist/bin/next", root)), "start", "--port", "3001", "--hostname", "127.0.0.1"], {
+const child = spawn(process.execPath, [fileURLToPath(new URL("node_modules/next/dist/bin/next", root)), "start", "--port", port, "--hostname", "127.0.0.1"], {
   cwd: fileURLToPath(root),
   windowsHide: true,
   stdio: "ignore",
-  env: { ...process.env, NODE_ENV: "production", FE_DIAGNOSTICS: "true", MAINTENANCE_MODE: maintenance ? "true" : "false" },
+  env: { ...process.env, SITE_URL: origin, NODE_ENV: "production", FE_DIAGNOSTICS: "true", MAINTENANCE_MODE: maintenance ? "true" : "false" },
 });
 let launchError;
 child.on("error", (error) => { launchError = error; });
@@ -35,6 +36,8 @@ try {
   assert.match(html, /noindex/);
   if (maintenance) {
     assert.equal(home.headers.get("retry-after"), "300");
+    const logo = await request("/images/stitch/glowup-logo.webp");
+    assert.equal(logo.status, 200); assert.match(logo.headers.get("content-type"), /image\/webp/);
     assert.equal((await request("/login")).status, 503);
     const mutation = await fetch(`${origin}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", signal: AbortSignal.timeout(2000) });
     assert.equal(mutation.status, 503); assert.equal((await mutation.json()).code, "MAINTENANCE");
@@ -44,7 +47,11 @@ try {
     assert.equal(diagnostic.status, 404, "Diagnostic must stay private even with FE_DIAGNOSTICS=true");
     assert.doesNotMatch(await diagnostic.text(), /data-connected|SSR → backend|NETWORK_ERROR/);
     assert.equal((await request("/missing-fe00-route")).status, 404);
-    assert.equal((await request("/login")).status, 200);
+    for (const route of ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/oauth/continue"]) {
+      const auth = await request(route);
+      assert.equal(auth.status, 200, `${route} must render independently`);
+      assert.doesNotMatch(await auth.text(), /<(?:header|footer)[\s>]/i, `${route} must not SSR site header/footer`);
+    }
     const privatePage = await request("/account/addresses");
     assert.equal(privatePage.status, 307); assert.match(privatePage.headers.get("location"), /login\?returnTo=%2Faccount%2Faddresses/);
     const maintenancePage = await request("/maintenance"); assert.equal(maintenancePage.status, 503); assert.equal(maintenancePage.headers.get("retry-after"), "300");

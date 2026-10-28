@@ -42,6 +42,12 @@ Thumbs.db
 !/scripts/sprint6-migration-check.ts
 !/scripts/sprint6-client-readiness.cjs
 !/scripts/export-db-schema.cjs
+!/scripts/catalog/
+!/scripts/demo/
+
+# Downloaded public catalog snapshots, local images and execution reports
+/.catalog-data/
+/.demo-data/
 
 # Generated database schema snapshot
 /prisma/schema.current.sql

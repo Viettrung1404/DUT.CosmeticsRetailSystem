@@ -1,10 +1,10 @@
 # 02 — Danh mục màn hình và tiêu chí triển khai
 
-Ngày cập nhật: 26/10/2026. **Đã chốt làm đủ cả blueprint.** Mọi screen dùng navbar trang chủ, cụm account dùng sidebar Sổ địa chỉ, màu primary `#C85A70`; footer thống nhất theo trang chủ.
+Ngày cập nhật: 28/10/2026. **Đã chốt làm đủ cả blueprint.** Các screen ngoài auth dùng navbar trang Danh mục chăm sóc da (S11, D00), cụm account dùng sidebar Sổ địa chỉ, màu primary `#C85A70`; footer thống nhất theo trang chủ. Auth (S25–S28/S41) không có header/footer theo D11.
 
 ## 1. Cách đọc
 
-- Nguồn HTML nằm trong `docs/4-stitch_design/<thư mục>/code.html`; ảnh đối chiếu cùng thư mục `screen.png`.
+- Nguồn thiết kế chuẩn nằm trong `docs/4-stitch_design/<thư mục>/code.html`; cần render HTML để đối chiếu. `screen.png` cùng thư mục đã cũ, không dùng ghi đè HTML (người dùng xác nhận 28/10/2026).
 - Axx là nhóm API đã có; Gxx là chức năng thiếu; Oxx là đề xuất tối ưu trong [03](03_api_contracts_and_gaps.md).
 - “API đã có” chỉ là xác nhận source/spec, không khẳng định staging/provider đã hoạt động.
 - Các CTA chưa có API được **bỏ khỏi UI bản đầu** theo quyết định người dùng. Vẫn dựng page/template có trong phạm vi; không xóa cả trang chỉ vì bỏ một CTA.
@@ -24,7 +24,7 @@ Ngày cập nhật: 26/10/2026. **Đã chốt làm đủ cả blueprint.** Mọi
 | S08 | [chi_ti_t_n_h_ng_glowup](../../4-stitch_design/chi_ti_t_n_h_ng_glowup/code.html) | Chi tiết đơn hàng | `/account/orders/[id]` | A05/A07 | FE-04 | Item snapshots/tổng tiền/status thật; cancel PENDING, link tracking/return/review; in bản đơn hàng không tự gọi là hóa đơn VAT. |
 | S09 | [chi_ti_t_s_n_ph_m_pdp_glowup](../../4-stitch_design/chi_ti_t_s_n_ph_m_pdp_glowup/code.html) | Chi tiết sản phẩm | `/products/[slug]` | A02/A03/A06/A07 | FE-02 | Gallery/variant/qty, add/buy, related, reviews, metadata; bỏ thử màu/stock chi nhánh khi thiếu API. |
 | S10 | [chi_ti_t_showroom_ng_kh_i_glowup](../../4-stitch_design/chi_ti_t_showroom_ng_kh_i_glowup/code.html) | Chi tiết showroom | `/stores/[id]` | G02 | FE-06 | Giữ page/gallery/giờ mở cửa/địa chỉ với dữ liệu được duyệt; bỏ đặt lịch/pickup/live stock chưa hỗ trợ. |
-| S11 | [danh_m_c_ch_m_s_c_da_glowup](../../4-stitch_design/danh_m_c_ch_m_s_c_da_glowup/code.html) | Danh mục chăm sóc da | `/categories/[slug]` | A02; O04 | FE-02 | Resolve slug qua tree; listing/filter chung, không hardcode category ID. |
+| S11 | [danh_m_c_ch_m_s_c_da_glowup](../../4-stitch_design/danh_m_c_ch_m_s_c_da_glowup/code.html) | Danh mục chăm sóc da — chuẩn navbar | `/categories/[slug]` | A02; O04 | FE-01 (navbar)/FE-02 (nội dung) | Navbar dùng chung theo `code.html` (pill nhiều màu); active state theo route. Resolve slug qua tree; listing/filter chung, không hardcode category ID. |
 | S12 | [danh_s_ch_i_tr_glowup](../../4-stitch_design/danh_s_ch_i_tr_glowup/code.html) | Danh sách đổi trả | `/account/returns` | A07 | FE-05 | Filter status, pagination, đơn không đủ điều kiện, link tạo/chi tiết. |
 | S13 | [flash_sale_glowup](../../4-stitch_design/flash_sale_glowup/code.html) | Flash sale | `/flash-sale` | A09; O03 | FE-06 | serverTime/endDate, remaining quota, hết giờ refetch; bỏ giữ giá 15 phút trong giỏ và lượt xem giả. |
 | S14 | [gi_h_ng_glowup_beauty_retail](../../4-stitch_design/gi_h_ng_glowup_beauty_retail/code.html) | Giỏ hàng | `/cart` | A03/A05 | FE-03 | Guest/customer, isSelected, quantity, remove, unavailable, price changed; đúng ID cart item. |
@@ -52,7 +52,7 @@ Ngày cập nhật: 26/10/2026. **Đã chốt làm đủ cả blueprint.** Mọi
 | S36 | [th_ng_tin_c_nh_n_glowup](../../4-stitch_design/th_ng_tin_c_nh_n_glowup/code.html) | Thông tin cá nhân | `/account/profile` | A04; G04 | FE-04 | fullName/phone/dateOfBirth/gender; email readonly; bỏ beauty profile/avatar upload chưa hỗ trợ. |
 | S37 | [thanh_to_n_glowup](../../4-stitch_design/thanh_to_n_glowup/code.html) | Checkout | `/checkout` | A04/A05; G01 bắt buộc | FE-03 | Navbar chung, form address, coupon/points, preview/quote/idempotency; chỉ COD hoặc VNPAY. |
 | S38 | [theo_d_i_v_n_chuy_n_glowup](../../4-stitch_design/theo_d_i_v_n_chuy_n_glowup/code.html) | Theo dõi vận chuyển | `/account/orders/[id]/tracking` | A07 | FE-04 | Nhiều kiện/timeline/trackingUrl; không bịa tọa độ live, số điện thoại tài xế hay ETA. |
-| S39 | [trang_ch_glowup_beauty_retail](../../4-stitch_design/trang_ch_glowup_beauty_retail/code.html) | Trang chủ — chuẩn navbar/footer | `/` | A02/A09/A10; G03/O03 | FE-01/02/06 | Hero/banner/category/shelves/brand/blog; navbar/footer dùng lại; bỏ newsletter/try-on CTA chưa hỗ trợ. |
+| S39 | [trang_ch_glowup_beauty_retail](../../4-stitch_design/trang_ch_glowup_beauty_retail/code.html) | Trang chủ — chuẩn footer | `/` | A02/A09/A10; G03/O03 | FE-01/02/06 | Hero/banner/category/shelves/brand/blog; navbar theo S11, footer dùng lại; bỏ newsletter/try-on CTA chưa hỗ trợ. |
 | S40 | [trung_t_m_tr_gi_p_glowup](../../4-stitch_design/trung_t_m_tr_gi_p_glowup/code.html) | Trung tâm trợ giúp | `/help` | A10; G10 | FE-06 | FAQ + CMS + contact đã duyệt; bỏ ticket/chat chưa tích hợp và copy 14 ngày. |
 | S41 | [x_c_th_c_email_glowup](../../4-stitch_design/x_c_th_c_email_glowup/code.html) | Xác thực email | `/verify-email?token=...` | A01 | FE-01 | Link token, pending/success/invalid/expired, resend; bỏ 6 ô OTP đăng ký. |
 
@@ -117,7 +117,7 @@ Không chỉ dựng screenshot “happy path”. Mỗi nhóm sau phải có tư�
 ## 7. Quy tắc hình thức và responsive chung
 
 - Kiểm tra 360/390px mobile, 768px tablet, 1280/1440px desktop; không tràn ngang. Giá/CTA/filter không mất chức năng ở mobile.
-- Chuẩn navbar/sidebar áp dụng ở mọi route phù hợp, không copy header sai khác từ HTML auth/checkout.
+- Chuẩn navbar/sidebar áp dụng ở mọi route phù hợp, auth không có header/footer theo D11; checkout dùng navbar site.
 - Footer theo trang chủ; thay nội dung nghiệp vụ bằng 7 ngày/ship theo backend/VNPAY+COD. Hotline trang chủ 1900 8899 chỉ là giá trị thiết kế tạm, cần nội dung chính thức trước public release.
 - Một card sản phẩm/CTA/theme duy nhất; snapshot visual chỉ chấp nhận những khác biệt đã được chốt ở decision log.
 - Form có label, inline error, focus tới lỗi, trạng thái pending; touch target đủ lớn và dialog quản lý focus đúng.

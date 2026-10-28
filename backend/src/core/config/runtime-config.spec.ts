@@ -1,6 +1,21 @@
 import { ConfigService } from '@nestjs/config';
-import { corsOptions, validateRuntimeConfig, webOrigin } from './runtime-config';
+import {
+  corsOptions,
+  redisCommandTimeout,
+  validateRuntimeConfig,
+  webOrigin,
+} from './runtime-config';
 describe('Runtime deployment configuration', () => {
+  it('bounds the Upstash command deadline at startup', () => {
+    expect(redisCommandTimeout()).toBe(4000);
+    for (const value of ['', 'bad', 0, 99, 10001, 1.5])
+      expect(() =>
+        validateRuntimeConfig({
+          JWT_SECRET: 'test',
+          UPSTASH_REDIS_TIMEOUT_MS: value,
+        }),
+      ).toThrow('UPSTASH_REDIS_TIMEOUT_MS');
+  });
   it('requires a JWT secret in all environments', () => {
     expect(() => validateRuntimeConfig({})).toThrow('JWT_SECRET');
   });
@@ -14,14 +29,17 @@ describe('Runtime deployment configuration', () => {
       UPSTASH_REDIS_REST_TOKEN: 'test',
     };
     expect(validateRuntimeConfig(env)).toBe(env);
-    for (const JWT_SECRET of ['short', 'super_secret_jwt_key_glowup_cosmetics_retail_system_2026'])
+    for (const JWT_SECRET of [
+      'short',
+      'super_secret_jwt_key_glowup_cosmetics_retail_system_2026',
+    ])
       expect(() => validateRuntimeConfig({ ...env, JWT_SECRET })).toThrow();
-    expect(() => validateRuntimeConfig({ ...env, CORS_ALLOWED_ORIGINS: '' })).toThrow(
-      'CORS_ALLOWED_ORIGINS',
-    );
-    expect(() => validateRuntimeConfig({ ...env, UPSTASH_REDIS_REST_TOKEN: '' })).toThrow(
-      'Upstash',
-    );
+    expect(() =>
+      validateRuntimeConfig({ ...env, CORS_ALLOWED_ORIGINS: '' }),
+    ).toThrow('CORS_ALLOWED_ORIGINS');
+    expect(() =>
+      validateRuntimeConfig({ ...env, UPSTASH_REDIS_REST_TOKEN: '' }),
+    ).toThrow('Upstash');
   });
   it('rejects untrusted URL forms and never reflects arbitrary CORS origins', () => {
     for (const url of [
@@ -35,18 +53,31 @@ describe('Runtime deployment configuration', () => {
     expect(
       corsOptions(
         new ConfigService({
-          CORS_ALLOWED_ORIGINS: 'https://web.example.test, https://admin.example.test',
+          CORS_ALLOWED_ORIGINS:
+            'https://web.example.test, https://admin.example.test',
         }),
       ).origin,
     ).toEqual(['https://web.example.test', 'https://admin.example.test']);
   });
   it('validates refresh lifetime bounds at startup', () => {
-    for (const value of ['0d', '366d', '-1h', 'invalid', '999999999999999999999d'])
+    for (const value of [
+      '0d',
+      '366d',
+      '-1h',
+      'invalid',
+      '999999999999999999999d',
+    ])
       expect(() =>
-        validateRuntimeConfig({ JWT_SECRET: 'test', JWT_REFRESH_EXPIRES_IN: value }),
+        validateRuntimeConfig({
+          JWT_SECRET: 'test',
+          JWT_REFRESH_EXPIRES_IN: value,
+        }),
       ).toThrow('JWT_REFRESH_EXPIRES_IN');
     expect(
-      validateRuntimeConfig({ JWT_SECRET: 'test', JWT_REFRESH_EXPIRES_IN: '30d' }),
+      validateRuntimeConfig({
+        JWT_SECRET: 'test',
+        JWT_REFRESH_EXPIRES_IN: '30d',
+      }),
     ).toBeDefined();
   });
 });
