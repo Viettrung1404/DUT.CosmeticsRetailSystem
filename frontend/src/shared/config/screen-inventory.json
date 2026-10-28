@@ -79,7 +79,7 @@
     "dependencies": [
       "A07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S07",
@@ -170,7 +170,7 @@
     "dependencies": [
       "A07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S13",
@@ -229,7 +229,7 @@
       "A08",
       "G08"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S17",
@@ -271,7 +271,7 @@
     "dependencies": [
       "A06"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S20",
@@ -286,7 +286,7 @@
       "A06",
       "G06"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S21",
@@ -440,7 +440,7 @@
       "A06",
       "A03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S32",
@@ -487,7 +487,7 @@
     "dependencies": [
       "A07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S35",
