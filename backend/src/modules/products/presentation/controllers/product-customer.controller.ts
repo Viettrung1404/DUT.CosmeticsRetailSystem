@@ -99,6 +99,13 @@ export class ProductCustomerController {
   }
 
   @Public()
+  @Get('facets')
+  @ApiOperation({ summary: 'Số lượng sản phẩm đang bán theo danh mục, thương hiệu và tag' })
+  async facets() {
+    return this.catalog?.facets() ?? { categories: [], brands: [], tags: [] };
+  }
+
+  @Public()
   @Get('suggest')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({
@@ -115,6 +122,31 @@ export class ProductCustomerController {
     if (this.catalog)
       return this.catalog.suggest(queryDto.q, queryDto.limit ?? 8, req?.user?.userId);
     return this.suggestProductsUseCase.execute(queryDto.q, queryDto.limit ?? 8);
+  }
+
+  @Public()
+  @Get('search-hints')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @ApiOperation({ summary: 'Gợi ý từ khóa, thương hiệu và sản phẩm cho ô tìm kiếm' })
+  async searchHints(@Query() queryDto: SuggestProductsQueryDto, @Req() req?: { user?: { userId?: string } }) {
+    if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
+    return this.catalog.searchHints(queryDto.q, req?.user?.userId);
+  }
+
+  @Public()
+  @Get(':id/try-on')
+  @ApiOperation({ summary: 'Mã màu son đã được duyệt cho thử màu camera, có thể null nếu chưa cấu hình' })
+  async tryOnColors(@Param('id', ParseUUIDPipe) id: string) {
+    if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
+    return this.catalog.tryOnColors(id);
+  }
+
+  @Public()
+  @Get(':id/availability')
+  @ApiOperation({ summary: 'Số lượng khả dụng theo cửa hàng cho một biến thể' })
+  async availability(@Param('id', ParseUUIDPipe) id: string, @Query('variantId', ParseUUIDPipe) variantId: string) {
+    if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
+    return this.catalog.availability(id, variantId);
   }
 
   @Public()

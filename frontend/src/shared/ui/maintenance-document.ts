@@ -1,4 +1,9 @@
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!,
+  );
 
 // S30 stays a standalone document when React or the session store is unavailable.
 export function maintenanceDocument(message?: string) {
@@ -19,5 +24,15 @@ export function maintenanceDocument(message?: string) {
 }
 
 export function maintenanceResponse(message?: string, retryAfter = "300") {
-  return new Response(maintenanceDocument(message), { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Retry-After": /^\d+$/.test(retryAfter) ? retryAfter : "300", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" } });
+  return new Response(maintenanceDocument(message), {
+    status: 503,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Retry-After": /^\d+$/.test(retryAfter) ? retryAfter : "300",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
