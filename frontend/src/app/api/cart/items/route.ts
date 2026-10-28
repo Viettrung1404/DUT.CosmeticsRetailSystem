@@ -20,7 +20,17 @@ export async function GET() {
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401) throw error;
       const guest = await guestCartSession();
-      if (!guest) return json({ id: "", items: [], totalQuantity: 0, subtotal: 0 });
+      if (!guest)
+        return json({
+          id: "",
+          items: [],
+          unavailableItems: [],
+          totalQuantity: 0,
+          subtotal: 0,
+          selectedQuantity: 0,
+          selectedSubtotal: 0,
+          hasPriceChanges: false,
+        });
       return json(
         await upstream("/cart", cartDetailSchema, undefined, undefined, "GET", {
           "x-session-id": guest,

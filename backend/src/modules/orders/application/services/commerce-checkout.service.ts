@@ -20,6 +20,8 @@ import { OrderEntity } from '../../domain/entities/order.entity';
 import { OrderStatus } from '@core/domain/orders/order-status.enum';
 import { reservePromotionBenefits } from '@core/services/promotion-lifecycle';
 import { formatOrderNumber } from '../utils/order-number.util';
+import { validatePaymentAmount } from '@modules/payments/domain/payment-policy';
+import { assertGatewayReady } from '@modules/payments/domain/gateway-readiness';
 import { createVariantNameSnapshot } from '../utils/variant-name-snapshot.util';
 
 @Injectable()
@@ -78,8 +80,10 @@ export class CommerceCheckoutService {
     };
   }
   async create(input: CreateOrderInput): Promise<OrderEntity> {
-    if (!['COD'].includes(input.paymentMethod ?? 'COD'))
+    const paymentMethod = input.paymentMethod ?? 'COD';
+    if (!['COD', 'VNPAY'].includes(paymentMethod))
       throw new ServiceUnavailableException('ONLINE_PAYMENT_MODULE_REQUIRED');
+    if (paymentMethod === 'VNPAY') assertGatewayReady(paymentMethod);
     const owner = await this.db.customer.findUniqueOrThrow({
       where: { id: input.customerId },
       select: { userId: true },
@@ -106,6 +110,7 @@ export class CommerceCheckoutService {
         if (!input.quoteVersion)
           throw new BadRequestException('PRICE_QUOTE_REQUIRED');
         this.pricing.assertQuote(input.quoteVersion, quote);
+        validatePaymentAmount(paymentMethod, quote.totalAmount);
         const variantIds = selection.items.map((i) => i.variantId);
         const inventory = await tx.$queryRaw<
           {
@@ -249,7 +254,7 @@ export class CommerceCheckoutService {
         await tx.payment.create({
           data: {
             orderId: order.id,
-            paymentMethod: 'COD',
+            paymentMethod,
             status: 'PENDING',
             amount: order.totalAmount,
           },
