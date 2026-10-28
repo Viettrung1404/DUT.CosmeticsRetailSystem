@@ -1,0 +1,30 @@
+{
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
+  "rootDir": "..",
+  "testRegex": "test/.*\\.e2e-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "allowJs": true
+        }
+      }
+    ]
+  },
+  "testEnvironment": "node",
+  "testTimeout": 30000,
+  "maxWorkers": 1,
+  "moduleNameMapper": {
+    "^@core/(.*)$": "<rootDir>/src/core/$1",
+    "^@modules/(.*)$": "<rootDir>/src/modules/$1",
+    "^@infrastructure/(.*)$": "<rootDir>/src/infrastructure/$1"
+  },
+  "transformIgnorePatterns": [
+    "node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|launder)/)"
+  ]
+}

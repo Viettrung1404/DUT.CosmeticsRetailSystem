@@ -13,6 +13,8 @@ export class PrismaVariantCatalogAdapter implements IVariantCatalogProvider {
     const variants = await this.prisma.productVariant.findMany({
       where: {
         id: { in: variantIds },
+        isActive: true,
+        product: { isActive: true },
       },
       include: {
         product: {

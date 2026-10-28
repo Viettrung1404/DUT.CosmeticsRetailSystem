@@ -53,6 +53,7 @@ describe('ResetPasswordUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
       rotateActive: jest
@@ -130,8 +131,8 @@ describe('ResetPasswordUseCase', () => {
   it('should throw BadRequestException if token is invalid or expired', async () => {
     tokenRepo.findByTokenHash.mockResolvedValue(null);
 
-    await expect(
-      useCase.execute('invalid-token', 'NewStrongPassword@2026'),
-    ).rejects.toThrow(BadRequestException);
+    await expect(useCase.execute('invalid-token', 'NewStrongPassword@2026')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });

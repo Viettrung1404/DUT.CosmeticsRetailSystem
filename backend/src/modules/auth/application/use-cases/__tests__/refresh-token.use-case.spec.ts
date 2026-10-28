@@ -42,6 +42,7 @@ describe('RefreshTokenUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
       rotateActive: jest
@@ -51,6 +52,7 @@ describe('RefreshTokenUseCase', () => {
 
     jwtService = {
       generateAccessToken: jest.fn().mockReturnValue('new-access-token'),
+      refreshExpiresAt: jest.fn().mockImplementation(() => new Date(Date.now() + 7 * 86400000)),
       generateRefreshToken: jest.fn().mockReturnValue('new-refresh-token'),
       verifyAccessToken: jest.fn(),
     } as any;
@@ -108,15 +110,8 @@ describe('RefreshTokenUseCase', () => {
 
     expect(result.accessToken).toBe('new-access-token');
     expect(result.refreshToken).toBe('new-refresh-token');
-    expect(sessionRepo.rotateActive).toHaveBeenCalledWith(
-      'valid-old-token',
-      'new-refresh-token',
-      expect.any(Date),
-    );
-    expect(sessionRepo.create).not.toHaveBeenCalled();
-    expect(jwtService.generateAccessToken).toHaveBeenCalledWith(
-      expect.objectContaining({ sid: 'session-1' }),
-    );
+    expect(sessionRepo.consume).toHaveBeenCalledWith('session-1');
+    expect(sessionRepo.create).toHaveBeenCalled();
     expect(getPermissionsUseCase.execute).toHaveBeenCalledWith('user-1');
   });
 

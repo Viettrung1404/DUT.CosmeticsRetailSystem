@@ -1,6 +1,9 @@
 import { Inject, Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { UserEntity } from '../../domain/entities/user.entity';
-import { USER_REPOSITORY, IUserRepository } from '../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../domain/repositories/user.repository.interface';
 import {
   VERIFICATION_TOKEN_REPOSITORY,
   IVerificationTokenRepository,
@@ -31,7 +34,8 @@ export interface RegisterOutput {
 export class RegisterUseCase {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
-    @Inject(VERIFICATION_TOKEN_REPOSITORY) private readonly tokenRepo: IVerificationTokenRepository,
+    @Inject(VERIFICATION_TOKEN_REPOSITORY)
+    private readonly tokenRepo: IVerificationTokenRepository,
     @Inject(EMAIL_SERVICE) private readonly emailService: IEmailService,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: IUnitOfWork,
     private readonly bcryptService: BcryptService,
@@ -79,10 +83,10 @@ export class RegisterUseCase {
 
       if (input.phone) {
         const existingCustomer = await this.userRepo.findCustomerByPhone(input.phone);
-        if (existingCustomer && !existingCustomer.userId) {
-          // Merge: link existing POS walk-in customer profile to new user
-          await this.userRepo.linkCustomerToUser(existingCustomer.id, uId);
-        } else if (!existingCustomer) {
+        if (existingCustomer) {
+          // A supplied phone number does not prove ownership of POS history/points.
+          throw new ConflictException('PHONE_VERIFICATION_REQUIRED');
+        } else {
           await this.userRepo.createCustomerForUser(uId, input.phone);
         }
       } else {
@@ -114,4 +118,3 @@ export class RegisterUseCase {
     };
   }
 }
-

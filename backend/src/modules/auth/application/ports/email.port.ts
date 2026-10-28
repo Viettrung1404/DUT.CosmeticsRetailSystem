@@ -1,6 +1,7 @@
 export const EMAIL_SERVICE = Symbol('IEmailService');
 
 export interface IEmailService {
+  sendOAuthVerificationEmail?(to: string, token: string): Promise<void>;
   /** Send account email verification */
   sendVerificationEmail(to: string, fullName: string, token: string): Promise<void>;
 

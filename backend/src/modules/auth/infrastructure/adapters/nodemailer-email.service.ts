@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { IEmailService } from '../../application/ports/email.port';
@@ -12,7 +12,7 @@ export class NodemailerEmailService implements IEmailService {
 
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('SMTP_HOST');
-    const port = this.configService.get<number>('SMTP_PORT', 587);
+    const port = Number(this.configService.get('SMTP_PORT', 587));
     const user = this.configService.get<string>('SMTP_USER');
     const pass = this.configService.get<string>('SMTP_PASS');
     this.from = this.configService.get<string>('SMTP_FROM', 'GlowUp <noreply@glowup.vn>');
@@ -26,7 +26,7 @@ export class NodemailerEmailService implements IEmailService {
         auth: { user, pass },
       });
     } else {
-      this.logger.warn('SMTP credentials not configured. Emails will be logged to console.');
+      this.logger.warn('SMTP credentials not configured. Email delivery is disabled.');
     }
   }
 
@@ -46,6 +46,21 @@ export class NodemailerEmailService implements IEmailService {
     `;
 
     await this.sendMail(to, subject, html);
+  }
+
+  async sendOAuthVerificationEmail(to: string, token: string): Promise<void> {
+    if (!this.transporter)
+      throw new ServiceUnavailableException('OAUTH_EMAIL_DELIVERY_NOT_CONFIGURED');
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: 'GlowUp OAuth email verification',
+        text: `Confirm your GlowUp sign-in or account linking with this one-time code (valid for 10 minutes): ${token}. If you did not request this, ignore this email.`,
+      });
+    } catch {
+      throw new ServiceUnavailableException('OAUTH_EMAIL_DELIVERY_FAILED');
+    }
   }
 
   async sendWelcomeEmail(to: string, fullName: string): Promise<void> {
@@ -96,7 +111,7 @@ export class NodemailerEmailService implements IEmailService {
 
   private async sendMail(to: string, subject: string, html: string): Promise<void> {
     if (!this.transporter) {
-      this.logger.log(`[EMAIL LOG] To: ${to} | Subject: ${subject}`);
+      this.logger.warn('Email delivery is not configured; message was not sent.');
       return;
     }
 
@@ -108,7 +123,7 @@ export class NodemailerEmailService implements IEmailService {
         html,
       });
     } catch (error) {
-      this.logger.error(`Failed to send email to ${to}:`, error);
+      this.logger.error('Email delivery failed');
       // Suppress error to avoid crashing the business flow
     }
   }

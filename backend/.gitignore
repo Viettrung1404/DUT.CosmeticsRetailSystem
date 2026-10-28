@@ -31,7 +31,15 @@ Thumbs.db
 # Testing
 /coverage
 /.nyc_output
+/.tmp
 
 /scripts
+!/scripts/
+/scripts/*
+!/scripts/sprint6-redis-readiness.ts
+!/scripts/sprint6-benchmark.ts
+!/scripts/sprint6-export-collection.cjs
+!/scripts/sprint6-migration-check.ts
+!/scripts/sprint6-client-readiness.cjs
 
 /.agents

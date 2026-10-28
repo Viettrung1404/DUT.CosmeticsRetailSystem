@@ -11,6 +11,7 @@ export interface CreateOrderItemInput {
   unitCost: number;
   discountAmount: number;
   totalPrice: number;
+  pricingSnapshot?: unknown;
 }
 
 export interface CreateOrderTransactionInput {
@@ -28,8 +29,12 @@ export interface CreateOrderTransactionInput {
   couponId?: string | null;
   loyaltyPointsUsed: number;
   paymentMethod: string;
-  cartId?: string;
   items: CreateOrderItemInput[];
+  couponDiscount?: number;
+  pointsDiscount?: number;
+  pointsValueVnd?: number;
+  cartId?: string;
+  pricingSnapshot?: unknown;
 }
 
 export interface IOrderRepository {

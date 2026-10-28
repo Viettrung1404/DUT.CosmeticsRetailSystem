@@ -1,12 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MinLength,
-  Matches,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, Matches } from 'class-validator';
 
 export class RegisterDto {
   @ApiProperty({ example: 'customer@example.com', description: 'Địa chỉ email người dùng' })
@@ -75,7 +68,10 @@ export class LogoutDto {
 }
 
 export class ForgotPasswordDto {
-  @ApiProperty({ example: 'customer@example.com', description: 'Email tài khoản cần đặt lại mật khẩu' })
+  @ApiProperty({
+    example: 'customer@example.com',
+    description: 'Email tài khoản cần đặt lại mật khẩu',
+  })
   @IsEmail({}, { message: 'Email không hợp lệ' })
   email: string;
 }
@@ -116,10 +112,10 @@ export class AuthUserDto {
 }
 
 export class LoginResponseDto {
-  @ApiProperty({ description: 'JWT Access Token (hạn 15 phút)' })
+  @ApiProperty({ description: 'GlowUp JWT access token; TTL follows JWT_EXPIRES_IN' })
   accessToken: string;
 
-  @ApiProperty({ description: 'Refresh Token (hạn 7 ngày)' })
+  @ApiProperty({ description: 'Opaque refresh token; TTL follows JWT_REFRESH_EXPIRES_IN' })
   refreshToken: string;
 
   @ApiProperty({ type: AuthUserDto })
