@@ -7,6 +7,7 @@ import { ContentService } from './application/content.service';
 import { CommercePricingService } from './application/commerce-pricing.service';
 import { BroadcastService } from './application/broadcast.service';
 import { ExperienceController } from './presentation/experience.controller';
+import { BrandController } from './presentation/brand.controller';
 import {
   PromotionController,
   PromotionsService,
@@ -20,7 +21,7 @@ import { CommercePricingModule } from './commerce-pricing.module';
     CustomerCommerceModule,
     CommercePricingModule,
   ],
-  controllers: [ExperienceController, PromotionController],
+  controllers: [ExperienceController, PromotionController, BrandController],
   providers: [
     ReviewsService,
     ContentService,

@@ -24,6 +24,41 @@ export class PublicCatalogService {
     private readonly db: PrismaService,
     @Optional() private readonly es?: ElasticsearchProductService,
   ) {}
+  async facets() {
+    const active = { isActive: true, category: { isActive: true }, variants: { some: { isActive: true } }, OR: [{ brandId: null }, { brand: { isActive: true } }] };
+    const [categoryCounts, brandCounts, tagCounts] = await Promise.all([
+      this.db.product.groupBy({ by: ['categoryId'], where: active, _count: { _all: true } }),
+      this.db.product.groupBy({ by: ['brandId'], where: active, _count: { _all: true } }),
+      this.db.productTag.groupBy({ by: ['tagName'], where: { product: active }, _count: { _all: true } }),
+    ]);
+    const [categories, brands] = await Promise.all([
+      this.db.category.findMany({ where: { id: { in: categoryCounts.map(row => row.categoryId) } }, select: { id: true, name: true, slug: true } }),
+      this.db.brand.findMany({ where: { id: { in: brandCounts.flatMap(row => row.brandId ? [row.brandId] : []) } }, select: { id: true, name: true, slug: true } }),
+    ]);
+    return {
+      categories: categories.map(item => ({ ...item, count: categoryCounts.find(row => row.categoryId === item.id)?._count._all ?? 0 })),
+      brands: brands.map(item => ({ ...item, count: brandCounts.find(row => row.brandId === item.id)?._count._all ?? 0 })).sort((a,b) => b.count - a.count || a.name.localeCompare(b.name)),
+      tags: tagCounts.map(row => ({ name: row.tagName, count: row._count._all })).sort((a,b) => b.count - a.count || a.name.localeCompare(b.name)),
+    };
+  }
+  async availability(productId: string, variantId: string) {
+    const variant = await this.db.productVariant.findFirst({ where: { id: variantId, productId, isActive: true, product: { isActive: true } }, select: { id: true } });
+    if (!variant) throw new NotFoundException('VARIANT_NOT_FOUND');
+    const stores = await this.db.store.findMany({
+      where: { isActive: true, type: 'STORE' }, orderBy: [{ name: 'asc' }, { id: 'asc' }], take: 100,
+      select: { id: true, name: true, address: true, city: true, inventory: { where: { productVariantId: variantId }, select: { quantity: true, reservedQuantity: true } } },
+    });
+    return stores.map(store => ({ id: store.id, name: store.name, address: store.address, city: store.city, available: Math.max(0, (store.inventory[0]?.quantity ?? 0) - (store.inventory[0]?.reservedQuantity ?? 0)) }));
+  }
+  async tryOnColors(productId: string) {
+    const product = await this.db.product.findFirst({ where: { id: productId, isActive: true }, select: { id: true } });
+    if (!product) throw new NotFoundException('PRODUCT_NOT_FOUND');
+    const [column] = await this.db.$queryRaw<{ exists: boolean }[]>`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='product_variants' AND column_name='try_on_color_hex') AS "exists"`;
+    const variants = column?.exists
+      ? await this.db.$queryRaw<{ id: string; option1Value: string | null; option2Value: string | null; colorHex: string | null }[]>`SELECT id,option1_value AS "option1Value",option2_value AS "option2Value",try_on_color_hex AS "colorHex" FROM product_variants WHERE product_id=${productId}::uuid AND is_active=true ORDER BY created_at,id`
+      : await this.db.$queryRaw<{ id: string; option1Value: string | null; option2Value: string | null; colorHex: string | null }[]>`SELECT id,option1_value AS "option1Value",option2_value AS "option2Value",NULL::text AS "colorHex" FROM product_variants WHERE product_id=${productId}::uuid AND is_active=true ORDER BY created_at,id`;
+    return variants.map(variant => ({ variantId: variant.id, label: [variant.option1Value, variant.option2Value].filter(Boolean).join(' · '), colorHex: variant.colorHex }));
+  }
   private async tier(userId?: string) {
     if (!userId) return 0;
     const customer = await this.db.customer.findFirst({
@@ -54,17 +89,18 @@ export class PublicCatalogService {
     const rows = await this.db.$queryRaw<
       { id: string; effective_price: Prisma.Decimal; total: bigint }[]
     >(Prisma.sql`
-      WITH RECURSIVE selected_categories AS (SELECT id FROM categories WHERE id=${filter.categoryId ?? null}::uuid UNION ALL SELECT c.id FROM categories c JOIN selected_categories parent ON c.parent_id=parent.id),
+      WITH RECURSIVE selected_categories AS (SELECT id FROM categories WHERE id=${filter.categoryId ?? null}::uuid OR id=ANY(${filter.categoryIds ?? []}::uuid[]) UNION ALL SELECT c.id FROM categories c JOIN selected_categories parent ON c.parent_id=parent.id),
       priced AS (
         SELECT p.id,p.created_at,p.avg_rating,p.total_sold,MIN(sprint5_variant_price(v.id,${tier}::numeric)) AS effective_price
         FROM products p JOIN categories c ON c.id=p.category_id
         LEFT JOIN brands b ON b.id=p.brand_id
         JOIN product_variants v ON v.product_id=p.id AND v.is_active=true
         WHERE p.is_active=true AND c.is_active=true AND (p.brand_id IS NULL OR b.is_active=true)
-        AND (${filter.categoryId ?? null}::uuid IS NULL OR p.category_id IN (SELECT id FROM selected_categories))
-        AND (${filter.brandId ?? null}::uuid IS NULL OR p.brand_id=${filter.brandId ?? null}::uuid)
+        AND (${filter.categoryId ?? null}::uuid IS NULL AND cardinality(${filter.categoryIds ?? []}::uuid[])=0 OR p.category_id IN (SELECT id FROM selected_categories))
+        AND (${filter.brandId ?? null}::uuid IS NULL AND cardinality(${filter.brandIds ?? []}::uuid[])=0 OR p.brand_id=${filter.brandId ?? null}::uuid OR p.brand_id=ANY(${filter.brandIds ?? []}::uuid[]))
         AND (${filter.rating ?? null}::numeric IS NULL OR p.avg_rating>=${filter.rating ?? null})
         AND (${filter.tag ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name ILIKE ${'%' + (filter.tag ?? '') + '%'}))
+        AND (cardinality(${filter.tags ?? []}::text[])=0 OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name=ANY(${filter.tags ?? []}::text[])))
         AND (${query ?? null}::text IS NULL OR p.name ILIKE ${'%' + (query ?? '') + '%'} OR p.description ILIKE ${'%' + (query ?? '') + '%'} OR b.name ILIKE ${'%' + (query ?? '') + '%'} OR p.id=ANY(${hintIds}::uuid[]) OR EXISTS(SELECT 1 FROM product_ingredients i WHERE i.product_id=p.id AND i.ingredient_name ILIKE ${'%' + (query ?? '') + '%'}))
         GROUP BY p.id
       ), filtered AS (SELECT * FROM priced WHERE (${filter.minPrice ?? null}::numeric IS NULL OR effective_price>=${filter.minPrice ?? null}) AND (${filter.maxPrice ?? null}::numeric IS NULL OR effective_price<=${filter.maxPrice ?? null}))
@@ -187,6 +223,16 @@ export class PublicCatalogService {
       imageUrl: p.primaryImage ?? null,
       price: p.effectivePrice!,
     }));
+  }
+  async searchHints(query: string, userId?: string) {
+    const q = query.trim().slice(0, 100);
+    const activeProduct = { isActive: true, category: { isActive: true }, variants: { some: { isActive: true } } };
+    const [products, brands, tags] = await Promise.all([
+      this.suggest(q, 5, userId),
+      this.db.brand.findMany({ where: { isActive: true, name: { contains: q, mode: 'insensitive' }, products: { some: activeProduct } }, select: { id: true, name: true, slug: true }, take: 4, orderBy: { name: 'asc' } }),
+      this.db.productTag.groupBy({ by: ['tagName'], where: { tagName: { contains: q, mode: 'insensitive' }, product: activeProduct }, _count: { _all: true }, orderBy: { _count: { tagName: 'desc' } }, take: 5 }),
+    ]);
+    return { products, brands, keywords: tags.map(tag => tag.tagName) };
   }
   async related(productId: string, limit: number, userId?: string) {
     const source = await this.db.product.findFirst({

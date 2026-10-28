@@ -12,6 +12,8 @@
     "build": "next build",
     "start": "next start --port 3001",
     "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:sessions": "node scripts/test-sessions.mjs",
@@ -22,10 +24,11 @@
     "contracts:check": "node scripts/generate-contracts.mjs --check",
     "inventory:generate": "node scripts/generate-inventory.mjs",
     "inventory:check": "node scripts/generate-inventory.mjs --check",
-    "check": "npm run contracts:check && npm run inventory:check && npm run lint && npm run typecheck && npm test && npm run build"
+    "check": "npm run contracts:check && npm run inventory:check && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.2",
+    "@mediapipe/tasks-vision": "0.10.32",
     "@tanstack/react-query": "5.105.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -50,6 +53,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
     "openapi-typescript": "7.13.0",
+    "prettier": "3.9.10",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "vitest": "5.0.5"

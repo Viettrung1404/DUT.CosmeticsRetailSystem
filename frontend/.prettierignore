@@ -1,0 +1,8 @@
+.next/
+.next-build/
+.next-e2e/
+coverage/
+node_modules/
+playwright-report/
+test-results/
+src/shared/api/generated/

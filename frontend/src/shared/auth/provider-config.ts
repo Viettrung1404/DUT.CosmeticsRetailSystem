@@ -7,7 +7,16 @@ export function oauthProviders(): OAuthProviders {
   const appId = process.env.FACEBOOK_APP_ID?.trim() || "";
   const version = process.env.FACEBOOK_GRAPH_VERSION?.trim() || "";
   return {
-    google: process.env.OAUTH_GOOGLE_ENABLED === "true" && /^\d+-[\w-]+\.apps\.googleusercontent\.com$/.test(clientId) ? { clientId } : null,
-    facebook: process.env.OAUTH_FACEBOOK_ENABLED === "true" && /^\d+$/.test(appId) && /^v\d+\.\d+$/.test(version) ? { appId, version } : null,
+    google:
+      process.env.OAUTH_GOOGLE_ENABLED === "true" &&
+      /^\d+-[\w-]+\.apps\.googleusercontent\.com$/.test(clientId)
+        ? { clientId }
+        : null,
+    facebook:
+      process.env.OAUTH_FACEBOOK_ENABLED === "true" &&
+      /^\d+$/.test(appId) &&
+      /^v\d+\.\d+$/.test(version)
+        ? { appId, version }
+        : null,
   };
 }

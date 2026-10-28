@@ -1,7 +1,16 @@
 import { cookies } from "next/headers";
 import { ApiError } from "@/shared/api/errors";
 import { authInputs, loginSchema, messageSchema, type AuthAction } from "@/shared/auth/contracts";
-import { authRuntime, cookieName, cookieOptions, currentUser, establishSession, sessionId, sessionTtl, upstream } from "@/shared/auth/server";
+import {
+  authRuntime,
+  cookieName,
+  cookieOptions,
+  currentUser,
+  establishSession,
+  sessionId,
+  sessionTtl,
+  upstream,
+} from "@/shared/auth/server";
 import { failure, json, mutationBody } from "@/shared/auth/http";
 import { mergeGuestCart } from "@/shared/auth/cart";
 import { validId } from "@/shared/auth/store";
@@ -12,7 +21,9 @@ export async function GET(_request: Request, context: { params: Promise<{ action
   try {
     if ((await context.params).action !== "session") throw new ApiError(404, "NOT_FOUND");
     return json({ user: await currentUser() });
-  } catch (error) { return failure(error); }
+  } catch (error) {
+    return failure(error);
+  }
 }
 export async function POST(request: Request, context: { params: Promise<{ action: string }> }) {
   try {
@@ -28,11 +39,16 @@ export async function POST(request: Request, context: { params: Promise<{ action
           const value = await store.get<Session>(id);
           await store.remove(id); // Delete before revoke; a refresh CAS cannot resurrect this ID.
           if (value) {
-            try { await upstream("/auth/logout", messageSchema, { refreshToken: value.refreshToken }); }
-            catch { revoked = false; }
+            try {
+              await upstream("/auth/logout", messageSchema, { refreshToken: value.refreshToken });
+            } catch {
+              revoked = false;
+            }
           }
         }
-      } finally { jar.set(cookieName(), "", { ...cookieOptions(), maxAge: 0 }); }
+      } finally {
+        jar.set(cookieName(), "", { ...cookieOptions(), maxAge: 0 });
+      }
       return json({ revoked });
     }
     if (action === "merge-cart") return json({ cart: await mergeGuestCart(await sessionId()) });
@@ -48,5 +64,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
     }
     await upstream(`/auth/${action}`, messageSchema, parsed.data);
     return json({ success: true }, action === "register" ? 201 : 200);
-  } catch (error) { return failure(error); }
+  } catch (error) {
+    return failure(error);
+  }
 }
