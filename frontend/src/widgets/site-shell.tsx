@@ -25,6 +25,7 @@ import { readBff } from "@/shared/api/browser";
 import { z } from "zod";
 import { useHydrated } from "@/shared/lib/use-hydrated";
 import { BrandLogo } from "@/shared/ui/brand-logo";
+import { CartContents } from "@/features/catalog/cart-contents";
 
 export const Logo = BrandLogo;
 
@@ -35,6 +36,8 @@ export function SiteHeader() {
   const trigger = useRef<HTMLButtonElement>(null);
   const pills = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const cartDialog = useRef<HTMLDialogElement>(null);
+  const cartTrigger = useRef<HTMLButtonElement>(null);
   const { data: user } = useQuery({
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
@@ -133,9 +136,15 @@ export function SiteHeader() {
             >
               <Heart />
             </Link>
-            <Link className="cart-entry" href="/cart" aria-label="Giỏ hàng">
+            <button
+              ref={cartTrigger}
+              type="button"
+              className="cart-entry"
+              aria-label="Mở giỏ hàng"
+              onClick={() => cartDialog.current?.showModal()}
+            >
               <ShoppingBag />
-            </Link>
+            </button>
           </div>
         </div>
         <div className="navigation-row">
@@ -221,6 +230,31 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
+      </dialog>
+      <dialog
+        ref={cartDialog}
+        className="mini-cart-drawer"
+        aria-label="Giỏ hàng"
+        onClose={() => cartTrigger.current?.focus()}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) cartDialog.current?.close();
+        }}
+      >
+        <div className="drawer-heading">
+          <h2>Giỏ hàng của bạn</h2>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Đóng giỏ hàng"
+            onClick={() => cartDialog.current?.close()}
+          >
+            <X />
+          </button>
+        </div>
+        <CartContents compact onNavigate={() => cartDialog.current?.close()} />
+        <Link href="/cart" onClick={() => cartDialog.current?.close()}>
+          Xem giỏ hàng đầy đủ
+        </Link>
       </dialog>
     </>
   );
