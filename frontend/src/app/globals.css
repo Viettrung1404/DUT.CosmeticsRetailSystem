@@ -3409,8 +3409,91 @@
   max-width: 650px;
   margin: 26px auto 55px;
 }
+.account-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 22px 0;
+}
+.account-stat-grid > div {
+  border: 1px solid #eadde0;
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  gap: 5px;
+}
+.account-stat-grid strong {
+  font-size: 22px;
+  color: #9d394f;
+}
+.account-stat-grid span {
+  color: #776d6d;
+  font-size: 13px;
+}
+.account-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 18px;
+}
+.account-links a,
+.account-links button {
+  color: #9d394f;
+}
+.account-form {
+  display: grid;
+  gap: 15px;
+  max-width: 540px;
+}
+.account-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.account-form input,
+.account-form select,
+.account-content select {
+  border: 1px solid #d9cacc;
+  border-radius: 7px;
+  padding: 10px;
+  background: #fff;
+}
+.account-list {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+.account-list article {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #eadde0;
+  border-radius: 10px;
+}
+.account-list article small {
+  display: block;
+  margin-top: 4px;
+  color: #776d6d;
+}
+.account-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+.tracking-shipment {
+  border: 1px solid #eadde0;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 16px 0;
+}
 @media (max-width: 700px) {
   .checkout-grid {
+    grid-template-columns: 1fr;
+  }
+  .account-stat-grid {
     grid-template-columns: 1fr;
   }
 }
