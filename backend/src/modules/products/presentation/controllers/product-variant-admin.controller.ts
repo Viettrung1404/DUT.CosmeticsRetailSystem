@@ -1,4 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
+import { Matches } from 'class-validator';
+import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -20,6 +23,12 @@ import {
 } from '../dtos/product-variant-request.dto';
 import { ProductVariantResponseDto } from '../dtos/product-variant-response.dto';
 
+class TryOnColorDto {
+  @ApiProperty({ example: '#B9465E', description: 'Mã màu được duyệt từ ảnh swatch của biến thể' })
+  @Matches(/^#[0-9A-Fa-f]{6}$/)
+  colorHex: string;
+}
+
 @ApiTags('Admin - Product Variants (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
 @Controller('admin')
@@ -29,7 +38,17 @@ export class ProductVariantAdminController {
     private readonly createProductVariantUseCase: CreateProductVariantUseCase,
     private readonly updateProductVariantUseCase: UpdateProductVariantUseCase,
     private readonly deleteProductVariantUseCase: DeleteProductVariantUseCase,
+    private readonly db: PrismaService,
   ) {}
+
+  @Patch('variants/:id/try-on-color')
+  @RequirePermissions('PRODUCT_UPDATE')
+  @ApiOperation({ summary: 'Cập nhật mã màu thử son đã được duyệt cho biến thể' })
+  async updateTryOnColor(@Param('id', ParseUUIDPipe) id: string, @Body() dto: TryOnColorDto) {
+    const count = await this.db.$executeRaw`UPDATE product_variants SET try_on_color_hex=${dto.colorHex} WHERE id=${id}::uuid`;
+    if (!count) throw new NotFoundException('VARIANT_NOT_FOUND');
+    return { id, tryOnColorHex: dto.colorHex };
+  }
 
   @Get('products/:productId/variants')
   @RequirePermissions('PRODUCT_VIEW')

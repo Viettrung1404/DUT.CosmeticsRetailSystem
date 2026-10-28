@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 
 export enum ProductSortBy {
@@ -12,6 +12,11 @@ export enum ProductSortBy {
 }
 
 export class ProductFilterDto extends PageOptionsDto {
+  @ApiPropertyOptional({ description: 'Nhiều danh mục UUID, phân tách bằng dấu phẩy', type: String })
+  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').filter(Boolean) : value)
+  @IsArray() @ArrayMaxSize(20) @IsUUID(undefined, { each: true })
+  categoryIds?: string[];
+
   @ApiPropertyOptional({ description: 'Lọc theo ID danh mục (UUID)' })
   @IsOptional()
   @IsUUID()
@@ -21,6 +26,11 @@ export class ProductFilterDto extends PageOptionsDto {
   @IsOptional()
   @IsUUID()
   brandId?: string;
+
+  @ApiPropertyOptional({ description: 'Nhiều thương hiệu UUID, phân tách bằng dấu phẩy', type: String })
+  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').filter(Boolean) : value)
+  @IsArray() @ArrayMaxSize(20) @IsUUID(undefined, { each: true })
+  brandIds?: string[];
 
   @ApiPropertyOptional({ description: 'Giá tối thiểu (VNĐ)' })
   @Type(() => Number)
@@ -48,6 +58,11 @@ export class ProductFilterDto extends PageOptionsDto {
   @IsOptional()
   @IsString()
   tag?: string;
+
+  @ApiPropertyOptional({ description: 'Nhiều tag tình trạng da, phân tách bằng dấu phẩy', type: String })
+  @IsOptional() @Transform(({ value }) => typeof value === 'string' ? value.split(',').map((item: string) => item.trim()).filter(Boolean) : value)
+  @IsArray() @ArrayMaxSize(10) @IsString({ each: true })
+  tags?: string[];
 
   @ApiPropertyOptional({
     enum: ProductSortBy,

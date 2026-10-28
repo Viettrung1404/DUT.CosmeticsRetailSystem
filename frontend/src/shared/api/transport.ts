@@ -12,6 +12,9 @@ export async function fetchWithTimeout(
     return await fetcher(input, { ...init, signal, cache: "no-store", redirect: "error" });
   } catch (error) {
     if (init.signal?.aborted) throw error;
-    throw new ApiError(timeout.aborted ? 504 : 503, timeout.aborted ? "REQUEST_TIMEOUT" : "NETWORK_ERROR");
+    throw new ApiError(
+      timeout.aborted ? 504 : 503,
+      timeout.aborted ? "REQUEST_TIMEOUT" : "NETWORK_ERROR",
+    );
   }
 }

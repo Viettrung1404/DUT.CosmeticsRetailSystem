@@ -41,6 +41,7 @@ import { CommercePricingService } from '../application/commerce-pricing.service'
 import { PublicListDto } from './experience.dto';
 import { ExperienceResponse } from './experience.responses';
 import { CommerceErrors } from '@modules/customer-commerce/presentation/commerce.responses';
+import { publicUrl } from '../domain/public-content';
 
 class SelectionItemDto {
   @ApiProperty() @IsUUID() variantId: string;
@@ -78,6 +79,31 @@ const publicCampaign = {
 @Injectable()
 export class PromotionsService {
   constructor(private readonly db: PrismaService) {}
+  async flashCards(limit: number) {
+    const now = new Date();
+    const quotas = await this.db.promotionVariantQuota.findMany({
+      where: {
+        promotion: { isActive: true, isFlashSale: true, startDate: { lte: now }, endDate: { gt: now }, OR: [{ usageLimit: null }, { usedCount: { lt: this.db.promotion.fields.usageLimit } }] },
+        variant: { isActive: true, product: { isActive: true, category: { isActive: true }, OR: [{ brandId: null }, { brand: { isActive: true } }] } },
+      },
+      orderBy: [{ promotion: { endDate: 'asc' } }, { id: 'asc' }],
+      take: Math.min(limit * 5, 100),
+      select: { id: true, productVariantId: true, quota: true, reservedQuantity: true, consumedQuantity: true,
+        promotion: { select: { id: true, name: true, endDate: true, minOrderAmount: true } },
+        variant: { select: { price: true, product: { select: { id: true, name: true, slug: true, basePrice: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { imageUrl: true } }, brand: { select: { name: true } } } } } },
+      },
+    });
+    const active = quotas.filter(q => q.quota > q.reservedQuantity + q.consumedQuantity).slice(0, limit);
+    const ids = active.map(q => q.productVariantId);
+    const prices = ids.length ? await this.db.$queryRaw<{ id: string; price: number }[]>`SELECT id,sprint5_variant_price(id,0::numeric)::float8 AS price FROM product_variants WHERE id=ANY(${ids}::uuid[])` : [];
+    return active.map(q => ({
+      promotionId: q.promotion.id, promotionName: q.promotion.name, endDate: q.promotion.endDate,
+      conditional: Number(q.promotion.minOrderAmount) > 0, remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
+      variantId: q.productVariantId, productId: q.variant.product.id, name: q.variant.product.name, slug: q.variant.product.slug,
+      brandName: q.variant.product.brand?.name ?? null, imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
+      originalPrice: Number(q.variant.price), effectivePrice: prices.find(p => p.id === q.productVariantId)?.price ?? Number(q.variant.price),
+    }));
+  }
   async active(query: PublicListDto, flash = false) {
     const now = new Date();
     const where = {
@@ -164,6 +190,13 @@ export class PromotionController {
     private readonly pricing: CommercePricingService,
     private readonly redis: UpstashRedisService,
   ) {}
+  @Public()
+  @Get('promotions/flash-sale/cards')
+  @ApiOperation({ summary: 'Card sản phẩm flash sale còn quota cho trang chủ' })
+  flashCards(@Query('limit') limit?: string) {
+    const requested = Number(limit ?? 5);
+    return this.promotions.flashCards(Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 20) : 5);
+  }
   @Public()
   @Get('promotions/active')
   @ApiOperation({

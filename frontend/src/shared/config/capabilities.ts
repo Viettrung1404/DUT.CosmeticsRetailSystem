@@ -29,5 +29,9 @@ export const capabilities = {
   beautyProfile: { contract: "omitted", blockers: ["G04"], phase: "out-of-scope" },
 } as const satisfies Record<string, Omit<Capability, "integrated">>;
 
-export const integrationStatus: Readonly<Record<keyof typeof capabilities, Capability["integrated"]>> =
-  Object.fromEntries(Object.keys(capabilities).map((key) => [key, false])) as Record<keyof typeof capabilities, false>;
+export const integrationStatus: Readonly<
+  Record<keyof typeof capabilities, Capability["integrated"]>
+> = Object.fromEntries(Object.keys(capabilities).map((key) => [key, false])) as Record<
+  keyof typeof capabilities,
+  false
+>;

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class SuggestProductsQueryDto {
   @ApiProperty({
@@ -9,6 +9,8 @@ export class SuggestProductsQueryDto {
   })
   @IsString()
   @IsNotEmpty({ message: 'Từ khóa tìm kiếm không được để trống' })
+  @MaxLength(100)
+  @Matches(/\S/)
   q: string;
 
   @ApiPropertyOptional({

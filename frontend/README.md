@@ -29,7 +29,9 @@ npm run test:production
 npm run test:maintenance
 ```
 
-`check`: OpenAPI drift, route/asset inventory, ESLint, Next route types + strict TypeScript, Vitest, production build. `test:sessions` dùng Redis/Upstash thật từ `.env.local`, tạo namespace ngẫu nhiên `glowup:test:*`, kiểm tra refresh/CAS/logout/TTL và xóa các record đã tạo. Có thể đặt `TEST_SESSION_REDIS_URL` để dùng database kiểm thử riêng; lệnh này không duyệt hoặc xóa key backend. Các test Redis được tách khỏi `npm test` để kiểm tra code không bắt buộc network.
+`check`: OpenAPI drift, route/asset inventory, Prettier, ESLint, Next route types + strict TypeScript, Vitest, production build. `test:sessions` dùng Redis/Upstash thật từ `.env.local`, tạo namespace ngẫu nhiên `glowup:test:*`, kiểm tra refresh/CAS/logout/TTL và xóa các record đã tạo. Có thể đặt `TEST_SESSION_REDIS_URL` để dùng database kiểm thử riêng; lệnh này không duyệt hoặc xóa key backend. Các test Redis được tách khỏi `npm test` để kiểm tra code không bắt buộc network.
+
+Định dạng mã trong `src` bằng `npm run format`; kiểm tra mà không sửa file bằng `npm run format:check`. Prettier dùng cấu hình trong `.prettierrc.json`; ESLint tiếp tục kiểm tra quy tắc mã bằng `npm run lint`.
 
 `test:e2e` cần cổng 3001 và 3100 trống, dùng session store từ `.env.local` (hoặc `TEST_SESSION_REDIS_URL`) với prefix riêng `glowup:e2e:*`. Tự bật Next dev và backend fixture cho auth/address/health, chạy desktop/mobile. Record test có TTL tối đa một giờ. Fixture không chứng minh SMTP/OAuth/backend thật hoạt động. Chạy các lệnh tạo type/build tuần tự với E2E để tránh Next dev và `typegen` cùng thay artifact `.next`.
 

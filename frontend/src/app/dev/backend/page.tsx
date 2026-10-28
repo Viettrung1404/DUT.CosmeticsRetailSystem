@@ -19,9 +19,16 @@ export default async function BackendDiagnosticPage() {
     if (error instanceof ApiError) message += ` (${error.code})`;
   }
 
-  return <main className="mx-auto max-w-3xl px-6 py-16">
-    <h1 className="font-heading text-3xl font-semibold">Kiểm tra kết nối FE-00</h1>
-    <p className="mt-6" data-testid="backend-status" data-connected={connected}>{message}</p>
-    <p className="mt-4 text-muted-foreground">Server Component gọi trực tiếp health/live. Kết quả này chỉ xác nhận tiến trình backend, không xác nhận database hay provider.</p>
-  </main>;
+  return (
+    <main className="mx-auto max-w-3xl px-6 py-16">
+      <h1 className="font-heading text-3xl font-semibold">Kiểm tra kết nối FE-00</h1>
+      <p className="mt-6" data-testid="backend-status" data-connected={connected}>
+        {message}
+      </p>
+      <p className="mt-4 text-muted-foreground">
+        Server Component gọi trực tiếp health/live. Kết quả này chỉ xác nhận tiến trình backend,
+        không xác nhận database hay provider.
+      </p>
+    </main>
+  );
 }

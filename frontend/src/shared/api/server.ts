@@ -14,8 +14,15 @@ const healthPaths = {
 export async function getBackendHealth(kind: keyof typeof healthPaths = "live") {
   const env = getServerEnv();
   const path = healthPaths[kind].replace(/^\/api\/v1/, "");
-  const response = await fetchWithTimeout(`${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}${path}`, {
-    headers: { Accept: "application/json", "X-Request-Id": crypto.randomUUID() },
-  }, env.BACKEND_TIMEOUT_MS);
-  return readApiResponse(response, z.object({ status: z.literal(kind === "live" ? "ok" : "ready") }));
+  const response = await fetchWithTimeout(
+    `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}${path}`,
+    {
+      headers: { Accept: "application/json", "X-Request-Id": crypto.randomUUID() },
+    },
+    env.BACKEND_TIMEOUT_MS,
+  );
+  return readApiResponse(
+    response,
+    z.object({ status: z.literal(kind === "live" ? "ok" : "ready") }),
+  );
 }
