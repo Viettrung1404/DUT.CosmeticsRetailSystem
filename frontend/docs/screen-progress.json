@@ -1,8 +1,11 @@
 {
   "S01": "UI-ready",
+  "S02": "UI-ready",
   "S14": "UI-ready",
+  "S08": "UI-ready",
   "S17": "UI-ready",
   "S22": "UI-ready",
+  "S23": "UI-ready",
   "S24": "UI-ready",
   "S25": "UI-ready",
   "S26": "UI-ready",
@@ -11,6 +14,9 @@
   "S29": "UI-ready",
   "S30": "UI-ready",
   "S32": "UI-ready",
+  "S33": "UI-ready",
+  "S36": "UI-ready",
   "S37": "UI-ready",
+  "S38": "UI-ready",
   "S41": "UI-ready"
 }

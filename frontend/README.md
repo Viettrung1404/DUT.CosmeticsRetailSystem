@@ -1,6 +1,6 @@
-# GlowUp frontend — FE-00 đến FE-03
+# GlowUp frontend — FE-00 đến FE-04
 
-Next.js App Router cho Guest/Customer, cổng **3001**; backend NestJS cổng **3000**. Đã có foundation, auth/session, catalog và các màn giỏ hàng, checkout, kết quả thanh toán FE-03. Xem [checklist FE-03](docs/fe-03-checklist.md) để biết kết quả kiểm thử và các gate backend/provider còn lại.
+Next.js App Router cho Guest/Customer, cổng **3001**; backend NestJS cổng **3000**. Đã có foundation, auth/session, catalog, checkout FE-03 và tài khoản/đơn hàng FE-04. Xem [checklist FE-03](docs/fe-03-checklist.md) và [FE-04](docs/fe-04-checklist.md) để biết kết quả kiểm thử và các gate backend/provider còn lại.
 
 ## Chạy local
 

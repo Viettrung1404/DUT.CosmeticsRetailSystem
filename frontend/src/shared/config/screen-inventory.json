@@ -22,7 +22,7 @@
       "A01",
       "G04"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S03",
@@ -110,7 +110,7 @@
       "A05",
       "A07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S09",
@@ -200,7 +200,7 @@
       "A03",
       "A05"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S15",
@@ -314,7 +314,7 @@
     "dependencies": [
       "G01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S23",
@@ -329,7 +329,7 @@
       "A05",
       "O07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S24",
@@ -341,7 +341,7 @@
     "dependencies": [
       "A03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S25",
@@ -455,7 +455,7 @@
       "A05",
       "G01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S33",
@@ -473,7 +473,7 @@
       "A08",
       "O07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S34",
@@ -517,7 +517,7 @@
       "A04",
       "G04"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S37",
@@ -533,7 +533,7 @@
       "A05",
       "G01"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S38",
@@ -547,7 +547,7 @@
     "dependencies": [
       "A07"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S39",
