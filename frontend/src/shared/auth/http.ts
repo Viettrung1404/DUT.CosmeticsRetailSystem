@@ -1,4 +1,5 @@
 import "server-only";
+import { ZodError } from "zod";
 import { ApiError } from "@/shared/api/errors";
 import { getServerEnv } from "@/shared/config/env";
 
@@ -11,7 +12,12 @@ export function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: privateHeaders });
 }
 export function failure(error: unknown) {
-  const e = error instanceof ApiError ? error : new ApiError(503, "SERVICE_UNAVAILABLE");
+  const e =
+    error instanceof ApiError
+      ? error
+      : error instanceof ZodError
+        ? new ApiError(400, "INVALID_INPUT", error.flatten())
+        : new ApiError(503, "SERVICE_UNAVAILABLE");
   return Response.json(
     { code: e.code, details: e.details },
     {
