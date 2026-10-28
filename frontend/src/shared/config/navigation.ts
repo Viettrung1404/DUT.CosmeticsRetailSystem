@@ -18,10 +18,11 @@ export const accountNavigation = [
 ] as const;
 
 export const siteNavigation = [
-  { label: "Sản phẩm", href: routes.products },
-  { label: "Hàng mới về", href: routes.newArrivals },
-  { label: "Thương hiệu", href: routes.brands },
-  { label: "Khuyến mãi", href: routes.promotions },
-  { label: "Showroom", href: routes.stores },
-  { label: "Góc làm đẹp", href: routes.blog },
+  { label: "Thương hiệu", href: routes.brands, tone: "brands" },
+  { label: "Khuyến mãi hot", href: routes.promotions, tone: "promotions" },
+  { label: "Trang điểm", href: "/categories/trang-diem", tone: "makeup" },
+  { label: "Chăm Sóc Da Mặt", href: "/categories/cham-soc-da", tone: "skincare" },
+  { label: "Chăm sóc cơ thể", href: "/categories/cham-soc-co-the-toc", tone: "bodycare" },
+  { label: "Sản Phẩm Mới", href: routes.newArrivals, tone: "new" },
+  { label: "ZO&FRIENDS", href: "/brands/zo-friends", tone: "friends" },
 ] as const;

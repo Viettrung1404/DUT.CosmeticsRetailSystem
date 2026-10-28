@@ -6,6 +6,7 @@ import { authRuntime, cookieOptions, establishSession, sessionId, sessionTtl, up
 import { createRedisStore, opaqueId, validId } from "./store";
 import { loginSchema, messageSchema, userSchema } from "./contracts";
 import { mergeGuestCart } from "./cart";
+import { oauthProviders } from "./provider-config";
 
 const flowCookie = "glowup-oauth";
 const challengeSchema = z.object({ code: z.enum(["ACCOUNT_LINK_REQUIRED", "EMAIL_VERIFICATION_REQUIRED"]), challenge: z.string().length(64), expiresIn: z.number().int().positive().max(600) });
@@ -19,7 +20,7 @@ export async function oauthFlow() {
 export async function oauthAction(action: string, input: unknown) {
   const jar = await cookies();
   if (action === "google" || action === "facebook") {
-    if (process.env[`OAUTH_${action.toUpperCase()}_VERIFIED`] !== "true") throw new ApiError(404, "PROVIDER_DISABLED");
+    if (!oauthProviders()[action]) throw new ApiError(404, "PROVIDER_DISABLED");
     const field = action === "google" ? "idToken" : "accessToken";
     const data = z.object({ [field]: z.string().min(20).max(16384) }).strict().safeParse(input);
     if (!data.success) throw new ApiError(400, "INVALID_INPUT");

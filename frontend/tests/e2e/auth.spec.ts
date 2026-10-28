@@ -1,32 +1,102 @@
 import { expect, test } from "@playwright/test";
+import { installOAuthSdk } from "../fixtures/oauth-browser";
 
-test("auth screens share the shell and remain usable on each viewport", async ({ page }, testInfo) => {
+test.beforeEach(async ({ page }) => { await installOAuthSdk(page); });
+
+test("skincare navbar follows the current HTML pills and keeps search usable", async ({ page, isMobile }, testInfo) => {
+  await page.goto("/categories/cham-soc-da");
+  await expect(page.locator("header .mobile-only").first()).toBeEnabled();
+  const navigation = page.getByRole("navigation", { name: "Điều hướng chính", exact: true });
+  const skincare = navigation.getByRole("link", { name: "Chăm Sóc Da Mặt", exact: true });
+  await expect(skincare).toHaveAttribute("aria-current", "page");
+  await expect(skincare).toHaveCSS("background-color", "rgb(217, 249, 157)");
+  await expect(navigation.getByRole("link", { name: "Khuyến mãi hot", exact: true })).toHaveCSS("background-color", "rgb(254, 215, 170)");
+  await expect(page.locator(".announcement")).toContainText("Đơn từ 129k→ Freeship 15k");
+  if (isMobile) {
+    await page.getByRole("button", { name: "Xem tiếp danh mục" }).click();
+    await expect.poll(() => page.locator(".nav-pills").evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  } else {
+    await page.getByLabel("Xem thêm", { exact: true }).click();
+    await expect(page.getByRole("navigation", { name: "Liên kết thêm" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("navigation", { name: "Liên kết thêm" })).not.toBeVisible();
+  }
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.locator("header").screenshot({ path: testInfo.outputPath("navbar-code-html.png"), style: "nextjs-portal { display: none; }" });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole("search").first().getByRole("searchbox").fill("serum");
+  await page.getByRole("search").first().getByRole("searchbox").press("Enter");
+  await expect(page).toHaveURL(/\/search\?q=serum$/);
+});
+
+test("Stitch auth layouts keep their distinct composition without site chrome", async ({ page }, testInfo) => {
+  const hydrationErrors: string[] = [];
+  page.on("console", message => { if (message.type() === "error" && /hydrat/i.test(message.text())) hydrationErrors.push(message.text()); });
+  await page.goto("/login");
+  await expect(page.getByText("Cổng đăng nhập an toàn", { exact: true })).toBeVisible();
+  for (const route of ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/oauth/continue"]) {
+    await page.goto(route);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.locator(".auth-form")).toHaveAttribute("aria-busy", "false");
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    if (["/forgot-password", "/reset-password", "/verify-email", "/oauth/continue"].includes(route)) {
+      await expect(page.locator(".auth-story")).toHaveCount(0);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`${route.slice(1).replaceAll("/", "-")}-stitch.png`), fullPage: true, style: "nextjs-portal { display: none; }" });
+  }
+  expect(hydrationErrors).toEqual([]);
+});
+
+test("Stitch failure screens preserve HTTP status and working recovery links", async ({ page }, testInfo) => {
+  const missing = await page.goto("/missing-stitch-screen");
+  expect(missing?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "Ôi! Trang bạn tìm kiếm không tồn tại" })).toBeVisible();
+  await expect(page.locator("header button.mobile-only")).toBeEnabled();
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.screenshot({ path: testInfo.outputPath("not-found-stitch.png"), fullPage: true, style: "nextjs-portal { display: none; }" });
+  const maintenance = await page.goto("/maintenance");
+  expect(maintenance?.status()).toBe(503);
+  expect(maintenance?.headers()["retry-after"]).toBe("300");
+  await expect(page.getByRole("heading", { name: "GlowUp đang được chăm chút để hoàn hảo hơn!" })).toBeVisible();
+  await expect.poll(() => page.locator(".brand img").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  await page.screenshot({ path: testInfo.outputPath("maintenance-stitch.png"), fullPage: true });
+});
+
+test("all auth routes exclude site header and footer, including after client navigation", async ({ page }, testInfo) => {
   const errors: string[] = []; page.on("pageerror", (error) => errors.push(error.message));
   for (const route of ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/oauth/continue"]) {
     await page.goto(route);
-    await expect(page.locator("header")).toHaveCount(1); await expect(page.locator("footer")).toHaveCount(1);
+    await expect(page.locator("header")).toHaveCount(0); await expect(page.locator("footer")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    if (route === "/login") await page.screenshot({ path: testInfo.outputPath("login.png"), fullPage: true });
+    if (route === "/login") { await expect(page.locator(".auth-form")).toHaveAttribute("aria-busy", "false"); await page.screenshot({ path: testInfo.outputPath("login.png"), fullPage: true, style: "nextjs-portal { display: none; }" }); }
   }
+  await page.goto("/");
+  await page.getByRole("link", { name: "Đăng nhập", exact: true }).first().click();
+  await expect(page.locator("header, footer")).toHaveCount(0);
+  await page.getByRole("link", { name: "Quay lại trang chủ", exact: true }).click();
+  await expect(page.locator("header")).toHaveCount(1);
+  await expect(page.locator("footer")).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 test("guest private access preserves returnTo and rejects forged CSRF/proxy input", async ({ page, request }) => {
   await page.goto("/account/addresses"); await expect(page).toHaveURL(/login\?returnTo=%2Faccount%2Faddresses/);
   const noOrigin = await request.post("/api/auth/login", { data: { email: "a@example.com", password: "GlowUp2026" } }); expect(noOrigin.status()).toBe(403);
   const foreign = await request.post("/api/auth/login", { headers: { Origin: "https://evil.test" }, data: {} }); expect(foreign.status()).toBe(403);
-  const injected = await request.post("/api/auth/login", { headers: { Origin: "http://localhost:3001" }, data: { email: "a@example.com", password: "GlowUp2026", upstream: "https://evil.test" } }); expect(injected.status()).toBe(400);
+  const injected = await request.post("/api/auth/login", { headers: { Origin: new URL(page.url()).origin }, data: { email: "a@example.com", password: "GlowUp2026", upstream: "https://evil.test" } }); expect(injected.status()).toBe(400);
   expect((await request.get("/api/auth/refresh-token")).status()).toBe(404);
 });
-test("sensitive forms cannot submit credentials before hydration", async ({ browser }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false });
+test("sensitive forms cannot submit credentials before hydration", async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, baseURL: testInfo.project.use.baseURL });
   try {
     const page = await context.newPage();
-    await page.goto("http://localhost:3001/login");
+    await page.goto("/login");
+    await expect(page.locator("header, footer")).toHaveCount(0);
     await expect(page.locator(".auth-form form")).toHaveAttribute("method", "post");
     // Streamed SSR markup can remain hidden without the React stream bootstrap.
     await expect(page.locator(".auth-form form > button.button")).toBeDisabled();
-    await expect(page).toHaveURL("http://localhost:3001/login");
+    await expect(page).toHaveURL(`${testInfo.project.use.baseURL}/login`);
   } finally { await context.close(); }
 });
 test("validation, wrong credentials, network errors and Retry-After retain the draft", async ({ page }) => {
@@ -61,12 +131,18 @@ test("opaque login cookie, address CRUD, logout and user switch isolate private 
   const cookie = (await context.cookies()).find((item) => item.name === "glowup-session");
   expect(cookie?.httpOnly).toBe(true); expect(cookie?.sameSite).toBe("Lax"); expect(cookie?.value).toMatch(/^[a-f0-9]{64}$/);
   await page.getByRole("button", { name: "Thêm địa chỉ mới", exact: true }).click();
-  const dialog = page.getByRole("dialog"); await dialog.getByLabel("Tên người nhận").fill("Lan FE01"); await dialog.getByLabel("Số điện thoại").fill("0901234567");
+  const dialog = page.getByRole("region", { name: /Thêm địa chỉ mới|Chỉnh sửa địa chỉ/ });
+  await expect(dialog.getByLabel("Tên người nhận")).toBeFocused();
+  await dialog.getByLabel("Tên người nhận").fill("Lan FE01"); await dialog.getByLabel("Số điện thoại").fill("0901234567");
   await dialog.getByLabel("Địa chỉ cụ thể").fill("1 Đường A"); await dialog.getByLabel("Tỉnh / Thành phố").fill("Đà Nẵng"); await dialog.getByLabel("Quận / Huyện").fill("Hải Châu"); await dialog.getByLabel("Phường / Xã").fill("Hòa Cường");
   await dialog.getByRole("button", { name: "Lưu địa chỉ" }).click(); await expect(dialog).not.toBeVisible();
   const address = page.locator("article").filter({ hasText: "Lan FE01" }).last(); await expect(address).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("addresses.png"), fullPage: true });
-  await address.getByRole("button", { name: "Chỉnh sửa" }).click(); await dialog.getByLabel("Tên người nhận").fill("Lan đã sửa"); await dialog.getByRole("button", { name: "Lưu địa chỉ" }).click(); await expect(page.getByText("Lan đã sửa", { exact: true }).last()).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: testInfo.outputPath("addresses.png"), fullPage: true, style: "nextjs-portal { display: none; }" });
+  await address.getByRole("button", { name: "Chỉnh sửa" }).click(); await dialog.getByLabel("Tên người nhận").fill("Lan đã sửa");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: testInfo.outputPath("address-editor.png"), fullPage: true, style: "nextjs-portal { display: none; }" });
+  await dialog.getByRole("button", { name: "Lưu địa chỉ" }).click(); await expect(page.getByText("Lan đã sửa", { exact: true }).last()).toBeVisible();
   await page.getByRole("button", { name: "Đăng xuất →" }).click(); await expect(page).toHaveURL(/\/login$/);
   expect((await context.cookies()).find((item) => item.name === "glowup-session")).toBeUndefined();
   await page.getByLabel("Địa chỉ email").fill(`b+${testInfo.project.name}@example.com`); await page.getByLabel(/^Mật khẩu/).fill("GlowUp2026"); await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
@@ -75,6 +151,6 @@ test("opaque login cookie, address CRUD, logout and user switch isolate private 
 });
 test("mobile menu closes with Escape and restores its trigger", async ({ page, isMobile }) => {
   test.skip(!isMobile);
-  await page.goto("/login"); const trigger = page.getByRole("button", { name: "Mở menu" }); await trigger.click();
+  await page.goto("/"); const trigger = page.getByRole("button", { name: "Mở menu" }); await trigger.click();
   await expect(page.getByRole("dialog")).toBeVisible(); await page.keyboard.press("Escape"); await expect(page.getByRole("dialog")).not.toBeVisible(); await expect(trigger).toBeFocused();
 });

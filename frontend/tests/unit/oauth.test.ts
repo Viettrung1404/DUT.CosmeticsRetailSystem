@@ -14,7 +14,7 @@ async function start(code = "EMAIL_VERIFICATION_REQUIRED") {
   return oauthAction("google", { idToken: providerToken });
 }
 describe("bound OAuth flow", () => {
-  beforeEach(() => { fixture.cookies.clear(); fixture.records.clear(); vi.clearAllMocks(); process.env.OAUTH_GOOGLE_VERIFIED = "true"; fixture.establish.mockResolvedValue("session"); fixture.sessionId.mockResolvedValue("target-session"); });
+  beforeEach(() => { fixture.cookies.clear(); fixture.records.clear(); vi.clearAllMocks(); process.env.OAUTH_GOOGLE_ENABLED = "true"; process.env.GOOGLE_OAUTH_CLIENT_ID = "123-fixture.apps.googleusercontent.com"; fixture.establish.mockResolvedValue("session"); fixture.sessionId.mockResolvedValue("target-session"); });
   it("keeps nonce and challenge server-side, returning only the continuation code", async () => {
     expect(await start()).toEqual({ code: "EMAIL_VERIFICATION_REQUIRED" });
     const call = fixture.upstream.mock.calls[0];
@@ -51,7 +51,7 @@ describe("bound OAuth flow", () => {
     await start();
     const { id, flow } = await oauthFlow(); fixture.records.set(id, { ...flow, expiresAt: Date.now() - 1 });
     await expect(oauthFlow()).rejects.toMatchObject({ code: "OAUTH_FLOW_EXPIRED" });
-    process.env.OAUTH_GOOGLE_VERIFIED = "false";
+    process.env.OAUTH_GOOGLE_ENABLED = "false";
     await expect(oauthAction("google", { idToken: providerToken })).rejects.toMatchObject({ code: "PROVIDER_DISABLED" });
   });
 });

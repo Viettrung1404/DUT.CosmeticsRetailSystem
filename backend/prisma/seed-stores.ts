@@ -1,4 +1,4 @@
-// Dữ liệu mẫu chi nhánh (tài liệu 04 mục 5.2): 3 cửa hàng Hà Nội / TP.HCM + 1 kho tổng.
+// Dữ liệu demo: 5 cửa hàng + 1 kho tổng. Địa chỉ là cấu hình giả lập của GlowUp.
 // Nhà cung cấp chỉ giao về kho tổng, nên luôn phải có ít nhất một địa điểm WAREHOUSE.
 import { PrismaClient } from '@prisma/client';
 
@@ -7,6 +7,16 @@ const prisma = new PrismaClient();
 const OPENING_HOURS = { mon_sun: '08:00-22:00' };
 
 const STORES = [
+  {
+    code: 'STORE-04', name: 'GlowUp Hải Châu', type: 'STORE',
+    address: '120 Nguyễn Văn Linh', city: 'Đà Nẵng', district: 'Hải Châu',
+    openingHours: OPENING_HOURS,
+  },
+  {
+    code: 'STORE-05', name: 'GlowUp Thủ Đức', type: 'STORE',
+    address: '88 Võ Văn Ngân', city: 'TP. Hồ Chí Minh', district: 'Thủ Đức',
+    openingHours: OPENING_HOURS,
+  },
   {
     code: 'WH-HN',
     name: 'Kho Tổng Hà Nội',

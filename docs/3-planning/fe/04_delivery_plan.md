@@ -1,13 +1,13 @@
 # 04 — Lộ trình triển khai và nghiệm thu
 
-Ngày cập nhật: 26/10/2026. Phạm vi đã chốt: **đủ blueprint, VNPAY + COD, bỏ CTA phụ chưa có API, sửa O01/O02/O03/O05 trước tích hợp liên quan**.
+Ngày cập nhật: 28/10/2026. Phạm vi đã chốt: **đủ blueprint, VNPAY + COD, bỏ CTA phụ chưa có API, sửa O01/O02/O03/O05 trước tích hợp liên quan**. Navbar chuẩn lấy từ trang Danh mục chăm sóc da theo D00 cập nhật.
 
 ## 1. Nguyên tắc chia việc
 
 - Mỗi phase có UI, dữ liệu, trạng thái lỗi và luồng demo kiểm chứng được. Không dành hết các phase đầu cho trang tĩnh rồi để tích hợp cuối cùng.
 - Phần API đang thiếu có thể dựng skeleton/fixture để review trong lúc BE làm; chỉ ghi “UI done”, chưa ghi “integrated”. VNPAY là release gate, không được bỏ qua để gọi COD-only là hoàn thành.
 - UI không chờ các CTA đã thống nhất bỏ: newsletter/chat/booking/pickup/2FA/beauty profile. Các **page** vẫn thuộc phạm vi 41 HTML + 5 trang blueprint.
-- Giữ navbar/sidebar chuẩn ngay FE-01; không dựng 41 layout riêng rồi sửa đồng bộ ở cuối.
+- Giữ navbar Danh mục chăm sóc da (S11) và sidebar Sổ địa chỉ chuẩn ngay FE-01; đối chiếu bản render `code.html` trước khi nghiệm thu, không dựng 41 layout riêng rồi sửa đồng bộ ở cuối. PNG cũ không phải chuẩn hiện tại.
 - Người phụ trách theo sprint plan hiện có: FE Web **Tuấn Anh**, BE End-user **Việt Trung**; nội dung/Admin phối hợp **Thành Lập**. Đây là phân công tham chiếu, không tự gửi giao việc ra ngoài.
 - Không đổi source backend trong lượt lập kế hoạch. Mỗi ticket sửa backend dưới đây có contract/review/validation riêng khi bắt đầu thực hiện.
 
@@ -35,7 +35,7 @@ Các nhánh có thể được các thành viên FE/BE làm độc lập khi con
 | Phase | Công việc chính | Bàn giao / điều kiện qua phase | FE ngày công sơ bộ |
 |---|---|---|---|
 | **FE-00** Foundation/contract | Tạo `frontend/`, pin stack, env sample, lint/type/build scripts; ADR session/refresh; kiểm kê asset; khóa route/tokens; BE review backlog | App chạy cổng 3001; SSR thử gọi backend; chuẩn API envelope/error/generated types; registry capabilities và route inventory được đưa vào checklist | 3–4 |
-| **FE-01** Shell/auth | Header/footer chuẩn, mobile nav, sidebar Sổ địa chỉ, primitives; login/register/link email/reset/OAuth flow; BFF session; error shells; address UI nền | Một layout xuyên site, màu #C85A70; Guest → register/verify/login → account; logout/private access/refresh race được kiểm tra; skeleton/404/error/maintenance UI | 5–7 |
+| **FE-01** Shell/auth | Header/footer chuẩn, mobile nav, sidebar Sổ địa chỉ, primitives; login/register/link email/reset/OAuth flow; BFF session; error shells; address UI nền | Layout site chung, auth riêng không header/footer (D11), màu #C85A70; Guest → register/verify/login → account; logout/private access/refresh race được kiểm tra; skeleton/404/error/maintenance UI | 5–7 |
 | **FE-02** Catalog/search/PDP | Home sections cơ bản, products/category/search/new-arrivals, PDP/variant/reviews/related; URL filters; metadata | Search → filter → PDP → chọn variant/add cart; không dùng filter giả; O01/O02 bàn giao trước integration; responsive cards/navbar | 5–7 |
 | **FE-03** Cart/checkout/payment | Drawer+cart shared, partial checkout/merge; address/coupon/points preview; COD + VNPAY; success/payment return | Guest cart → login merge → preview → đặt COD; luồng VNPAY sandbox success/fail/pending/return/reload; quote/idempotency/stale responses đúng; **G01 bắt buộc** | 6–8 |
 | **FE-04** Account/orders | Tổng quan/profile/address CRUD, orders/detail/cancel/tracking, security read/reset link | Sidebar đủ mục, profile/address update thật, delete default theo BE; order ownership, multiple shipments; không fake ETA/voucher count | 4–6 |
@@ -79,7 +79,7 @@ Mức kiểm thử:
 1. **Static:** lint, TypeScript strict, production build; generated types/spec không drift.
 2. **Unit/integration có chọn lọc:** money display/parser, contract adapter, query key/user isolation, refresh broker/concurrency, allowed redirects, quote state và idempotency command lifecycle. Không viết test chỉ lặp lại className hoặc copy implementation.
 3. **E2E:** tối thiểu Guest → buy, register/link/reset, COD, VNPAY, account/address, order/tracking/cancel, wishlist/redeem, return/refund; dùng backend test cô lập và tài khoản fixtures. Provider mock cho regression, sandbox thật cho sign-off.
-4. **Visual:** screenshot mọi screen ID S01–S41 và B01–B05, states trọng yếu; desktop/mobile. Snapshot dựa thiết kế đã chuẩn hóa, không cố giữ các header/sidebar/màu sai cũ.
+4. **Visual:** screenshot mọi screen ID S01–S41 và B01–B05, states trọng yếu; desktop/mobile. Mỗi ảnh phải đối chiếu bản render **`code.html` nguồn hiện tại**, kiểm tra composition/asset/type/spacing, ghi khác biệt được phép theo decision log. Không dùng PNG cũ hoặc ảnh tự chụp implementation làm chuẩn mặc định. Navbar/sidebar/footer áp dụng các mẫu dùng chung đã chốt.
 5. **Accessibility:** keyboard flow, focus management, labels/errors, contrast, zoom 200%, reduced motion, touch targets; automated scan cộng kiểm tra thủ công checkout/auth/modal.
 
 ## 6. Performance, SEO và vận hành
@@ -96,12 +96,13 @@ Mức kiểm thử:
 Một screen/feature chỉ coi hoàn tất khi:
 
 - [ ] Có mapping S/B ID, route thật và navigation tới/đi khỏi trang; mọi CTA còn giữ đều có hành vi.
-- [ ] Navbar trang chủ, sidebar Sổ địa chỉ và màu #C85A70 đồng nhất; footer theo trang chủ đã sửa nội dung mâu thuẫn.
+- [ ] Navbar Danh mục chăm sóc da (S11), sidebar Sổ địa chỉ và màu #C85A70 đồng nhất; footer theo trang chủ đã sửa nội dung mâu thuẫn. Navbar có ảnh đối chiếu desktop/mobile; active state đúng route.
 - [ ] Data adapter dùng endpoint thực, kiểm tra contract; dữ liệu mock chỉ môi trường test/preview rõ ràng.
 - [ ] Loading/empty/error/unauthorized/validation và mobile được xử lý.
 - [ ] Mutation chạy đúng backend, không tính nghiệp vụ chính ở frontend; ownership/session/cache/idempotency đúng.
 - [ ] API gap/optimization có ID, owner và trạng thái; CTA đã thống nhất bỏ thực sự không còn hứa tính năng.
 - [ ] Checks và test phù hợp đã pass, visual review có bằng chứng; lỗi còn lại ghi rõ mức ảnh hưởng.
+- [ ] Có bảng nguồn thiết kế → route/component → ảnh kết quả desktop/mobile và ngoại lệ; không ghi hoàn tất visual bằng việc chỉ kiểm tra trang có render.
 
 Toàn bộ frontend chỉ đạt nghiệm thu khi:
 

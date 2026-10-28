@@ -1,12 +1,12 @@
 # Kế hoạch frontend end-user GlowUp — Next.js
 
-Ngày cập nhật: **27/10/2026**. Trạng thái: **đã triển khai FE-00 và code shell/auth/session FE-01 trong `frontend/`**; FE-01 còn gate backend/SMTP/OAuth thật, FE-02–07 chưa triển khai. Xem [checklist FE-01](../../../frontend/docs/fe-01-checklist.md), [checklist FE-00](../../../frontend/docs/fe-00-checklist.md) và [README chạy app](../../../frontend/README.md). Frontend dùng chung Upstash với backend bằng namespace phiên riêng, đã kiểm tra lock/CAS trên Upstash thật; source backend không thay đổi.
+Ngày cập nhật: **28/10/2026**. Trạng thái: **đã triển khai FE-00 và code shell/auth/session FE-01 trong `frontend/`, đã sửa UI FE-01 theo nguồn Stitch và navbar Danh mục chăm sóc da**; còn gate backend/SMTP/OAuth thật; FE-02–07 chưa triển khai. Xem [bảng đối chiếu thiết kế](../../../frontend/docs/fe-01-design-review.md), [checklist FE-01](../../../frontend/docs/fe-01-checklist.md), [checklist FE-00](../../../frontend/docs/fe-00-checklist.md) và [README chạy app](../../../frontend/README.md). Frontend dùng chung Upstash với backend bằng namespace phiên riêng, đã kiểm tra lock/CAS trên Upstash thật; lượt sửa UI không đổi source backend.
 
 ## 1. Phạm vi và quyết định đã chốt
 
 - Làm website cho Guest/Customer bằng Next.js App Router; không bao gồm Admin, POS hoặc Mobile.
 - Dựng đầy đủ các trang và tương tác trong `docs/4-stitch_design` (tên thư mục thực tế).
-- **Navbar/header trang chủ là chuẩn layout chung**, thay các header khác trong những bản xuất Stitch. Áp dụng cả auth, checkout và account; lỗi toàn ứng dụng có thể dùng shell tối giản để vẫn phục hồi được khi layout hỏng.
+- **Navbar/header trong `code.html` trang Danh mục chăm sóc da là chuẩn layout chung**, theo [HTML hiện tại](../../4-stitch_design/danh_m_c_ch_m_s_c_da_glowup/code.html) và ảnh navbar mới người dùng gửi ngày 28/10/2026. Áp dụng trang chủ, checkout và account; auth không có header/footer theo D11; active state theo route thực. **Mọi màn lấy `code.html` làm chuẩn; `screen.png` đã cũ.** Lỗi toàn ứng dụng có thể dùng shell tối giản để vẫn phục hồi được khi layout hỏng.
 - **Sidebar trang Sổ địa chỉ là chuẩn cho cụm tài khoản**. Giữ hình thức, phân nhóm, khoảng cách, active state; bổ sung Tổng quan/Đổi trả/Bảo mật và các liên kết còn thiếu. Ví voucher dẫn tới Đổi ưu đãi.
 - **Màu chủ đạo #C85A70; làm đủ blueprint; footer theo trang chủ.** Đổi trả 7 ngày, verify đăng ký bằng link email; các quy tắc còn lại theo backend. Bỏ CTA phụ chưa có API.
 - **VNPAY + COD bắt buộc trong bản đầu.** COD-only là mốc trung gian, không đủ nghiệm thu cuối.
@@ -46,7 +46,7 @@ Ngày cập nhật: **27/10/2026**. Trạng thái: **đã triển khai FE-00 và
 
 ## 5. Nguồn đối chiếu
 
-- [Blueprint Stitch](../../4-stitch_design/design_1.md), [Design system Stitch](../../4-stitch_design/glowup_beauty_retail/DESIGN.md), toàn bộ HTML; xem ảnh trực tiếp trang chủ, Sổ địa chỉ và ba asset/reference.
+- [Blueprint Stitch](../../4-stitch_design/design_1.md), [Design system Stitch](../../4-stitch_design/glowup_beauty_retail/DESIGN.md), toàn bộ **`code.html` hiện tại**; render trực tiếp Danh mục chăm sóc da (navbar), trang chủ (footer), Sổ địa chỉ (sidebar). `screen.png` là ảnh cũ; ba asset/reference vẫn dùng đúng vai trò.
 - [Functional requirements](../../1-requirement/07_functional_requirements.md), [Sprint plan chung](../08_sprint_plan.md).
 - [OpenAPI](../../../backend/docs/api/openapi.json), [Handoff Next.js/Expo](../../../backend/docs/api/nextjs-expo-handoff.md), [Sprint 6 backend](../../../backend/docs/sprint-6.md).
 - Controller, DTO và service backend liên quan được dùng để xác minh hành vi, đặc biệt checkout, promotions, public catalog, auth, tracking và địa chỉ.
