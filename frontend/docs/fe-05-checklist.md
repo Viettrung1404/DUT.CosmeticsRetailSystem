@@ -14,6 +14,7 @@ Ngày cập nhật: 29/10/2026.
 ## Kiểm tra và giới hạn
 
 - Frontend lint, typecheck, unit, production build, inventory/contracts check.
-- Chưa nghiệm thu E2E với DB/order COMPLETED, policy rewards/return, private bucket hoặc ảnh đối chiếu Stitch desktop/mobile. Các màn đánh dấu UI-ready, chưa Verified.
+- Nghiệm thu backend thật ngày 29/10/2026: wishlist, điểm/hạng/lịch sử, rewards policy, danh sách và chi tiết đổi trả, thông báo đều HTTP 200 qua BFF với tài khoản demo có đơn COMPLETED và yêu cầu đổi trả đã seed. Lượt đầu wishlist 500 do DB thiếu migration `20261028000000_product_try_on_color`; sau khi áp dụng migration đã trả 200.
+- Bản production trong Chromium: `/account/loyalty`, `/account/loyalty/rewards`, `/account/returns`, `/account/returns/new`, `/account/returns/[id]`, `/account/wishlist`, `/account/notifications` đều HTTP 200 và có tiêu đề đúng. Next dev tại lần thử này gặp lỗi Suspense ở trang tài khoản rồi lặp tải trang, dẫn đến HTTP 429 ở `/auth/me`; bản production không tái hiện. Chưa kiểm tra thao tác redeem, tạo yêu cầu đổi trả/upload ảnh private, review sau mua và đối chiếu ảnh Stitch desktop/mobile. Các màn hiện UI-ready, chưa Verified.
 - Đổi hàng có chênh lệch dương hiện chỉ truyền COD; backend có thể trả `ONLINE_PAYMENT_MODULE_REQUIRED_FOR_DIFFERENCE` khi policy không cho COD. Không tuyên bố đã tích hợp thanh toán chênh lệch online.
 - Review chỉ hiển thị công khai sau duyệt backend. Không giả lập trạng thái hoàn tiền thành công.
