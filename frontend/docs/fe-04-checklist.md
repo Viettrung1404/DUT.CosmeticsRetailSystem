@@ -13,7 +13,8 @@ Ngày cập nhật: 29/10/2026.
 ## Kiểm tra
 
 - Frontend lint, typecheck, unit test, build production, inventory/contracts check.
-- Chưa có kiểm chứng E2E với DB và ảnh đối chiếu Stitch cho S02/S08/S23/S33/S36/S38. Các màn hiện UI-ready, chưa Verified.
+- Nghiệm thu backend thật ngày 29/10/2026: đăng nhập demo qua BFF; hồ sơ, danh sách đơn, chi tiết đơn và tracking đều HTTP 200 với dữ liệu đã seed. `npm run test:live` ghi kết quả từng endpoint.
+- Bản production trong Chromium: `/account/orders`, `/account/profile`, `/account/security`, `/account/orders/[id]`, `/account/orders/[id]/tracking` đều HTTP 200 và có tiêu đề đúng. Next dev tại lần thử này gặp lỗi Suspense ở trang tài khoản rồi lặp tải trang, dẫn đến HTTP 429 ở `/auth/me`; bản production không tái hiện. Chưa thử thao tác sửa hồ sơ/hủy đơn qua UI hoặc đối chiếu ảnh Stitch cho S02/S08/S23/S33/S36/S38. Các màn hiện UI-ready, chưa Verified.
 
 ## Phụ thuộc
 

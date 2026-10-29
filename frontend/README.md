@@ -20,6 +20,8 @@ Mở http://localhost:3001. `BACKEND_API_BASE_URL` gồm prefix `/api/v1`; `SITE
 
 ## Kiểm tra
 
+Khi nghiệm thu FE-03/04/05 với backend thật, kiểm tra `http://localhost:3000/api/v1/health/ready`. Nếu chưa chạy, tự chạy `npm run start:dev` trong `../backend` và đợi endpoint trả 200. Dùng `.env` sẵn có; chỉ dừng server mình vừa khởi động. `npm run test:live` dùng tài khoản demo cục bộ trong `../backend/.demo-data/credentials.json` để kiểm tra các BFF bằng dữ liệu thật mà không tạo đơn/đổi thưởng/đổi trả; cần frontend ở cổng 3001 và backend ở cổng 3000. Có thể chạy `node scripts/accept-live.mjs --ui-only` để chỉ thử giao diện, đặt `FE_ACCEPT_EMAIL` để chọn tài khoản demo khác. Không chạy dồn dập: backend giới hạn 100 request/phút trên cùng IP và có thể trả 429 ở `/auth/me`. `node scripts/accept-live-checkout.mjs` tạo rồi hủy một đơn COD thật, chỉ chạy trên DB demo; đơn đã hủy vẫn nằm trong lịch sử. Kết quả nghiệm thu và các luồng có ghi dữ liệu nằm trong checklist từng phase.
+
 ```powershell
 npm run check
 npm run test:sessions
