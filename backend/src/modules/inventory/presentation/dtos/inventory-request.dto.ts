@@ -6,10 +6,12 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
   Min,
   NotEquals,
@@ -107,6 +109,31 @@ export class ReceivePurchaseOrderDto {
   @IsString()
   @MaxLength(500)
   readonly note?: string;
+
+  @ApiPropertyOptional({ example: 'Nguyễn Văn Giao (xe NCC)', description: 'Người giao hàng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  readonly deliveredBy?: string;
+
+  @ApiPropertyOptional({ example: '0001234', description: 'Số hóa đơn NCC giao kèm hàng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  readonly invoiceNumber?: string;
+
+  @ApiPropertyOptional({ example: '2026-10-30', description: 'Ngày hóa đơn YYYY-MM-DD' })
+  @IsOptional()
+  @Matches(DATE_PATTERN, { message: 'invoiceDate phải có dạng YYYY-MM-DD' })
+  readonly invoiceDate?: string;
+
+  @ApiPropertyOptional({ example: 6000000, description: 'Tổng tiền trên hóa đơn NCC (dùng tính công nợ)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Tiền hóa đơn không hợp lệ' })
+  @Min(0)
+  @Max(9_999_999_999.99)
+  readonly invoiceAmount?: number;
 }
 
 export class AdjustInventoryDto {

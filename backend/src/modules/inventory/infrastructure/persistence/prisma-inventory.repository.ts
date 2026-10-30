@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
+import { nextDocumentCode } from '@infrastructure/database/document-code.util';
 import {
   IInventoryRepository,
   InventoryListFilter,
@@ -172,6 +173,24 @@ export class PrismaInventoryRepository implements IInventoryRepository {
 
       await this.updateCostPrices(tx, command);
 
+      const totalCost = command.lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0);
+      const receipt = await tx.goodsReceipt.create({
+        data: {
+          receiptCode: await nextDocumentCode(tx, 'GRN'),
+          purchaseOrderId: command.purchaseOrderId,
+          supplierId: command.supplierId,
+          storeId: command.storeId,
+          deliveredBy: command.deliveredBy,
+          receivedBy: command.receivedBy,
+          receivedDate: command.receivedDate,
+          totalCost: Math.round(totalCost * 100) / 100,
+          invoiceNumber: command.invoiceNumber,
+          invoiceDate: command.invoiceDate,
+          invoiceAmount: command.invoiceAmount,
+          note: command.note,
+        },
+      });
+
       const batchIds: string[] = [];
       for (const line of command.lines) {
         const batch = await tx.batch.findUnique({
@@ -215,8 +234,8 @@ export class PrismaInventoryRepository implements IInventoryRepository {
             batchId: savedBatch.id,
             transactionType: 'IN',
             quantity: line.quantity,
-            referenceType: 'PO',
-            referenceId: command.purchaseOrderId,
+            referenceType: 'GRN',
+            referenceId: receipt.id,
             note: command.note,
             createdBy: command.receivedBy,
           },
@@ -238,7 +257,7 @@ export class PrismaInventoryRepository implements IInventoryRepository {
         data: { status: poStatus, receivedDate: fullyReceived ? command.receivedDate : undefined },
       });
 
-      return { ok: true, poStatus, batchIds };
+      return { ok: true, poStatus, batchIds, receiptCode: receipt.receiptCode };
     }, TX_OPTIONS).catch((error): ReceiptResult => {
       if (error instanceof BatchExpiryMismatch) {
         return { ok: false, reason: 'BATCH_EXPIRY_MISMATCH', batchNumber: error.batchNumber };

@@ -27,6 +27,10 @@ export interface ReceivePurchaseOrderInput {
   purchaseOrderId: string;
   items: ReceiveItemInput[];
   note?: string;
+  deliveredBy?: string;
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  invoiceAmount?: number;
 }
 
 const RECEIVABLE_STATUSES = ['SENT', 'CONFIRMED', 'PARTIALLY_RECEIVED'];
@@ -110,6 +114,15 @@ export class ReceivePurchaseOrderUseCase {
       }
     }
 
+    const invoiceDate = input.invoiceDate ? new Date(`${input.invoiceDate}T00:00:00Z`) : null;
+    if (invoiceDate && invoiceDate.getTime() > today.getTime()) {
+      throw new BadRequestException('Ngày hóa đơn không được sau hôm nay');
+    }
+    const invoiceNumber = input.invoiceNumber?.trim() || null;
+    if ((invoiceDate || input.invoiceAmount !== undefined) && !invoiceNumber) {
+      throw new BadRequestException('Ghi ngày hoặc tiền hóa đơn thì phải có số hóa đơn');
+    }
+
     const result = await this.repository.applyReceipt({
       purchaseOrderId: po.id,
       storeId: po.storeId,
@@ -118,6 +131,10 @@ export class ReceivePurchaseOrderUseCase {
       note: input.note?.trim() || null,
       receivedBy: userId,
       receivedDate: today,
+      deliveredBy: input.deliveredBy?.trim() || null,
+      invoiceNumber,
+      invoiceDate,
+      invoiceAmount: input.invoiceAmount ?? null,
     });
 
     if (!result.ok) {
@@ -129,6 +146,11 @@ export class ReceivePurchaseOrderUseCase {
       throw new ConflictException('Đơn đặt hàng vừa được người khác nhận hàng, vui lòng tải lại');
     }
 
-    return { poNumber: po.poNumber, status: result.poStatus, receivedLines: lines.length };
+    return {
+      poNumber: po.poNumber,
+      receiptCode: result.receiptCode,
+      status: result.poStatus,
+      receivedLines: lines.length,
+    };
   }
 }

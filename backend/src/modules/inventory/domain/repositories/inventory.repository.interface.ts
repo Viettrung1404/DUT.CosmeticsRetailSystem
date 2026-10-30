@@ -73,10 +73,15 @@ export interface ReceiptCommand {
   note: string | null;
   receivedBy: string;
   receivedDate: Date;
+  // Đầu phiếu nhập GRN (NC3): người giao + hóa đơn NCC để đối chiếu công nợ
+  deliveredBy: string | null;
+  invoiceNumber: string | null;
+  invoiceDate: Date | null;
+  invoiceAmount: number | null;
 }
 
 export type ReceiptResult =
-  | { ok: true; poStatus: string; batchIds: string[] }
+  | { ok: true; poStatus: string; batchIds: string[]; receiptCode: string }
   | { ok: false; reason: 'STATUS_CHANGED' | 'OVER_RECEIVED' }
   | { ok: false; reason: 'BATCH_EXPIRY_MISMATCH'; batchNumber: string };
 

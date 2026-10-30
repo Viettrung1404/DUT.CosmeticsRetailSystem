@@ -76,8 +76,8 @@ export class InventoryAdminController {
     const result = await this.receivePurchaseOrderUseCase.execute(userId, dto);
     const message =
       result.status === 'RECEIVED'
-        ? `Đã nhận đủ hàng cho đơn ${result.poNumber}`
-        : `Đã nhận một phần hàng cho đơn ${result.poNumber}`;
+        ? `Đã nhận đủ hàng cho đơn ${result.poNumber} (phiếu nhập ${result.receiptCode})`
+        : `Đã nhận một phần hàng cho đơn ${result.poNumber} (phiếu nhập ${result.receiptCode})`;
     return { message, data: result };
   }
 

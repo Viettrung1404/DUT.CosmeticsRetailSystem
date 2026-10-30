@@ -21,6 +21,7 @@ import { CustomersModule } from '@modules/customers/customers.module';
 import { OrdersModule } from '@modules/orders/orders.module';
 import { PaymentsModule } from '@modules/payments/payments.module';
 import { HrModule } from '@modules/hr/hr.module';
+import { SuppliersModule } from '@modules/suppliers/suppliers.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -51,6 +52,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     OrdersModule,
     PaymentsModule,
     HrModule,
+    SuppliersModule,
   ],
   providers: [
     {

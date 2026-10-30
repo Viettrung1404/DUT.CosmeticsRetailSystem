@@ -84,7 +84,10 @@ model User {
   adjustmentsApproved        InventoryAdjustment[] @relation("ApprovedAdjustments")
   stocktakesCreated         Stocktake[]           @relation("CreatedStocktakes")
   stocktakesCompleted        Stocktake[]           @relation("CompletedStocktakes")
-  purchaseOrdersCreated      PurchaseOrder[]
+  purchaseOrdersCreated      PurchaseOrder[]       @relation("CreatedPurchaseOrders")
+  purchaseOrdersApproved     PurchaseOrder[]       @relation("ApprovedPurchaseOrders")
+  goodsReceiptsReceived      GoodsReceipt[]
+  supplierPaymentsCreated    SupplierPayment[]
   blogPosts                  BlogPost[]
   invoicesIssued             Invoice[]
   returnOrdersHandled        ReturnOrder[]
@@ -345,6 +348,7 @@ model Store {
   orders                Order[]
   posSessions           PosSession[]
   purchaseOrders        PurchaseOrder[]
+  goodsReceipts         GoodsReceipt[]
   invoices              Invoice[]
   returnOrders          ReturnOrder[]
   restockReturnItems    ReturnOrderItem[]      @relation("RestockStore")
@@ -1135,6 +1139,7 @@ model Supplier {
   batches          Batch[]
   purchaseOrders   PurchaseOrder[]
   supplierPayments SupplierPayment[]
+  goodsReceipts    GoodsReceipt[]
 
   @@map("suppliers")
 }
@@ -1148,6 +1153,8 @@ model PurchaseOrder {
   totalAmount  Decimal   @map("total_amount") @db.Decimal(12, 2)
   note         String?   @db.Text
   createdBy    String?   @map("created_by") @db.Uuid
+  approvedBy   String?   @map("approved_by") @db.Uuid
+  approvedAt   DateTime? @map("approved_at") @db.Timestamptz
   expectedDate DateTime? @map("expected_date") @db.Date
   receivedDate DateTime? @map("received_date") @db.Date
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -1155,12 +1162,40 @@ model PurchaseOrder {
 
   supplier         Supplier            @relation(fields: [supplierId], references: [id])
   store            Store               @relation(fields: [storeId], references: [id])
-  creator          User?               @relation(fields: [createdBy], references: [id])
+  creator          User?               @relation("CreatedPurchaseOrders", fields: [createdBy], references: [id])
+  approver         User?               @relation("ApprovedPurchaseOrders", fields: [approvedBy], references: [id])
   items            PurchaseOrderItem[]
   batches          Batch[]
   supplierPayments SupplierPayment[]
+  goodsReceipts    GoodsReceipt[]
 
   @@map("purchase_orders")
+}
+
+// Phiếu nhập kho theo PO (NC3): mỗi lần nhận hàng một phiếu, kèm hóa đơn NCC để tính công nợ (NC4)
+model GoodsReceipt {
+  id              String    @id @default(uuid()) @db.Uuid
+  receiptCode     String    @unique @map("receipt_code") @db.VarChar(50)
+  purchaseOrderId String    @map("purchase_order_id") @db.Uuid
+  supplierId      String    @map("supplier_id") @db.Uuid
+  storeId         String    @map("store_id") @db.Uuid
+  deliveredBy     String?   @map("delivered_by") @db.VarChar(100)
+  receivedBy      String?   @map("received_by") @db.Uuid
+  receivedDate    DateTime  @map("received_date") @db.Date
+  totalCost       Decimal   @map("total_cost") @db.Decimal(12, 2)
+  invoiceNumber   String?   @map("invoice_number") @db.VarChar(50)
+  invoiceDate     DateTime? @map("invoice_date") @db.Date
+  invoiceAmount   Decimal?  @map("invoice_amount") @db.Decimal(12, 2)
+  note            String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  supplier      Supplier      @relation(fields: [supplierId], references: [id])
+  store         Store         @relation(fields: [storeId], references: [id])
+  receiver      User?         @relation(fields: [receivedBy], references: [id])
+
+  @@index([supplierId, receivedDate])
+  @@map("goods_receipts")
 }
 
 model PurchaseOrderItem {
@@ -1188,11 +1223,14 @@ model SupplierPayment {
   paymentDate     DateTime @map("payment_date") @db.Date
   status          String   @db.VarChar(20)
   note            String?  @db.Text
+  createdBy       String?  @map("created_by") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   supplier      Supplier       @relation(fields: [supplierId], references: [id])
   purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  creator       User?          @relation(fields: [createdBy], references: [id])
 
+  @@index([supplierId, status])
   @@map("supplier_payments")
 }
 
