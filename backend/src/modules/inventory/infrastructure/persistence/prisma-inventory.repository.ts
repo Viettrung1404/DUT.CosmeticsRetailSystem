@@ -2,8 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
-  AdjustmentCommand,
-  AdjustmentResult,
   IInventoryRepository,
   InventoryListFilter,
   InventoryListItem,
@@ -249,163 +247,19 @@ export class PrismaInventoryRepository implements IInventoryRepository {
     });
   }
 
-  applyAdjustment(command: AdjustmentCommand): Promise<AdjustmentResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<{ quantity: number; reserved_quantity: number }[]>`
-        SELECT quantity, reserved_quantity FROM inventory
-        WHERE store_id = ${command.storeId}::uuid AND product_variant_id = ${command.productVariantId}::uuid
-        FOR UPDATE`;
-      const current = rows[0];
-
-      if (command.quantity < 0) {
-        return this.applyDecrease(tx, command, current);
-      }
-      return this.applyIncrease(tx, command);
-    }, TX_OPTIONS);
+  findInventoryRow(id: string) {
+    return this.prisma.inventory.findUnique({
+      where: { id },
+      select: { id: true, storeId: true, maxQuantity: true },
+    });
   }
 
-  private async applyDecrease(
-    tx: Tx,
-    command: AdjustmentCommand,
-    current: { quantity: number; reserved_quantity: number } | undefined,
-  ): Promise<AdjustmentResult> {
-    const need = -command.quantity;
-    if (!current || current.quantity < need) {
-      return { ok: false, reason: 'NO_STOCK', available: current?.quantity ?? 0 };
-    }
-    // Không xuất lấn vào phần đang giữ chỗ cho đơn online (BR-15)
-    if (current.quantity - need < current.reserved_quantity) {
-      return {
-        ok: false,
-        reason: 'RESERVED_CONFLICT',
-        available: current.quantity - current.reserved_quantity,
-      };
-    }
-
-    const where = { storeId: command.storeId, productVariantId: command.productVariantId };
-    let allocations: { batchId: string; batchNumber: string; quantity: number }[] = [];
-
-    if (command.batchId) {
-      const batch = await tx.batch.findFirst({ where: { ...where, id: command.batchId } });
-      if (!batch) {
-        return { ok: false, reason: 'BATCH_NOT_FOUND' };
-      }
-      if (batch.quantity < need) {
-        return { ok: false, reason: 'BATCH_SHORTAGE', available: batch.quantity };
-      }
-      allocations = [{ batchId: batch.id, batchNumber: batch.batchNumber, quantity: need }];
-    } else {
-      const batches = await tx.batch.findMany({ where: { ...where, isActive: true } });
-      const hasAnyBatch = batches.length > 0 || (await tx.batch.count({ where })) > 0;
-      // Hàng nhập trước khi có quản lý lô thì chỉ có tồn tổng, trừ thẳng tồn tổng
-      if (hasAnyBatch) {
-        const { allocations: picked, shortfall } = allocateByExpiry(batches, need);
-        if (shortfall > 0) {
-          return { ok: false, reason: 'BATCH_SHORTAGE', available: need - shortfall };
-        }
-        allocations = picked.map((a) => ({
-          ...a,
-          batchNumber: batches.find((b) => b.id === a.batchId)!.batchNumber,
-        }));
-      }
-    }
-
-    for (const a of allocations) {
-      await tx.batch.update({ where: { id: a.batchId }, data: { quantity: { decrement: a.quantity } } });
-    }
-    const updated = await tx.inventory.update({
-      where: { storeId_productVariantId: where },
-      data: { quantity: { decrement: need } },
+  updateThresholds(id: string, minQuantity: number, maxQuantity: number | null) {
+    return this.prisma.inventory.update({
+      where: { id },
+      data: { minQuantity, maxQuantity },
+      select: { id: true, minQuantity: true, maxQuantity: true },
     });
-
-    const transactions = allocations.length
-      ? allocations.map((a) => ({ batchId: a.batchId, quantity: -a.quantity }))
-      : [{ batchId: null, quantity: -need }];
-    await tx.inventoryTransaction.createMany({
-      data: transactions.map((t) => ({
-        ...where,
-        batchId: t.batchId,
-        transactionType: 'ADJUST',
-        quantity: t.quantity,
-        note: command.reason,
-        createdBy: command.createdBy,
-      })),
-    });
-
-    return {
-      ok: true,
-      quantity: updated.quantity,
-      reservedQuantity: updated.reservedQuantity,
-      allocations,
-    };
-  }
-
-  private async applyIncrease(tx: Tx, command: AdjustmentCommand): Promise<AdjustmentResult> {
-    const where = { storeId: command.storeId, productVariantId: command.productVariantId };
-    let batchId: string;
-    let batchNumber: string;
-
-    if (command.batchId) {
-      const batch = await tx.batch.findFirst({ where: { ...where, id: command.batchId } });
-      if (!batch) {
-        return { ok: false, reason: 'BATCH_NOT_FOUND' };
-      }
-      await tx.batch.update({
-        where: { id: batch.id },
-        data: { quantity: { increment: command.quantity } },
-      });
-      batchId = batch.id;
-      batchNumber = batch.batchNumber;
-    } else {
-      const newBatch = command.newBatch!;
-      const existing = await tx.batch.findUnique({
-        where: { storeId_productVariantId_batchNumber: { ...where, batchNumber: newBatch.batchNumber } },
-      });
-      if (existing && existing.expiryDate.getTime() !== newBatch.expiryDate.getTime()) {
-        return { ok: false, reason: 'BATCH_EXPIRY_MISMATCH' };
-      }
-      const saved = existing
-        ? await tx.batch.update({
-            where: { id: existing.id },
-            data: { quantity: { increment: command.quantity } },
-          })
-        : await tx.batch.create({
-            data: {
-              ...where,
-              batchNumber: newBatch.batchNumber,
-              quantity: command.quantity,
-              expiryDate: newBatch.expiryDate,
-              manufactureDate: newBatch.manufactureDate,
-            },
-          });
-      batchId = saved.id;
-      batchNumber = saved.batchNumber;
-    }
-
-    const updated = await this.incrementInventory(
-      tx,
-      command.storeId,
-      command.productVariantId,
-      command.quantity,
-      false,
-    );
-    await tx.inventoryTransaction.create({
-      data: {
-        ...where,
-        batchId,
-        transactionType: 'ADJUST',
-        quantity: command.quantity,
-        note: command.reason,
-        createdBy: command.createdBy,
-      },
-    });
-
-    return {
-      ok: true,
-      quantity: updated.quantity,
-      reservedQuantity: updated.reservedQuantity,
-      allocations: [{ batchId, batchNumber, quantity: command.quantity }],
-    };
   }
 
   private incrementInventory(

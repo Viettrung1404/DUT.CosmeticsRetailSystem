@@ -12,6 +12,7 @@ import {
 import { GetInventoryUseCase } from '../get-inventory.use-case';
 import { ReceivePurchaseOrderUseCase } from '../receive-purchase-order.use-case';
 import { AdjustInventoryUseCase } from '../adjust-inventory.use-case';
+import { IAdjustmentRepository } from '../../../domain/repositories/adjustment.repository.interface';
 
 const makePo = (overrides: Partial<PurchaseOrderSnapshot> = {}): PurchaseOrderSnapshot => ({
   id: 'po1',
@@ -47,7 +48,8 @@ describe('Inventory use cases', () => {
       findMany: jest.fn().mockResolvedValue({ items: [], total: 0 }),
       findPurchaseOrder: jest.fn().mockResolvedValue(makePo()),
       applyReceipt: jest.fn().mockResolvedValue({ ok: true, poStatus: 'PARTIALLY_RECEIVED', batchIds: ['b1'] }),
-      applyAdjustment: jest.fn(),
+      findInventoryRow: jest.fn(),
+      updateThresholds: jest.fn(),
     };
     scope = { execute: jest.fn() };
     givenScope('STORE', ['wh', 's1']);
@@ -149,8 +151,19 @@ describe('Inventory use cases', () => {
   });
 
   describe('AdjustInventoryUseCase', () => {
+    let adjustments: jest.Mocked<IAdjustmentRepository>;
+    beforeEach(() => {
+      adjustments = {
+        create: jest.fn().mockResolvedValue({ ok: true, adjustment: { id: 'a1', status: 'PENDING' } }),
+        approve: jest.fn(),
+        close: jest.fn(),
+        findById: jest.fn(),
+        findMany: jest.fn(),
+        currentStock: jest.fn().mockResolvedValue({ quantity: 10, reserved: 2 }),
+      };
+    });
     const adjust = (input: Record<string, unknown> = {}) =>
-      new AdjustInventoryUseCase(repo, scopeUseCase()).execute('u1', {
+      new AdjustInventoryUseCase(repo, adjustments, scopeUseCase()).execute('u1', {
         storeId: 's1',
         productVariantId: 'v1',
         quantity: -3,
@@ -158,14 +171,9 @@ describe('Inventory use cases', () => {
         ...input,
       });
 
-    it('xuất thủ công trả về tồn mới và các lô đã trừ', async () => {
-      repo.applyAdjustment.mockResolvedValue({
-        ok: true,
-        quantity: 7,
-        reservedQuantity: 2,
-        allocations: [{ batchId: 'b1', batchNumber: 'LOT-A', quantity: 3 }],
-      });
-      await expect(adjust()).resolves.toMatchObject({ quantity: 7, availableQuantity: 5 });
+    it('T4: xuất hủy tạo phiếu chờ duyệt, chưa trừ tồn', async () => {
+      await expect(adjust()).resolves.toMatchObject({ status: 'PENDING' });
+      expect(adjustments.create.mock.calls[0][0]).toMatchObject({ applyNow: false, createdBy: 'u1' });
     });
 
     it('thiếu lý do → 400', async () => {
@@ -176,10 +184,11 @@ describe('Inventory use cases', () => {
       await expect(adjust({ quantity: 5 })).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('nhập thêm vào lô mới thì gửi thông tin lô xuống repository', async () => {
-      repo.applyAdjustment.mockResolvedValue({ ok: true, quantity: 5, reservedQuantity: 0, allocations: [] });
+    it('T4: nhập thêm vào lô mới áp ngay, gửi thông tin lô xuống repository', async () => {
       await adjust({ quantity: 5, batchNumber: 'MAU-THU', expiryDate: '2099-12-31' });
-      expect(repo.applyAdjustment.mock.calls[0][0].newBatch).toMatchObject({ batchNumber: 'MAU-THU' });
+      const call = adjustments.create.mock.calls[0][0];
+      expect(call.applyNow).toBe(true);
+      expect(call.lines[0].newBatch).toMatchObject({ batchNumber: 'MAU-THU' });
     });
 
     it('ngày sản xuất không trước hạn dùng → 400', async () => {
@@ -188,14 +197,13 @@ describe('Inventory use cases', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('đụng phần giữ chỗ đơn online → 409', async () => {
-      repo.applyAdjustment.mockResolvedValue({ ok: false, reason: 'RESERVED_CONFLICT', available: 1 });
-      await expect(adjust()).rejects.toBeInstanceOf(ConflictException);
+    it('đụng phần giữ chỗ đơn online → 409 ngay lúc lập', async () => {
+      await expect(adjust({ quantity: -9 })).rejects.toBeInstanceOf(ConflictException);
+      expect(adjustments.create).not.toHaveBeenCalled();
     });
 
-    it('không đủ hàng → 400', async () => {
-      repo.applyAdjustment.mockResolvedValue({ ok: false, reason: 'NO_STOCK', available: 1 });
-      await expect(adjust()).rejects.toBeInstanceOf(BadRequestException);
+    it('không đủ hàng → 400 ngay lúc lập', async () => {
+      await expect(adjust({ quantity: -11 })).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('cửa hàng ngoài phạm vi → 403', async () => {

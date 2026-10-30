@@ -78,7 +78,11 @@ model User {
   inventoryTransactions      InventoryTransaction[]
   transfersRequested         InventoryTransfer[]   @relation("RequestedTransfers")
   transfersApproved          InventoryTransfer[]   @relation("ApprovedTransfers")
-  stocktakesCreated          Stocktake[]           @relation("CreatedStocktakes")
+  transfersShipped           InventoryTransfer[]   @relation("ShippedTransfers")
+  transfersReceived          InventoryTransfer[]   @relation("ReceivedTransfers")
+  adjustmentsCreated         InventoryAdjustment[] @relation("CreatedAdjustments")
+  adjustmentsApproved        InventoryAdjustment[] @relation("ApprovedAdjustments")
+  stocktakesCreated         Stocktake[]           @relation("CreatedStocktakes")
   stocktakesCompleted        Stocktake[]           @relation("CompletedStocktakes")
   purchaseOrdersCreated      PurchaseOrder[]
   blogPosts                  BlogPost[]
@@ -254,6 +258,7 @@ model ProductVariant {
   batches               Batch[]
   transferItems         InventoryTransferItem[]
   stocktakeItems        StocktakeItem[]
+  adjustmentItems       InventoryAdjustmentItem[]
   cartItems             CartItem[]
   orderItems            OrderItem[]
   returnOrderItems      ReturnOrderItem[]
@@ -335,6 +340,7 @@ model Store {
   transfersFrom         InventoryTransfer[]    @relation("TransferFromStore")
   transfersTo           InventoryTransfer[]    @relation("TransferToStore")
   stocktakes            Stocktake[]
+  inventoryAdjustments  InventoryAdjustment[]
   carts                 Cart[]
   orders                Order[]
   posSessions           PosSession[]
@@ -411,6 +417,7 @@ model Batch {
   transactions       InventoryTransaction[]
   transferItems      InventoryTransferItem[]
   stocktakeItems     StocktakeItem[]
+  adjustmentItems    InventoryAdjustmentItem[]
   orderItemBatches   OrderItemBatch[]
   restockReturnItems ReturnOrderItem[]       @relation("RestockBatch")
 
@@ -427,6 +434,8 @@ model InventoryTransfer {
   status       String    @db.VarChar(30)
   requestedBy  String?   @map("requested_by") @db.Uuid
   approvedBy   String?   @map("approved_by") @db.Uuid
+  shippedBy    String?   @map("shipped_by") @db.Uuid
+  receivedBy   String?   @map("received_by") @db.Uuid
   shippedAt    DateTime? @map("shipped_at") @db.Timestamptz
   receivedAt   DateTime? @map("received_at") @db.Timestamptz
   note         String?   @db.Text
@@ -437,6 +446,8 @@ model InventoryTransfer {
   toStore   Store                   @relation("TransferToStore", fields: [toStoreId], references: [id])
   requester User?                   @relation("RequestedTransfers", fields: [requestedBy], references: [id])
   approver  User?                   @relation("ApprovedTransfers", fields: [approvedBy], references: [id])
+  shipper   User?                   @relation("ShippedTransfers", fields: [shippedBy], references: [id])
+  receiver  User?                   @relation("ReceivedTransfers", fields: [receivedBy], references: [id])
   items     InventoryTransferItem[]
 
   @@index([fromStoreId, toStoreId, status])
@@ -449,6 +460,7 @@ model InventoryTransferItem {
   productVariantId  String   @map("product_variant_id") @db.Uuid
   batchId           String?  @map("batch_id") @db.Uuid
   quantityRequested Int      @map("quantity_requested")
+  quantityApproved  Int?     @map("quantity_approved")
   quantityShipped   Int      @default(0) @map("quantity_shipped")
   quantityReceived  Int      @default(0) @map("quantity_received")
   // Cột GENERATED (quantity_shipped - quantity_received), tạo trong migration add_db_constraints. Chỉ đọc, không ghi.
@@ -503,6 +515,47 @@ model StocktakeItem {
   batch     Batch?         @relation(fields: [batchId], references: [id])
 
   @@map("stocktake_items")
+}
+
+// Phiếu điều chỉnh / xuất hủy: giảm tồn chờ người khác duyệt, tăng tồn áp ngay
+model InventoryAdjustment {
+  id             String    @id @default(uuid()) @db.Uuid
+  adjustmentCode String    @unique @map("adjustment_code") @db.VarChar(50)
+  storeId        String    @map("store_id") @db.Uuid
+  status         String    @db.VarChar(20)
+  reason         String    @db.Text
+  reviewNote     String?   @map("review_note") @db.Text
+  createdBy      String?   @map("created_by") @db.Uuid
+  approvedBy     String?   @map("approved_by") @db.Uuid
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  store    Store                     @relation(fields: [storeId], references: [id])
+  creator  User?                     @relation("CreatedAdjustments", fields: [createdBy], references: [id])
+  approver User?                     @relation("ApprovedAdjustments", fields: [approvedBy], references: [id])
+  items    InventoryAdjustmentItem[]
+
+  @@index([storeId, status])
+  @@map("inventory_adjustments")
+}
+
+model InventoryAdjustmentItem {
+  id               String    @id @default(uuid()) @db.Uuid
+  adjustmentId     String    @map("adjustment_id") @db.Uuid
+  productVariantId String    @map("product_variant_id") @db.Uuid
+  batchId          String?   @map("batch_id") @db.Uuid
+  quantity         Int
+  batchNumber      String?   @map("batch_number") @db.VarChar(100)
+  expiryDate       DateTime? @map("expiry_date") @db.Date
+  manufactureDate  DateTime? @map("manufacture_date") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  adjustment InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  variant    ProductVariant      @relation(fields: [productVariantId], references: [id])
+  batch      Batch?              @relation(fields: [batchId], references: [id])
+
+  @@map("inventory_adjustment_items")
 }
 
 // =============================================================================

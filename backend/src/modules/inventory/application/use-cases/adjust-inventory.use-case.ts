@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -9,11 +8,17 @@ import {
 import { GetUserDataScopeUseCase } from '@modules/permissions/application/use-cases/get-user-data-scope.use-case';
 import { isStoreInScope } from '@modules/permissions/application/utils/store-scope.util';
 import {
-  AdjustmentCommand,
   INVENTORY_REPOSITORY,
   IInventoryRepository,
 } from '../../domain/repositories/inventory.repository.interface';
+import {
+  ADJUSTMENT_REPOSITORY,
+  AdjustmentLineInput,
+  AdjustmentView,
+  IAdjustmentRepository,
+} from '../../domain/repositories/adjustment.repository.interface';
 import { startOfVnToday } from '../utils/vn-date.util';
+import { stockFailureToException } from '../utils/stock-error.util';
 
 export interface AdjustInventoryInput {
   storeId: string;
@@ -26,15 +31,18 @@ export interface AdjustInventoryInput {
   manufactureDate?: string;
 }
 
+// T4: lập phiếu điều chỉnh. Tăng tồn áp ngay; giảm tồn (xuất hủy) chờ người khác duyệt
 @Injectable()
 export class AdjustInventoryUseCase {
   constructor(
     @Inject(INVENTORY_REPOSITORY)
     private readonly repository: IInventoryRepository,
+    @Inject(ADJUSTMENT_REPOSITORY)
+    private readonly adjustments: IAdjustmentRepository,
     private readonly getUserDataScope: GetUserDataScopeUseCase,
   ) {}
 
-  async execute(userId: string, input: AdjustInventoryInput) {
+  async execute(userId: string, input: AdjustInventoryInput): Promise<AdjustmentView> {
     if (input.quantity === 0) {
       throw new BadRequestException('Số lượng điều chỉnh phải khác 0');
     }
@@ -55,12 +63,9 @@ export class AdjustInventoryUseCase {
       throw new NotFoundException('Không tìm thấy biến thể sản phẩm');
     }
 
-    const command: AdjustmentCommand = {
-      storeId: store.id,
+    const line: AdjustmentLineInput = {
       productVariantId: input.productVariantId,
       quantity: input.quantity,
-      reason,
-      createdBy: userId,
       batchId: input.batchId,
     };
 
@@ -80,34 +85,27 @@ export class AdjustInventoryUseCase {
       if (manufactureDate && manufactureDate.getTime() >= expiryDate.getTime()) {
         throw new BadRequestException(`Lô ${batchNumber}: ngày sản xuất phải trước hạn sử dụng`);
       }
-      command.newBatch = { batchNumber, expiryDate, manufactureDate };
+      line.newBatch = { batchNumber, expiryDate, manufactureDate };
     }
 
-    const result = await this.repository.applyAdjustment(command);
-    if (result.ok) {
-      return {
-        quantity: result.quantity,
-        reservedQuantity: result.reservedQuantity,
-        availableQuantity: result.quantity - result.reservedQuantity,
-        allocations: result.allocations,
-      };
+    // Kiểm sớm để báo lỗi ngay lúc lập; lúc duyệt kiểm lại có khóa dòng
+    if (input.quantity < 0) {
+      const stock = await this.adjustments.currentStock(store.id, input.productVariantId);
+      const need = -input.quantity;
+      if (stock.quantity < need) throw stockFailureToException('NO_STOCK', stock.quantity);
+      if (stock.quantity - need < stock.reserved) {
+        throw stockFailureToException('RESERVED_CONFLICT', stock.quantity - stock.reserved);
+      }
     }
 
-    switch (result.reason) {
-      case 'NO_STOCK':
-        throw new BadRequestException(
-          `Không đủ hàng để xuất: tồn hiện có ${result.available ?? 0}`,
-        );
-      case 'RESERVED_CONFLICT':
-        throw new ConflictException(
-          `Chỉ xuất được tối đa ${result.available ?? 0} vì phần còn lại đang giữ chỗ cho đơn online`,
-        );
-      case 'BATCH_NOT_FOUND':
-        throw new NotFoundException('Không tìm thấy lô này tại địa điểm đã chọn');
-      case 'BATCH_SHORTAGE':
-        throw new BadRequestException(`Lô đã chọn chỉ còn ${result.available ?? 0}`);
-      default:
-        throw new ConflictException('Số lô này đã có với hạn sử dụng khác, kiểm tra lại số lô');
-    }
+    const result = await this.adjustments.create({
+      storeId: store.id,
+      reason,
+      createdBy: userId,
+      applyNow: input.quantity > 0,
+      lines: [line],
+    });
+    if (!result.ok) throw stockFailureToException(result.reason, result.available);
+    return result.adjustment;
   }
 }

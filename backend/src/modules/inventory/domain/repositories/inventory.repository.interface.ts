@@ -80,34 +80,6 @@ export type ReceiptResult =
   | { ok: false; reason: 'STATUS_CHANGED' | 'OVER_RECEIVED' }
   | { ok: false; reason: 'BATCH_EXPIRY_MISMATCH'; batchNumber: string };
 
-export interface AdjustmentCommand {
-  storeId: string;
-  productVariantId: string;
-  quantity: number;
-  reason: string;
-  createdBy: string;
-  batchId?: string;
-  newBatch?: { batchNumber: string; expiryDate: Date; manufactureDate: Date | null };
-}
-
-export type AdjustmentResult =
-  | {
-      ok: true;
-      quantity: number;
-      reservedQuantity: number;
-      allocations: { batchId: string; batchNumber: string; quantity: number }[];
-    }
-  | {
-      ok: false;
-      reason:
-        | 'NO_STOCK'
-        | 'RESERVED_CONFLICT'
-        | 'BATCH_NOT_FOUND'
-        | 'BATCH_SHORTAGE'
-        | 'BATCH_EXPIRY_MISMATCH';
-      available?: number;
-    };
-
 export interface IInventoryRepository {
   findStore(storeId: string): Promise<StoreInfo | null>;
   variantExists(productVariantId: string): Promise<boolean>;
@@ -115,5 +87,10 @@ export interface IInventoryRepository {
   findPurchaseOrder(id: string): Promise<PurchaseOrderSnapshot | null>;
   // Khóa phiếu nhập trong transaction rồi kiểm lại số đã nhận, tránh hai người nhận cùng một phiếu
   applyReceipt(command: ReceiptCommand): Promise<ReceiptResult>;
-  applyAdjustment(command: AdjustmentCommand): Promise<AdjustmentResult>;
+  findInventoryRow(id: string): Promise<{ id: string; storeId: string; maxQuantity: number | null } | null>;
+  updateThresholds(
+    id: string,
+    minQuantity: number,
+    maxQuantity: number | null,
+  ): Promise<{ id: string; minQuantity: number; maxQuantity: number | null }>;
 }
