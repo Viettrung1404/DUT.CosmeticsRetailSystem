@@ -20,6 +20,7 @@ import { CartModule } from '@modules/cart/cart.module';
 import { CustomersModule } from '@modules/customers/customers.module';
 import { OrdersModule } from '@modules/orders/orders.module';
 import { PaymentsModule } from '@modules/payments/payments.module';
+import { HrModule } from '@modules/hr/hr.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -49,6 +50,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CustomersModule,
     OrdersModule,
     PaymentsModule,
+    HrModule,
   ],
   providers: [
     {
