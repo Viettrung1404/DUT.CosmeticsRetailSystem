@@ -13,6 +13,7 @@ import {
   Min,
 } from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
+import { ATTENDANCE_STATUSES } from '../../domain/entities/attendance.entity';
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TIME_MESSAGE = 'Giờ phải có dạng HH:mm (ví dụ 08:00)';
@@ -93,5 +94,32 @@ export class UpdateShiftRequestDto {
   @IsOptional()
   @Matches(TIME_REGEX, { message: TIME_MESSAGE })
   endTime?: string;
+}
+
+export class GetAttendanceQueryDto extends PageOptionsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('all', { message: 'employeeId không hợp lệ' })
+  readonly employeeId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('all', { message: 'storeId không hợp lệ' })
+  readonly storeId?: string;
+
+  @ApiPropertyOptional({ example: '2026-10-01' })
+  @IsOptional()
+  @Matches(DATE_REGEX, { message: DATE_MESSAGE })
+  readonly from?: string;
+
+  @ApiPropertyOptional({ example: '2026-10-31' })
+  @IsOptional()
+  @Matches(DATE_REGEX, { message: DATE_MESSAGE })
+  readonly to?: string;
+
+  @ApiPropertyOptional({ enum: ATTENDANCE_STATUSES })
+  @IsOptional()
+  @IsIn(ATTENDANCE_STATUSES as unknown as string[], { message: 'Trạng thái chấm công không hợp lệ' })
+  readonly status?: string;
 }
 
