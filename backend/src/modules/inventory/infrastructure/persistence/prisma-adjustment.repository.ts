@@ -9,7 +9,8 @@ import {
   IAdjustmentRepository,
 } from '../../domain/repositories/adjustment.repository.interface';
 import { StockFailure } from '../../domain/repositories/stock-movement.types';
-import { STOCK_TX_OPTIONS, nextDocumentCode, putStock, takeStock } from './stock-ledger';
+import { nextDocumentCode } from '@infrastructure/database/document-code.util';
+import { STOCK_TX_OPTIONS, putStock, takeStock } from './stock-ledger';
 
 type Tx = Prisma.TransactionClient;
 

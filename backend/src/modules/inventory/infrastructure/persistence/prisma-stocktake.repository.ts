@@ -7,7 +7,8 @@ import {
   StocktakeView,
   StocktakeWriteResult,
 } from '../../domain/repositories/stocktake.repository.interface';
-import { STOCK_TX_OPTIONS, nextDocumentCode, putStock, takeStock } from './stock-ledger';
+import { nextDocumentCode } from '@infrastructure/database/document-code.util';
+import { STOCK_TX_OPTIONS, putStock, takeStock } from './stock-ledger';
 
 type Tx = Prisma.TransactionClient;
 

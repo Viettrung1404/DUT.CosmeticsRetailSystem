@@ -9,7 +9,8 @@ import {
   TransferView,
 } from '../../domain/repositories/transfer.repository.interface';
 import { StockFailure } from '../../domain/repositories/stock-movement.types';
-import { STOCK_TX_OPTIONS, nextDocumentCode, putStock, takeStock } from './stock-ledger';
+import { nextDocumentCode } from '@infrastructure/database/document-code.util';
+import { STOCK_TX_OPTIONS, putStock, takeStock } from './stock-ledger';
 
 const INCLUDE = {
   fromStore: { select: { name: true } },

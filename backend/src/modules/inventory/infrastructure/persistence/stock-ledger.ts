@@ -237,23 +237,3 @@ export const putStock = async (
     reservedQuantity: updated.reservedQuantity,
   };
 };
-
-const CODE_SOURCES = {
-  TRF: { table: 'inventory_transfers', column: 'transfer_code' },
-  STK: { table: 'stocktakes', column: 'stocktake_code' },
-  ADJ: { table: 'inventory_adjustments', column: 'adjustment_code' },
-} as const;
-
-// Mã chứng từ <tiền tố><ngày VN><3 số>, khóa theo tiền tố để hai người tạo cùng lúc không trùng số
-export const nextDocumentCode = async (tx: Tx, kind: keyof typeof CODE_SOURCES): Promise<string> => {
-  const today = startOfVnToday().toISOString().slice(0, 10).replace(/-/g, '');
-  const prefix = kind === 'TRF' ? `${kind}${today.slice(0, 6)}` : `${kind}${today}`;
-  const { table, column } = CODE_SOURCES[kind];
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${prefix}))`;
-  const rows = await tx.$queryRawUnsafe<{ code: string | null }[]>(
-    `SELECT max(${column}) AS code FROM ${table} WHERE ${column} LIKE $1`,
-    `${prefix}%`,
-  );
-  const last = rows[0]?.code ? Number(rows[0].code.slice(prefix.length)) || 0 : 0;
-  return `${prefix}${String(last + 1).padStart(3, '0')}`;
-};
