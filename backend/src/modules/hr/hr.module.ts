@@ -10,6 +10,7 @@ import { PrismaEmployeeRepository } from './infrastructure/persistence/prisma-em
 import { DepartmentAdminController } from './presentation/controllers/department-admin.controller';
 import { ShiftAdminController } from './presentation/controllers/shift-admin.controller';
 import { AttendanceAdminController } from './presentation/controllers/attendance-admin.controller';
+import { CommissionAdminController } from './presentation/controllers/commission-admin.controller';
 import { GetDepartmentsUseCase } from './application/use-cases/get-departments.use-case';
 import { CreateDepartmentUseCase } from './application/use-cases/create-department.use-case';
 import { UpdateDepartmentUseCase } from './application/use-cases/update-department.use-case';
@@ -21,12 +22,16 @@ import { DeleteShiftUseCase } from './application/use-cases/delete-shift.use-cas
 import { CheckInUseCase } from './application/use-cases/check-in.use-case';
 import { CheckOutUseCase } from './application/use-cases/check-out.use-case';
 import { GetAttendanceUseCase } from './application/use-cases/get-attendance.use-case';
+import { GetCommissionsUseCase } from './application/use-cases/get-commissions.use-case';
+import { FinalizeCommissionsUseCase } from './application/use-cases/finalize-commissions.use-case';
 import { DEPARTMENT_REPOSITORY } from './domain/repositories/department.repository.interface';
 import { SHIFT_REPOSITORY } from './domain/repositories/shift.repository.interface';
 import { ATTENDANCE_REPOSITORY } from './domain/repositories/attendance.repository.interface';
+import { COMMISSION_REPOSITORY } from './domain/repositories/commission.repository.interface';
 import { PrismaDepartmentRepository } from './infrastructure/persistence/prisma-department.repository';
 import { PrismaShiftRepository } from './infrastructure/persistence/prisma-shift.repository';
 import { PrismaAttendanceRepository } from './infrastructure/persistence/prisma-attendance.repository';
+import { PrismaCommissionRepository } from './infrastructure/persistence/prisma-commission.repository';
 
 @Module({
   imports: [UsersModule, PermissionsModule],
@@ -35,6 +40,7 @@ import { PrismaAttendanceRepository } from './infrastructure/persistence/prisma-
     DepartmentAdminController,
     ShiftAdminController,
     AttendanceAdminController,
+    CommissionAdminController,
   ],
   providers: [
     GetEmployeesUseCase,
@@ -51,10 +57,13 @@ import { PrismaAttendanceRepository } from './infrastructure/persistence/prisma-
     CheckInUseCase,
     CheckOutUseCase,
     GetAttendanceUseCase,
+    GetCommissionsUseCase,
+    FinalizeCommissionsUseCase,
     { provide: EMPLOYEE_REPOSITORY, useClass: PrismaEmployeeRepository },
     { provide: DEPARTMENT_REPOSITORY, useClass: PrismaDepartmentRepository },
     { provide: SHIFT_REPOSITORY, useClass: PrismaShiftRepository },
     { provide: ATTENDANCE_REPOSITORY, useClass: PrismaAttendanceRepository },
+    { provide: COMMISSION_REPOSITORY, useClass: PrismaCommissionRepository },
   ],
 })
 export class HrModule {}

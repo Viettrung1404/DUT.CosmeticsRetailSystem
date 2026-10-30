@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AttendanceView } from '../../domain/entities/attendance.entity';
+import { CommissionSummary, CommissionView } from '../../domain/entities/commission.entity';
 import { DepartmentView } from '../../domain/entities/department.entity';
 import { ShiftView } from '../../domain/entities/shift.entity';
 
@@ -49,3 +50,47 @@ export class AttendanceResponseDto {
   }
 }
 
+export class CommissionResponseDto {
+  @ApiProperty() id: string;
+  @ApiProperty() employeeId: string;
+  @ApiProperty() employeeCode: string;
+  @ApiProperty() employeeName: string;
+  @ApiPropertyOptional() storeId: string | null;
+  @ApiProperty() orderId: string;
+  @ApiProperty() orderNumber: string;
+  @ApiProperty() amount: number;
+  @ApiProperty({ description: 'Tỷ lệ % lúc bán' }) rate: number;
+  @ApiProperty() periodMonth: number;
+  @ApiProperty() periodYear: number;
+  @ApiProperty({ description: 'PENDING | PAID (đã chốt) | CANCELLED' }) status: string;
+  @ApiProperty() createdAt: Date;
+
+  static fromDomain(c: CommissionView): CommissionResponseDto {
+    return Object.assign(new CommissionResponseDto(), c);
+  }
+}
+
+export class CommissionSummaryResponseDto {
+  @ApiProperty() employeeId: string;
+  @ApiProperty() employeeCode: string;
+  @ApiProperty() employeeName: string;
+  @ApiProperty() orderCount: number;
+  @ApiProperty({ description: 'Tổng hoa hồng (không tính dòng CANCELLED)' }) totalAmount: number;
+
+  static fromDomain(s: CommissionSummary): CommissionSummaryResponseDto {
+    return Object.assign(new CommissionSummaryResponseDto(), s);
+  }
+}
+
+export class CommissionListResponseDto {
+  @ApiProperty({ type: [CommissionResponseDto] }) items: CommissionResponseDto[];
+  @ApiProperty({ type: [CommissionSummaryResponseDto], description: 'Tổng theo nhân viên trên toàn bộ kết quả lọc' })
+  summary: CommissionSummaryResponseDto[];
+  @ApiProperty() meta: object;
+}
+
+export class FinalizeCommissionsResponseDto {
+  @ApiProperty() month: number;
+  @ApiProperty() year: number;
+  @ApiProperty({ description: 'Số dòng hoa hồng được đổi PENDING -> PAID' }) finalizedCount: number;
+}

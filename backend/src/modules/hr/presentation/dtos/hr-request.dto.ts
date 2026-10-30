@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { ATTENDANCE_STATUSES } from '../../domain/entities/attendance.entity';
+import { COMMISSION_STATUSES } from '../../domain/entities/commission.entity';
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TIME_MESSAGE = 'Giờ phải có dạng HH:mm (ví dụ 08:00)';
@@ -123,3 +124,51 @@ export class GetAttendanceQueryDto extends PageOptionsDto {
   readonly status?: string;
 }
 
+export class GetCommissionsQueryDto extends PageOptionsDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('all', { message: 'employeeId không hợp lệ' })
+  readonly employeeId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('all', { message: 'storeId không hợp lệ' })
+  readonly storeId?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 12 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Tháng phải là số nguyên' })
+  @Min(1, { message: 'Tháng từ 1 đến 12' })
+  @Max(12, { message: 'Tháng từ 1 đến 12' })
+  readonly month?: number;
+
+  @ApiPropertyOptional({ example: 2026 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Năm phải là số nguyên' })
+  @Min(2000)
+  @Max(2100)
+  readonly year?: number;
+
+  @ApiPropertyOptional({ enum: COMMISSION_STATUSES })
+  @IsOptional()
+  @IsIn(COMMISSION_STATUSES as unknown as string[], { message: 'Trạng thái hoa hồng không hợp lệ' })
+  readonly status?: string;
+}
+
+export class FinalizeCommissionsRequestDto {
+  @ApiProperty({ minimum: 1, maximum: 12 })
+  @Type(() => Number)
+  @IsInt({ message: 'Tháng phải là số nguyên' })
+  @Min(1, { message: 'Tháng từ 1 đến 12' })
+  @Max(12, { message: 'Tháng từ 1 đến 12' })
+  month: number;
+
+  @ApiProperty({ example: 2026 })
+  @Type(() => Number)
+  @IsInt({ message: 'Năm phải là số nguyên' })
+  @Min(2000)
+  @Max(2100)
+  year: number;
+}
