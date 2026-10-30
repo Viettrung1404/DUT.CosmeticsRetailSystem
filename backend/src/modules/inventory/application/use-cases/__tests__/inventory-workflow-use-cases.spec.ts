@@ -53,7 +53,7 @@ const inventoryRepo = (): jest.Mocked<IInventoryRepository> => ({
   updateThresholds: jest.fn().mockResolvedValue({ id: 'inv1', minQuantity: 5, maxQuantity: 50 }),
 });
 
-describe('Phiếu điều chỉnh (T4)', () => {
+describe('Phiếu điều chỉnh', () => {
   const pending = { id: 'a1', storeId: STORE, status: 'PENDING', createdBy: 'creator', adjustmentCode: 'ADJ1' };
   const repo = (): jest.Mocked<IAdjustmentRepository> => ({
     create: jest.fn(),
@@ -122,7 +122,7 @@ describe('Ngưỡng tồn', () => {
   });
 });
 
-describe('Chuyển kho (T2, V11)', () => {
+describe('Chuyển kho', () => {
   const transfer = (over: Partial<TransferView> = {}): TransferView => ({
     id: 't1',
     transferCode: 'TRF202610001',
@@ -263,7 +263,7 @@ describe('Chuyển kho (T2, V11)', () => {
   });
 });
 
-describe('Kiểm kê (T3)', () => {
+describe('Kiểm kê', () => {
   const stocktake = (over: Partial<StocktakeView> = {}): StocktakeView => ({
     id: 'k1',
     stocktakeCode: 'STK20261030001',
@@ -336,7 +336,7 @@ describe('Kiểm kê (T3)', () => {
   });
 });
 
-describe('Lô hàng (T9)', () => {
+describe('Lô hàng', () => {
   const batch = {
     id: 'b1',
     storeId: STORE,
@@ -379,7 +379,7 @@ describe('Lô hàng (T9)', () => {
   });
 });
 
-describe('Cảnh báo kho (T10)', () => {
+describe('Cảnh báo kho', () => {
   it('mỗi người phụ trách nhận một thông báo/ngày/địa điểm, event_key theo ngày VN', async () => {
     const repo: jest.Mocked<IInventoryAlertRepository> = {
       summarize: jest.fn().mockResolvedValue([

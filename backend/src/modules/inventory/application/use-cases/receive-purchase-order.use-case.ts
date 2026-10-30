@@ -59,7 +59,7 @@ export class ReceivePurchaseOrderUseCase {
     if (!isStoreInScope(scope, po.storeId)) {
       throw new ForbiddenException('Đơn đặt hàng giao về kho không thuộc phạm vi của bạn');
     }
-    // V9: nhà cung cấp chỉ giao về kho tổng
+    // Nhà cung cấp chỉ giao về kho tổng
     if (po.storeType !== 'WAREHOUSE') {
       throw new BadRequestException('Đơn đặt hàng phải giao về kho tổng mới nhận hàng được');
     }

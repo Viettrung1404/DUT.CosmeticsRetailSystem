@@ -30,7 +30,7 @@ export interface CreateAdminUserResult {
   activationEmailSent: boolean;
 }
 
-// Dùng chung cho POST /admin/users và POST /admin/employees (H1): tài khoản chưa có mật khẩu, nhân viên tự đặt qua email
+// Dùng chung cho POST /admin/users và POST /admin/employees: tài khoản chưa có mật khẩu, nhân viên tự đặt qua email
 @Injectable()
 export class CreateAdminUserUseCase {
   private readonly logger = new Logger(CreateAdminUserUseCase.name);

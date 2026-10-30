@@ -12,7 +12,7 @@ import {
 
 export type TransferSide = 'FROM' | 'TO' | 'EITHER';
 
-// Bên nào được thao tác bước nào (V11): QL cửa hàng nhận lập/gửi/nhận, NV kho tổng duyệt/xuất
+// Bên nào được thao tác bước nào: QL cửa hàng nhận lập/gửi/nhận, NV kho tổng duyệt/xuất
 @Injectable()
 export class TransferAccessService {
   constructor(

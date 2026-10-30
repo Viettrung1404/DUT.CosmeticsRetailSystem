@@ -21,7 +21,7 @@ import {
   UpdateTransferDraftDto,
 } from '../dtos/inventory-workflow-request.dto';
 
-// T2: DRAFT → REQUESTED (QL) → APPROVED (kho tổng) → SHIPPED (kho tổng xuất FEFO) → RECEIVED (QL nhận)
+// DRAFT → REQUESTED (QL) → APPROVED (kho tổng) → SHIPPED (kho tổng xuất FEFO) → RECEIVED (QL nhận)
 @ApiTags('Admin - Inventory (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
 @ApiConflictResponse({ description: 'Phiếu không ở trạng thái cho phép bước này' })

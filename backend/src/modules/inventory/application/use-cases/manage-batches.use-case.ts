@@ -27,7 +27,7 @@ export interface BatchListResult {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Theo dõi và khóa lô (05.06, T9): lô khóa bị bỏ qua ở mọi luồng xuất FEFO
+// Theo dõi và khóa lô: lô khóa bị bỏ qua ở mọi luồng xuất FEFO
 @Injectable()
 export class ManageBatchesUseCase {
   constructor(

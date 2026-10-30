@@ -8,7 +8,7 @@ import {
 
 const MAX_LISTED_SKUS = 10;
 
-// T10: mỗi sáng gửi một thông báo tổng hợp cho từng người phụ trách mỗi địa điểm
+// Mỗi sáng gửi một thông báo tổng hợp cho từng người phụ trách mỗi địa điểm
 @Injectable()
 export class SendInventoryAlertsUseCase {
   constructor(

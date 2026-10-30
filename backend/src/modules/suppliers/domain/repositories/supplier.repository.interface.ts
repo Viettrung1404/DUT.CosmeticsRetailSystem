@@ -28,7 +28,7 @@ export interface SupplierData {
 
 export interface SupplierBalance {
   supplierId: string;
-  // Σ tiền hóa đơn trên phiếu nhập; phiếu chưa có hóa đơn tạm tính giá PO × SL nhận (NC4)
+  // Σ tiền hóa đơn trên phiếu nhập; phiếu chưa có hóa đơn tạm tính giá PO × SL nhận
   totalReceived: number;
   totalPaid: number;
   balance: number;

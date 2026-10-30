@@ -9,7 +9,7 @@ import { toMinutes, vnMinutesOfDay } from '../utils/vn-time.util';
 
 export const LATE_AFTER_MINUTES = 15;
 
-// H6: trễ quá 15 phút so với giờ bắt đầu ca thì LATE
+// Trễ quá 15 phút so với giờ bắt đầu ca thì LATE
 @Injectable()
 export class CheckInUseCase {
   constructor(@Inject(ATTENDANCE_REPOSITORY) private readonly repository: IAttendanceRepository) {}
@@ -27,7 +27,7 @@ export class CheckInUseCase {
       throw new ConflictException('Bạn đã chấm công vào, hãy chấm công ra trước');
     }
 
-    // H7: dòng đã phân ca nhưng chưa chấm là "lịch"; chọn ca có giờ bắt đầu gần giờ hiện tại nhất
+    // Dòng đã phân ca nhưng chưa chấm là "lịch"; chọn ca có giờ bắt đầu gần giờ hiện tại nhất
     const planned = rows.filter((r) => !r.checkInAt);
     if (planned.length === 0) {
       if (rows.length > 0) throw new ConflictException('Hôm nay bạn đã chấm công đủ');

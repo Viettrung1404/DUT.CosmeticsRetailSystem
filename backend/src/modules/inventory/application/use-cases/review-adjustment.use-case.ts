@@ -14,7 +14,7 @@ import {
 } from '../../domain/repositories/adjustment.repository.interface';
 import { stockFailureToException } from '../utils/stock-error.util';
 
-// Duyệt / từ chối phiếu giảm tồn: người duyệt phải khác người lập (T4)
+// Duyệt / từ chối phiếu giảm tồn: người duyệt phải khác người lập
 @Injectable()
 export class ReviewAdjustmentUseCase {
   constructor(

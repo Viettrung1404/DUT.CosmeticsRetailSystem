@@ -10,7 +10,7 @@ export const SUPPLIER_PAYMENT_METHODS = ['BANK_TRANSFER', 'CASH'] as const;
 
 const formatVnd = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
 
-// Công nợ NCC (12.05, NC4): nợ = Σ hóa đơn trên phiếu nhập − Σ đã trả; kế toán ghi khoản đã chuyển cho NCC
+// Công nợ NCC: nợ = Σ hóa đơn trên phiếu nhập − Σ đã trả; kế toán ghi khoản đã chuyển cho NCC
 @Injectable()
 export class SupplierPaymentsUseCase {
   constructor(@Inject(SUPPLIER_REPOSITORY) private readonly repository: ISupplierRepository) {}

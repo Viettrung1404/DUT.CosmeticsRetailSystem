@@ -31,7 +31,7 @@ export interface AdjustInventoryInput {
   manufactureDate?: string;
 }
 
-// T4: lập phiếu điều chỉnh. Tăng tồn áp ngay; giảm tồn (xuất hủy) chờ người khác duyệt
+// Lập phiếu điều chỉnh. Tăng tồn áp ngay; giảm tồn (xuất hủy) chờ người khác duyệt
 @Injectable()
 export class AdjustInventoryUseCase {
   constructor(

@@ -9,7 +9,7 @@ import {
 const clean = (value: string | null | undefined): string | null | undefined =>
   value === undefined ? undefined : value?.trim() || null;
 
-// Danh bạ NCC (12.01–02) và chấm điểm (12.06, NC5: thang 1–5); ngừng hợp tác = isActive false, không xóa
+// Danh bạ NCC và chấm điểm (thang 1–5); ngừng hợp tác = isActive false, không xóa
 @Injectable()
 export class ManageSuppliersUseCase {
   constructor(@Inject(SUPPLIER_REPOSITORY) private readonly repository: ISupplierRepository) {}

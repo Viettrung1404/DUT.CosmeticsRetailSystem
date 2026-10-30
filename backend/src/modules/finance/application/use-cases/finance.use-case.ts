@@ -33,7 +33,7 @@ export class FinanceUseCase {
     private readonly getPermissions: GetUserEffectivePermissionsUseCase,
   ) {}
 
-  // 07.04: người chỉ có quyền thu tiền (NV bán hàng) chỉ thấy giao dịch trong ca của chính mình (V3)
+  // Người chỉ có quyền thu tiền (NV bán hàng) chỉ thấy giao dịch trong ca của chính mình
   async payments(
     userId: string,
     input: {
@@ -92,7 +92,7 @@ export class FinanceUseCase {
     };
   }
 
-  // T8: đánh dấu đã đối soát cả nhóm; nhóm POS chỉ đánh dấu khi mọi ca liên quan đã chốt (RECONCILED)
+  // Đánh dấu đã đối soát cả nhóm; nhóm POS chỉ đánh dấu khi mọi ca liên quan đã chốt (RECONCILED)
   async mark(
     userId: string,
     input: { date: string; storeId: string; channel: 'POS' | 'ONLINE'; paymentMethod: string },

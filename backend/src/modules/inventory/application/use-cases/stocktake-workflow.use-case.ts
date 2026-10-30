@@ -25,7 +25,7 @@ import {
 } from '../../domain/repositories/stocktake.repository.interface';
 import { stockFailureToException } from '../utils/stock-error.util';
 
-// Kiểm kê (T3): DRAFT → IN_PROGRESS khi nhập số đếm → COMPLETED (có chênh lệch thì người chốt khác người lập)
+// Kiểm kê: DRAFT → IN_PROGRESS khi nhập số đếm → COMPLETED (có chênh lệch thì người chốt khác người lập)
 @Injectable()
 export class StocktakeWorkflowUseCase {
   constructor(

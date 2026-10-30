@@ -37,7 +37,7 @@ export interface ReconciliationGroup {
   count: number;
   amount: number;
   reconciledCount: number;
-  // POS: số ca có giao dịch trong nhóm mà chưa RECONCILED (T8: còn ca chưa chốt thì chưa đánh dấu được)
+  // POS: số ca có giao dịch trong nhóm mà chưa RECONCILED (còn ca chưa chốt thì chưa đánh dấu được)
   unreconciledSessions: number;
 }
 

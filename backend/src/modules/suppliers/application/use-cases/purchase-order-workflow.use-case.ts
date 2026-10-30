@@ -23,7 +23,7 @@ const OPEN_STATUSES = ['DRAFT', 'SENT', 'CONFIRMED'];
 const toDate = (value?: string | null): Date | null | undefined =>
   value === undefined ? undefined : value === null ? null : new Date(`${value}T00:00:00Z`);
 
-// T1: DRAFT (KHO lập) → SENT (KT/Admin "duyệt & gửi", khác người lập) → CONFIRMED (KHO ghi NCC xác nhận)
+// DRAFT (KHO lập) → SENT (KT/Admin "duyệt & gửi", khác người lập) → CONFIRMED (KHO ghi NCC xác nhận)
 // → PARTIALLY_RECEIVED / RECEIVED (tự chuyển khi nhận hàng) · CANCELLED khi chưa nhận dòng nào
 @Injectable()
 export class PurchaseOrderWorkflowUseCase {
@@ -49,7 +49,7 @@ export class PurchaseOrderWorkflowUseCase {
     if (!store) throw new NotFoundException('Không tìm thấy kho nhận hàng');
     if (!supplier) throw new NotFoundException('Không tìm thấy nhà cung cấp');
     if (!supplier.isActive) throw new BadRequestException('Nhà cung cấp đã ngừng hợp tác');
-    // NC1, V9: nhà cung cấp chỉ giao về kho tổng
+    // Nhà cung cấp chỉ giao về kho tổng
     if (store.type !== 'WAREHOUSE' || !store.isActive) {
       throw new BadRequestException('Đơn đặt hàng chỉ giao về kho tổng đang hoạt động');
     }

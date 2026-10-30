@@ -73,7 +73,7 @@ export interface ReceiptCommand {
   note: string | null;
   receivedBy: string;
   receivedDate: Date;
-  // Đầu phiếu nhập GRN (NC3): người giao + hóa đơn NCC để đối chiếu công nợ
+  // Đầu phiếu nhập GRN: người giao + hóa đơn NCC để đối chiếu công nợ
   deliveredBy: string | null;
   invoiceNumber: string | null;
   invoiceDate: Date | null;

@@ -25,7 +25,7 @@ export interface CreateEmployeeResult {
   activationEmailSent: boolean;
 }
 
-// Mã nhân viên tự sinh NV001, NV002... khi không gửi (H9)
+// Mã nhân viên tự sinh NV001, NV002... khi không gửi
 @Injectable()
 export class CreateEmployeeUseCase {
   constructor(

@@ -4,7 +4,7 @@ import {
   IDepartmentRepository,
 } from '../../domain/repositories/department.repository.interface';
 
-// Bảng departments không có cột ẩn nên xóa cứng, chỉ khi không còn nhân viên (H14)
+// Bảng departments không có cột ẩn nên xóa cứng, chỉ khi không còn nhân viên
 @Injectable()
 export class DeleteDepartmentUseCase {
   constructor(@Inject(DEPARTMENT_REPOSITORY) private readonly repository: IDepartmentRepository) {}

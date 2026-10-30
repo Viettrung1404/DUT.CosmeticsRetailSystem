@@ -67,8 +67,8 @@ const poRepo = (view = po()): jest.Mocked<IPurchaseOrderRepository> => ({
 
 const line = [{ productVariantId: 'v1', quantity: 10, unitCost: 100 }];
 
-describe('Đơn đặt hàng NCC (T1)', () => {
-  it('chỉ giao về kho tổng (NC1); NCC ngừng hợp tác: 400', async () => {
+describe('Đơn đặt hàng NCC', () => {
+  it('chỉ giao về kho tổng; NCC ngừng hợp tác: 400', async () => {
     const r = poRepo();
     const uc = new PurchaseOrderWorkflowUseCase(r, scopeOf('ALL'));
     await expect(uc.create('kho', { supplierId: 'sup', storeId: 's1', items: line })).rejects.toBeInstanceOf(
@@ -119,7 +119,7 @@ describe('Đơn đặt hàng NCC (T1)', () => {
   });
 });
 
-describe('Công nợ NCC (NC4)', () => {
+describe('Công nợ NCC', () => {
   const repo = (): jest.Mocked<ISupplierRepository> => ({
     findMany: jest.fn(),
     findById: jest.fn().mockResolvedValue({ id: 'sup' }),

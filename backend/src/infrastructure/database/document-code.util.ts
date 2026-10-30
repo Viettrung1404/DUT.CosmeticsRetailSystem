@@ -11,7 +11,7 @@ const CODE_SOURCES = {
 
 export type DocumentKind = keyof typeof CODE_SOURCES;
 
-// D0.1: <tiền tố><yyyyMMdd giờ VN><4 số> như số đơn ORD; khóa theo tiền tố để hai người tạo cùng lúc không trùng số
+// <tiền tố><yyyyMMdd giờ VN><4 số> như số đơn ORD; khóa theo tiền tố để hai người tạo cùng lúc không trùng số
 export const nextDocumentCode = async (
   tx: Prisma.TransactionClient,
   kind: DocumentKind,

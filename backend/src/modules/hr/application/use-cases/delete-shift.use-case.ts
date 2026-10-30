@@ -3,7 +3,7 @@ import { GetUserDataScopeUseCase } from '@modules/permissions/application/use-ca
 import { IShiftRepository, SHIFT_REPOSITORY } from '../../domain/repositories/shift.repository.interface';
 import { assertCanWriteShiftOfStore } from './shift-scope.util';
 
-// Bảng shifts không có cột ẩn nên xóa cứng, chỉ khi chưa có dòng chấm công nào dùng ca (H14)
+// Bảng shifts không có cột ẩn nên xóa cứng, chỉ khi chưa có dòng chấm công nào dùng ca
 @Injectable()
 export class DeleteShiftUseCase {
   constructor(

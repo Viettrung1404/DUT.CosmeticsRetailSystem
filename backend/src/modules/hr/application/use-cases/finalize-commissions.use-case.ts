@@ -13,7 +13,7 @@ import {
 
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 
-// D0.7: chốt cả tháng cho toàn chuỗi, nên chỉ người có phạm vi ALL; tháng đã chốt không chốt lại (H16)
+// Chốt cả tháng cho toàn chuỗi, nên chỉ người có phạm vi ALL; tháng đã chốt không chốt lại
 @Injectable()
 export class FinalizeCommissionsUseCase {
   constructor(

@@ -31,7 +31,7 @@ export const validateTransferLines = async (
   }
 };
 
-// QL lập phiếu xin hàng từ kho tổng về cửa hàng mình (V9, V11); kiểm phạm vi theo nơi nhận
+// QL lập phiếu xin hàng từ kho tổng về cửa hàng mình; kiểm phạm vi theo nơi nhận
 @Injectable()
 export class CreateTransferUseCase {
   constructor(
