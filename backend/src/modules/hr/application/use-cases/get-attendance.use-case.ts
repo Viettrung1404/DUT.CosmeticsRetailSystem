@@ -61,4 +61,27 @@ export class GetAttendanceUseCase {
 
     return this.repository.findAll(filter);
   }
+
+  async executeSelf(
+    userId: string,
+    input: Omit<GetAttendanceInput, 'employeeId' | 'storeId'>,
+  ): Promise<{ items: AttendanceView[]; total: number }> {
+    const employee = await this.repository.findEmployeeByUserId(userId);
+    if (!employee) throw new ForbiddenException('Tài khoản này không có hồ sơ nhân viên');
+
+    const from = input.from ? parseDateOnly(input.from) : undefined;
+    const to = input.to ? parseDateOnly(input.to) : undefined;
+    if (from && to && from > to) {
+      throw new BadRequestException('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc');
+    }
+    return this.repository.findAll({
+      skip: (input.page - 1) * input.limit,
+      take: input.limit,
+      order: input.order === 'ASC' ? 'asc' : 'desc',
+      employeeId: employee.id,
+      from,
+      to,
+      status: input.status,
+    });
+  }
 }

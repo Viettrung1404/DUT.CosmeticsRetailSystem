@@ -54,7 +54,11 @@ export class EmployeeAdminController {
   @Put(':id')
   @RequirePermissions('EMPLOYEE_MANAGE', 'SYSTEM_USER_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa hồ sơ nhân viên và thông tin tài khoản (họ tên, SĐT)' })
-  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateEmployeeRequestDto) {
-    return EmployeeResponseDto.fromDomain(await this.updateEmployee.execute(id, dto));
+  async update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateEmployeeRequestDto,
+  ) {
+    return EmployeeResponseDto.fromDomain(await this.updateEmployee.execute(user.userId, id, dto));
   }
 }

@@ -39,6 +39,23 @@ export class AttendanceAdminController {
     return { message: 'Chấm công ra thành công', data: AttendanceResponseDto.fromDomain(row) };
   }
 
+  @Get('me')
+  @ApiOperation({ summary: 'Nhân viên xem lịch sử chấm công của chính mình' })
+  async listMine(@CurrentUser() user: JwtPayload, @Query() query: GetAttendanceQueryDto) {
+    const { items, total } = await this.getAttendance.executeSelf(user.userId, {
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+      order: query.order ?? OrderDirection.DESC,
+      from: query.from,
+      to: query.to,
+      status: query.status,
+    });
+    return new PageDto(
+      items.map((a) => AttendanceResponseDto.fromDomain(a)),
+      new PageMetaDto({ pageOptionsDto: query, itemCount: total }),
+    );
+  }
+
   @Get()
   @RequirePermissions('EMPLOYEE_ATTENDANCE')
   @ApiOperation({ summary: 'Admin - Bảng chấm công (lọc nhân viên, cửa hàng, khoảng ngày, trạng thái; theo phạm vi dữ liệu)' })

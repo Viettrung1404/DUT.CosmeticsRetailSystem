@@ -16,6 +16,7 @@ const EID = 'b2eebc99-9c0b-4ef8-bb6d-6bb9bd380a33';
 const UID = 'a1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 const STORE = 'c3eebc99-9c0b-4ef8-bb6d-6bb9bd380a44';
 const OTHER_STORE = 'd4eebc99-9c0b-4ef8-bb6d-6bb9bd380a55';
+const ACTOR = 'e5eebc99-9c0b-4ef8-bb6d-6bb9bd380a66';
 
 const makeEmployee = (over: Partial<EmployeeView> = {}): EmployeeView => ({
   id: EID,
@@ -111,38 +112,38 @@ describe('Employee use cases', () => {
 
     it('ném NotFound khi không có nhân viên', async () => {
       repo.findById.mockResolvedValue(null);
-      await expect(new UpdateEmployeeUseCase(repo).execute(EID, {})).rejects.toThrow(NotFoundException);
+      await expect(new UpdateEmployeeUseCase(repo).execute(ACTOR, EID, {})).rejects.toThrow(NotFoundException);
     });
 
     it('cắt khoảng trắng và chuyển SĐT rỗng thành null', async () => {
-      await new UpdateEmployeeUseCase(repo).execute(EID, { fullName: ' Bình ', phone: '' });
-      expect(repo.update).toHaveBeenCalledWith(EID, { fullName: 'Bình', phone: null });
+      await new UpdateEmployeeUseCase(repo).execute(ACTOR, EID, { fullName: ' Bình ', phone: '' });
+      expect(repo.update).toHaveBeenCalledWith(EID, { fullName: 'Bình', phone: null }, ACTOR);
     });
 
     it('chặn SĐT của người khác nhưng cho giữ SĐT của chính mình', async () => {
       const useCase = new UpdateEmployeeUseCase(repo);
       repo.findPhoneOwner.mockResolvedValue({ id: 'nguoi-khac' });
-      await expect(useCase.execute(EID, { phone: '0905123456' })).rejects.toThrow(ConflictException);
+      await expect(useCase.execute(ACTOR, EID, { phone: '0905123456' })).rejects.toThrow(ConflictException);
       repo.findPhoneOwner.mockResolvedValue({ id: UID });
-      await expect(useCase.execute(EID, { phone: '0905123456' })).resolves.toBeDefined();
+      await expect(useCase.execute(ACTOR, EID, { phone: '0905123456' })).resolves.toBeDefined();
     });
 
     it('chặn phòng ban, cửa hàng không tồn tại và trạng thái lạ', async () => {
       const useCase = new UpdateEmployeeUseCase(repo);
       repo.departmentExists.mockResolvedValue(false);
-      await expect(useCase.execute(EID, { departmentId: OTHER_STORE })).rejects.toThrow(
+      await expect(useCase.execute(ACTOR, EID, { departmentId: OTHER_STORE })).rejects.toThrow(
         BadRequestException,
       );
       repo.storeExists.mockResolvedValue(false);
-      await expect(useCase.execute(EID, { storeId: OTHER_STORE })).rejects.toThrow(BadRequestException);
-      await expect(useCase.execute(EID, { status: 'FIRED' })).rejects.toThrow(BadRequestException);
+      await expect(useCase.execute(ACTOR, EID, { storeId: OTHER_STORE })).rejects.toThrow(BadRequestException);
+      await expect(useCase.execute(ACTOR, EID, { status: 'FIRED' })).rejects.toThrow(BadRequestException);
       expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('cho phép bỏ phòng ban và cửa hàng bằng null', async () => {
-      await new UpdateEmployeeUseCase(repo).execute(EID, { departmentId: null, storeId: null });
+      await new UpdateEmployeeUseCase(repo).execute(ACTOR, EID, { departmentId: null, storeId: null });
       expect(repo.departmentExists).not.toHaveBeenCalled();
-      expect(repo.update).toHaveBeenCalledWith(EID, { departmentId: null, storeId: null });
+      expect(repo.update).toHaveBeenCalledWith(EID, { departmentId: null, storeId: null }, ACTOR);
     });
   });
 

@@ -59,7 +59,7 @@ describe('Admin user use cases', () => {
       setPermissions: jest.fn(),
       setStores: jest.fn(),
     };
-    mailer = { sendActivationEmail: jest.fn().mockResolvedValue(undefined) };
+    mailer = { sendActivationEmail: jest.fn().mockResolvedValue(true) };
   });
 
   describe('GetAdminUsersUseCase', () => {
@@ -99,6 +99,12 @@ describe('Admin user use cases', () => {
       expect(rawToken).toHaveLength(64);
       expect(rawToken).not.toBe(data.tokenHash);
       expect(result.activationEmailSent).toBe(true);
+    });
+
+    it('chưa cấu hình SMTP thì báo activationEmailSent=false', async () => {
+      mailer.sendActivationEmail.mockResolvedValue(false);
+      const result = await new CreateAdminUserUseCase(repo, mailer).execute(input);
+      expect(result.activationEmailSent).toBe(false);
     });
 
     it('thư gửi lỗi thì vẫn tạo tài khoản và báo activationEmailSent=false', async () => {

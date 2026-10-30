@@ -151,6 +151,20 @@ describe('GetAttendanceUseCase', () => {
     expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ employeeId: EID }));
   });
 
+  it('executeSelf: luôn lọc theo hồ sơ của chính người gọi, không cần phạm vi', async () => {
+    const { repo, uc } = build({ type: 'STORE', storeIds: [OTHER], employeeId: null });
+    await uc.executeSelf('u', base);
+    const filter = repo.findAll.mock.calls[0][0];
+    expect(filter.employeeId).toBe(EID);
+    expect(filter.storeIds).toBeUndefined();
+  });
+
+  it('executeSelf: tài khoản không có hồ sơ nhân viên: 403', async () => {
+    const { repo, uc } = build({ type: 'ALL', storeIds: [], employeeId: null });
+    repo.findEmployeeByUserId.mockResolvedValue(null);
+    await expect(uc.executeSelf('u', base)).rejects.toThrow(ForbiddenException);
+  });
+
   it('khoảng ngày ngược: 400', async () => {
     const { uc } = build({ type: 'ALL', storeIds: [], employeeId: null });
     await expect(uc.execute('u', { ...base, from: '2026-10-31', to: '2026-10-01' })).rejects.toThrow(

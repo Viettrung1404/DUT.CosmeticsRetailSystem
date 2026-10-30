@@ -79,11 +79,18 @@ export class PrismaEmployeeRepository implements IEmployeeRepository {
     }, 0);
   }
 
-  async update(id: string, patch: EmployeePatch): Promise<EmployeeView> {
+  async update(id: string, patch: EmployeePatch, actorId: string): Promise<EmployeeView> {
     await this.prisma.$transaction(async (tx) => {
       const employee = await tx.employee.findUniqueOrThrow({
         where: { id },
-        select: { userId: true, status: true },
+        select: {
+          userId: true,
+          status: true,
+          storeId: true,
+          commissionRate: true,
+          salary: true,
+          user: { select: { status: true } },
+        },
       });
 
       const { fullName, phone, status, ...profile } = patch;
@@ -95,35 +102,106 @@ export class PrismaEmployeeRepository implements IEmployeeRepository {
         },
       });
 
+      const resigning = status === 'RESIGNED' && employee.status !== 'RESIGNED';
+      const returning = employee.status === 'RESIGNED' && !!status && status !== 'RESIGNED';
+      const lockUser = resigning && employee.user.status === 'ACTIVE';
+
       const userData: Prisma.UserUpdateInput = {};
       if (fullName !== undefined) userData.fullName = fullName;
       if (phone !== undefined) userData.phone = phone;
-      if (status === 'RESIGNED' && employee.status !== 'RESIGNED') userData.status = 'INACTIVE';
+      if (lockUser) userData.status = 'INACTIVE';
+      if (returning && (await this.wasLockedByResign(tx, id, employee.userId))) {
+        userData.status = 'ACTIVE';
+      }
       if (Object.keys(userData).length > 0) {
         await tx.user.update({ where: { id: employee.userId }, data: userData });
       }
 
-      if (status === 'RESIGNED' && employee.status !== 'RESIGNED') {
+      if (resigning) {
         await tx.userSession.updateMany({
           where: { userId: employee.userId, isRevoked: false },
           data: { isRevoked: true },
         });
       }
-      if (employee.status === 'RESIGNED' && status && status !== 'RESIGNED') {
-        await tx.user.updateMany({
-          where: { id: employee.userId, status: 'INACTIVE' },
-          data: { status: 'ACTIVE' },
-        });
+
+      if (profile.storeId !== undefined && profile.storeId !== employee.storeId) {
+        if (employee.storeId) {
+          await tx.userStore.deleteMany({
+            where: { userId: employee.userId, storeId: employee.storeId },
+          });
+        }
+        if (profile.storeId) {
+          await tx.userStore.upsert({
+            where: { userId_storeId: { userId: employee.userId, storeId: profile.storeId } },
+            create: { userId: employee.userId, storeId: profile.storeId },
+            update: {},
+          });
+        }
       }
 
-      if (profile.storeId) {
-        await tx.userStore.upsert({
-          where: { userId_storeId: { userId: employee.userId, storeId: profile.storeId } },
-          create: { userId: employee.userId, storeId: profile.storeId },
-          update: {},
+      const oldData: Record<string, unknown> = {};
+      const newData: Record<string, unknown> = {};
+      const track = (key: string, before: unknown, after: unknown) => {
+        if (after === undefined) return;
+        const oldValue = before === null ? null : String(before);
+        const newValue = after === null ? null : String(after);
+        const same =
+          oldValue === newValue ||
+          (oldValue !== null && newValue !== null && Number(oldValue) === Number(newValue));
+        if (!same) {
+          oldData[key] = oldValue;
+          newData[key] = newValue;
+        }
+      };
+      track('storeId', employee.storeId, profile.storeId);
+      track('status', employee.status, status);
+      track('commissionRate', employee.commissionRate, profile.commissionRate);
+      track('salary', employee.salary, profile.salary);
+      if (lockUser) newData.lockedUser = true;
+      if (userData.status === 'ACTIVE') newData.reactivatedUser = true;
+
+      if (Object.keys(newData).length > 0) {
+        await tx.auditLog.create({
+          data: {
+            userId: actorId,
+            action: resigning ? 'EMPLOYEE_RESIGN' : 'EMPLOYEE_UPDATE',
+            entityType: 'employees',
+            entityId: id,
+            oldData: oldData as Prisma.InputJsonValue,
+            newData: newData as Prisma.InputJsonValue,
+          },
         });
       }
     });
     return (await this.findById(id)) as EmployeeView;
+  }
+
+  // Chỉ mở lại khi lần khóa gần nhất là do nghỉ việc, không phải Admin khóa tay sau đó
+  private async wasLockedByResign(
+    tx: Prisma.TransactionClient,
+    employeeId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const rows = await tx.auditLog.findMany({
+      where: {
+        OR: [
+          { entityType: 'employees', entityId: employeeId, action: 'EMPLOYEE_RESIGN' },
+          { entityType: 'users', entityId: userId, action: 'USER_UPDATE' },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { action: true, oldData: true, newData: true },
+    });
+    const last = rows.find((r) => {
+      if (r.action === 'EMPLOYEE_RESIGN') return true;
+      const before = (r.oldData as { status?: string } | null)?.status;
+      const after = (r.newData as { status?: string } | null)?.status;
+      return before !== after;
+    });
+    return (
+      last?.action === 'EMPLOYEE_RESIGN' &&
+      (last.newData as { lockedUser?: boolean } | null)?.lockedUser === true
+    );
   }
 }

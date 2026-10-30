@@ -18,7 +18,7 @@ export class UpdateEmployeeUseCase {
     @Inject(EMPLOYEE_REPOSITORY) private readonly repository: IEmployeeRepository,
   ) {}
 
-  async execute(id: string, input: EmployeePatch): Promise<EmployeeView> {
+  async execute(actorId: string, id: string, input: EmployeePatch): Promise<EmployeeView> {
     const current = await this.repository.findById(id);
     if (!current) throw new NotFoundException('Không tìm thấy nhân viên');
 
@@ -45,6 +45,6 @@ export class UpdateEmployeeUseCase {
       throw new BadRequestException('Trạng thái nhân viên không hợp lệ');
     }
 
-    return this.repository.update(id, patch);
+    return this.repository.update(id, patch, actorId);
   }
 }

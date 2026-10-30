@@ -20,6 +20,8 @@ import { PageOptionsDto } from '@core/common/pagination.dto';
 import { EMPLOYEE_STATUSES } from '../../domain/entities/employee.entity';
 
 const PHONE_MESSAGE = 'Số điện thoại không hợp lệ (10-11 chữ số)';
+// employees.salary là Decimal(12,2)
+const MAX_SALARY = 9_999_999_999.99;
 
 export class GetEmployeesQueryDto extends PageOptionsDto {
   @ApiPropertyOptional({ description: 'Tìm theo mã nhân viên, họ tên hoặc email' })
@@ -96,8 +98,9 @@ export class CreateEmployeeRequestDto {
   @ApiPropertyOptional({ example: 8000000 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(MAX_SALARY, { message: 'Lương vượt quá giới hạn cho phép' })
   salary?: number;
 
   @ApiPropertyOptional({ example: 2, description: 'Phần trăm hoa hồng, 0-100' })
@@ -151,8 +154,9 @@ export class UpdateEmployeeRequestDto {
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
+  @Max(MAX_SALARY, { message: 'Lương vượt quá giới hạn cho phép' })
   salary?: number | null;
 
   @ApiPropertyOptional()

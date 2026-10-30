@@ -33,5 +33,5 @@ export interface IEmployeeRepository {
   storeExists(id: string): Promise<boolean>;
   findPhoneOwner(phone: string): Promise<{ id: string } | null>;
   findMaxEmployeeNumber(): Promise<number>;
-  update(id: string, patch: EmployeePatch): Promise<EmployeeView>;
+  update(id: string, patch: EmployeePatch, actorId: string): Promise<EmployeeView>;
 }

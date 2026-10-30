@@ -86,9 +86,9 @@ export class CreateAdminUserUseCase {
       employee: input.employee,
     });
 
-    let activationEmailSent = true;
+    let activationEmailSent = false;
     try {
-      await this.mailer.sendActivationEmail(email, fullName, rawToken);
+      activationEmailSent = await this.mailer.sendActivationEmail(email, fullName, rawToken);
     } catch (error) {
       activationEmailSent = false;
       this.logger.error(`Không gửi được email kích hoạt cho ${email}: ${(error as Error).message}`);
