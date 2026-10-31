@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { webOrigin } from '@core/config/runtime-config';
@@ -15,7 +19,7 @@ export const xmlEscape = (value: string) =>
         "'": '&apos;',
       })[x]!,
   );
-const sources = ['products', 'categories', 'blog', 'pages'] as const;
+const sources = ['products', 'categories', 'brands', 'blog', 'pages'] as const;
 type Source = (typeof sources)[number];
 const size = 1000;
 const reserved = new Set([
@@ -40,7 +44,8 @@ export class SeoService {
   ) {}
   private get origin() {
     const value = this.config.get<string>('PUBLIC_WEB_URL');
-    if (!value) throw new ServiceUnavailableException('PUBLIC_WEB_URL_REQUIRED');
+    if (!value)
+      throw new ServiceUnavailableException('PUBLIC_WEB_URL_REQUIRED');
     return webOrigin(value, this.config.get('NODE_ENV') === 'production');
   }
   private productWhere() {
@@ -55,8 +60,13 @@ export class SeoService {
     return { isPublished: true, slug: { notIn: ['.', '..', ...reserved] } };
   }
   private count(source: Source) {
-    if (source === 'products') return this.db.product.count({ where: this.productWhere() });
+    if (source === 'products')
+      return this.db.product.count({ where: this.productWhere() });
     if (source === 'categories') return this.categoryCount();
+    if (source === 'brands')
+      return this.db.brand.count({
+        where: { isActive: true, products: { some: this.productWhere() } },
+      });
     if (source === 'blog')
       return this.db.blogPost.count({
         where: { status: 'PUBLISHED', publishedAt: { lte: new Date() } },
@@ -80,6 +90,12 @@ export class SeoService {
         select,
       });
     if (source === 'categories') return this.categoryRows(page);
+    if (source === 'brands')
+      return this.db.brand.findMany({
+        ...pagination,
+        where: { isActive: true, products: { some: this.productWhere() } },
+        select,
+      });
     if (source === 'blog')
       return this.db.blogPost.findMany({
         ...pagination,
@@ -93,23 +109,32 @@ export class SeoService {
     });
   }
   private async categoryCount() {
-    const rows = await this.db.$queryRaw<{ total: bigint }[]>`WITH RECURSIVE visible AS (
+    const rows = await this.db.$queryRaw<
+      { total: bigint }[]
+    >`WITH RECURSIVE visible AS (
       SELECT id FROM categories WHERE parent_id IS NULL AND is_active
       UNION ALL SELECT c.id FROM categories c JOIN visible parent ON c.parent_id=parent.id WHERE c.is_active)
       SELECT count(*) AS total FROM visible`;
     return Number(rows[0].total);
   }
   private categoryRows(page: number) {
-    return this.db.$queryRaw<{ slug: string; updatedAt: Date }[]>`WITH RECURSIVE visible AS (
+    return this.db.$queryRaw<
+      { slug: string; updatedAt: Date }[]
+    >`WITH RECURSIVE visible AS (
       SELECT id,slug,updated_at FROM categories WHERE parent_id IS NULL AND is_active
       UNION ALL SELECT c.id,c.slug,c.updated_at FROM categories c JOIN visible parent ON c.parent_id=parent.id WHERE c.is_active)
       SELECT slug,updated_at AS "updatedAt" FROM visible ORDER BY id LIMIT ${size} OFFSET ${(page - 1) * size}`;
   }
   async index() {
     const origin = this.origin;
-    const counts = await Promise.all(sources.map((source) => this.count(source)));
+    const counts = await Promise.all(
+      sources.map((source) => this.count(source)),
+    );
     const entries: string[] = [];
-    if (counts.reduce((total, count) => total + Math.ceil(count / size), 0) > 50000)
+    if (
+      counts.reduce((total, count) => total + Math.ceil(count / size), 0) >
+      50000
+    )
       throw new ServiceUnavailableException('SITEMAP_INDEX_LIMIT_EXCEEDED');
     sources.forEach((source, i) => {
       for (let page = 1; page <= Math.ceil(counts[i] / size); page++)
@@ -138,11 +163,14 @@ export class SeoService {
           !['.', '..'].includes(row.slug) &&
           (kind !== 'pages' || !reserved.has(row.slug.toLowerCase())),
       )
-      .map((row: { slug: string; updatedAt?: Date; contentUpdatedAt?: Date }) => {
-        const prefix = kind === 'pages' ? '' : kind === 'blog' ? '/blog' : `/${kind}`;
-        const loc = `${origin}${prefix}/${encodeURIComponent(row.slug)}`;
-        return `<url><loc>${xmlEscape(loc)}</loc><lastmod>${(row.contentUpdatedAt ?? row.updatedAt)!.toISOString()}</lastmod></url>`;
-      });
+      .map(
+        (row: { slug: string; updatedAt?: Date; contentUpdatedAt?: Date }) => {
+          const prefix =
+            kind === 'pages' ? '' : kind === 'blog' ? '/blog' : `/${kind}`;
+          const loc = `${origin}${prefix}/${encodeURIComponent(row.slug)}`;
+          return `<url><loc>${xmlEscape(loc)}</loc><lastmod>${(row.contentUpdatedAt ?? row.updatedAt)!.toISOString()}</lastmod></url>`;
+        },
+      );
     return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`;
   }
   robots() {

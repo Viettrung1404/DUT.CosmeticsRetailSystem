@@ -48,7 +48,13 @@ export interface IOrderRepository {
 
   findCustomerOrders(
     customerId: string,
-    options: { page: number; limit: number; status?: string },
+    options: {
+      page: number;
+      limit: number;
+      status?: string;
+      search?: string;
+      year?: number;
+    },
   ): Promise<{ orders: OrderEntity[]; total: number }>;
 
   cancelOrderWithTransaction(

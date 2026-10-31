@@ -7,6 +7,7 @@ import { userSchema } from "./contracts";
 import { createRedisStore, opaqueId, validId } from "./store";
 
 export const guestCookie = "glowup-guest-cart";
+export const guestCheckoutCookie = "glowup-guest-checkout";
 interface GuestCart {
   backendSession: string;
   expiresAt: number;
@@ -24,10 +25,38 @@ export async function guestCartSession(create = false): Promise<string | null> {
     return existing.backendSession;
   if (!create) return null;
   const id = opaqueId();
-  const value: GuestCart = { backendSession: randomUUID(), expiresAt: Date.now() + 604800000 };
+  const checkoutReference = jar.get(guestCheckoutCookie)?.value;
+  const checkout = validId(checkoutReference)
+    ? await store.get<GuestCart>(checkoutReference)
+    : null;
+  const value: GuestCart = {
+    backendSession:
+      checkout && checkout.expiresAt > Date.now() ? checkout.backendSession : randomUUID(),
+    expiresAt: Date.now() + 604800000,
+  };
   await store.create(id, value, value.expiresAt);
   jar.set(guestCookie, id, { ...cookieOptions(), expires: new Date(value.expiresAt) });
   return value.backendSession;
+}
+export async function guestCheckoutSession(create = false): Promise<string | null> {
+  const jar = await cookies();
+  const reference = jar.get(guestCheckoutCookie)?.value;
+  const store = createRedisStore();
+  const existing = validId(reference) ? await store.get<GuestCart>(reference) : null;
+  if (
+    existing &&
+    existing.expiresAt > Date.now() &&
+    z.uuid().safeParse(existing.backendSession).success
+  )
+    return existing.backendSession;
+  if (!create) return null;
+  const backendSession = await guestCartSession(true);
+  if (!backendSession) return null;
+  const id = opaqueId();
+  const value: GuestCart = { backendSession, expiresAt: Date.now() + 604800000 };
+  await store.create(id, value, value.expiresAt);
+  jar.set(guestCheckoutCookie, id, { ...cookieOptions(), expires: new Date(value.expiresAt) });
+  return backendSession;
 }
 export async function mergeGuestCart(id: string): Promise<"none" | "merged" | "pending"> {
   const jar = await cookies();

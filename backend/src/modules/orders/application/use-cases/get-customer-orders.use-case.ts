@@ -10,6 +10,8 @@ export interface GetCustomerOrdersInput {
   page?: number;
   limit?: number;
   status?: string;
+  search?: string;
+  year?: number;
 }
 
 export interface GetCustomerOrdersResult {
@@ -27,7 +29,9 @@ export class GetCustomerOrdersUseCase {
     private readonly orderRepo: IOrderRepository,
   ) {}
 
-  async execute(input: GetCustomerOrdersInput): Promise<GetCustomerOrdersResult> {
+  async execute(
+    input: GetCustomerOrdersInput,
+  ): Promise<GetCustomerOrdersResult> {
     const { customerId, page = 1, limit = 10, status } = input;
 
     const { orders, total } = await this.orderRepo.findCustomerOrders(
@@ -36,6 +40,8 @@ export class GetCustomerOrdersUseCase {
         page,
         limit,
         status,
+        ...(input.search ? { search: input.search } : {}),
+        ...(input.year ? { year: input.year } : {}),
       },
     );
 

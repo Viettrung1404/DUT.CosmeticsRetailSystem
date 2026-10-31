@@ -1,3 +1,4 @@
+import { publicUrl } from '@modules/customer-experience/domain/public-content';
 import { validatePaymentAmount } from '@modules/payments/domain/payment-policy';
 import { assertGatewayReady } from '@modules/payments/domain/gateway-readiness';
 import {
@@ -96,7 +97,10 @@ export class PrismaOrderRepository implements IOrderRepository {
                 ...coupon,
                 discountValue: Number(coupon.discountValue),
                 minOrderAmount: Number(coupon.minOrderAmount),
-                maxDiscountAmount: coupon.maxDiscountAmount === null ? null : Number(coupon.maxDiscountAmount),
+                maxDiscountAmount:
+                  coupon.maxDiscountAmount === null
+                    ? null
+                    : Number(coupon.maxDiscountAmount),
                 discountType:
                   coupon.discountType === 'FIXED'
                     ? 'FIXED_AMOUNT'
@@ -278,7 +282,26 @@ export class PrismaOrderRepository implements IOrderRepository {
 
         const fullOrder = await tx.order.findUnique({
           where: { id: order.id },
-          include: { items: true, payments: true },
+          include: {
+            items: {
+              include: {
+                variant: {
+                  select: {
+                    product: {
+                      select: {
+                        images: {
+                          orderBy: { sortOrder: 'asc' },
+                          take: 1,
+                          select: { imageUrl: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            payments: true,
+          },
         });
 
         return this.mapToEntity(fullOrder!);
@@ -290,7 +313,26 @@ export class PrismaOrderRepository implements IOrderRepository {
   async findById(id: string): Promise<OrderEntity | null> {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: true, payments: true },
+      include: {
+        items: {
+          include: {
+            variant: {
+              select: {
+                product: {
+                  select: {
+                    images: {
+                      orderBy: { sortOrder: 'asc' },
+                      take: 1,
+                      select: { imageUrl: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: true,
+      },
     });
 
     return order ? this.mapToEntity(order) : null;
@@ -299,7 +341,26 @@ export class PrismaOrderRepository implements IOrderRepository {
   async findByOrderNumber(orderNumber: string): Promise<OrderEntity | null> {
     const order = await this.prisma.order.findUnique({
       where: { orderNumber },
-      include: { items: true, payments: true },
+      include: {
+        items: {
+          include: {
+            variant: {
+              select: {
+                product: {
+                  select: {
+                    images: {
+                      orderBy: { sortOrder: 'asc' },
+                      take: 1,
+                      select: { imageUrl: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        payments: true,
+      },
     });
 
     return order ? this.mapToEntity(order) : null;
@@ -307,12 +368,31 @@ export class PrismaOrderRepository implements IOrderRepository {
 
   async findCustomerOrders(
     customerId: string,
-    options: { page: number; limit: number; status?: string },
+    options: {
+      page: number;
+      limit: number;
+      status?: string;
+      search?: string;
+      year?: number;
+    },
   ): Promise<{ orders: OrderEntity[]; total: number }> {
     const { page, limit, status } = options;
     const skip = (page - 1) * limit;
 
     const where: any = { customerId };
+    if (options.search?.trim()) {
+      const contains = options.search.trim();
+      where.OR = [
+        { orderNumber: { contains, mode: 'insensitive' } },
+        { items: { some: { productName: { contains, mode: 'insensitive' } } } },
+      ];
+    }
+    if (options.year) {
+      where.createdAt = {
+        gte: new Date(`${options.year}-01-01T00:00:00+07:00`),
+        lt: new Date(`${options.year + 1}-01-01T00:00:00+07:00`),
+      };
+    }
     if (status) {
       where.status = status;
     }
@@ -323,7 +403,26 @@ export class PrismaOrderRepository implements IOrderRepository {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { items: true, payments: true },
+        include: {
+          items: {
+            include: {
+              variant: {
+                select: {
+                  product: {
+                    select: {
+                      images: {
+                        orderBy: { sortOrder: 'asc' },
+                        take: 1,
+                        select: { imageUrl: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          payments: true,
+        },
       }),
       this.prisma.order.count({ where }),
     ]);
@@ -474,7 +573,26 @@ export class PrismaOrderRepository implements IOrderRepository {
       const updatedOrder = await tx.order.update({
         where: { id: existingRow.id },
         data: { status: OrderStatus.CANCELLED },
-        include: { items: true, payments: true },
+        include: {
+          items: {
+            include: {
+              variant: {
+                select: {
+                  product: {
+                    select: {
+                      images: {
+                        orderBy: { sortOrder: 'asc' },
+                        take: 1,
+                        select: { imageUrl: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          payments: true,
+        },
       });
 
       await notifyCustomer(
@@ -591,6 +709,9 @@ export class PrismaOrderRepository implements IOrderRepository {
             orderId: i.orderId,
             productVariantId: i.productVariantId,
             productName: i.productName,
+            thumbnailUrl: publicUrl(
+              i.variant?.product?.images?.[0]?.imageUrl ?? null,
+            ),
             variantName: i.variantName,
             quantity: i.quantity,
             unitPrice: Number(i.unitPrice),
@@ -599,7 +720,11 @@ export class PrismaOrderRepository implements IOrderRepository {
             createdAt: i.createdAt,
           }),
       ),
-      payments: row.payments,
+      payments: row.payments?.map((p: any) => ({
+        id: p.id,
+        paymentMethod: p.paymentMethod,
+        status: p.status,
+      })),
     });
   }
 }

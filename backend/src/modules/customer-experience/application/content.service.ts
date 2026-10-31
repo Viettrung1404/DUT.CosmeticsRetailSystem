@@ -3,6 +3,7 @@ import { VersionedPublicCacheService } from '@core/cache/versioned-public-cache.
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { BlogQueryDto } from '../presentation/experience.dto';
 import { publicHtml, publicUrl } from '../domain/public-content';
+import { UpstashRedisService } from '@core/cache/upstash-redis.service';
 
 const blogSelect = {
   id: true,
@@ -22,10 +23,13 @@ export class ContentService {
   constructor(
     private readonly db: PrismaService,
     @Optional() private readonly cache?: VersionedPublicCacheService,
+    @Optional() private readonly redis?: UpstashRedisService,
   ) {}
   async page(slug: string) {
     return this.cache
-      ? this.cache.remember(`page:${encodeURIComponent(slug)}`, () => this.loadPage(slug))
+      ? this.cache.remember(`page:${encodeURIComponent(slug)}`, () =>
+          this.loadPage(slug),
+        )
       : this.loadPage(slug);
   }
   private async loadPage(slug: string) {
@@ -71,23 +75,40 @@ export class ContentService {
     };
   }
   async post(slug: string) {
-    return this.db.$transaction(async (tx) => {
-      const result = await tx.blogPost.updateMany({
-        where: { slug, status: 'PUBLISHED', publishedAt: { lte: new Date() } },
+    const row = await this.db.blogPost.findFirst({
+      where: { slug, status: 'PUBLISHED', publishedAt: { lte: new Date() } },
+      select: {
+        ...blogSelect,
+        content: true,
+        metaTitle: true,
+        metaDescription: true,
+      },
+    });
+    if (!row) throw new NotFoundException('POST_NOT_FOUND');
+    return {
+      ...row,
+      featuredImage: publicUrl(row.featuredImage),
+      excerpt: row.excerpt ? publicHtml(row.excerpt) : null,
+      content: publicHtml(row.content),
+    };
+  }
+  async recordView(slug: string, identity: string) {
+    const post = await this.db.blogPost.findFirst({
+      where: { slug, status: 'PUBLISHED', publishedAt: { lte: new Date() } },
+      select: { id: true },
+    });
+    if (!post) throw new NotFoundException('POST_NOT_FOUND');
+    if (!this.redis?.configured) return;
+    const first = await this.redis.rateLimit(
+      `blog:view:${post.id}:${identity}`,
+      1,
+      86400000,
+    );
+    if (first)
+      await this.db.blogPost.update({
+        where: { id: post.id },
         data: { viewsCount: { increment: 1 } },
       });
-      if (!result.count) throw new NotFoundException('POST_NOT_FOUND');
-      const row = await tx.blogPost.findUniqueOrThrow({
-        where: { slug },
-        select: { ...blogSelect, content: true },
-      });
-      return {
-        ...row,
-        featuredImage: publicUrl(row.featuredImage),
-        excerpt: row.excerpt ? publicHtml(row.excerpt) : null,
-        content: publicHtml(row.content),
-      };
-    });
   }
   categories() {
     return this.db.blogCategory.findMany({
@@ -102,7 +123,9 @@ export class ContentService {
     });
   }
   async faqs() {
-    return this.cache ? this.cache.remember('faqs', () => this.loadFaqs()) : this.loadFaqs();
+    return this.cache
+      ? this.cache.remember('faqs', () => this.loadFaqs())
+      : this.loadFaqs();
   }
   private async loadFaqs() {
     const rows = await this.db.faq.findMany({
@@ -111,7 +134,10 @@ export class ContentService {
       take: 200,
       select: { id: true, question: true, answer: true, category: true },
     });
-    const groups = new Map<string, { id: string; question: string; answer: string }[]>();
+    const groups = new Map<
+      string,
+      { id: string; question: string; answer: string }[]
+    >();
     for (const row of rows) {
       const category = row.category ?? 'Chung';
       const items = groups.get(category) ?? [];

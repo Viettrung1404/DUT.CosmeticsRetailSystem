@@ -19,6 +19,7 @@ const schema = z.object({
     .refine((value) => new URL(value).pathname === "/", "SITE_URL must be an origin"),
   BACKEND_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(5000),
   FE_DIAGNOSTICS: z.enum(["true", "false"]).default("false"),
+  SEO_INDEXING_ENABLED: z.enum(["true", "false"]).default("false"),
 });
 
 export function getServerEnv() {
@@ -28,6 +29,7 @@ export function getServerEnv() {
     SITE_URL: process.env.SITE_URL,
     BACKEND_TIMEOUT_MS: process.env.BACKEND_TIMEOUT_MS,
     FE_DIAGNOSTICS: process.env.FE_DIAGNOSTICS,
+    SEO_INDEXING_ENABLED: process.env.SEO_INDEXING_ENABLED,
   });
   if (!result.success) throw new Error("Invalid frontend server configuration");
   return result.data;

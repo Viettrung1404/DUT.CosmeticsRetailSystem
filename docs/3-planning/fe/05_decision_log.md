@@ -102,3 +102,12 @@ Chi tiết: [ADR session](../../../frontend/docs/adr/001-session-refresh.md), [A
 - Bổ sung Google Identity Services và Facebook JS SDK ở login/register. Chỉ public client/app ID được truyền ra browser; Facebook secret ở backend. BFF và UI dùng chung kiểm tra cấu hình `OAUTH_*_ENABLED`; bật tính năng không đồng nghĩa đã nghiệm thu provider thật.
 - Callback gửi Google ID token/Facebook access token về BFF; session opaque, challenge/nonce, email proof và login tài khoản đích giữ nguyên. Chưa cấu hình thì provider hiện chưa khả dụng, lỗi SDK/provider không chặn login email.
 - Test fixture kiểm tra SDK callback → BFF → Upstash → backend fixture, đăng nhập trực tiếp, proof, linking, hủy và lỗi SDK. Nghiệm thu tài khoản/consent/SMTP thật vẫn thuộc ENV-01.
+
+## 10. Sửa FE-03–06 theo HTML và cho phép guest checkout — 29/10/2026
+
+- Người dùng yêu cầu sửa cả FE-03, FE-04, FE-05 cùng FE-06; cart được nêu rõ là màn còn khác thiết kế. Chuẩn vẫn là từng `code.html`, với các thành phần chung S11/S29/S39 theo quyết định trước.
+- Guest được thêm giỏ và đặt hàng không cần đăng nhập. Backend trước lượt sửa có guest cart nhưng tạo đơn yêu cầu customer; đã bổ sung báo giá/tạo đơn/đọc đơn/thanh toán VNPAY theo phiên guest. Không tạo customer giả. Điểm và mã ưu đãi dành cho tài khoản vẫn theo quyền backend.
+- Người dùng cho phép bổ sung API còn thiếu trong backend. Bổ sung tìm đơn theo mã/tên sản phẩm và năm để thanh tìm kiếm trong S23 hoạt động thật.
+- Người dùng xác nhận chưa có danh sách showroom thật: giữ trạng thái chờ nội dung, không công khai địa chỉ seed.
+- Không lấy banner đã có chữ làm nền rồi chồng lại cùng nội dung. Home dùng ảnh nguồn Stitch và một lớp chữ HTML.
+- Kết quả, bằng chứng và các khác biệt nghiệp vụ được ghi ở [bảng sửa UI FE-03–06](../../../frontend/docs/fe-03-06-design-review.md). Build/test không thay thế duyệt thiết kế cuối cùng hay nghiệm thu VNPAY với provider.

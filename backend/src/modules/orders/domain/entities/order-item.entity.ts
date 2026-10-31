@@ -1,4 +1,5 @@
 export class OrderItemEntity {
+  thumbnailUrl?: string | null;
   id: string;
   orderId: string;
   productVariantId: string;

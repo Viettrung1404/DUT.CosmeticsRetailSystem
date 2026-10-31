@@ -52,6 +52,7 @@ export const orderDetailSchema = orderSchema.extend({
   items: z.array(
     z.object({
       id: z.uuid(),
+      thumbnailUrl: z.string().nullable().optional(),
       productName: z.string(),
       variantName: z.string(),
       quantity: z.number(),

@@ -1,5 +1,16 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiPropertyOptional,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Public } from '@core/decorators/public.decorator';
@@ -8,7 +19,11 @@ import { publicUrl } from '../domain/public-content';
 
 class PublicBrandQueryDto {
   @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 8 })
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit = 8;
 }
 
@@ -19,15 +34,64 @@ export class BrandController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Danh sách thương hiệu đang hiển thị trên cửa hàng' })
-  @ApiOkResponse({ description: 'Thương hiệu công khai, ưu tiên thương hiệu nổi bật' })
+  @ApiOperation({
+    summary: 'Danh sách thương hiệu đang hiển thị trên cửa hàng',
+  })
+  @ApiOkResponse({
+    description: 'Thương hiệu công khai, ưu tiên thương hiệu nổi bật',
+  })
   async list(@Query() query: PublicBrandQueryDto) {
     const rows = await this.db.brand.findMany({
-      where: { isActive: true, products: { some: { isActive: true, category: { isActive: true }, variants: { some: { isActive: true } } } } },
+      where: {
+        isActive: true,
+        products: {
+          some: {
+            isActive: true,
+            category: { isActive: true },
+            variants: { some: { isActive: true } },
+          },
+        },
+      },
       orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
       take: query.limit,
       select: { id: true, name: true, slug: true, logoUrl: true },
     });
     return rows.map((row) => ({ ...row, logoUrl: publicUrl(row.logoUrl) }));
+  }
+
+  @Public()
+  @Get(':slug')
+  @ApiOperation({ summary: 'Chi tiết thương hiệu đang hiển thị' })
+  async detail(@Param('slug') slug: string) {
+    const row = await this.db.brand.findFirst({
+      where: {
+        slug,
+        isActive: true,
+        products: {
+          some: {
+            isActive: true,
+            category: { isActive: true },
+            variants: { some: { isActive: true } },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        bannerUrl: true,
+        description: true,
+        countryOfOrigin: true,
+        metaTitle: true,
+        metaDescription: true,
+      },
+    });
+    if (!row) throw new NotFoundException('BRAND_NOT_FOUND');
+    return {
+      ...row,
+      logoUrl: publicUrl(row.logoUrl),
+      bannerUrl: publicUrl(row.bannerUrl),
+    };
   }
 }

@@ -4,6 +4,8 @@ Ngày cập nhật: **28/10/2026**. Trạng thái: **đã triển khai FE-00 và
 
 ## 1. Phạm vi và quyết định đã chốt
 
+**Cập nhật triển khai 29/10:** FE-02–06 đã có code trong `frontend/`; đang rà lại FE-03–06 theo HTML sau phản hồi của người dùng, chưa đồng nghĩa nghiệm thu cuối. Guest cart/checkout không yêu cầu đăng nhập; API thiếu được phép bổ sung theo yêu cầu triển khai. Xem [bảng sửa UI](../../../frontend/docs/fe-03-06-design-review.md) và [gate FE-06/07](../../../frontend/docs/fe-06-07-checklist.md). Dòng trạng thái ngày 28/10 ở trên là mốc lịch sử trước lượt triển khai này.
+
 - Làm website cho Guest/Customer bằng Next.js App Router; không bao gồm Admin, POS hoặc Mobile.
 - Dựng đầy đủ các trang và tương tác trong `docs/4-stitch_design` (tên thư mục thực tế).
 - **Navbar/header trong `code.html` trang Danh mục chăm sóc da là chuẩn layout chung**, theo [HTML hiện tại](../../4-stitch_design/danh_m_c_ch_m_s_c_da_glowup/code.html) và ảnh navbar mới người dùng gửi ngày 28/10/2026. Áp dụng trang chủ, checkout và account; auth không có header/footer theo D11; active state theo route thực. **Mọi màn lấy `code.html` làm chuẩn; `screen.png` đã cũ.** Lỗi toàn ứng dụng có thể dùng shell tối giản để vẫn phục hồi được khi layout hỏng.

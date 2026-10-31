@@ -3,6 +3,8 @@ import { CustomerExperienceModule } from '@modules/customer-experience/customer-
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { CommerceCheckoutService } from './application/services/commerce-checkout.service';
 import { CustomerOrderController } from './presentation/controllers/order-customer.controller';
+import { GuestCheckoutController } from './presentation/controllers/guest-checkout.controller';
+import { PaymentsModule } from '@modules/payments/payments.module';
 import { ORDER_REPOSITORY } from './domain/repositories/order.repository.interface';
 import { PrismaOrderRepository } from './infrastructure/repositories/prisma-order.repository';
 import { VARIANT_CATALOG_PROVIDER } from './application/ports/variant-catalog.provider';
@@ -31,8 +33,18 @@ import { UpdateAdminOrderStatusUseCase } from './application/use-cases/update-ad
 import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-order.use-case';
 
 @Module({
-  imports: [CartModule, PermissionsModule, CustomerExperienceModule, CustomerCommerceModule],
-  controllers: [CustomerOrderController, OrderAdminController],
+  imports: [
+    CartModule,
+    PermissionsModule,
+    CustomerExperienceModule,
+    CustomerCommerceModule,
+    PaymentsModule,
+  ],
+  controllers: [
+    CustomerOrderController,
+    OrderAdminController,
+    GuestCheckoutController,
+  ],
   providers: [
     CommerceCheckoutService,
     CustomerContextService,
@@ -71,10 +83,6 @@ import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-or
     UpdateAdminOrderStatusUseCase,
     CancelAdminOrderUseCase,
   ],
-  exports: [
-    ORDER_REPOSITORY,
-    PreviewOrderUseCase,
-    CreateOrderUseCase,
-  ],
+  exports: [ORDER_REPOSITORY, PreviewOrderUseCase, CreateOrderUseCase],
 })
 export class OrdersModule {}

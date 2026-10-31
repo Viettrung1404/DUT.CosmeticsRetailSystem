@@ -19,6 +19,14 @@ export async function GET(request: Request) {
       throw new ApiError(400, "INVALID_STATUS");
     const query = new URLSearchParams({ page: String(page), limit: "10" });
     if (status) query.set("status", status);
+    const search = z
+      .string()
+      .trim()
+      .max(100)
+      .parse(url.searchParams.get("search") ?? "");
+    const year = url.searchParams.get("year");
+    if (search) query.set("search", search);
+    if (year) query.set("year", String(z.coerce.number().int().min(2000).max(2100).parse(year)));
     return json(
       await authRuntime().broker.read(await sessionId(), (token) =>
         upstream(`/customers/me/orders?${query}`, ordersSchema, undefined, token),

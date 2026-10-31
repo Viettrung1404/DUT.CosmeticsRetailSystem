@@ -61,7 +61,11 @@ Build tải font qua next/font; cần network đến Google Fonts ở build time
 - [Backlog BE review](docs/backend-review.md)
 - [Kế hoạch toàn bộ frontend](../docs/3-planning/fe/README.md)
 
-Mặc định noindex; chưa có sitemap/robots proxy production. Trước public release cần origin/callback, image hosts, nội dung chính thức, session infra, provider tests và FE-07 gate. Deploy rollback dùng artifact/lockfile phiên bản trước; thay schema/migrations do backend quản lý.
+Mặc định noindex; sitemap/robots proxy được khóa bằng `SEO_INDEXING_ENABLED=false`. Trước public release cần origin/callback, image hosts, nội dung chính thức, session infra, provider tests và FE-07 gate. Deploy rollback dùng artifact/lockfile phiên bản trước; thay schema/migrations do backend quản lý.
+
+FE-06/07: xem [checklist nghiệm thu](docs/fe-06-07-checklist.md). `SEO_INDEXING_ENABLED=false` mặc định; sitemap/robots chỉ mở khi cả frontend và backend bật indexing với cùng website origin. Store directory backend mặc định ẩn vì seed hiện là dữ liệu demo; chỉ bật `PUBLIC_STORE_DIRECTORY_ENABLED=true` sau khi có danh sách showroom được duyệt.
+
+Lượt sửa FE-03–06 theo `code.html`: xem [bảng đối chiếu](docs/fe-03-06-design-review.md). Guest có thể thêm giỏ và đặt hàng COD/VNPAY mà không đăng nhập; đơn và thanh toán guest được bảo vệ theo phiên trình duyệt, mã ưu đãi/điểm thành viên vẫn theo quyền backend. `node scripts/create-stitch-report.mjs` tạo trang đối chiếu từ ảnh local sau khi chạy các script review.
 
 `MAINTENANCE_MODE=true` trả 503 cho site/BFF và `Retry-After`; `/maintenance` luôn trả 503. Restart server sau khi đổi cờ. Lỗi backend thông thường dùng error boundary và nút thử lại, không tự bật bảo trì. OAuth continuation giữ challenge/nonce trong store có TTL; login/register có Google Identity Services/Facebook JS SDK, callback qua BFF. Bật tính năng không đồng nghĩa đã nghiệm thu provider thật; xem cấu hình bên dưới.
 

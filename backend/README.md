@@ -118,3 +118,11 @@ Xuất SQL đầy đủ cấu trúc database đang kết nối vào `prisma/sche
 bao gồm function, trigger và các ràng buộc viết tay.
 Xem [hướng dẫn xuất schema](docs/database-schema-export.md) để đổi đường dẫn,
 chọn chế độ portable và cấu hình `pg_dump`/Docker.
+
+## Guest checkout cho web
+
+API `/api/v1/guest/orders/preview`, `/guest/orders`, `/guest/orders/:id`, `/guest/payments/vnpay`, `/guest/payments/:id/status` dùng header bí mật `x-session-id` (UUID v4). Tạo đơn cần `Idempotency-Key`; cùng phiên/key/payload trả cùng đơn, đổi payload trả conflict. Guest dùng cùng quy tắc giá/tồn/khuyến mãi trực tiếp và COD/VNPAY; điểm và mã quyền lợi tài khoản cần đăng nhập. Không tạo customer giả.
+
+BFF giữ secret trong Redis và chỉ đưa cookie opaque HttpOnly ra trình duyệt. Không đưa session secret vào URL hay link chia sẻ. Đọc đơn/thanh toán luôn ràng buộc hash phiên; response không trả pricing snapshot, giá vốn hoặc dữ liệu gateway riêng. Phiên guest web có hạn 7 ngày; receipt mở lại trong trình duyệt đã đặt hàng.
+
+Lịch sử đơn customer hỗ trợ `search` (mã đơn/tên sản phẩm, tối đa 100 ký tự) và `year` (2000–2100), luôn giữ điều kiện ownership customer ở cả danh sách và tổng số.

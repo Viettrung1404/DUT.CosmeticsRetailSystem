@@ -252,9 +252,6 @@ export function SiteHeader() {
           </button>
         </div>
         <CartContents compact onNavigate={() => cartDialog.current?.close()} />
-        <Link href="/cart" onClick={() => cartDialog.current?.close()}>
-          Xem giỏ hàng đầy đủ
-        </Link>
       </dialog>
     </>
   );
@@ -268,6 +265,7 @@ const footerGroups = [
       ["Chăm sóc da toàn diện", "/categories/cham-soc-da"],
       ["Trang điểm & Mỹ phẩm", "/categories/trang-diem"],
       ["Săn deal Flash Sale", "/flash-sale"],
+      ["Chương trình khuyến mãi", "/promotions"],
       ["Thương hiệu được yêu thích", "/brands"],
     ],
   },
@@ -278,6 +276,7 @@ const footerGroups = [
       ["Câu hỏi thường gặp (FAQ)", "/faq"],
       ["Tra cứu tình trạng đơn hàng", "/account/orders"],
       ["Trung tâm hỗ trợ", "/help"],
+      ["Chính sách đổi trả", "/chinh-sach-doi-tra"],
     ],
   },
   {

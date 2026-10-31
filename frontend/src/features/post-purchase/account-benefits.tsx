@@ -1,5 +1,20 @@
 "use client";
 import Link from "next/link";
+import {
+  Heart,
+  ShoppingBag,
+  Gem,
+  Gift,
+  Sparkles,
+  Coins,
+  Bell,
+  Package,
+  ShieldCheck,
+  Ticket,
+  Check,
+} from "lucide-react";
+import { AccountHeading } from "@/features/account/account-ui";
+import { ContentEmpty } from "@/features/catalog/content-layout";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
@@ -68,31 +83,48 @@ export function WishlistPage() {
     }
   }
   return (
-    <section className="panel">
-      <h1>Sản phẩm yêu thích</h1>
+    <section className="account-screen">
+      <AccountHeading
+        title="Sản phẩm yêu thích"
+        description="Lưu giữ những sản phẩm bạn yêu thích và chọn mua khi sẵn sàng."
+        actions={
+          query.data ? <span className="order-status">{query.data.total} sản phẩm</span> : undefined
+        }
+      />
       {query.isPending ? (
         <p role="status">Đang tải…</p>
       ) : query.isError ? (
-        <p role="alert">
+        <div className="account-surface" role="alert">
           Không tải được danh sách. <button onClick={() => query.refetch()}>Thử lại</button>
-        </p>
+        </div>
       ) : query.data.items.length ? (
         <>
-          <div className="benefit-cards">
+          <div className="wishlist-grid">
             {query.data.items.map((product) => (
-              <article key={product.id}>
-                <Link href={`/products/${product.slug}`}>
-                  <CatalogImage src={product.primaryImage ?? undefined} alt={product.name} />
-                  <h2>{product.name}</h2>
+              <article key={product.id} className="wishlist-card">
+                <Link className="wishlist-image" href={`/products/${product.slug}`}>
+                  <CatalogImage src={product.primaryImage} alt={product.name} />
                 </Link>
-                <p>
-                  {formatPrice(product.effectivePrice ?? product.salePrice ?? product.basePrice)}
-                </p>
-                <div className="account-links">
-                  <Link href={`/products/${product.slug}`}>Chọn phiên bản để mua</Link>
-                  <button disabled={!!busy} onClick={() => void remove(product.id)}>
-                    Bỏ yêu thích
-                  </button>
+                <button
+                  className="wishlist-remove"
+                  aria-label={`Bỏ yêu thích ${product.name}`}
+                  disabled={!!busy}
+                  onClick={() => void remove(product.id)}
+                >
+                  <Heart size={17} fill="currentColor" />
+                </button>
+                <div className="wishlist-copy">
+                  <p className="catalog-brand">{product.brandName || "GLOWUP"}</p>
+                  <Link href={`/products/${product.slug}`}>
+                    <h2>{product.name}</h2>
+                  </Link>
+                  <p>
+                    {formatPrice(product.effectivePrice ?? product.salePrice ?? product.basePrice)}
+                  </p>
+                  <Link href={`/products/${product.slug}`}>
+                    <ShoppingBag size={15} />
+                    Chọn phiên bản để mua
+                  </Link>
                 </div>
               </article>
             ))}
@@ -100,7 +132,9 @@ export function WishlistPage() {
           <Pager page={page} total={query.data.total} route="/account/wishlist" />
         </>
       ) : (
-        <p>Chưa có sản phẩm yêu thích.</p>
+        <ContentEmpty title="Danh sách yêu thích đang trống">
+          Lưu sản phẩm bạn thích để dễ dàng tìm lại trong lần mua tiếp theo.
+        </ContentEmpty>
       )}
       {error && <p role="alert">{error}</p>}
     </section>
@@ -121,45 +155,93 @@ export function LoyaltyPage() {
       </p>
     );
   const data = query.data;
+  const remaining = data.nextTier ? Math.max(0, data.nextTier.minPoints - data.balance) : 0;
   return (
-    <section className="panel">
-      <h1>Điểm thưởng</h1>
-      <div className="account-stat-grid">
-        <div>
-          <strong>{data.balance}</strong>
-          <span>Điểm hiện có</span>
-        </div>
-        <div>
-          <strong>{data.tier?.name ?? "—"}</strong>
-          <span>Hạng hiện tại</span>
-        </div>
-        <div>
-          <strong>{data.nextTier?.name ?? "—"}</strong>
-          <span>Hạng tiếp theo</span>
-        </div>
+    <section className="account-screen">
+      <AccountHeading
+        title="Điểm thưởng & Hạng thành viên"
+        description="Theo dõi số dư điểm và quyền lợi thành viên GlowUp của bạn."
+      />
+      <div className="loyalty-hero">
+        <section className="loyalty-membership">
+          <Gem size={30} />
+          <h2>GlowUp Rewards · {data.tier?.name ?? "Thành viên"}</h2>
+          <p>ĐIỂM THƯỞNG HIỆN CÓ</p>
+          <strong>{data.balance.toLocaleString("vi-VN")}</strong>
+          <div>
+            <span>Điểm GlowUp</span>
+            <Link href="/account/loyalty/rewards">Đổi ưu đãi →</Link>
+          </div>
+        </section>
+        <section className="loyalty-next">
+          <span className="content-icon">
+            <Sparkles size={24} />
+          </span>
+          <h2>
+            {data.nextTier ? `Hướng tới hạng ${data.nextTier.name}` : "Quyền lợi dành cho bạn"}
+          </h2>
+          {data.nextTier ? (
+            <>
+              <p>Còn {remaining.toLocaleString("vi-VN")} điểm để đạt ngưỡng của hạng tiếp theo.</p>
+              <progress
+                value={Math.min(data.balance, data.nextTier.minPoints)}
+                max={Math.max(1, data.nextTier.minPoints)}
+                aria-label="Tiến độ điểm tới hạng tiếp theo"
+              />
+              <strong>
+                {data.balance.toLocaleString("vi-VN")} /{" "}
+                {data.nextTier.minPoints.toLocaleString("vi-VN")} điểm
+              </strong>
+            </>
+          ) : (
+            <p>Khám phá ưu đãi đang có trong mục đổi điểm của bạn.</p>
+          )}
+        </section>
       </div>
-      <Link className="button" href="/account/loyalty/rewards">
-        Đổi ưu đãi
-      </Link>
-      <h2>Lịch sử điểm</h2>
-      <div className="account-list">
-        {data.history.map((item) => (
-          <article key={item.id}>
-            <div>
-              <strong>{item.type}</strong>
-              <small>
-                {item.description ?? new Date(item.createdAt).toLocaleDateString("vi-VN")}
-              </small>
-            </div>
-            <strong>
-              {item.points > 0 ? "+" : ""}
-              {item.points}
-            </strong>
-          </article>
-        ))}
-      </div>
-      {!data.history.length && <p>Chưa có giao dịch điểm.</p>}
-      <Pager page={page} total={data.total} route="/account/loyalty" />
+      <section className="account-surface">
+        <div className="account-surface-header">
+          <h2>Lịch sử tích lũy & đổi điểm thưởng</h2>
+          <Coins size={22} />
+        </div>
+        {data.history.length ? (
+          <div className="account-table-scroll">
+            <table className="points-table">
+              <thead>
+                <tr>
+                  <th>Giao dịch</th>
+                  <th>Ngày</th>
+                  <th>Điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.history.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>
+                        {{
+                          EARN: "Tích điểm mua hàng",
+                          REDEEM: "Sử dụng điểm",
+                          REFUND: "Hoàn điểm",
+                          ADJUSTMENT: "Điều chỉnh điểm",
+                        }[item.type] ?? item.type}
+                      </strong>
+                      <small>{item.description}</small>
+                    </td>
+                    <td>{new Date(item.createdAt).toLocaleDateString("vi-VN")}</td>
+                    <td className={item.points > 0 ? "points-positive" : "points-negative"}>
+                      {item.points > 0 ? "+" : ""}
+                      {item.points.toLocaleString("vi-VN")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">Chưa có giao dịch điểm.</p>
+        )}
+        <Pager page={page} total={data.total} route="/account/loyalty" />
+      </section>
     </section>
   );
 }
@@ -172,6 +254,10 @@ export function RewardsPage() {
   const query = useQuery({
     queryKey: ["rewards"],
     queryFn: ({ signal }) => readBff("/api/account/commerce/rewards", rewardsSchema, signal),
+  });
+  const loyalty = useQuery({
+    queryKey: ["loyalty", 1],
+    queryFn: ({ signal }) => readBff("/api/account/commerce/loyalty?page=1", loyaltySchema, signal),
   });
   async function redeem(code: string) {
     if (!window.confirm("Bạn muốn dùng điểm để đổi ưu đãi này?")) return;
@@ -214,49 +300,91 @@ export function RewardsPage() {
     }
   }
   return (
-    <section className="panel">
-      <h1>Đổi ưu đãi</h1>
+    <section className="account-screen">
+      <AccountHeading
+        title="Đổi điểm lấy ưu đãi & Quà tặng"
+        description="Chọn ưu đãi phù hợp và sử dụng điểm thưởng GlowUp của bạn."
+      />
+      <div className="rewards-balance">
+        <div>
+          <p>ĐIỂM CÓ THỂ SỬ DỤNG</p>
+          <strong>{loyalty.data?.balance.toLocaleString("vi-VN") ?? "—"} điểm</strong>
+        </div>
+        <Link href="/account/loyalty">Xem lịch sử điểm →</Link>
+      </div>
       {query.isPending ? (
         <p role="status">Đang tải ưu đãi…</p>
       ) : query.isError ? (
-        <p role="alert">
+        <div className="account-surface" role="alert">
           Chính sách đổi ưu đãi hiện chưa khả dụng.{" "}
           <button onClick={() => query.refetch()}>Thử lại</button>
-        </p>
+        </div>
       ) : query.data.length ? (
-        <div className="benefit-cards">
+        <div className="reward-grid">
           {query.data.map((reward) => (
-            <article key={`${reward.code}-${reward.version}`}>
-              <h2>{reward.code}</h2>
-              <p>{reward.pointsCost} điểm</p>
-              <p>
-                Giảm{" "}
-                {reward.discountType === "PERCENTAGE"
-                  ? `${reward.discountValue}%`
-                  : formatPrice(reward.discountValue)}
-              </p>
-              <p>
-                Đơn tối thiểu {formatPrice(reward.minOrderAmount)} · Hiệu lực {reward.validityDays}{" "}
-                ngày sau đổi
-              </p>
-              <button className="button" disabled={!!busy} onClick={() => void redeem(reward.code)}>
-                {busy === reward.code ? "Đang đổi…" : "Đổi ưu đãi"}
-              </button>
+            <article className="reward-card" key={`${reward.code}-${reward.version}`}>
+              <div className="reward-art">
+                <Ticket size={40} />
+                <strong>
+                  {reward.discountType === "PERCENTAGE"
+                    ? `${reward.discountValue}%`
+                    : formatPrice(reward.discountValue)}
+                </strong>
+              </div>
+              <div className="reward-copy">
+                <p className="account-kicker">GLOWUP REWARDS</p>
+                <h2>
+                  Ưu đãi giảm{" "}
+                  {reward.discountType === "PERCENTAGE"
+                    ? `${reward.discountValue}%`
+                    : formatPrice(reward.discountValue)}
+                </h2>
+                <p>
+                  Đơn hàng từ {formatPrice(reward.minOrderAmount)} · Hiệu lực {reward.validityDays}{" "}
+                  ngày sau đổi.
+                </p>
+                <div>
+                  <strong>{reward.pointsCost.toLocaleString("vi-VN")} điểm</strong>
+                  <button
+                    disabled={
+                      !!busy || (loyalty.data ? loyalty.data.balance < reward.pointsCost : false)
+                    }
+                    onClick={() => void redeem(reward.code)}
+                  >
+                    {busy === reward.code ? "Đang đổi…" : "Đổi ngay"}
+                  </button>
+                </div>
+              </div>
             </article>
           ))}
         </div>
       ) : (
-        <p>Chưa có ưu đãi để đổi.</p>
+        <ContentEmpty title="Chưa có ưu đãi để đổi">
+          Các quyền lợi đổi điểm mới sẽ được cập nhật tại đây.
+        </ContentEmpty>
       )}
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <div className="account-tip" role="status">
+          <Gift size={22} />
+          <p>{message}</p>
+        </div>
+      )}
       {coupon && (
-        <div className="notice">
+        <div className="account-surface">
+          <h2>Ưu đãi đã đổi thành công</h2>
           <p>
             Mã ưu đãi: <strong>{coupon.code}</strong>
           </p>
           <p>Hạn dùng: {new Date(coupon.endDate).toLocaleDateString("vi-VN")}</p>
         </div>
       )}
+      <div className="account-tip">
+        <ShieldCheck size={22} />
+        <p>
+          Kiểm tra điều kiện và thời hạn trước khi đổi. Số điểm và quyền lợi được hệ thống xác nhận
+          khi thực hiện.
+        </p>
+      </div>
     </section>
   );
 }
@@ -286,34 +414,58 @@ export function NotificationsPage() {
     }
   }
   return (
-    <section className="panel">
-      <h1>Thông báo</h1>
+    <section className="account-screen">
+      <AccountHeading
+        title="Thông báo của bạn"
+        description="Cập nhật đơn hàng, quyền lợi và các thông tin quan trọng từ GlowUp."
+        actions={
+          query.data ? (
+            <span className="order-status">{query.data.unreadCount} chưa đọc</span>
+          ) : undefined
+        }
+      />
       {query.isPending ? (
         <p role="status">Đang tải…</p>
       ) : query.isError ? (
-        <p role="alert">
+        <div className="account-surface" role="alert">
           Không tải được thông báo. <button onClick={() => query.refetch()}>Thử lại</button>
-        </p>
+        </div>
       ) : (
         <>
-          <p>{query.data.unreadCount} chưa đọc</p>
-          <div className="account-list">
+          <div className="notification-list">
             {query.data.items.map((item) => (
-              <article key={item.id}>
+              <article
+                className={`notification-item ${!item.isRead ? "is-unread" : ""}`}
+                key={item.id}
+              >
+                <span className="content-icon">
+                  {item.type === "ORDER" ? (
+                    <Package size={23} />
+                  ) : item.type === "LOYALTY" ? (
+                    <Coins size={23} />
+                  ) : (
+                    <Bell size={23} />
+                  )}
+                </span>
                 <div>
                   <h2>{item.title}</h2>
                   <p>{item.message}</p>
-                  <small>{new Date(item.createdAt).toLocaleDateString("vi-VN")}</small>
+                  <time>{new Date(item.createdAt).toLocaleString("vi-VN")}</time>
                 </div>
                 {!item.isRead && (
                   <button disabled={!!busy} onClick={() => void mark(item.id)}>
+                    <Check size={14} style={{ display: "inline", marginRight: 4 }} />
                     Đánh dấu đã đọc
                   </button>
                 )}
               </article>
             ))}
           </div>
-          {!query.data.items.length && <p>Chưa có thông báo.</p>}
+          {!query.data.items.length && (
+            <ContentEmpty title="Chưa có thông báo">
+              Các cập nhật mới sẽ được hiển thị tại đây.
+            </ContentEmpty>
+          )}
           <Pager page={page} total={query.data.total} route="/account/notifications" />
         </>
       )}

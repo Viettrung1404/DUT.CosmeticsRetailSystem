@@ -55,6 +55,10 @@ const blogPostSchema = z.object({
   excerpt: z.string().nullable().optional(),
   featuredImage: z.string().nullable().optional(),
   publishedAt: z.string().nullable().optional(),
+  metaTitle: z.string().nullable().optional(),
+  metaDescription: z.string().nullable().optional(),
+  category: z.object({ name: z.string(), slug: z.string() }).nullable().optional(),
+  author: z.object({ fullName: z.string() }).nullable().optional(),
 });
 const brandSchema = z.array(
   z.object({
@@ -64,6 +68,83 @@ const brandSchema = z.array(
     logoUrl: z.string().nullable().optional(),
   }),
 );
+const brandDetailSchema = brandSchema.element.extend({
+  bannerUrl: z.string().nullable(),
+  description: z.string().nullable(),
+  countryOfOrigin: z.string().nullable(),
+  metaTitle: z.string().nullable(),
+  metaDescription: z.string().nullable(),
+});
+const storeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+  address: z.string(),
+  city: z.string(),
+  district: z.string(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  openingHours: z.unknown().nullable(),
+});
+const promotionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  type: z.string(),
+  value: money,
+  minOrderAmount: money,
+  maxDiscountAmount: money.nullable(),
+  startDate: z.string(),
+  endDate: z.string(),
+  isFlashSale: z.boolean(),
+});
+const promotionPageSchema = z.object({
+  items: z.array(promotionSchema),
+  total: z.number(),
+  page: z.number(),
+  limit: z.number(),
+  serverTime: z.string(),
+});
+const promotionDetailSchema = promotionSchema.extend({
+  serverTime: z.string(),
+  page: z.number(),
+  limit: z.number(),
+  total: z.number(),
+  products: z.array(
+    z.object({
+      variantId: z.string(),
+      productId: z.string(),
+      name: z.string(),
+      slug: z.string(),
+      imageUrl: z.string().nullable(),
+      price: money,
+      remaining: z.number(),
+    }),
+  ),
+});
+const blogCategoriesSchema = z.array(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    slug: z.string(),
+    description: z.string().nullable(),
+  }),
+);
+const faqSchema = z.array(
+  z.object({
+    category: z.string(),
+    items: z.array(z.object({ id: z.string(), question: z.string(), answer: z.string() })),
+  }),
+);
+const pageSchema = z.object({
+  title: z.string(),
+  slug: z.string(),
+  content: z.string(),
+  metaTitle: z.string().nullable(),
+  metaDescription: z.string().nullable(),
+});
 const reviewsSchema = z.object({
   items: z.array(
     z.object({
@@ -104,6 +185,7 @@ const flashCardsSchema = z.array(
   z.object({
     promotionId: z.string(),
     promotionName: z.string(),
+    serverTime: z.string(),
     endDate: z.string(),
     conditional: z.boolean(),
     remaining: z.number(),
@@ -174,13 +256,31 @@ export const getBlogPost = (slug: string) =>
   request(`/blog/posts/${encodeURIComponent(slug)}`, blogPostSchema);
 export const getBrands = (limit = 8) =>
   request(`/brands?limit=${Math.min(Math.max(limit, 1), 100)}`, brandSchema);
+export const getBrand = (slug: string) =>
+  request(`/brands/${encodeURIComponent(slug)}`, brandDetailSchema);
+export const getStores = (city?: string) =>
+  request(`/stores${city ? `?city=${encodeURIComponent(city)}` : ""}`, z.array(storeSchema));
+export const getStore = (id: string) => request(`/stores/${encodeURIComponent(id)}`, storeSchema);
+export const getPromotions = (page = 1) =>
+  request(`/promotions/active?page=${page}&limit=12`, promotionPageSchema);
+export const getPromotion = (id: string, page = 1) =>
+  request(`/promotions/${encodeURIComponent(id)}?page=${page}&limit=12`, promotionDetailSchema);
+export const getBlogCategories = () => request("/blog/categories", blogCategoriesSchema);
+export const getBlogCategoryPosts = (id: string, page = 1) =>
+  request(`/blog/posts?categoryId=${encodeURIComponent(id)}&page=${page}&limit=12`, postSchema);
+export const getFaqs = () => request("/faqs", faqSchema);
+export const getCmsPage = (slug: string) =>
+  request(`/pages/${encodeURIComponent(slug)}`, pageSchema);
 export const getReviews = (id: string, page = 1) =>
   request(
     `/customer/products/${encodeURIComponent(id)}/reviews?page=${page}&limit=5`,
     reviewsSchema,
   );
-export const getFlashCards = () =>
-  request("/promotions/flash-sale/cards?limit=5", flashCardsSchema);
+export const getFlashCards = (limit = 5) =>
+  request(
+    `/promotions/flash-sale/cards?limit=${Math.min(Math.max(limit, 1), 20)}`,
+    flashCardsSchema,
+  );
 export const getFacets = () => request("/customer/products/facets", facetsSchema);
 export const getAvailability = (productId: string, variantId: string) =>
   request(

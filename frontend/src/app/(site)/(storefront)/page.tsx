@@ -9,6 +9,16 @@ import {
 import { CatalogImage, ProductGrid, SectionTitle } from "@/features/catalog/components";
 import { BrandCarousel, CategoryCarousel, DealCarousel } from "@/features/catalog/home-carousels";
 import { FlashCountdown, HomeMotion } from "@/features/catalog/home-motion";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Sparkles,
+  Truck,
+  Droplets,
+  Heart,
+  Sun,
+  Clock3,
+} from "lucide-react";
 
 export const metadata = {
   title: "GlowUp | Mỹ phẩm và chăm sóc sắc đẹp",
@@ -37,16 +47,23 @@ export default async function HomePage() {
           className="home-hero-main"
           style={{
             backgroundImage:
-              "linear-gradient(90deg,rgba(49,20,30,.65),rgba(49,20,30,.05)),url('/images/stitch/home/editorial-1.jpg')",
+              "linear-gradient(0deg,rgba(40,24,17,.85),rgba(40,24,17,.4) 45%,transparent),url('/images/stitch/home/editorial-1.jpg')",
           }}
         >
           <div className="home-hero-copy">
-            <span className="home-kicker">GLOWUP BEAUTY RETAIL</span>
+            <span className="home-hero-badge">
+              <Sparkles size={13} /> BỘ SƯU TẬP GLOWUP
+            </span>
             <h1>Sắc Đẹp Theo Cách Của Bạn</h1>
             <p>Khám phá thế giới mỹ phẩm và chăm sóc da dành riêng cho bạn.</p>
-            <Link className="home-white-button" href="/products">
-              Khám phá ngay →
-            </Link>
+            <div className="home-hero-actions">
+              <Link className="home-primary-button" href="/products">
+                Khám phá ngay <ArrowRight size={16} />
+              </Link>
+              <Link className="home-white-button" href="/promotions">
+                Xem ưu đãi độc quyền
+              </Link>
+            </div>
           </div>
         </div>
         <div className="home-hero-side">
@@ -58,8 +75,11 @@ export default async function HomePage() {
                 "linear-gradient(90deg,rgba(37,35,42,.64),transparent),url('/images/stitch/home/editorial-2.jpg')",
             }}
           >
-            <span>Dưỡng Da Căng Mọng</span>
-            <strong>Khởi đầu từ làn da khỏe</strong>
+            <div>
+              <span className="home-mini-badge">CHĂM SÓC DA</span>
+              <h2>Dưỡng Da Căng Mọng</h2>
+              <p>Khám phá sản phẩm dưỡng ẩm và chăm sóc làn da.</p>
+            </div>
             <small>Mua ngay →</small>
           </Link>
           <Link
@@ -70,30 +90,40 @@ export default async function HomePage() {
                 "linear-gradient(90deg,rgba(71,16,42,.64),transparent),url('/images/stitch/home/editorial-3.jpg')",
             }}
           >
-            <span>Bộ sưu tập mới</span>
-            <strong>BST Son Velvet Mới</strong>
+            <div>
+              <span className="home-mini-badge">GLOWUP MAKEUP</span>
+              <h2>Sắc Son Velvet</h2>
+              <p>Khám phá sắc màu dành cho bạn.</p>
+            </div>
             <small>Khám phá →</small>
           </Link>
         </div>
       </section>
       <section className="home-trust" aria-label="Lợi ích khi mua sắm">
         <div>
-          <span>✦</span>
-          <strong>100% Mỹ Phẩm Chính Hãng</strong>
-          <small>Nguồn gốc rõ ràng</small>
+          <span>
+            <BadgeCheck size={25} />
+          </span>
+          <strong>Khám Phá Mỹ Phẩm</strong>
+          <small>Chọn sản phẩm phù hợp với bạn</small>
         </div>
         <div>
-          <span>◷</span>
+          <span>
+            <Truck size={25} />
+          </span>
           <strong>Giao Hàng Thuận Tiện</strong>
           <small>Theo dõi đơn hàng dễ dàng</small>
         </div>
         <div>
-          <span>♡</span>
+          <span>
+            <Sparkles size={25} />
+          </span>
           <strong>Tích Điểm GlowUp Rewards</strong>
           <small>Ưu đãi dành cho thành viên</small>
         </div>
       </section>
       <section className="home-section">
+        <p className="home-section-eyebrow">DANH MỤC TUYỂN CHỌN</p>
         <SectionTitle
           title="Khám Phá Theo Danh Mục"
           href="/products"
@@ -111,12 +141,15 @@ export default async function HomePage() {
             <span className="home-kicker">ƯU ĐÃI DÀNH CHO BẠN</span>
             <h2>DEAL ĐẸP CÓ HẠN ⚡</h2>
           </div>
-          {dealEndDate && <FlashCountdown endDate={dealEndDate} />}
+          {dealEndDate && (
+            <FlashCountdown endDate={dealEndDate} serverTime={deals[0]?.serverTime} />
+          )}
           <Link href="/flash-sale">Xem tất cả →</Link>
         </div>
         <DealCarousel cards={deals} />
       </section>
       <section className="home-section">
+        <p className="home-section-eyebrow">ĐƯỢC TIN DÙNG</p>
         <SectionTitle
           title="Bán Chạy Nhất"
           href="/products?sortBy=bestseller"
@@ -134,6 +167,7 @@ export default async function HomePage() {
         >
           <span>BỘ SƯU TẬP CHĂM SÓC DA</span>
           <h3>Bắt Đầu Từ Làn Da Khỏe</h3>
+          <p>Lắng nghe và chăm sóc làn da của bạn mỗi ngày.</p>
           <small>Khám phá ngay →</small>
         </Link>
         <Link
@@ -145,10 +179,12 @@ export default async function HomePage() {
         >
           <span>GLOWUP MAKEUP</span>
           <h3>Bộ Sưu Tập Sắc Son Thời Thượng</h3>
+          <p>Tìm sắc son phù hợp với phong cách của bạn.</p>
           <small>Khám phá ngay →</small>
         </Link>
       </section>
       <section className="home-section home-brand-section">
+        <p className="home-section-eyebrow">ĐỐI TÁC THƯƠNG HIỆU</p>
         <SectionTitle
           title="Thương Hiệu Được Yêu Thích"
           href="/brands"
@@ -161,23 +197,27 @@ export default async function HomePage() {
         )}
       </section>
       <section className="home-section home-concerns">
+        <p className="home-section-eyebrow">CÁ NHÂN HÓA CHU TRÌNH</p>
         <SectionTitle title="Khám Phá Theo Nhu Cầu Da Của Bạn" />
         <div>
           {[
-            { icon: "💧", title: "Dưỡng ẩm sâu", tag: "dưỡng ẩm" },
-            { icon: "✦", title: "Kiềm dầu & Lỗ chân lông", tag: "kiềm dầu" },
-            { icon: "♡", title: "Phục hồi nhạy cảm", tag: "phục hồi" },
-            { icon: "☀", title: "Làm sáng & Mờ thâm", tag: "làm sáng" },
-            { icon: "◷", title: "Chống lão hóa", tag: "chống lão hóa" },
+            { icon: Droplets, title: "Dưỡng ẩm sâu", tag: "dưỡng ẩm" },
+            { icon: Sparkles, title: "Kiềm dầu & Lỗ chân lông", tag: "kiềm dầu" },
+            { icon: Heart, title: "Phục hồi nhạy cảm", tag: "phục hồi" },
+            { icon: Sun, title: "Làm sáng & Mờ thâm", tag: "làm sáng" },
+            { icon: Clock3, title: "Chống lão hóa", tag: "chống lão hóa" },
           ].map((item) => (
             <Link key={item.tag} href={`/products?tag=${encodeURIComponent(item.tag)}`}>
-              <span>{item.icon}</span>
+              <span>
+                <item.icon size={21} />
+              </span>
               <strong>{item.title}</strong>
             </Link>
           ))}
         </div>
       </section>
       <section className="home-section home-blog">
+        <p className="home-section-eyebrow">TẠP CHÍ LÀM ĐẸP</p>
         <SectionTitle title="Góc Đẹp GlowUp" href="/blog" linkText="Xem tất cả bài viết" />
         {articles.length ? (
           <div className="home-articles">

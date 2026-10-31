@@ -3,6 +3,8 @@ import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
 import { getServerEnv } from "@/shared/config/env";
 import { Providers } from "./providers";
 import "./globals.css";
+import "@/features/catalog/content.css";
+import "@/features/account/commerce.css";
 
 const bodyFont = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -17,11 +19,12 @@ const headingFont = Montserrat({
 });
 
 export function generateMetadata(): Metadata {
+  const index = getServerEnv().SEO_INDEXING_ENABLED === "true";
   return {
     metadataBase: new URL(getServerEnv().SITE_URL),
     title: { default: "GlowUp", template: "%s | GlowUp" },
     description: "GlowUp — Chăm sóc vẻ đẹp của bạn.",
-    robots: { index: false, follow: false },
+    robots: { index, follow: index },
   };
 }
 

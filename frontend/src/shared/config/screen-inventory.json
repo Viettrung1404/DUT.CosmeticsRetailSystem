@@ -36,7 +36,7 @@
     "dependencies": [
       "A10"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S04",
@@ -51,7 +51,7 @@
       "A09",
       "O03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S05",
@@ -65,7 +65,7 @@
     "dependencies": [
       "A10"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S06",
@@ -95,7 +95,7 @@
       "G07",
       "O03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S08",
@@ -141,7 +141,7 @@
     "dependencies": [
       "G02"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S11",
@@ -185,7 +185,7 @@
       "A09",
       "O03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S14",
@@ -257,7 +257,7 @@
     "dependencies": [
       "G02"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S19",
@@ -565,7 +565,7 @@
       "G03",
       "O03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S40",
@@ -580,7 +580,7 @@
       "A10",
       "G10"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "S41",
@@ -608,7 +608,7 @@
     "dependencies": [
       "G03"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "B02",
@@ -623,7 +623,7 @@
       "G03",
       "A02"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "B03",
@@ -637,7 +637,7 @@
     "dependencies": [
       "A10"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "B04",
@@ -651,7 +651,7 @@
     "dependencies": [
       "A10"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   },
   {
     "id": "B05",
@@ -666,6 +666,6 @@
       "A10",
       "O05"
     ],
-    "status": "TODO"
+    "status": "UI-ready"
   }
 ]

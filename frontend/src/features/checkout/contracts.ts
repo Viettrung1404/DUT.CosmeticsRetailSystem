@@ -41,6 +41,7 @@ export const previewSchema = z.object({
   ),
 });
 export const orderSchema = z.object({
+  isGuest: z.boolean().optional(),
   id: z.uuid(),
   orderNumber: z.string(),
   status: z.string(),

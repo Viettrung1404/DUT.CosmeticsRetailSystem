@@ -23,6 +23,7 @@ import { cancelReservedOrder } from '@core/services/cancel-reserved-order';
 import { assertGatewayReady } from '../../domain/gateway-readiness';
 import { ConcurrencyLimiter } from '@core/utils/concurrency-limiter';
 import { GatewayCallNotStartedError } from '../../domain/gateway-call-not-started.error';
+import { guestSessionHash } from '@modules/orders/domain/guest-checkout';
 export const PAYMENT_GATEWAYS = Symbol('PAYMENT_GATEWAYS');
 const hash = (value: string) =>
   createHash('sha256').update(value).digest('hex');
@@ -132,6 +133,7 @@ export class PaymentsService {
     orderId: string,
     platform = 'WEB',
     ip = '127.0.0.1',
+    guestHash?: string,
   ) {
     if (
       !ONLINE_METHODS.includes(method) ||
@@ -142,7 +144,18 @@ export class PaymentsService {
     const prepared = await this.transaction(async (tx) => {
       await this.lock(tx, orderId);
       const order = await tx.order.findFirst({
-        where: { id: orderId, customer: { userId } },
+        where: {
+          id: orderId,
+          ...(guestHash
+            ? {
+                customerId: null,
+                pricingSnapshot: {
+                  path: ['guest', 'sessionHash'],
+                  equals: guestHash,
+                },
+              }
+            : { customer: { userId } }),
+        },
         include: { payments: { orderBy: { createdAt: 'desc' } } },
       });
       if (!order) throw new NotFoundException('Không tìm thấy đơn hàng');
@@ -459,7 +472,24 @@ export class PaymentsService {
     }
     return count;
   }
-  async status(userId: string, paymentId: string) {
+  createGuest(sessionId: string, orderId: string, ip = '127.0.0.1') {
+    return this.create(
+      'guest',
+      'VNPAY',
+      orderId,
+      'WEB',
+      ip,
+      guestSessionHash(sessionId),
+    );
+  }
+  statusGuest(sessionId: string, paymentId: string) {
+    return this.status(
+      '00000000-0000-0000-0000-000000000000',
+      paymentId,
+      guestSessionHash(sessionId),
+    );
+  }
+  async status(userId: string, paymentId: string, guestHash?: string) {
     const [result] = await this.db.$queryRaw<
       Array<{
         paymentId: string;
@@ -485,8 +515,11 @@ export class PaymentsService {
         p.return_url AS "returnUrl",COALESCE(p.expires_at,o.created_at+CASE WHEN p.payment_method='COD' THEN interval '30 minutes' ELSE interval '15 minutes' END) AS "expiresAt",
         p.verification_pending AS "verificationPending",EXISTS(SELECT 1 FROM refunds r WHERE r.payment_id=p.id AND r.status='PENDING') AS "refundPending",
         CASE WHEN p.first_paid_received_at<p.expires_at THEN p.expires_at+interval '60 seconds' END AS "verificationDeadline"
-      FROM payments p JOIN orders o ON o.id=p.order_id JOIN customers c ON c.id=o.customer_id
-      WHERE p.id=${paymentId}::uuid AND c.user_id=${userId}::uuid`;
+      FROM payments p JOIN orders o ON o.id=p.order_id LEFT JOIN customers c ON c.id=o.customer_id
+      WHERE p.id=${paymentId}::uuid AND (
+        (${guestHash ?? null}::text IS NULL AND c.user_id=${userId}::uuid)
+        OR (${guestHash ?? null}::text IS NOT NULL AND o.customer_id IS NULL AND o.pricing_snapshot->'guest'->>'sessionHash'=${guestHash ?? null})
+      )`;
     if (!result) throw new NotFoundException('Không tìm thấy thanh toán');
     return result;
   }
