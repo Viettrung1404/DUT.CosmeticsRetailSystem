@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function HomeMotion() {
   useEffect(() => {
@@ -29,20 +30,25 @@ export function HomeMotion() {
   return null;
 }
 
-function remaining(endDate: string) {
-  return Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now()) / 1000));
+function remaining(endDate: string, offsetMs: number) {
+  return Math.max(0, Math.ceil((new Date(endDate).getTime() - Date.now() - offsetMs) / 1000));
 }
-export function FlashCountdown({ endDate }: { endDate: string }) {
+export function FlashCountdown({ endDate, serverTime }: { endDate: string; serverTime?: string }) {
+  const router = useRouter();
   const [seconds, setSeconds] = useState<number | null>(null);
   useEffect(() => {
-    const tick = () => setSeconds(remaining(endDate));
+    const offsetMs = serverTime ? Date.now() - new Date(serverTime).getTime() : 0;
+    const tick = () => setSeconds(remaining(endDate, offsetMs));
     const initial = window.setTimeout(tick, 0);
     const timer = window.setInterval(tick, 1000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [endDate]);
+  }, [endDate, serverTime]);
+  useEffect(() => {
+    if (seconds === 0) router.refresh();
+  }, [seconds, router]);
   if (seconds === null)
     return (
       <div className="flash-countdown" aria-label="Đang tải thời gian còn lại">

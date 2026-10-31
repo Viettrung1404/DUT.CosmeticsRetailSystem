@@ -11,7 +11,12 @@ import {
   HttpStatus,
   Headers,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiHeader,
+} from '@nestjs/swagger';
 import { CustomerContextService } from '../../../../core/services/customer-context.service';
 import { PreviewOrderUseCase } from '../../application/use-cases/preview-order.use-case';
 import { CreateOrderUseCase } from '../../application/use-cases/create-order.use-case';
@@ -41,7 +46,9 @@ export class CustomerOrderController {
     summary: 'Xem trước chi phí đơn hàng, khuyến mãi, điểm thưởng và kho xử lý',
   })
   async previewOrder(@Req() req: any, @Body() dto: PreviewOrderDto) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(
+      req.user.userId,
+    ))!;
 
     const result = await this.previewOrderUseCase.execute({
       customerId,
@@ -71,7 +78,9 @@ export class CustomerOrderController {
     @Body() dto: CreateOrderDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(
+      req.user.userId,
+    ))!;
 
     const result = await this.createOrderUseCase.execute({
       customerId,
@@ -96,13 +105,17 @@ export class CustomerOrderController {
   @Get('customers/me/orders')
   @ApiOperation({ summary: 'Lấy danh sách lịch sử đơn hàng của khách hàng' })
   async getCustomerOrders(@Req() req: any, @Query() query: OrderQueryDto) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(
+      req.user.userId,
+    ))!;
 
     const result = await this.getCustomerOrdersUseCase.execute({
       customerId,
       page: query.page,
       limit: query.limit,
       status: query.status,
+      search: query.search,
+      year: query.year,
     });
 
     return {
@@ -115,7 +128,9 @@ export class CustomerOrderController {
   @Get('orders/:id')
   @ApiOperation({ summary: 'Xem chi tiết đơn hàng (có bảo vệ IDOR)' })
   async getOrderDetail(@Req() req: any, @Param('id') id: string) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(
+      req.user.userId,
+    ))!;
 
     const result = await this.getOrderDetailUseCase.execute(id, customerId);
 
@@ -128,8 +143,14 @@ export class CustomerOrderController {
 
   @Put('orders/:id/cancel')
   @ApiOperation({ summary: 'Hủy đơn hàng đang ở trạng thái PENDING' })
-  async cancelOrder(@Req() req: any, @Param('id') id: string, @Body() dto: CancelOrderDto) {
-    const customerId = (await this.customerContext.getCustomerIdFromUserId(req.user.userId))!;
+  async cancelOrder(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: CancelOrderDto,
+  ) {
+    const customerId = (await this.customerContext.getCustomerIdFromUserId(
+      req.user.userId,
+    ))!;
 
     const result = await this.cancelOrderUseCase.execute({
       orderId: id,
