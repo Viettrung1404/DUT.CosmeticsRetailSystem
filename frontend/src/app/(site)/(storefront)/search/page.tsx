@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCategories } from "@/features/catalog/server";
 import { ProductListing, type ListingParams } from "@/features/catalog/listing";
-export const metadata = { title: "Tìm kiếm | GlowUp" };
+export const metadata = { title: "Tìm kiếm | GlowUp", robots: { index: false, follow: false } };
 export default async function SearchPage({
   searchParams,
 }: {

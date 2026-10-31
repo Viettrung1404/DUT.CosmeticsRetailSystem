@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  HttpCode,
   Get,
   Param,
   ParseUUIDPipe,
@@ -15,7 +16,12 @@ import { Public } from '@core/decorators/public.decorator';
 import { CustomerOnlyGuard } from '@modules/customer-commerce/presentation/customer-only.guard';
 import { ReviewsService } from '../application/reviews.service';
 import { ContentService } from '../application/content.service';
-import { BannerQueryDto, BlogQueryDto, CreateReviewDto, ReviewQueryDto } from './experience.dto';
+import {
+  BannerQueryDto,
+  BlogQueryDto,
+  CreateReviewDto,
+  ReviewQueryDto,
+} from './experience.dto';
 import { ExperienceResponse } from './experience.responses';
 import { CommerceErrors } from '@modules/customer-commerce/presentation/commerce.responses';
 
@@ -31,16 +37,21 @@ export class ExperienceController {
   @UseGuards(CustomerOnlyGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Đánh giá sản phẩm đã mua trong đơn COMPLETED; một review/product/customer',
+    summary:
+      'Đánh giá sản phẩm đã mua trong đơn COMPLETED; một review/product/customer',
   })
   @ExperienceResponse('review', 201)
-  create(@Req() req: { user: { userId: string } }, @Body() input: CreateReviewDto) {
+  create(
+    @Req() req: { user: { userId: string } },
+    @Body() input: CreateReviewDto,
+  ) {
     return this.reviews.create(req.user.userId, input);
   }
   @Public()
   @Get('customer/products/:id/reviews')
   @ApiOperation({
-    summary: 'Review đã duyệt, histogram và aggregate, không trả thông tin riêng của khách',
+    summary:
+      'Review đã duyệt, histogram và aggregate, không trả thông tin riêng của khách',
   })
   @ExperienceResponse('reviews')
   list(@Param('id', ParseUUIDPipe) id: string, @Query() query: ReviewQueryDto) {
@@ -64,11 +75,28 @@ export class ExperienceController {
   @Get('blog/posts/:slug')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({
-    summary: 'Chi tiết bài viết và tăng một lượt xem thành công',
+    summary: 'Chi tiết bài viết đã xuất bản; đọc không tăng lượt xem',
   })
   @ExperienceResponse('post')
   post(@Param('slug') slug: string) {
     return this.content.post(slug);
+  }
+  @Public()
+  @Post('blog/posts/:slug/view')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Ghi lượt xem bài viết sau khi hiển thị; dedupe 24 giờ theo khách',
+  })
+  async view(
+    @Param('slug') slug: string,
+    @Req()
+    req: { ip: string; headers: Record<string, string | string[] | undefined> },
+  ) {
+    await this.content.recordView(
+      slug,
+      `${req.ip}:${req.headers['x-glowup-visitor'] ?? req.headers['user-agent'] ?? ''}`,
+    );
   }
   @Public()
   @Get('blog/categories')

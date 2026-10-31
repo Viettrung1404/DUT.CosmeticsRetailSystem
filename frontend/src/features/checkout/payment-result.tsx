@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { Check, Clock3, X, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { z } from "zod";
@@ -29,7 +30,9 @@ export function PaymentResult() {
           timer = setTimeout(poll, Math.min(2000 * 2 ** count, 12000));
       } catch {
         if (active)
-          setError("Chưa tra cứu được trạng thái thanh toán. Vui lòng đăng nhập và thử lại.");
+          setError(
+            "Chưa tra cứu được trạng thái thanh toán. Vui lòng mở lại liên kết trong trình duyệt đã đặt hàng và thử lại.",
+          );
       }
     }
     void poll();
@@ -40,27 +43,60 @@ export function PaymentResult() {
   }, [paymentId]);
   if (!paymentId || !z.uuid().safeParse(paymentId).success)
     return <p role="alert">Liên kết thanh toán không hợp lệ.</p>;
+  const successful = status?.paymentStatus === "COMPLETED";
+  const failed = status && ["FAILED", "CANCELLED"].includes(status.paymentStatus);
   return (
-    <section className="checkout-panel payment-result">
-      <h1>Kết quả thanh toán</h1>
-      {error && <p role="alert">{error}</p>}
-      {!status && !error && <p role="status">Đang xác nhận trạng thái từ hệ thống…</p>}
-      {status && (
-        <>
-          <p role="status">
-            {status.paymentStatus === "COMPLETED"
-              ? "Thanh toán đã được xác nhận."
-              : status.paymentStatus === "FAILED" || status.paymentStatus === "CANCELLED"
-                ? "Thanh toán chưa thành công."
-                : "Đang xác nhận thanh toán. Bạn có thể kiểm tra lại trong chi tiết đơn hàng."}
+    <div className="result-page">
+      <section className="result-hero">
+        <span className={`result-symbol ${successful ? "" : failed ? "is-failed" : "is-pending"}`}>
+          {successful ? <Check size={40} /> : failed ? <X size={40} /> : <Clock3 size={40} />}
+        </span>
+        <h1>
+          {successful
+            ? "Thanh toán thành công qua VNPAY!"
+            : failed
+              ? "Thanh toán không thành công"
+              : "Giao dịch đang chờ xác nhận"}
+        </h1>
+        <p role="status">
+          {successful
+            ? "Giao dịch của bạn đã được hệ thống xác nhận. Cảm ơn bạn đã mua sắm tại GlowUp."
+            : failed
+              ? "Giao dịch chưa được hoàn tất. Bạn có thể kiểm tra đơn hàng và thử thanh toán lại."
+              : "Hệ thống đang đối soát kết quả thanh toán. Vui lòng kiểm tra lại trạng thái đơn hàng trước khi thử giao dịch mới."}
+        </p>
+        {error && (
+          <p role="alert" className="cart-warning">
+            {error}
           </p>
-          <p>Mã trạng thái đơn: {status.orderStatus}</p>
-          <Link className="button" href={`/order-success/${status.orderId}`}>
-            Xem đơn hàng
-          </Link>
-        </>
-      )}
-      {error && <Link href="/account/orders">Đơn hàng của tôi</Link>}
-    </section>
+        )}
+        {status && (
+          <div className="result-reference">
+            <div>
+              <small>Phương thức thanh toán</small>
+              <strong>VNPAY</strong>
+            </div>
+            <div>
+              <small>Trạng thái giao dịch</small>
+              <strong>
+                {successful ? "Đã xác nhận" : failed ? "Chưa hoàn tất" : "Đang xử lý"}
+              </strong>
+            </div>
+          </div>
+        )}
+        <div className="result-actions">
+          {status && (
+            <Link className="button" href={`/order-success/${status.orderId}`}>
+              Xem đơn hàng
+            </Link>
+          )}
+          <Link href="/products">Tiếp tục mua sắm</Link>
+        </div>
+        <p>
+          <ShieldCheck size={15} style={{ display: "inline", marginRight: 6 }} />
+          Kết quả thanh toán được xác nhận từ hệ thống.
+        </p>
+      </section>
+    </div>
   );
 }

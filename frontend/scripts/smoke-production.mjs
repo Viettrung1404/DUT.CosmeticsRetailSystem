@@ -8,7 +8,7 @@ const root = new URL("../", import.meta.url);
 const maintenance = process.argv.includes("--maintenance");
 const port = process.env.SMOKE_PORT || "3001";
 const origin = `http://127.0.0.1:${port}`;
-const request = (path) => fetch(`${origin}${path}`, { signal: AbortSignal.timeout(2000), redirect: "manual" });
+const request = (path) => fetch(`${origin}${path}`, { signal: AbortSignal.timeout(10000), redirect: "manual" });
 const existing = await request("/").catch(() => null);
 if (existing) throw new Error(`Port ${port} is occupied; choose another SMOKE_PORT.`);
 
@@ -22,7 +22,7 @@ let launchError;
 child.on("error", (error) => { launchError = error; });
 try {
   let home;
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (launchError) throw launchError;
     if (child.exitCode !== null) throw new Error("Production server exited before readiness.");

@@ -7,6 +7,9 @@ import {
   HttpException,
   Injectable,
   Post,
+  Param,
+  ParseUUIDPipe,
+  NotFoundException,
   Query,
   Req,
   UseGuards,
@@ -83,25 +86,83 @@ export class PromotionsService {
     const now = new Date();
     const quotas = await this.db.promotionVariantQuota.findMany({
       where: {
-        promotion: { isActive: true, isFlashSale: true, startDate: { lte: now }, endDate: { gt: now }, OR: [{ usageLimit: null }, { usedCount: { lt: this.db.promotion.fields.usageLimit } }] },
-        variant: { isActive: true, product: { isActive: true, category: { isActive: true }, OR: [{ brandId: null }, { brand: { isActive: true } }] } },
+        promotion: {
+          isActive: true,
+          isFlashSale: true,
+          startDate: { lte: now },
+          endDate: { gt: now },
+          OR: [
+            { usageLimit: null },
+            { usedCount: { lt: this.db.promotion.fields.usageLimit } },
+          ],
+        },
+        variant: {
+          isActive: true,
+          product: {
+            isActive: true,
+            category: { isActive: true },
+            OR: [{ brandId: null }, { brand: { isActive: true } }],
+          },
+        },
       },
       orderBy: [{ promotion: { endDate: 'asc' } }, { id: 'asc' }],
       take: Math.min(limit * 5, 100),
-      select: { id: true, productVariantId: true, quota: true, reservedQuantity: true, consumedQuantity: true,
-        promotion: { select: { id: true, name: true, endDate: true, minOrderAmount: true } },
-        variant: { select: { price: true, product: { select: { id: true, name: true, slug: true, basePrice: true, images: { orderBy: { sortOrder: 'asc' }, take: 1, select: { imageUrl: true } }, brand: { select: { name: true } } } } } },
+      select: {
+        id: true,
+        productVariantId: true,
+        quota: true,
+        reservedQuantity: true,
+        consumedQuantity: true,
+        promotion: {
+          select: { id: true, name: true, endDate: true, minOrderAmount: true },
+        },
+        variant: {
+          select: {
+            price: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                basePrice: true,
+                images: {
+                  orderBy: { sortOrder: 'asc' },
+                  take: 1,
+                  select: { imageUrl: true },
+                },
+                brand: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
     });
-    const active = quotas.filter(q => q.quota > q.reservedQuantity + q.consumedQuantity).slice(0, limit);
-    const ids = active.map(q => q.productVariantId);
-    const prices = ids.length ? await this.db.$queryRaw<{ id: string; price: number }[]>`SELECT id,sprint5_variant_price(id,0::numeric)::float8 AS price FROM product_variants WHERE id=ANY(${ids}::uuid[])` : [];
-    return active.map(q => ({
-      promotionId: q.promotion.id, promotionName: q.promotion.name, endDate: q.promotion.endDate,
-      conditional: Number(q.promotion.minOrderAmount) > 0, remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
-      variantId: q.productVariantId, productId: q.variant.product.id, name: q.variant.product.name, slug: q.variant.product.slug,
-      brandName: q.variant.product.brand?.name ?? null, imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
-      originalPrice: Number(q.variant.price), effectivePrice: prices.find(p => p.id === q.productVariantId)?.price ?? Number(q.variant.price),
+    const active = quotas
+      .filter((q) => q.quota > q.reservedQuantity + q.consumedQuantity)
+      .slice(0, limit);
+    const ids = active.map((q) => q.productVariantId);
+    const prices = ids.length
+      ? await this.db.$queryRaw<
+          { id: string; price: number }[]
+        >`SELECT id,sprint5_variant_price(id,0::numeric)::float8 AS price FROM product_variants WHERE id=ANY(${ids}::uuid[])`
+      : [];
+    return active.map((q) => ({
+      serverTime: now.toISOString(),
+      promotionId: q.promotion.id,
+      promotionName: q.promotion.name,
+      endDate: q.promotion.endDate,
+      conditional: Number(q.promotion.minOrderAmount) > 0,
+      remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
+      variantId: q.productVariantId,
+      productId: q.variant.product.id,
+      name: q.variant.product.name,
+      slug: q.variant.product.slug,
+      brandName: q.variant.product.brand?.name ?? null,
+      imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
+      originalPrice: Number(q.variant.price),
+      effectivePrice:
+        prices.find((p) => p.id === q.productVariantId)?.price ??
+        Number(q.variant.price),
     }));
   }
   async active(query: PublicListDto, flash = false) {
@@ -110,7 +171,10 @@ export class PromotionsService {
       isActive: true,
       startDate: { lte: now },
       endDate: { gt: now },
-      OR: [{ usageLimit: null }, { usedCount: { lt: this.db.promotion.fields.usageLimit } }],
+      OR: [
+        { usageLimit: null },
+        { usedCount: { lt: this.db.promotion.fields.usageLimit } },
+      ],
       ...(flash && { isFlashSale: true }),
     };
     const rows = await this.db.promotion.findMany({
@@ -169,7 +233,8 @@ export class PromotionsService {
           .map((q) => ({
             variantId: q.productVariantId,
             remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
-            effectivePrice: prices.find((v) => v.id === q.productVariantId)?.price,
+            effectivePrice: prices.find((v) => v.id === q.productVariantId)
+              ?.price,
             conditional: Number(p.minOrderAmount) > 0,
           })),
       })),
@@ -178,6 +243,82 @@ export class PromotionsService {
       limit: query.limit,
       serverTime: now.toISOString(),
       reservation: false,
+    };
+  }
+
+  async detail(id: string, page: number, limit: number) {
+    const now = new Date();
+    const promotion = await this.db.promotion.findFirst({
+      where: {
+        id,
+        isActive: true,
+        startDate: { lte: now },
+        endDate: { gt: now },
+      },
+      select: publicCampaign,
+    });
+    if (!promotion) throw new NotFoundException('PROMOTION_NOT_FOUND');
+    const where = {
+      promotionId: id,
+      variant: {
+        isActive: true,
+        product: {
+          isActive: true,
+          category: { isActive: true },
+          OR: [{ brandId: null }, { brand: { isActive: true } }],
+        },
+      },
+    };
+    const [quotas, total] = await this.db.$transaction([
+      this.db.promotionVariantQuota.findMany({
+        where,
+        orderBy: { id: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          productVariantId: true,
+          quota: true,
+          reservedQuantity: true,
+          consumedQuantity: true,
+          variant: {
+            select: {
+              price: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  images: {
+                    orderBy: { sortOrder: 'asc' },
+                    take: 1,
+                    select: { imageUrl: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.db.promotionVariantQuota.count({ where }),
+    ]);
+    return {
+      ...promotion,
+      serverTime: now.toISOString(),
+      page,
+      limit,
+      total,
+      products: quotas.map((q) => ({
+        variantId: q.productVariantId,
+        productId: q.variant.product.id,
+        name: q.variant.product.name,
+        slug: q.variant.product.slug,
+        imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
+        price: Number(q.variant.price),
+        remaining: Math.max(
+          0,
+          q.quota - q.reservedQuantity - q.consumedQuantity,
+        ),
+      })),
     };
   }
 }
@@ -195,12 +336,15 @@ export class PromotionController {
   @ApiOperation({ summary: 'Card sản phẩm flash sale còn quota cho trang chủ' })
   flashCards(@Query('limit') limit?: string) {
     const requested = Number(limit ?? 5);
-    return this.promotions.flashCards(Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 20) : 5);
+    return this.promotions.flashCards(
+      Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 20) : 5,
+    );
   }
   @Public()
   @Get('promotions/active')
   @ApiOperation({
-    summary: 'Campaign đang hoạt động và điều kiện áp dụng, không trả mã coupon riêng',
+    summary:
+      'Campaign đang hoạt động và điều kiện áp dụng, không trả mã coupon riêng',
   })
   @ExperienceResponse('promotions')
   active(@Query() query: PublicListDto) {
@@ -209,11 +353,23 @@ export class PromotionController {
   @Public()
   @Get('promotions/flash-sale')
   @ApiOperation({
-    summary: 'Flash Sale và quota còn lại; checkout xác nhận lại giá và giữ quota',
+    summary:
+      'Flash Sale và quota còn lại; checkout xác nhận lại giá và giữ quota',
   })
   @ExperienceResponse('promotions')
   flash(@Query() query: PublicListDto) {
     return this.promotions.active(query, true);
+  }
+  @Public()
+  @Get('promotions/:id')
+  @ApiOperation({
+    summary: 'Chi tiết campaign đang hoạt động và sản phẩm có quota',
+  })
+  detail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PublicListDto,
+  ) {
+    return this.promotions.detail(id, query.page, query.limit);
   }
   @Post('coupons/validate')
   @HttpCode(200)
@@ -221,7 +377,8 @@ export class PromotionController {
   @ApiBearerAuth('JWT-auth')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({
-    summary: 'Kiểm tra coupon bằng cùng pricing engine; không giữ quota/điểm/lượt coupon',
+    summary:
+      'Kiểm tra coupon bằng cùng pricing engine; không giữ quota/điểm/lượt coupon',
   })
   @ExperienceResponse('quote')
   async validate(
@@ -229,9 +386,18 @@ export class PromotionController {
     @Body() input: CouponValidationDto,
   ) {
     if (this.redis.configured) {
-      const userAllowed = await this.redis.rateLimit(`coupon:user:${req.user.userId}`, 10, 60000);
-      const ipAllowed = await this.redis.rateLimit(`coupon:ip:${req.ip}`, 30, 60000);
-      if (!userAllowed || !ipAllowed) throw new HttpException('COUPON_RATE_LIMITED', 429);
+      const userAllowed = await this.redis.rateLimit(
+        `coupon:user:${req.user.userId}`,
+        10,
+        60000,
+      );
+      const ipAllowed = await this.redis.rateLimit(
+        `coupon:ip:${req.ip}`,
+        30,
+        60000,
+      );
+      if (!userAllowed || !ipAllowed)
+        throw new HttpException('COUPON_RATE_LIMITED', 429);
     }
     try {
       const { variants: _, ...quote } = await this.pricing.quote({
