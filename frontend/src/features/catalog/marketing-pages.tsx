@@ -29,6 +29,7 @@ import {
   getFaqs,
 } from "./server";
 import { CatalogImage, FlashGrid, ProductGrid, formatPrice } from "./components";
+import { FavoriteButton } from "./favorite-button";
 import { FlashCountdown } from "./home-motion";
 import { BrandDirectory } from "./brand-directory";
 import { FaqList } from "./faq-list";
@@ -201,6 +202,12 @@ export async function PromotionScreen({ id, page }: { id: string; page: number }
                   <Link className="catalog-card-image" href={`/products/${product.slug}`}>
                     <CatalogImage src={product.imageUrl} alt={product.name} />
                   </Link>
+                  <FavoriteButton
+                    productId={product.productId}
+                    slug={product.slug}
+                    name={product.name}
+                    className="catalog-favorite"
+                  />
                   <div className="catalog-card-copy">
                     <Link className="catalog-card-title" href={`/products/${product.slug}`}>
                       {product.name}

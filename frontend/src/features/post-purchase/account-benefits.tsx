@@ -20,6 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { CatalogImage, formatPrice } from "@/features/catalog/components";
+import { beginWishlistRemoval } from "@/features/catalog/commerce-state";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
 import {
@@ -64,22 +65,24 @@ export function WishlistPage() {
   const [error, setError] = useState("");
   const query = useQuery({
     queryKey: ["wishlist", page],
-    queryFn: ({ signal }) =>
-      readBff(`/api/account/commerce/wishlist?page=${page}`, wishlistSchema, signal),
+    queryFn: ({ signal }) => readBff(`/api/wishlist?page=${page}`, wishlistSchema, signal),
   });
   async function remove(id: string) {
     setBusy(id);
     setError("");
+    const rollback = await beginWishlistRemoval(client, [id]);
     try {
-      await requestBff(`/api/account/commerce/wishlist/${id}`, wishlistResultSchema, {
+      await requestBff(`/api/wishlist/${id}`, wishlistResultSchema, {
         method: "PUT",
         body: { productId: id, selected: false, idempotencyKey: crypto.randomUUID() },
       });
-      await client.invalidateQueries({ queryKey: ["wishlist"] });
     } catch (e) {
+      rollback();
       setError(apiErrorMessage(e));
     } finally {
       setBusy("");
+      void client.invalidateQueries({ queryKey: ["wishlist"] });
+      void client.invalidateQueries({ queryKey: ["wishlist-ids"] });
     }
   }
   return (
@@ -129,7 +132,7 @@ export function WishlistPage() {
               </article>
             ))}
           </div>
-          <Pager page={page} total={query.data.total} route="/account/wishlist" />
+          <Pager page={page} total={query.data.total} route="/wishlist" />
         </>
       ) : (
         <ContentEmpty title="Danh sách yêu thích đang trống">

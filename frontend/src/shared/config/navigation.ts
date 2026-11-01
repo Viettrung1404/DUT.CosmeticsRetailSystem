@@ -24,11 +24,48 @@ export const accountNavigation = [
 ] as const;
 
 export const siteNavigation = [
+  {
+    label: "Chăm sóc da",
+    href: "/categories/cham-soc-da",
+    tone: "skincare",
+    categorySlug: "cham-soc-da",
+  },
+  {
+    label: "Trang điểm",
+    href: "/categories/trang-diem",
+    tone: "makeup",
+    categorySlug: "trang-diem",
+  },
+  {
+    label: "Cơ thể & Tóc",
+    href: "/categories/co-the-toc",
+    tone: "bodycare",
+    categorySlug: "co-the-toc",
+  },
+  {
+    label: "Phụ kiện",
+    href: "/categories/phu-kien",
+    tone: "accessories",
+    categorySlug: "phu-kien",
+  },
   { label: "Thương hiệu", href: routes.brands, tone: "brands" },
-  { label: "Khuyến mãi hot", href: routes.promotions, tone: "promotions" },
-  { label: "Trang điểm", href: "/categories/trang-diem", tone: "makeup" },
-  { label: "Chăm Sóc Da Mặt", href: "/categories/cham-soc-da", tone: "skincare" },
-  { label: "Chăm sóc cơ thể", href: "/categories/cham-soc-co-the-toc", tone: "bodycare" },
-  { label: "Sản Phẩm Mới", href: routes.newArrivals, tone: "new" },
-  { label: "ZO&FRIENDS", href: "/brands/zo-friends", tone: "friends" },
+  { label: "Khuyến mãi", href: routes.promotions, tone: "promotions" },
+  { label: "Sản phẩm mới", href: routes.newArrivals, tone: "new" },
+  { label: "Flash Sale", href: routes.flashSale, tone: "flash" },
+  { label: "Dear Dahlia", href: "/brands/dear-dahlia", tone: "featured-brand" },
+] as const;
+
+export const navigationBrandSlugs = [
+  "the-face-shop",
+  "clio",
+  "dear-dahlia",
+  "goodal",
+  "peripera",
+  "maybelline",
+  "cocoon",
+  "banila-co",
+  "3ce",
+  "amuse",
+  "la-roche-posay",
+  "innisfree",
 ] as const;
