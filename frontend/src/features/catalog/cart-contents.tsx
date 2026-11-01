@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
-import { readBff, requestBff } from "@/shared/api/browser";
+import { useState } from "react";
+import { requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
-import { cartSchema } from "./cart";
+import { queueCartChanges, type CartChange } from "./cart-commands";
 import { CatalogImage, formatPrice } from "./components";
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { previewSchema } from "@/features/checkout/contracts";
 import { useHydrated } from "@/shared/lib/use-hydrated";
+import { cartQuery, type Cart } from "./commerce-state";
 
 export function CartContents({
   compact = false,
@@ -29,13 +30,8 @@ export function CartContents({
 }) {
   const client = useQueryClient();
   const hydrated = useHydrated();
-  const [busy, setBusy] = useState<string | null>(null);
-  const mutationInFlight = useRef(false);
   const [error, setError] = useState("");
-  const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ["cart"],
-    queryFn: ({ signal }) => readBff("/api/cart/items", cartSchema, signal),
-  });
+  const { data, isPending, isError, refetch } = useQuery(cartQuery());
   const selection =
     data?.items
       .filter((item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded)
@@ -51,43 +47,36 @@ export function CartContents({
       }),
     retry: false,
   });
-  async function selectAll() {
-    if (mutationInFlight.current || !data) return;
-    const available = data.items.filter((item) => item.isAvailable);
-    const selected = !available.every((item) => item.isSelected);
-    mutationInFlight.current = true;
-    setBusy("all");
+  function queue(changes: CartChange[]) {
     setError("");
-    try {
-      for (const item of available.filter((item) => item.isSelected !== selected))
-        client.setQueryData(
-          ["cart"],
-          await requestBff(`/api/cart/items/${item.id}`, cartSchema, {
-            method: "PUT",
-            body: { isSelected: selected },
-          }),
-        );
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    } finally {
-      mutationInFlight.current = false;
-      setBusy(null);
-    }
+    queueCartChanges(client, changes, (cause) => setError(apiErrorMessage(cause)));
   }
-  async function change(id: string, method: "PUT" | "DELETE", body: object = {}) {
-    if (mutationInFlight.current) return;
-    mutationInFlight.current = true;
-    setBusy(id);
-    setError("");
-    try {
-      const result = await requestBff(`/api/cart/items/${id}`, cartSchema, { method, body });
-      client.setQueryData(["cart"], result);
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    } finally {
-      mutationInFlight.current = false;
-      setBusy(null);
-    }
+  function selectAll() {
+    const current = client.getQueryData<Cart>(["cart"]);
+    if (!current) return;
+    const available = current.items.filter((item) => item.isAvailable);
+    if (!available.length) return;
+    const selected = !available.every((item) => item.isSelected);
+    queue(
+      available
+        .filter((item) => item.isSelected !== selected)
+        .map((item) => ({ id: item.id, method: "PUT", body: { isSelected: selected } })),
+    );
+  }
+  function change(
+    id: string,
+    method: "PUT" | "DELETE",
+    body: { quantity?: number; isSelected?: boolean } = {},
+  ) {
+    queue([{ id, method, body }]);
+  }
+  function changeQuantity(id: string, delta: number) {
+    const current = client.getQueryData<Cart>(["cart"]);
+    const item = current?.items.find((row) => row.id === id);
+    if (!item) return;
+    const quantity = item.quantity + delta;
+    if (quantity < 1 || quantity > 100) return;
+    change(id, "PUT", { quantity });
   }
   if (!hydrated || isPending)
     return (
@@ -107,17 +96,38 @@ export function CartContents({
       (item) => !data.items.some((existing) => existing.id === item.id),
     ),
   ];
+  const updatingAddedItem =
+    data.totalQuantity > items.reduce((sum, item) => sum + item.quantity, 0);
   if (!items.length)
     return (
       <div className="catalog-empty">
-        Giỏ hàng đang trống.{" "}
-        <Link href="/products" onClick={onNavigate}>
-          Khám phá sản phẩm
-        </Link>
+        {updatingAddedItem ? (
+          <span role="status">Đang thêm sản phẩm vào giỏ hàng…</span>
+        ) : (
+          <>
+            Giỏ hàng đang trống.{" "}
+            <Link href="/products" onClick={onNavigate}>
+              Khám phá sản phẩm
+            </Link>
+          </>
+        )}
       </div>
     );
   const eligible = data.items.filter(
     (item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded,
+  );
+  const selectable = data.items.filter((item) => item.isAvailable);
+  const allSelected = selectable.length > 0 && selectable.every((item) => item.isSelected);
+  const selectAllControl = (
+    <label className="cart-select-all">
+      <input
+        type="checkbox"
+        checked={allSelected}
+        disabled={!selectable.length}
+        onChange={selectAll}
+      />
+      Chọn tất cả ({selectable.length} sản phẩm)
+    </label>
   );
   return (
     <>
@@ -169,19 +179,15 @@ export function CartContents({
             </div>
           )}
           <div className="cart-items">
+            {updatingAddedItem && (
+              <p className="cart-updating" role="status">
+                Đang cập nhật sản phẩm vừa thêm…
+              </p>
+            )}
+            {compact && <div className="cart-compact-select-all">{selectAllControl}</div>}
             {!compact && (
               <div className="cart-table-head">
-                <label className="cart-select-all">
-                  <input
-                    type="checkbox"
-                    checked={data.items
-                      .filter((item) => item.isAvailable)
-                      .every((item) => item.isSelected)}
-                    disabled={!!busy}
-                    onChange={() => void selectAll()}
-                  />
-                  Chọn tất cả ({items.length} sản phẩm)
-                </label>
+                {selectAllControl}
                 <span>Đơn giá</span>
                 <span>Số lượng</span>
                 <span>Thành tiền</span>
@@ -194,9 +200,9 @@ export function CartContents({
                     type="checkbox"
                     aria-label={`Chọn mua ${item.productName}`}
                     checked={item.isSelected}
-                    disabled={!!busy || !item.isAvailable}
+                    disabled={!item.isAvailable}
                     onChange={(event) =>
-                      void change(item.id, "PUT", { isSelected: event.target.checked })
+                      change(item.id, "PUT", { isSelected: event.target.checked })
                     }
                   />
                 )}
@@ -209,9 +215,9 @@ export function CartContents({
                       <input
                         type="checkbox"
                         checked={item.isSelected}
-                        disabled={!!busy || !item.isAvailable}
+                        disabled={!item.isAvailable}
                         onChange={(event) =>
-                          void change(item.id, "PUT", { isSelected: event.target.checked })
+                          change(item.id, "PUT", { isSelected: event.target.checked })
                         }
                       />{" "}
                       Chọn mua
@@ -235,8 +241,8 @@ export function CartContents({
                   <button
                     type="button"
                     aria-label={`Giảm số lượng ${item.productName}`}
-                    disabled={!!busy || item.quantity <= 1}
-                    onClick={() => void change(item.id, "PUT", { quantity: item.quantity - 1 })}
+                    disabled={item.quantity <= 1}
+                    onClick={() => changeQuantity(item.id, -1)}
                   >
                     −
                   </button>
@@ -244,8 +250,8 @@ export function CartContents({
                   <button
                     type="button"
                     aria-label={`Tăng số lượng ${item.productName}`}
-                    disabled={!!busy || item.quantity >= 100}
-                    onClick={() => void change(item.id, "PUT", { quantity: item.quantity + 1 })}
+                    disabled={item.quantity >= 100}
+                    onClick={() => changeQuantity(item.id, 1)}
                   >
                     +
                   </button>
@@ -256,8 +262,7 @@ export function CartContents({
                     type="button"
                     className="cart-remove"
                     aria-label={`Xóa ${item.productName}`}
-                    disabled={!!busy}
-                    onClick={() => void change(item.id, "DELETE")}
+                    onClick={() => change(item.id, "DELETE")}
                   >
                     <Trash2 size={15} />
                   </button>

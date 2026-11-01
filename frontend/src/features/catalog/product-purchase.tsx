@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
@@ -7,6 +7,7 @@ import { formatPrice } from "./components";
 import { TryOnCamera } from "./try-on-camera";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { emptyCart, optimisticCartAdd, type Cart } from "./commerce-state";
 
 interface Variant {
   id?: string;
@@ -44,9 +45,9 @@ export function ProductPurchase({
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [pending, setPending] = useState(false);
+  const addQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingUnits = useRef(0);
   const [message, setMessage] = useState("");
-  const [wishlisted, setWishlisted] = useState(false);
   const [stores, setStores] = useState<z.infer<typeof availabilitySchema>>([]);
   const [storeError, setStoreError] = useState(false);
   const variant = variants[selected];
@@ -71,44 +72,44 @@ export function ProductPurchase({
       });
     return () => controller.abort();
   }, [productId, variant?.id]);
-  async function add(buyNow = false) {
+  function add(buyNow = false) {
     if (!variant?.id) return;
-    setPending(true);
+    const variantId = variant.id;
+    const units = quantity;
     setMessage("");
-    try {
-      await requestBff("/api/cart/items", z.object({ totalQuantity: z.number() }), {
-        method: "POST",
-        body: { productVariantId: variant.id, quantity },
-      });
-      await queryClient.invalidateQueries({ queryKey: ["cart"] });
-      if (buyNow) router.push("/cart");
-      else setMessage("Đã thêm vào giỏ hàng.");
-    } catch (error) {
-      setMessage(apiErrorMessage(error));
-    } finally {
-      setPending(false);
-    }
-  }
-  async function saveWishlist() {
-    setPending(true);
-    setMessage("");
-    try {
-      await requestBff(
-        `/api/account/commerce/wishlist/${productId}`,
-        z.object({ productId: z.string(), isWishlisted: z.literal(true) }),
-        {
-          method: "PUT",
-          body: { productId, selected: true, idempotencyKey: crypto.randomUUID() },
-        },
-      );
-      setWishlisted(true);
-      void queryClient.invalidateQueries({ queryKey: ["wishlist"] });
-      setMessage("Đã lưu vào sản phẩm yêu thích.");
-    } catch (error) {
-      setMessage(apiErrorMessage(error));
-    } finally {
-      setPending(false);
-    }
+    void queryClient.cancelQueries({ queryKey: ["cart"] });
+    pendingUnits.current += units;
+    queryClient.setQueryData<Cart>(["cart"], (current) =>
+      optimisticCartAdd(current ?? emptyCart(), units),
+    );
+    if (!buyNow) setMessage("Đã thêm vào giỏ hàng.");
+    addQueue.current = addQueue.current.then(async () => {
+      try {
+        const result = await requestBff(
+          "/api/cart/items",
+          z.object({ totalQuantity: z.number() }),
+          {
+            method: "POST",
+            body: { productVariantId: variantId, quantity: units },
+          },
+        );
+        pendingUnits.current -= units;
+        queryClient.setQueryData<Cart>(["cart"], (current) => ({
+          ...(current ?? emptyCart()),
+          totalQuantity: result.totalQuantity + pendingUnits.current,
+        }));
+        if (buyNow) router.push("/cart");
+      } catch (error) {
+        pendingUnits.current -= units;
+        queryClient.setQueryData<Cart>(["cart"], (current) => ({
+          ...(current ?? emptyCart()),
+          totalQuantity: Math.max(0, (current?.totalQuantity ?? units) - units),
+        }));
+        setMessage(apiErrorMessage(error));
+      } finally {
+        if (pendingUnits.current === 0) void queryClient.invalidateQueries({ queryKey: ["cart"] });
+      }
+    });
   }
   return (
     <div className="pdp-purchase">
@@ -165,27 +166,19 @@ export function ProductPurchase({
           type="button"
           className="button pdp-add"
           onClick={() => add()}
-          disabled={!available || pending}
+          disabled={!available}
         >
-          {pending ? "Đang thêm..." : available ? "Thêm vào giỏ hàng" : "Tạm hết hàng"}
+          {available ? "Thêm vào giỏ hàng" : "Tạm hết hàng"}
         </button>
         <button
           type="button"
           className="button pdp-buy"
           onClick={() => add(true)}
-          disabled={!available || pending}
+          disabled={!available}
         >
           Mua ngay
         </button>
       </div>
-      <button
-        type="button"
-        className="cart-remove"
-        disabled={pending || wishlisted}
-        onClick={() => void saveWishlist()}
-      >
-        {wishlisted ? "Đã yêu thích" : "Lưu vào yêu thích"}
-      </button>
       {message && (
         <p role="status" className="pdp-message">
           {message}

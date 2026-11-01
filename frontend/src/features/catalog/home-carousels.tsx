@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { FavoriteButton } from "./favorite-button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
 import { CatalogImage, formatPrice } from "./components";
@@ -168,6 +169,12 @@ export function DealCarousel({ cards }: { cards: FlashCard[] }) {
       <Link href={`/products/${card.slug}`} className="catalog-card-image">
         <CatalogImage src={card.imageUrl} alt={card.name} />
       </Link>
+      <FavoriteButton
+        productId={card.productId}
+        slug={card.slug}
+        name={card.name}
+        className="catalog-favorite"
+      />
       <div className="catalog-card-copy">
         <p className="catalog-brand">{card.brandName || "GLOWUP"}</p>
         <Link className="catalog-card-title" href={`/products/${card.slug}`}>

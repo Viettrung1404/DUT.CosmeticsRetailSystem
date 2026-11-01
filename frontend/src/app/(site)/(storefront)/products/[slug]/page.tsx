@@ -6,6 +6,8 @@ import { getProduct, getRelated, getReviews } from "@/features/catalog/server";
 import { ProductGrid, SectionTitle } from "@/features/catalog/components";
 import { ProductGallery } from "@/features/catalog/product-gallery";
 import { ProductPurchase } from "@/features/catalog/product-purchase";
+import { FavoriteButton } from "@/features/catalog/favorite-button";
+import { ProductTabs } from "@/features/catalog/product-tabs";
 import { ReviewForm } from "@/features/post-purchase/review-form";
 
 function plainText(html: string) {
@@ -68,7 +70,15 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         <ProductGallery images={gallery} name={product.name} />
         <div className="pdp-summary">
           <p className="catalog-overline">{product.brandName || "GLOWUP BEAUTY"}</p>
-          <h1>{product.name}</h1>
+          <div className="pdp-title-row">
+            <h1>{product.name}</h1>
+            <FavoriteButton
+              productId={product.id}
+              slug={product.slug}
+              name={product.name}
+              className="pdp-favorite"
+            />
+          </div>
           <p className="catalog-rating">
             ★ {product.avgRating.toFixed(1)} <span>({product.totalReviews} đánh giá)</span>
           </p>
@@ -87,44 +97,39 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </div>
         </div>
       </div>
-      <div className="pdp-content">
-        <section>
-          <SectionTitle title="Thông tin sản phẩm" />
-          <p>
-            {plainText(
-              product.description ||
-                product.shortDescription ||
-                "Thông tin sản phẩm đang được cập nhật.",
-            )}
-          </p>
-          {product.ingredients?.length ? (
-            <>
-              <h3>Thành phần</h3>
-              <p>{product.ingredients.map((item) => item.ingredientName).join(", ")}</p>
-            </>
-          ) : null}
-        </section>
-        <section>
-          <SectionTitle title={`Đánh giá sản phẩm (${product.totalReviews})`} />
-          <ReviewForm productId={product.id} />
-          {reviews.status === "fulfilled" ? (
-            reviews.value.items.length ? (
-              reviews.value.items.map((review) => (
-                <article key={review.id} className="pdp-review">
-                  <strong>{review.reviewerName || "Khách hàng GlowUp"}</strong>
-                  <span> {"★".repeat(review.rating)}</span>
-                  <p>{review.title}</p>
-                  <p>{review.content}</p>
-                </article>
-              ))
+      <ProductTabs
+        description={plainText(
+          product.description ||
+            product.shortDescription ||
+            "Thông tin sản phẩm đang được cập nhật.",
+        )}
+        ingredients={product.ingredients ?? []}
+        brand={product.brandName}
+        category={product.categoryName}
+        reviewCount={product.totalReviews}
+        reviews={
+          <div className="pdp-reviews">
+            <h2>Đánh giá sản phẩm</h2>
+            <ReviewForm productId={product.id} />
+            {reviews.status === "fulfilled" ? (
+              reviews.value.items.length ? (
+                reviews.value.items.map((review) => (
+                  <article key={review.id} className="pdp-review">
+                    <strong>{review.reviewerName || "Khách hàng GlowUp"}</strong>
+                    <span> {"★".repeat(review.rating)}</span>
+                    <p>{review.title}</p>
+                    <p>{review.content}</p>
+                  </article>
+                ))
+              ) : (
+                <p>Chưa có đánh giá cho sản phẩm này.</p>
+              )
             ) : (
-              <p>Chưa có đánh giá cho sản phẩm này.</p>
-            )
-          ) : (
-            <p>Chưa tải được đánh giá. Vui lòng thử lại sau.</p>
-          )}
-        </section>
-      </div>
+              <p>Chưa tải được đánh giá. Vui lòng thử lại sau.</p>
+            )}
+          </div>
+        }
+      />
       {related.status === "fulfilled" && related.value.length > 0 && (
         <section className="pdp-related">
           <SectionTitle title="Sản phẩm thường được mua cùng" href="/products" />

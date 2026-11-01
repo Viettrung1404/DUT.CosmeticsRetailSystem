@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Product, Category, ProductPage, FlashCard } from "./server";
+import { FavoriteButton } from "./favorite-button";
 
 export const formatPrice = (value: number | null | undefined) =>
   value == null || !Number.isFinite(value)
@@ -42,6 +43,12 @@ export function ProductCard({ product }: { product: Product }) {
           </span>
         )}
       </Link>
+      <FavoriteButton
+        productId={product.id}
+        slug={product.slug}
+        name={product.name}
+        className="catalog-favorite"
+      />
       <div className="catalog-card-copy">
         <p className="catalog-brand">{product.brandName || "GLOWUP"}</p>
         <Link href={`/products/${product.slug}`} className="catalog-card-title">
@@ -78,6 +85,12 @@ export function FlashGrid({ cards }: { cards: FlashCard[] }) {
           <Link href={`/products/${card.slug}`} className="catalog-card-image">
             <CatalogImage src={card.imageUrl} alt={card.name} />
           </Link>
+          <FavoriteButton
+            productId={card.productId}
+            slug={card.slug}
+            name={card.name}
+            className="catalog-favorite"
+          />
           <div className="catalog-card-copy">
             <p className="catalog-brand">{card.brandName || "GLOWUP"}</p>
             <Link className="catalog-card-title" href={`/products/${card.slug}`}>

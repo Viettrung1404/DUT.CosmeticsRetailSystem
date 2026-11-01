@@ -5,6 +5,7 @@ import { requestBff } from "@/shared/api/browser";
 const authResponse = z.object({
   success: z.boolean().optional(),
   cart: z.enum(["none", "merged", "pending"]).optional(),
+  wishlist: z.enum(["none", "merged", "pending"]).optional(),
   revoked: z.boolean().optional(),
   code: z.enum(["ACCOUNT_LINK_REQUIRED", "EMAIL_VERIFICATION_REQUIRED"]).optional(),
 });

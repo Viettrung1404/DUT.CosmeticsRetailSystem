@@ -16,7 +16,7 @@ export function ProductGallery({ images, name }: { images: GalleryImage[]; name:
     trigger.current?.focus();
   }
   return (
-    <div className="pdp-gallery">
+    <div className={`pdp-gallery${images.length > 1 ? " pdp-gallery-many" : ""}`}>
       <button
         ref={trigger}
         type="button"

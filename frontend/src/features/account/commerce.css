@@ -2023,6 +2023,14 @@
   border: 0;
   border-radius: 0;
 }
+.cart-compact-select-all {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 4px 12px;
+  border-bottom: 1px solid #efe5e7;
+  background: #fff;
+}
 .mini-cart-drawer .cart-right-column {
   flex-shrink: 0;
   border-top: 1px solid #efe5e7;

@@ -30,6 +30,7 @@ export const routes = {
   addresses: "/account/addresses",
   orders: "/account/orders",
   wishlist: "/account/wishlist",
+  publicWishlist: "/wishlist",
   loyalty: "/account/loyalty",
   rewards: "/account/loyalty/rewards",
   returns: "/account/returns",

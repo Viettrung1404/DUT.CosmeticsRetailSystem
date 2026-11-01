@@ -13,6 +13,7 @@ import {
 import { createRedisStore, opaqueId, validId } from "./store";
 import { loginSchema, messageSchema, userSchema } from "./contracts";
 import { mergeGuestCart } from "./cart";
+import { mergeGuestWishlist } from "./wishlist";
 import { oauthProviders } from "./provider-config";
 
 const flowCookie = "glowup-oauth";
@@ -53,7 +54,8 @@ export async function oauthAction(action: string, input: unknown) {
     );
     if ("accessToken" in result) {
       const id = await establishSession(result, startedAt);
-      return { user: result.user, cart: await mergeGuestCart(id) };
+      const [cart, wishlist] = await Promise.all([mergeGuestCart(id), mergeGuestWishlist(id)]);
+      return { user: result.user, cart, wishlist };
     }
     const store = createRedisStore();
     const previous = jar.get(flowCookie)?.value;
@@ -96,5 +98,9 @@ export async function oauthAction(action: string, input: unknown) {
   const session = await establishSession(result, startedAt);
   await createRedisStore().remove(id);
   jar.delete(flowCookie);
-  return { user: result.user, cart: await mergeGuestCart(session) };
+  const [cart, wishlist] = await Promise.all([
+    mergeGuestCart(session),
+    mergeGuestWishlist(session),
+  ]);
+  return { user: result.user, cart, wishlist };
 }
