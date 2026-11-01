@@ -17,7 +17,8 @@ import {
   Headset,
 } from "lucide-react";
 import { SearchBox } from "@/features/catalog/search-box";
-import { siteNavigation } from "@/shared/config/navigation";
+import { navigationBrandSlugs, siteNavigation } from "@/shared/config/navigation";
+import { routes } from "@/shared/config/routes";
 import { useQuery } from "@tanstack/react-query";
 import { userSchema } from "@/shared/auth/contracts";
 import { ApiError } from "@/shared/api/errors";
@@ -26,10 +27,19 @@ import { z } from "zod";
 import { useHydrated } from "@/shared/lib/use-hydrated";
 import { BrandLogo } from "@/shared/ui/brand-logo";
 import { CartContents } from "@/features/catalog/cart-contents";
+import { WishlistDrawer } from "@/features/catalog/wishlist-drawer";
+import { cartQuery, wishlistIdsQuery } from "@/features/catalog/commerce-state";
+import type { Category } from "@/features/catalog/server";
 
 export const Logo = BrandLogo;
 
-export function SiteHeader() {
+export function SiteHeader({
+  categories = [],
+  brands = [],
+}: {
+  categories?: Category[];
+  brands?: { id: string; name: string; slug: string }[];
+}) {
   const hydrated = useHydrated();
   const path = usePathname();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -38,6 +48,13 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const cartDialog = useRef<HTMLDialogElement>(null);
   const cartTrigger = useRef<HTMLButtonElement>(null);
+  const wishlistDialog = useRef<HTMLDialogElement>(null);
+  const wishlistTrigger = useRef<HTMLButtonElement>(null);
+  const [wishlistOpen, setWishlistOpen] = useState(false);
+  const { data: cart } = useQuery(cartQuery());
+  const { data: wishlistIds } = useQuery(wishlistIdsQuery());
+  const cartCount = hydrated ? (cart?.totalQuantity ?? 0) : 0;
+  const wishlistCount = hydrated ? (wishlistIds?.ids.length ?? 0) : 0;
   const { data: user } = useQuery({
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
@@ -49,6 +66,7 @@ export function SiteHeader() {
       }
     },
   });
+  const visibleUser = hydrated ? user : null;
   useEffect(() => {
     if (open) {
       dialog.current?.showModal();
@@ -66,6 +84,29 @@ export function SiteHeader() {
     trigger.current?.focus();
   };
   const active = (href: string) => path === href || path.startsWith(`${href}/`);
+  const navigationBrands = navigationBrandSlugs.flatMap((slug) => {
+    const brand = brands.find((item) => item.slug === slug);
+    return brand
+      ? [{ id: brand.id, name: brand.name, href: `/brands/${encodeURIComponent(brand.slug)}` }]
+      : [];
+  });
+  const navigation = siteNavigation.map((item) => ({
+    ...item,
+    links:
+      "categorySlug" in item
+        ? (categories.find((category) => category.slug === item.categorySlug)?.children ?? []).map(
+            (child) => ({
+              id: child.id,
+              name: child.name,
+              href: `/categories/${encodeURIComponent(child.slug)}`,
+            }),
+          )
+        : item.href === routes.brands
+          ? navigationBrands
+          : [],
+  }));
+  const activeNavigation = (item: (typeof navigation)[number]) =>
+    active(item.href) || item.links.some((link) => path === link.href);
   return (
     <>
       <a href="#main-content" className="skip-link">
@@ -123,51 +164,69 @@ export function SiteHeader() {
             </details>
             <Link
               className="account-entry"
-              href={user ? "/account" : "/login"}
-              aria-label={user ? `Tài khoản ${user.fullName}` : "Đăng nhập"}
+              href={visibleUser ? "/account" : "/login"}
+              aria-label={visibleUser ? `Tài khoản ${visibleUser.fullName}` : "Đăng nhập"}
             >
               <UserRound className="mobile-only" />
-              <span>{user ? user.fullName : "Đăng nhập"}</span>
+              <span>{visibleUser ? visibleUser.fullName : "Đăng nhập"}</span>
             </Link>
-            <Link
+            <button
+              ref={wishlistTrigger}
+              type="button"
               className="wishlist-entry"
-              href="/account/wishlist"
-              aria-label="Sản phẩm yêu thích"
+              aria-label={`Mở sản phẩm yêu thích, ${wishlistCount} sản phẩm`}
+              onClick={() => {
+                setWishlistOpen(true);
+                wishlistDialog.current?.showModal();
+              }}
             >
               <Heart />
-            </Link>
+              {wishlistCount > 0 && <span className="header-count">{wishlistCount}</span>}
+            </button>
             <button
               ref={cartTrigger}
               type="button"
               className="cart-entry"
-              aria-label="Mở giỏ hàng"
+              aria-label={`Mở giỏ hàng, ${cartCount} sản phẩm`}
               onClick={() => cartDialog.current?.showModal()}
             >
               <ShoppingBag />
+              {cartCount > 0 && <span className="header-count">{cartCount}</span>}
             </button>
           </div>
         </div>
         <div className="navigation-row">
           <nav className="desktop-nav site-container" aria-label="Điều hướng chính">
             <div ref={pills} className="nav-pills">
-              {siteNavigation.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active(item.href) ? "page" : undefined}
-                  className={`nav-pill pill-${item.tone}`}
-                >
-                  {item.label}
-                </Link>
+              {navigation.map((item) => (
+                <div className="nav-group" key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={activeNavigation(item) ? "page" : undefined}
+                    className={`nav-pill pill-${item.tone}`}
+                  >
+                    {item.label}
+                  </Link>
+                  {item.links.length > 0 && (
+                    <div
+                      className={`nav-dropdown${item.href === routes.brands ? " nav-dropdown-brands" : ""}`}
+                    >
+                      <div className="nav-dropdown-inner">
+                        <Link className="nav-dropdown-all" href={item.href}>
+                          Xem tất cả {item.label.toLowerCase()} <ChevronRight size={15} />
+                        </Link>
+                        <div className="nav-dropdown-links">
+                          {item.links.map((link) => (
+                            <Link key={link.id} href={link.href}>
+                              {link.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
-              <span
-                className="nav-pill pill-pickup"
-                role="link"
-                aria-disabled="true"
-                title="Dịch vụ nhận tại cửa hàng sẽ sớm ra mắt"
-              >
-                Đặt hàng Online & nhận tại cửa hàng
-              </span>
             </div>
             <button
               type="button"
@@ -209,15 +268,37 @@ export function SiteHeader() {
           </button>
         </div>
         <nav aria-label="Điều hướng di động">
+          {navigation.map((item) =>
+            item.links.length ? (
+              <details className="drawer-category" key={item.href}>
+                <summary>{item.label}</summary>
+                <Link onClick={close} href={item.href}>
+                  Xem tất cả {item.label.toLowerCase()}
+                </Link>
+                {item.links.map((link) => (
+                  <Link onClick={close} key={link.id} href={link.href}>
+                    {link.name}
+                  </Link>
+                ))}
+              </details>
+            ) : (
+              <Link
+                onClick={close}
+                key={item.href}
+                href={item.href}
+                aria-current={activeNavigation(item) ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
+            ),
+          )}
           {[
             { href: "/products", label: "Tất cả sản phẩm" },
-            ...siteNavigation,
-            { href: "/flash-sale", label: "Flash Sale" },
             { href: "/stores", label: "Hệ thống cửa hàng" },
             { href: "/blog", label: "Góc làm đẹp" },
             { href: "/account", label: "Tài khoản của tôi" },
             { href: "/account/orders", label: "Tra cứu đơn hàng" },
-            { href: "/account/wishlist", label: "Sản phẩm yêu thích" },
+            { href: "/wishlist", label: "Sản phẩm yêu thích" },
             { href: "/account/notifications", label: "Thông báo" },
           ].map((item) => (
             <Link
@@ -230,6 +311,22 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
+      </dialog>
+      <dialog
+        ref={wishlistDialog}
+        className="wishlist-drawer"
+        aria-label="Sản phẩm yêu thích"
+        onClose={() => {
+          setWishlistOpen(false);
+          wishlistTrigger.current?.focus();
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) wishlistDialog.current?.close();
+        }}
+      >
+        {hydrated && (
+          <WishlistDrawer open={wishlistOpen} onNavigate={() => wishlistDialog.current?.close()} />
+        )}
       </dialog>
       <dialog
         ref={cartDialog}
@@ -251,7 +348,7 @@ export function SiteHeader() {
             <X />
           </button>
         </div>
-        <CartContents compact onNavigate={() => cartDialog.current?.close()} />
+        {hydrated && <CartContents compact onNavigate={() => cartDialog.current?.close()} />}
       </dialog>
     </>
   );

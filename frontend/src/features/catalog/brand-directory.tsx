@@ -29,7 +29,7 @@ export function BrandDirectory({ brands }: { brands: Brand[] }) {
         </label>
       </div>
       <nav className="brand-alphabet" aria-label="Lọc thương hiệu theo chữ cái">
-        <button type="button" aria-pressed={!letter} onClick={() => setLetter("")}>
+        <button type="button" style={{ padding: "0rem 1rem" }} aria-pressed={!letter} onClick={() => setLetter("")}>
           Tất cả
         </button>
         {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((char) => (

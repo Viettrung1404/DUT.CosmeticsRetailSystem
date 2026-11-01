@@ -49,7 +49,7 @@ export function safeReturnTo(value: unknown): string {
     return "/account";
   const url = new URL(value, "https://glowup.invalid");
   if (url.origin !== "https://glowup.invalid") return "/account";
-  return /^(?:\/$|\/account(?:\/|$)|\/checkout$|\/cart$|\/oauth\/continue$|\/products(?:\/|$))/.test(
+  return /^(?:\/$|\/account(?:\/|$)|\/checkout$|\/cart$|\/wishlist$|\/oauth\/continue$|\/products(?:\/|$))/.test(
     url.pathname,
   )
     ? url.pathname + url.search + url.hash

@@ -13,6 +13,7 @@ import {
 } from "@/shared/auth/server";
 import { failure, json, mutationBody } from "@/shared/auth/http";
 import { mergeGuestCart } from "@/shared/auth/cart";
+import { mergeGuestWishlist } from "@/shared/auth/wishlist";
 import { validId } from "@/shared/auth/store";
 import type { Session } from "@/shared/auth/broker";
 
@@ -60,7 +61,8 @@ export async function POST(request: Request, context: { params: Promise<{ action
       const startedAt = Date.now();
       const data = await upstream("/auth/login", loginSchema, parsed.data);
       const id = await establishSession(data, startedAt);
-      return json({ user: data.user, cart: await mergeGuestCart(id) });
+      const [cart, wishlist] = await Promise.all([mergeGuestCart(id), mergeGuestWishlist(id)]);
+      return json({ user: data.user, cart, wishlist });
     }
     await upstream(`/auth/${action}`, messageSchema, parsed.data);
     return json({ success: true }, action === "register" ? 201 : 200);

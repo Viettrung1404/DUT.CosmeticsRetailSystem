@@ -102,34 +102,38 @@ export function CatalogListingClient({
           </div>
         )}
         {facets && (
-          <fieldset className="filter-checks filter-group">
-            <legend>Thương hiệu</legend>
-            {facets.brands.slice(0, 15).map((item) => (
-              <label key={item.id}>
-                <input
-                  type="checkbox"
-                  checked={brands.has(item.id)}
-                  onChange={(event) => toggle("brandIds", item.id, event.target.checked)}
-                />
-                {item.name} <small>({item.count})</small>
-              </label>
-            ))}
-          </fieldset>
+          <div className="filter-group">
+            <fieldset className="filter-checks">
+              <legend>Thương hiệu</legend>
+              {facets.brands.slice(0, 15).map((item) => (
+                <label key={item.id}>
+                  <input
+                    type="checkbox"
+                    checked={brands.has(item.id)}
+                    onChange={(event) => toggle("brandIds", item.id, event.target.checked)}
+                  />
+                  {item.name} <small>({item.count})</small>
+                </label>
+              ))}
+            </fieldset>
+          </div>
         )}
         {skinTags.length > 0 && (
-          <fieldset className="filter-checks filter-group">
-            <legend>Tình trạng da</legend>
-            {skinTags.map((item) => (
-              <label key={item.name}>
-                <input
-                  type="checkbox"
-                  checked={tags.has(item.name)}
-                  onChange={(event) => toggle("tags", item.name, event.target.checked)}
-                />
-                {item.name} <small>({item.count})</small>
-              </label>
-            ))}
-          </fieldset>
+          <div className="filter-group">
+            <fieldset className="filter-checks">
+              <legend>Tình trạng da</legend>
+              {skinTags.map((item) => (
+                <label key={item.name}>
+                  <input
+                    type="checkbox"
+                    checked={tags.has(item.name)}
+                    onChange={(event) => toggle("tags", item.name, event.target.checked)}
+                  />
+                  {item.name} <small>({item.count})</small>
+                </label>
+              ))}
+            </fieldset>
+          </div>
         )}
         <form
           className="filter-group"

@@ -4,6 +4,7 @@ const fixture = vi.hoisted(() => ({ cookies: new Map<string, string>(), records:
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => fixture.cookies.has(key) ? { value: fixture.cookies.get(key) } : undefined, set: (key: string, value: string) => fixture.cookies.set(key, value), delete: (key: string) => fixture.cookies.delete(key) }) }));
 vi.mock("@/shared/auth/server", () => ({ upstream: fixture.upstream, establishSession: fixture.establish, sessionId: fixture.sessionId, sessionTtl: () => 3600, cookieOptions: () => ({ httpOnly: true }), authRuntime: () => ({ broker: { write: fixture.write } }) }));
 vi.mock("@/shared/auth/cart", () => ({ mergeGuestCart: async () => "none" }));
+vi.mock("@/shared/auth/wishlist", () => ({ mergeGuestWishlist: async () => "none" }));
 vi.mock("@/shared/auth/store", async (original) => ({ ...await original<typeof import("@/shared/auth/store")>(), createRedisStore: () => ({ get: async (key: string) => fixture.records.get(key) ?? null, create: async (key: string, value: unknown) => { fixture.records.set(key, value); }, remove: async (key: string) => { fixture.records.delete(key); } }) }));
 import { oauthAction, oauthFlow } from "@/shared/auth/oauth";
 import { ApiError } from "@/shared/api/errors";
