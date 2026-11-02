@@ -3,6 +3,7 @@ import { Check, Package, ChevronRight, ShoppingBag, CreditCard, CheckCircle2 } f
 import type { ReactNode } from "react";
 import { CatalogImage, formatPrice } from "@/features/catalog/components";
 export const orderStatusText: Record<string, string> = {
+  PENDING_PAYMENT: "Chờ thanh toán",
   PENDING: "Chờ xác nhận",
   CONFIRMED: "Đã xác nhận",
   PROCESSING: "Đang chuẩn bị",
@@ -60,7 +61,7 @@ export function OrderProgress({ status }: { status: string }) {
     { text: "Hoàn thành", icon: Check },
   ];
   const current =
-    status === "PENDING"
+    ["PENDING_PAYMENT", "PENDING"].includes(status)
       ? 0
       : ["CONFIRMED", "PROCESSING"].includes(status)
         ? 1

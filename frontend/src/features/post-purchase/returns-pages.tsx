@@ -1,4 +1,5 @@
 "use client";
+import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, ImagePlus, Package, Clock3, Check, Plus } from "lucide-react";
 import { AccountHeading, StatusBadge, returnStatusText } from "@/features/account/account-ui";
@@ -132,7 +133,7 @@ export function ReturnsPage() {
         ))}
       </nav>
       {query.isPending ? (
-        <p role="status">Đang tải…</p>
+        <ContentLoading variant="list" label="Đang tải yêu cầu đổi trả…" heading={false} />
       ) : query.isError ? (
         <div className="account-surface" role="alert">
           Không tải được yêu cầu. <button onClick={() => query.refetch()}>Thử lại</button>
@@ -301,7 +302,7 @@ export function NewReturnPage() {
           description="Chọn đơn hàng đã hoàn tất để bắt đầu yêu cầu."
         />
         {orders.isPending ? (
-          <p role="status">Đang tải đơn hàng…</p>
+          <ContentLoading variant="list" label="Đang tải đơn hàng…" heading={false} />
         ) : orders.isError ? (
           <p role="alert">
             Không tải được danh sách đơn hàng.{" "}
@@ -353,7 +354,7 @@ export function NewReturnPage() {
         )}
       </section>
     );
-  if (order.isPending) return <p role="status">Đang tải đơn hàng…</p>;
+  if (order.isPending) return <ContentLoading variant="detail" label="Đang tải đơn hàng…" />;
   if (order.isError) return <p role="alert">Không xem được đơn hàng.</p>;
   if (order.data.status !== "COMPLETED") return <p>Đơn hàng chưa đủ điều kiện đổi trả.</p>;
   return (
@@ -596,7 +597,7 @@ export function ReturnDetailPage({ id }: { id: string }) {
       setBusy(false);
     }
   }
-  if (query.isPending) return <p role="status">Đang tải yêu cầu…</p>;
+  if (query.isPending) return <ContentLoading variant="detail" label="Đang tải yêu cầu…" />;
   if (query.isError)
     return (
       <p role="alert">

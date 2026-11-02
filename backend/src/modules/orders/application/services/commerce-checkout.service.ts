@@ -4,36 +4,37 @@ import {
   Injectable,
   ServiceUnavailableException,
   NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '@infrastructure/database/prisma.service';
-import { Prisma } from '@prisma/client';
+} from "@nestjs/common";
+import { PrismaService } from "@infrastructure/database/prisma.service";
+import { Prisma } from "@prisma/client";
 import {
   guestSessionHash,
   checkoutRequestHash,
-} from '../../domain/guest-checkout';
+} from "../../domain/guest-checkout";
 import {
   CustomerCommands,
   json,
-} from '@modules/customer-commerce/infrastructure/commands';
-import { CommercePricingService } from '@modules/customer-experience/application/commerce-pricing.service';
-import { notifyCustomer } from '@core/services/customer-events';
-import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
-import { CreateOrderInput } from '../use-cases/create-order.use-case';
-import { PreviewOrderInput } from '../use-cases/preview-order.use-case';
-import { StoreResolverService } from './store-resolver.service';
-import { OrderEntity } from '../../domain/entities/order.entity';
-import { OrderStatus } from '@core/domain/orders/order-status.enum';
-import { reservePromotionBenefits } from '@core/services/promotion-lifecycle';
-import { formatOrderNumber } from '../utils/order-number.util';
-import { validatePaymentAmount } from '@modules/payments/domain/payment-policy';
-import { assertGatewayReady } from '@modules/payments/domain/gateway-readiness';
-import { createVariantNameSnapshot } from '../utils/variant-name-snapshot.util';
+} from "@modules/customer-commerce/infrastructure/commands";
+import { CommercePricingService } from "@modules/customer-experience/application/commerce-pricing.service";
+import { notifyCustomer } from "@core/services/customer-events";
+import { evaluateTier } from "@modules/customer-commerce/application/loyalty.service";
+import { CreateOrderInput } from "../use-cases/create-order.use-case";
+import { PreviewOrderInput } from "../use-cases/preview-order.use-case";
+import { StoreResolverService } from "./store-resolver.service";
+import { OrderEntity } from "../../domain/entities/order.entity";
+import { OrderStatus } from "@core/domain/orders/order-status.enum";
+import { reservePromotionBenefits } from "@core/services/promotion-lifecycle";
+import { formatOrderNumber } from "../utils/order-number.util";
+import { validatePaymentAmount } from "@modules/payments/domain/payment-policy";
+import { assertGatewayReady } from "@modules/payments/domain/gateway-readiness";
+import { createVariantNameSnapshot } from "../utils/variant-name-snapshot.util";
+import { STORE_SHIPPING_POLICY } from "@modules/customer-experience/domain/pricing-engine";
 
-type CheckoutSelection = Omit<PreviewOrderInput, 'customerId'> & {
+type CheckoutSelection = Omit<PreviewOrderInput, "customerId"> & {
   customerId?: string;
   sessionId?: string;
 };
-type CheckoutCreate = Omit<CreateOrderInput, 'customerId'> & {
+type CheckoutCreate = Omit<CreateOrderInput, "customerId"> & {
   customerId?: string;
   sessionId?: string;
 };
@@ -56,13 +57,13 @@ export class CommerceCheckoutService {
     tx: Prisma.TransactionClient = this.db,
   ) {
     if (!input.customerId && !input.sessionId)
-      throw new BadRequestException('CHECKOUT_SESSION_REQUIRED');
+      throw new BadRequestException("CHECKOUT_SESSION_REQUIRED");
     const cart = await tx.cart.findFirst({
       where: input.customerId
         ? { customerId: input.customerId }
         : { sessionId: input.sessionId, customerId: null },
       include: {
-        items: { where: { isSelected: true }, orderBy: { id: 'asc' } },
+        items: { where: { isSelected: true }, orderBy: { id: "asc" } },
       },
     });
     if (input.items?.length) {
@@ -77,7 +78,7 @@ export class CommerceCheckoutService {
         );
       return { items: input.items, cartId: matchesCart ? cart.id : null };
     }
-    if (!cart?.items.length) throw new BadRequestException('CART_EMPTY');
+    if (!cart?.items.length) throw new BadRequestException("CART_EMPTY");
     return {
       items: cart.items.map((i) => ({
         variantId: i.productVariantId,
@@ -99,6 +100,7 @@ export class CommerceCheckoutService {
     const { variants, ...publicQuote } = quote;
     return {
       ...publicQuote,
+      shippingPolicy: STORE_SHIPPING_POLICY,
       storeId,
       discountAmount: quote.lineDiscount + quote.couponDiscount,
       items: quote.items.map((line) => ({
@@ -114,26 +116,26 @@ export class CommerceCheckoutService {
     };
   }
   async create(input: CreateOrderInput): Promise<OrderEntity> {
-    const paymentMethod = input.paymentMethod ?? 'COD';
-    if (!['COD', 'VNPAY'].includes(paymentMethod))
-      throw new ServiceUnavailableException('ONLINE_PAYMENT_MODULE_REQUIRED');
-    if (paymentMethod === 'VNPAY') assertGatewayReady(paymentMethod);
+    const paymentMethod = input.paymentMethod ?? "COD";
+    if (!["COD", "SEPAY"].includes(paymentMethod))
+      throw new ServiceUnavailableException("ONLINE_PAYMENT_MODULE_REQUIRED");
+    if (paymentMethod === "SEPAY") assertGatewayReady(paymentMethod);
     const owner = await this.db.customer.findUniqueOrThrow({
       where: { id: input.customerId },
       select: { userId: true },
     });
-    if (!owner.userId) throw new BadRequestException('CUSTOMER_REQUIRED');
+    if (!owner.userId) throw new BadRequestException("CUSTOMER_REQUIRED");
     return this.commands.execute(
       owner.userId,
-      'CHECKOUT',
-      input.idempotencyKey ?? '',
+      "CHECKOUT",
+      input.idempotencyKey ?? "",
       input,
       (tx, customerId) => this.commit(tx, input, customerId),
     );
   }
 
   async previewGuest(
-    input: Omit<PreviewOrderInput, 'customerId'>,
+    input: Omit<PreviewOrderInput, "customerId">,
     sessionId: string,
   ) {
     guestSessionHash(sessionId);
@@ -147,24 +149,24 @@ export class CommerceCheckoutService {
     storeId?: string;
   }) {
     if ((input.usePoints ?? 0) > 0 || input.couponCode)
-      throw new BadRequestException('CUSTOMER_BENEFITS_REQUIRE_LOGIN');
+      throw new BadRequestException("CUSTOMER_BENEFITS_REQUIRE_LOGIN");
     if (input.storeId)
-      throw new BadRequestException('STORE_PICKUP_NOT_AVAILABLE');
+      throw new BadRequestException("STORE_PICKUP_NOT_AVAILABLE");
   }
 
   async createGuest(
-    input: Omit<CreateOrderInput, 'customerId'>,
+    input: Omit<CreateOrderInput, "customerId">,
     sessionId: string,
   ) {
     const sessionHash = guestSessionHash(sessionId);
     this.assertGuestBenefits(input);
-    const key = input.idempotencyKey ?? '';
+    const key = input.idempotencyKey ?? "";
     if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))
-      throw new BadRequestException('IDEMPOTENCY_KEY_REQUIRED');
-    const method = input.paymentMethod ?? 'COD';
-    if (!['COD', 'VNPAY'].includes(method))
-      throw new BadRequestException('INVALID_PAYMENT_METHOD');
-    if (method === 'VNPAY') assertGatewayReady(method);
+      throw new BadRequestException("IDEMPOTENCY_KEY_REQUIRED");
+    const method = input.paymentMethod ?? "COD";
+    if (!["COD", "SEPAY"].includes(method))
+      throw new BadRequestException("INVALID_PAYMENT_METHOD");
+    if (method === "SEPAY") assertGatewayReady(method);
     const requestHash = checkoutRequestHash(input);
     return this.db.$transaction(
       async (tx) => {
@@ -176,13 +178,13 @@ export class CommerceCheckoutService {
             AND: [
               {
                 pricingSnapshot: {
-                  path: ['guest', 'sessionHash'],
+                  path: ["guest", "sessionHash"],
                   equals: sessionHash,
                 },
               },
               {
                 pricingSnapshot: {
-                  path: ['guest', 'idempotencyKey'],
+                  path: ["guest", "idempotencyKey"],
                   equals: key,
                 },
               },
@@ -195,7 +197,7 @@ export class CommerceCheckoutService {
             guest: GuestReceipt;
           };
           if (snapshot.guest.requestHash !== requestHash)
-            throw new ConflictException('IDEMPOTENCY_PAYLOAD_MISMATCH');
+            throw new ConflictException("IDEMPOTENCY_PAYLOAD_MISMATCH");
           return this.guestOrder(sessionId, previous.id, tx);
         }
         return this.commit(tx, { ...input, sessionId }, undefined, {
@@ -219,7 +221,7 @@ export class CommerceCheckoutService {
         id,
         customerId: null,
         pricingSnapshot: {
-          path: ['guest', 'sessionHash'],
+          path: ["guest", "sessionHash"],
           equals: sessionHash,
         },
       },
@@ -247,12 +249,12 @@ export class CommerceCheckoutService {
           },
         },
         payments: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           select: { id: true, paymentMethod: true, status: true },
         },
       },
     });
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND');
+    if (!order) throw new NotFoundException("ORDER_NOT_FOUND");
     return {
       ...order,
       subtotal: Number(order.subtotal),
@@ -275,10 +277,10 @@ export class CommerceCheckoutService {
     customerId?: string,
     guest?: GuestReceipt,
   ): Promise<OrderEntity> {
-    const paymentMethod = input.paymentMethod ?? 'COD';
+    const paymentMethod = input.paymentMethod ?? "COD";
 
     if (customerId !== input.customerId)
-      throw new BadRequestException('CUSTOMER_REQUIRED');
+      throw new BadRequestException("CUSTOMER_REQUIRED");
     const selection = await this.selection(input, tx);
     const storeId = await this.stores.resolveStoreForOrder({
       requestedStoreId: input.storeId,
@@ -290,7 +292,7 @@ export class CommerceCheckoutService {
       true,
     );
     if (!input.quoteVersion)
-      throw new BadRequestException('PRICE_QUOTE_REQUIRED');
+      throw new BadRequestException("PRICE_QUOTE_REQUIRED");
     this.pricing.assertQuote(input.quoteVersion, quote);
     validatePaymentAmount(paymentMethod, quote.totalAmount);
     const variantIds = selection.items.map((i) => i.variantId);
@@ -307,7 +309,7 @@ export class CommerceCheckoutService {
         (i) => i.product_variant_id === item.variantId,
       );
       if (!row || row.quantity - row.reserved_quantity < item.quantity)
-        throw new ConflictException('INSUFFICIENT_STOCK');
+        throw new ConflictException("INSUFFICIENT_STOCK");
       await tx.inventory.update({
         where: { id: row.id },
         data: { reservedQuantity: { increment: item.quantity } },
@@ -322,8 +324,8 @@ export class CommerceCheckoutService {
         orderNumber,
         customerId,
         storeId,
-        orderType: input.storeId ? 'STORE_PICKUP' : 'ONLINE',
-        status: 'PENDING',
+        orderType: input.storeId ? "STORE_PICKUP" : "ONLINE",
+        status: paymentMethod === "SEPAY" ? "PENDING_PAYMENT" : "PENDING",
         subtotal: quote.subtotal,
         discountAmount:
           quote.lineDiscount + quote.couponDiscount + quote.pointsDiscount,
@@ -336,7 +338,7 @@ export class CommerceCheckoutService {
         loyaltyPointsUsed: quote.pointsUsed,
         pricingSnapshot: json({
           version: 1,
-          policy: 'SPRINT5',
+          policy: "SPRINT5",
           ...(guest ? { guest } : {}),
           quoteVersion: quote.quoteVersion,
           lineDiscount: quote.lineDiscount,
@@ -363,7 +365,7 @@ export class CommerceCheckoutService {
           discountAmount:
             line.lineDiscount + line.couponDiscount + line.pointsValue,
           totalPrice: line.cashValue,
-          pricingSnapshot: json({ version: 1, policy: 'SPRINT5', ...line }),
+          pricingSnapshot: json({ version: 1, policy: "SPRINT5", ...line }),
         },
       });
     }
@@ -408,7 +410,7 @@ export class CommerceCheckoutService {
           customerId,
           orderId: order.id,
           points: -quote.pointsUsed,
-          type: 'REDEEM',
+          type: "REDEEM",
           eventKey: `ORDER:${order.id}:REDEEM`,
         },
       });
@@ -425,36 +427,36 @@ export class CommerceCheckoutService {
             isSelected: true,
           },
         });
-        if (removed.count !== 1) throw new ConflictException('CART_CHANGED');
+        if (removed.count !== 1) throw new ConflictException("CART_CHANGED");
       }
     }
     await tx.payment.create({
       data: {
         orderId: order.id,
         paymentMethod,
-        status: 'PENDING',
+        status: "PENDING",
         amount: order.totalAmount,
       },
     });
     await tx.orderStatusHistory.create({
       data: {
         orderId: order.id,
-        status: 'PENDING',
-        note: 'Đơn hàng được khởi tạo thành công',
+        status: order.status,
+        note: paymentMethod === "SEPAY" ? "Đơn hàng chờ thanh toán SePay" : "Đơn hàng được khởi tạo thành công",
       },
     });
     if (customerId)
       await notifyCustomer(
         tx,
         customerId,
-        `ORDER:${order.id}:PENDING`,
-        'Đã nhận đơn hàng',
-        'ORDER',
+        `ORDER:${order.id}:${order.status}`,
+        paymentMethod === "SEPAY" ? "Đơn hàng đang chờ thanh toán" : "Đã nhận đơn hàng",
+        "ORDER",
         { orderId: order.id },
       );
     const items = await tx.orderItem.findMany({
       where: { orderId: order.id },
-      orderBy: { id: 'asc' },
+      orderBy: { id: "asc" },
       select: {
         id: true,
         orderId: true,
@@ -470,7 +472,7 @@ export class CommerceCheckoutService {
     const { pricingSnapshot: _privateSnapshot, ...publicOrder } = order;
     return new OrderEntity({
       ...publicOrder,
-      status: OrderStatus.PENDING,
+      status: order.status as OrderStatus,
       shippingAddress: input.shippingAddress,
       subtotal: Number(order.subtotal),
       discountAmount: Number(order.discountAmount),
@@ -482,7 +484,7 @@ export class CommerceCheckoutService {
         unitPrice: Number(item.unitPrice),
         discountAmount: Number(item.discountAmount),
         totalPrice: Number(item.totalPrice),
-      })) as OrderEntity['items'],
+      })) as OrderEntity["items"],
     });
   }
 }

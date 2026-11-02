@@ -8,7 +8,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '@core/decorators/public.decorator';
 import { PrismaService } from '@infrastructure/database/prisma.service';
@@ -18,6 +18,7 @@ import {
   PaymentsService,
 } from '../../application/services/payments.service';
 import { GatewayAdapter } from '../../infrastructure/gateways/gateway-adapters';
+import { SepayAdapter } from '../../infrastructure/gateways/sepay-adapter';
 
 @Public()
 @ApiTags('Payment callbacks')
@@ -29,6 +30,39 @@ export class PaymentCallbacksController {
     private readonly gateways: Record<Gateway, GatewayAdapter>,
     private readonly db: PrismaService,
   ) {}
+  @Post('sepay/webhook')
+  @ApiOperation({
+    summary:
+      'SePay HMAC-SHA256 webhook; durable receipt before acknowledgement',
+  })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['success'],
+      properties: { success: { type: 'boolean' } },
+    },
+  })
+  async sepay(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Res() res: Response,
+  ) {
+    try {
+      const adapter = this.gateways.SEPAY as SepayAdapter;
+      const raw = req.rawBody?.toString('utf8') || '';
+      adapter.verifyWebhook(
+        raw,
+        req.get('x-sepay-signature') || '',
+        req.get('x-sepay-timestamp') || '',
+      );
+      const observation = adapter.callback(raw);
+      await this.service.receive(observation);
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      const status = error instanceof HttpException ? error.getStatus() : 503;
+      // Never acknowledge a transient storage failure: SePay must retry it.
+      return res.status(status).json({ success: false });
+    }
+  }
   @Get('vnpay/ipn')
   @ApiOperation({ summary: 'VNPay native GET IPN' })
   vnpay(@Req() req: Request, @Res() res: Response) {
@@ -54,7 +88,7 @@ export class PaymentCallbacksController {
       if (gateway === 'ZALOPAY')
         return res
           .status(200)
-          .json({ return_code: 1, return_message: 'ThÃ nh cÃ´ng' });
+          .json({ return_code: 1, return_message: 'Thành công' });
       return res.status(200).json({
         RspCode: duplicate ? '02' : '00',
         Message: duplicate ? 'Order already confirmed' : 'Confirm Success',
@@ -82,7 +116,7 @@ export class PaymentCallbacksController {
       if (gateway === 'ZALOPAY' && status < 500)
         return res
           .status(200)
-          .json({ return_code: 2, return_message: 'Tháº¥t báº¡i' });
+          .json({ return_code: 2, return_message: 'Thất bại' });
       return res.status(status >= 500 ? 503 : 400).end();
     }
   }
@@ -112,7 +146,8 @@ export class PaymentCallbacksController {
       },
       select: { id: true, platform: true },
     });
-    if (!payment) return res.status(410).send('LiÃªn káº¿t thanh toÃ¡n Ä‘Ã£ háº¿t háº¡n');
+    if (!payment)
+      return res.status(410).send('LiÃªn káº¿t thanh toÃ¡n Ä‘Ã£ háº¿t háº¡n');
     const web = new URL(process.env.PAYMENT_WEB_RETURN_URL!);
     web.searchParams.set('paymentId', payment.id);
     if (payment.platform !== 'MOBILE') return res.redirect(303, web.toString());
@@ -141,4 +176,3 @@ export class PaymentCallbacksController {
       );
   }
 }
-

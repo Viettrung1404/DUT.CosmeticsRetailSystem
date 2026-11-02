@@ -8,6 +8,8 @@ export interface CustomerAddressProps {
   city: string;
   district: string;
   ward: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -23,6 +25,8 @@ export class CustomerAddressEntity {
   public city: string;
   public district: string;
   public ward: string;
+  public latitude?: number | null;
+  public longitude?: number | null;
   public isDefault: boolean;
   public createdAt: Date;
   public updatedAt: Date;
@@ -37,12 +41,16 @@ export class CustomerAddressEntity {
     this.city = props.city;
     this.district = props.district;
     this.ward = props.ward;
+    this.latitude = props.latitude ?? null;
+    this.longitude = props.longitude ?? null;
     this.isDefault = props.isDefault ?? false;
     this.createdAt = props.createdAt || new Date();
     this.updatedAt = props.updatedAt || new Date();
   }
 
   public getFullAddress(): string {
-    return `${this.addressLine}, ${this.ward}, ${this.district}, ${this.city}`;
+    return [this.addressLine, this.ward, this.district, this.city]
+      .filter(Boolean)
+      .join(", ");
   }
 }

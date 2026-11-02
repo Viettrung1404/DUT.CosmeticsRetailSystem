@@ -46,7 +46,7 @@ export class GuestCheckoutController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiOperation({
-    summary: 'Tạo đơn guest COD/VNPAY với idempotency bền vững theo phiên',
+    summary: 'Tạo đơn guest COD/SEPAY với idempotency bền vững theo phiên',
   })
   create(
     @Headers('x-session-id') session: string,
@@ -66,11 +66,11 @@ export class GuestCheckoutController {
   ) {
     return this.checkout.guestOrder(session, id);
   }
-  @Post('payments/vnpay')
+  @Post('payments/sepay')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({
-    summary: 'Tạo/khôi phục thanh toán VNPAY cho đơn thuộc phiên guest',
+    summary: 'Tạo/khôi phục thanh toán SEPAY cho đơn thuộc phiên guest',
   })
   payment(
     @Headers('x-session-id') session: string,

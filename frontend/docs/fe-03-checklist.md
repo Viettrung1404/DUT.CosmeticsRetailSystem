@@ -1,6 +1,18 @@
 # FE-03 — Giỏ hàng, checkout và thanh toán
 
-Ngày cập nhật: 29/10/2026.
+Ngày cập nhật: 01/11/2026.
+
+## Checkout theo Stitch — 01/11/2026
+
+- Đối chiếu `thanh_to_n_glowup/code.html`: khung hai cột, tiến trình đặt hàng, thẻ địa chỉ, thanh toán, voucher/xu, tóm tắt đơn và thông tin giao hàng. Desktop/mobile không tràn ngang.
+- Guest nhập địa chỉ; tài khoản chọn địa chỉ đã lưu, thêm/chỉnh sửa ngay trong checkout. Sổ địa chỉ tài khoản dùng cùng biểu mẫu hai cấp. Địa chỉ cũ được giữ nguyên và cần chọn lại đơn vị hiện tại trước khi checkout.
+- Dữ liệu tỉnh–xã snapshot `2026.10.8` từ tinhthanhpho.com (CC BY 4.0), đủ 34 tỉnh/thành và 3.321 phường/xã/đặc khu. Không có trường nhập quận/huyện. Chọn lại tỉnh xóa xã và ghim cũ.
+- Leaflet hỗ trợ chọn/kéo ghim và định vị trình duyệt; tọa độ được lưu ở sổ địa chỉ, có thể gửi trong shipping snapshot. Ghim không tự suy ra số nhà hoặc thay thế địa chỉ. Test tự động dùng tile giả lập, không thu thập tile OSM bằng trình duyệt headless.
+- Voucher nhập tay chỉ áp dụng sau khi kiểm tra backend; kho voucher chỉ trả mã công khai và mã thuộc tài khoản hiện tại, loại mã hết lượt/chiến dịch không còn hoạt động. Không điền sẵn voucher hay xu. Slider/toggle xu đọc số dư và quy tắc backend, tách giảm sản phẩm, voucher, xu và phí ship trong tổng tiền.
+- Phí ship và ngưỡng miễn phí cùng nguồn chính sách với pricing engine (hiện 30.000đ, miễn phí từ 500.000đ tiền hàng sau ưu đãi/xu hoặc campaign freeship). Chưa có hãng vận chuyển/ETA; giao diện ghi lịch giao được cửa hàng xác nhận.
+- Migration `20261101000000_address_map_location` đã áp dụng; backend readiness 200. Backend build và 42 test liên quan qua; frontend production build, TypeScript, ESLint phần thay đổi, 53 unit test qua (14 test có điều kiện skip), 6 ca trình duyệt desktop/mobile qua. OpenAPI/BFF contract đã cập nhật.
+- Smoke backend thật bằng `scripts/accept-checkout-layout.mjs`: đăng nhập demo; đọc voucher/xu; thêm và chọn địa chỉ ngay tại checkout; định vị, lưu và đọc lại tọa độ; áp mã thật; sửa địa chỉ trong sổ địa chỉ và kiểm tra giữ tọa độ. Địa chỉ QA đã xóa, không tạo đơn hay chuyển tiền. Ảnh desktop/mobile và kết quả JSON tại `.tmp/checkout-review/` ở root workspace (gitignored).
+- Các mục bên dưới là kết quả lịch sử ngày 29/10/2026. Checkout online hiện dùng SePay; xem `backend/docs/sepay-setup.md` cho trạng thái nghiệm thu thanh toán mới nhất.
 
 ## Đã triển khai
 

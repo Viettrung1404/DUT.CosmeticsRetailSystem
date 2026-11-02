@@ -1,4 +1,5 @@
 "use client";
+import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import {
   Heart,
@@ -95,7 +96,7 @@ export function WishlistPage() {
         }
       />
       {query.isPending ? (
-        <p role="status">Đang tải…</p>
+        <ContentLoading variant="cards" label="Đang tải sản phẩm yêu thích…" heading={false} />
       ) : query.isError ? (
         <div className="account-surface" role="alert">
           Không tải được danh sách. <button onClick={() => query.refetch()}>Thử lại</button>
@@ -150,7 +151,7 @@ export function LoyaltyPage() {
     queryFn: ({ signal }) =>
       readBff(`/api/account/commerce/loyalty?page=${page}`, loyaltySchema, signal),
   });
-  if (query.isPending) return <p role="status">Đang tải điểm thưởng…</p>;
+  if (query.isPending) return <ContentLoading variant="list" label="Đang tải điểm thưởng…" />;
   if (query.isError)
     return (
       <p role="alert">
@@ -316,7 +317,7 @@ export function RewardsPage() {
         <Link href="/account/loyalty">Xem lịch sử điểm →</Link>
       </div>
       {query.isPending ? (
-        <p role="status">Đang tải ưu đãi…</p>
+        <ContentLoading variant="cards" label="Đang tải ưu đãi…" heading={false} />
       ) : query.isError ? (
         <div className="account-surface" role="alert">
           Chính sách đổi ưu đãi hiện chưa khả dụng.{" "}
@@ -428,7 +429,7 @@ export function NotificationsPage() {
         }
       />
       {query.isPending ? (
-        <p role="status">Đang tải…</p>
+        <ContentLoading variant="list" label="Đang tải thông báo…" heading={false} />
       ) : query.isError ? (
         <div className="account-surface" role="alert">
           Không tải được thông báo. <button onClick={() => query.refetch()}>Thử lại</button>

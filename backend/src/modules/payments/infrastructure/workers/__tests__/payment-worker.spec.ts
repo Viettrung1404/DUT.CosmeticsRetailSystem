@@ -3,7 +3,44 @@ import { Test } from '@nestjs/testing';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { PaymentsService } from '../../../application/services/payments.service';
+import { VnpayQueryError } from '../../../domain/vnpay-query.error';
 describe('Payment worker scheduling', () => {
+  it('logs VNPay query diagnostics and schedules recovery without confirming payment', async () => {
+    const db = { $executeRaw: jest.fn().mockResolvedValue(1) };
+    const service = {
+      process: jest
+        .fn()
+        .mockRejectedValue(new VnpayQueryError('request-id', '99')),
+    };
+    const worker = new PaymentWorker(db as any, service as any);
+    const warn = jest
+      .spyOn((worker as any).logger, 'warn')
+      .mockImplementation();
+    await (worker as any).run({ id: 'payment-id', claim_token: 'lease' });
+    expect(warn).toHaveBeenCalledWith({
+      code: 'VNPAY_QUERY_UNAVAILABLE',
+      paymentId: 'payment-id',
+      requestId: 'request-id',
+      responseCode: '99',
+    });
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+    const [sql, slowExpiredVnpay, paymentId, claimToken] = db.$executeRaw.mock.calls[0];
+    expect(sql.join('')).toContain("clock_timestamp()+interval '15 seconds'");
+    expect(sql.join('')).toContain("expires_at+interval '60 seconds'<=clock_timestamp()");
+    expect(sql.join('')).toContain("clock_timestamp()+interval '5 minutes'");
+    expect(slowExpiredVnpay).toBe(true);
+    expect(sql.join('')).not.toContain("status='COMPLETED'");
+    expect([paymentId, claimToken]).toEqual(['payment-id', 'lease']);
+  });
+  it('preserves normal retries for SePay, transport errors and other failures', async () => {
+    const db = { $executeRaw: jest.fn().mockResolvedValue(1) };
+    const service = { process: jest.fn().mockRejectedValue(new Error('timeout')) };
+    const worker = new PaymentWorker(db as any, service as any);
+    const warn = jest.spyOn((worker as any).logger, 'warn').mockImplementation();
+    await (worker as any).run({ id: 'payment-id', claim_token: 'lease' });
+    expect(db.$executeRaw.mock.calls[0].slice(1)).toEqual([false, 'payment-id', 'lease']);
+    expect(warn).not.toHaveBeenCalled();
+  });
   it('waits for an in-flight claim before finishing shutdown', async () => {
     const previous = process.env.PAYMENT_WORKER_ENABLED;
     process.env.PAYMENT_WORKER_ENABLED = 'true';

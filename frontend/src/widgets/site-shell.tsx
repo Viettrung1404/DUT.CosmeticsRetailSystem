@@ -441,7 +441,7 @@ export function SiteFooter() {
             ))}
             {group.title === "Tài khoản & Quyền lợi" && (
               <p className="payment-methods">
-                <span>VNPAY</span>
+                <span>SePay</span>
                 <span>COD</span>
               </p>
             )}

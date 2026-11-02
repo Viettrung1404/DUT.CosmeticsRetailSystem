@@ -13,6 +13,7 @@ import { TransformResponseInterceptor } from '@core/interceptors/transform-respo
 import { PaymentsModule } from '../../../payments.module';
 import { UsersModule } from '@modules/users/users.module';
 import { NotificationsModule } from '@modules/notifications/notifications.module';
+import { PermissionsModule } from '@modules/permissions/permissions.module';
 const integration = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 integration('Public payment protocol and private API contracts', () => {
   let app: INestApplication;
@@ -44,6 +45,7 @@ integration('Public payment protocol and private API contracts', () => {
         PaymentsModule,
         UsersModule,
         NotificationsModule,
+        PermissionsModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
     }).compile();
@@ -64,6 +66,20 @@ integration('Public payment protocol and private API contracts', () => {
   afterAll(async () => {
     await app?.close();
   });
+  async function sessionToken(userId: string) {
+    await db.user.update({
+      where: { id: userId },
+      data: { emailVerified: true },
+    });
+    const session = await db.userSession.create({
+      data: {
+        userId,
+        refreshToken: randomUUID(),
+        expiresAt: new Date(Date.now() + 3600000),
+      },
+    });
+    return jwt.sign({ userId, sessionId: session.id }, 'sprint3-test-secret');
+  }
   async function callbackFixture(method: string) {
     await db.role.upsert({
       where: { id: 6 },
@@ -210,16 +226,7 @@ integration('Public payment protocol and private API contracts', () => {
   });
   it('uses the actual HTTP create status in the response envelope', async () => {
     const { payment, order, user } = await callbackFixture('MOMO');
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        roleId: 6,
-        roleName: 'Customer',
-        permissionCodes: [],
-        dataScope: 'SELF',
-      },
-      'sprint3-test-secret',
-    );
+    const token = await sessionToken(user.id);
     const ready = await request(app.getHttpServer())
       .post('/api/v1/payments/momo/create')
       .auth(token, { type: 'bearer' })
@@ -239,16 +246,7 @@ integration('Public payment protocol and private API contracts', () => {
   });
   it('rejects null fullName as a validation error without writing profile', async () => {
     const { user } = await callbackFixture('MOMO');
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        roleId: 6,
-        roleName: 'Customer',
-        permissionCodes: [],
-        dataScope: 'SELF',
-      },
-      'sprint3-test-secret',
-    );
+    const token = await sessionToken(user.id);
     await request(app.getHttpServer())
       .put('/api/v1/users/me')
       .auth(token, { type: 'bearer' })
@@ -304,16 +302,7 @@ integration('Public payment protocol and private API contracts', () => {
         status: 'PENDING',
       },
     });
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        roleId: 6,
-        roleName: 'Customer',
-        permissionCodes: [],
-        dataScope: 'SELF',
-      },
-      'sprint3-test-secret',
-    );
+    const token = await sessionToken(user.id);
     const reply = await request(app.getHttpServer())
       .post('/api/v1/payments/momo/create')
       .auth(token, { type: 'bearer' })

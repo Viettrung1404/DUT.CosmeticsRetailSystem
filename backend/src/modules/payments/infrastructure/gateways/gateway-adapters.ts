@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { parse } from 'lossless-json';
+import { VnpayQueryError } from '../../domain/vnpay-query.error';
 import {
   Gateway,
   GatewayState,
@@ -11,6 +12,7 @@ import {
   zaloDuration,
 } from '../../domain/payment-policy';
 export interface Attempt {
+  transactionId?: string;
   id: string;
   merchantReference: string;
   requestId: string;
@@ -381,6 +383,15 @@ export class VnpayAdapter implements GatewayAdapter {
         ),
       },
     );
+    // VNPay can return HTTP 200 with only ResponseCode/Message on API errors.
+    // Keep these errors distinct from a forged or malformed payment response.
+    if (
+      !data.vnp_SecureHash &&
+      typeof data.vnp_ResponseCode === 'string' &&
+      /^\d{2}$/.test(data.vnp_ResponseCode) &&
+      data.vnp_ResponseCode !== '00'
+    )
+      throw new VnpayQueryError(r.vnp_RequestId, data.vnp_ResponseCode);
     const responseKeys = [
       'vnp_ResponseId',
       'vnp_Command',

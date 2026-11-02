@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 const titles: Record<string, string> = {
+  PENDING_PAYMENT: 'Đơn hàng đang chờ thanh toán',
+  PAYMENT_RECEIVED: 'Đã nhận thanh toán; đơn chờ cửa hàng xác nhận',
   PENDING: 'Đã nhận đơn hàng',
   CONFIRMED: 'Đơn hàng đã xác nhận',
   SHIPPING: 'Đơn hàng đang giao',

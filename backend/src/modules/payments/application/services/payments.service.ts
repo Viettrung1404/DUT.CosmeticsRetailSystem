@@ -114,6 +114,7 @@ export class PaymentsService {
   }
   private checkMerchant(p: Payment, o: Observation) {
     const field = {
+      SEPAY: 'accountNumber',
       MOMO: 'partnerCode',
       VNPAY: 'vnp_TmnCode',
       ZALOPAY: 'app_id',
@@ -164,16 +165,16 @@ export class PaymentsService {
         throw new BadRequestException(
           'Đơn hàng phải dùng cổng đã chọn khi checkout',
         );
-      if (order.status !== 'PENDING')
+      if (!['PENDING_PAYMENT', 'PENDING'].includes(order.status) || active.status === 'COMPLETED')
         throw new BadRequestException('Đơn hàng không còn chờ thanh toán');
       const now = await this.clock(tx);
       const expiresAt = new Date(order.createdAt.getTime() + 900000);
       if (now >= expiresAt)
         throw new BadRequestException('Đơn hàng đã hết hạn thanh toán');
       if (active.merchantReference && active.status !== 'FAILED') {
-        // VNPay create only signs a URL locally, so a crash before publishing it is safely replayable.
+        // VNPay URLs and SePay QR instructions are generated locally and safely replayable.
         const recoverUrl =
-          method === 'VNPAY' &&
+          ['VNPAY', 'SEPAY'].includes(method) &&
           active.status === 'INITIATING' &&
           !active.paymentUrl &&
           !!active.requestSnapshot;
@@ -197,7 +198,9 @@ export class PaymentsService {
       const merchantReference =
         method === 'ZALOPAY'
           ? `${vnDate(now).slice(2, 8)}_${id.replace(/-/g, '')}`
-          : id.replace(/-/g, '');
+          : method === 'SEPAY'
+            ? `GU${id.replace(/-/g, '').toUpperCase()}`
+            : id.replace(/-/g, '');
       const a: Attempt = {
         id,
         merchantReference,
@@ -333,9 +336,17 @@ export class PaymentsService {
     const payment = await this.db.payment.findUniqueOrThrow({
       where: { id: paymentId },
     });
-    const o = await this.gateways[payment.paymentMethod as Gateway].query(
-      this.attempt(payment),
-    );
+    const pendingCharge =
+      payment.paymentMethod === 'SEPAY'
+        ? await this.db.paymentCharge.findFirst({
+            where: { paymentId, verifiedAt: null },
+            orderBy: { firstPaidReceivedAt: 'asc' },
+          })
+        : null;
+    const o = await this.gateways[payment.paymentMethod as Gateway].query({
+      ...this.attempt(payment),
+      transactionId: pendingCharge?.transactionId,
+    });
     this.checkMerchant(payment, o);
     if (
       o.gateway !== payment.paymentMethod ||
@@ -384,14 +395,14 @@ export class PaymentsService {
         let confirmed = false;
         if (
           !current.fulfilledTransactionId &&
-          current.orderStatus === 'PENDING'
+          ['PENDING_PAYMENT', 'PENDING'].includes(current.orderStatus)
         ) {
           await tx.$queryRaw`SELECT id FROM inventory WHERE store_id=${current.storeId}::uuid AND product_variant_id IN (SELECT product_variant_id FROM order_items WHERE order_id=${payment.orderId}::uuid) ORDER BY id FOR UPDATE`;
           // Compare native timestamps in PostgreSQL; JS Date truncates microseconds.
           const changed =
-            await tx.$executeRaw`UPDATE orders o SET status='CONFIRMED',updated_at=clock_timestamp()
+            await tx.$executeRaw`UPDATE orders o SET status=${o.gateway === 'SEPAY' ? 'PENDING' : 'CONFIRMED'},updated_at=clock_timestamp()
             FROM payments p JOIN payment_charges c ON c.payment_id=p.id
-            WHERE o.id=${payment.orderId}::uuid AND o.id=p.order_id AND p.id=${payment.id}::uuid AND c.id=${charge.id}::uuid AND o.status='PENDING'
+            WHERE o.id=${payment.orderId}::uuid AND o.id=p.order_id AND p.id=${payment.id}::uuid AND c.id=${charge.id}::uuid AND o.status IN ('PENDING_PAYMENT','PENDING')
             AND c.first_paid_received_at<p.expires_at AND clock_timestamp()<p.expires_at+interval '60 seconds'`;
           confirmed = changed === 1;
         }
@@ -399,7 +410,7 @@ export class PaymentsService {
           !confirmed &&
           (current.orderStatus === 'CANCELLED' ||
             current.fulfilledTransactionId !== o.transactionId);
-        if (refund && current.orderStatus === 'PENDING')
+        if (refund && !current.fulfilledTransactionId && ['PENDING_PAYMENT', 'PENDING'].includes(current.orderStatus))
           await cancelReservedOrder(
             tx,
             payment.orderId,
@@ -416,12 +427,13 @@ export class PaymentsService {
         ), inbox AS (
           UPDATE payment_webhook_inbox SET processed_at=clock_timestamp() WHERE payment_id=${payment.id}::uuid AND transaction_id=${o.transactionId} AND processed_at IS NULL
         ), history AS (
-          INSERT INTO order_status_history (id,order_id,status,note) SELECT ${randomUUID()}::uuid,${payment.orderId}::uuid,'CONFIRMED','Đã xác minh thanh toán online' WHERE ${confirmed}
+          INSERT INTO order_status_history (id,order_id,status,note) SELECT ${randomUUID()}::uuid,${payment.orderId}::uuid,${o.gateway === 'SEPAY' ? 'PENDING' : 'CONFIRMED'},${o.gateway === 'SEPAY' ? 'Đã thanh toán SePay; chờ cửa hàng xác nhận' : 'Đã xác minh thanh toán online'} WHERE ${confirmed}
         ) INSERT INTO refunds (id,order_id,payment_id,amount,reason,status,compensation_key,updated_at)
           SELECT ${randomUUID()}::uuid,${payment.orderId}::uuid,${payment.id}::uuid,${o.amount},'Thanh toán muộn hoặc thừa; chờ hoàn tiền thủ công','PENDING',${compensationKey},clock_timestamp() WHERE ${refund}
+          AND NOT EXISTS (SELECT 1 FROM refunds r JOIN payments rp ON rp.id=r.payment_id WHERE r.payment_id=${payment.id}::uuid AND r.event_key=${`CANCEL:${payment.orderId}:${payment.id}`} AND rp.transaction_id=${o.transactionId})
           ON CONFLICT(compensation_key) DO NOTHING`;
         if (confirmed)
-          await enqueueOrderEvent(tx, payment.orderId, 'CONFIRMED');
+          await enqueueOrderEvent(tx, payment.orderId, o.gateway === 'SEPAY' ? 'PAYMENT_RECEIVED' : 'CONFIRMED');
         if (refund)
           await enqueueOrderEvent(
             tx,
@@ -430,20 +442,23 @@ export class PaymentsService {
             hash(compensationKey).slice(0, 16),
           );
       } else {
-        const terminal = o.state === 'FAILED' && !current.hasPaidEvidence;
+        const terminal = o.state === 'FAILED' && !current.hasPaidEvidence && !current.fulfilledTransactionId;
+        const verifying = current.hasPaidEvidence || !['PAYABLE', 'FAILED'].includes(o.state);
         await tx.$executeRaw`WITH updated AS (
-          UPDATE payments SET status=CASE WHEN status='COMPLETED' THEN 'COMPLETED' WHEN recovery_until<=clock_timestamp() THEN 'NEEDS_REVIEW' WHEN ${terminal} THEN 'FAILED' WHEN ${o.state === 'PAYABLE'} THEN 'PAYABLE' ELSE 'UNKNOWN' END,
-            gateway_reported_status=${o.state},gateway_response=${JSON.stringify(o.payload)}::jsonb,reconciled_at=clock_timestamp(),verification_pending=NOT ${terminal},
+          UPDATE payments SET status=CASE WHEN status IN ('COMPLETED','CANCELLED') THEN status WHEN recovery_until<=clock_timestamp() THEN 'NEEDS_REVIEW' WHEN ${terminal} THEN 'FAILED' WHEN ${o.state === 'PAYABLE'} THEN 'PAYABLE' ELSE 'UNKNOWN' END,
+            gateway_reported_status=${o.state},gateway_response=${JSON.stringify(o.payload)}::jsonb,reconciled_at=clock_timestamp(),verification_pending=${!terminal && verifying},
             next_query_at=CASE WHEN ${terminal} OR recovery_until<=clock_timestamp() THEN NULL ELSE clock_timestamp()+interval '15 seconds' END,
             claim_token=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE id=${payment.id}::uuid
         ) UPDATE payment_webhook_inbox SET processed_at=clock_timestamp() WHERE payment_id=${payment.id}::uuid AND processed_at IS NULL AND ${terminal}`;
+        if (terminal && o.gateway === 'SEPAY')
+          await cancelReservedOrder(tx, payment.orderId, 'Thanh toán SePay thất bại đã được xác minh');
       }
     });
   }
   async expire(): Promise<number> {
     const rows = await this.db.$queryRaw<
       { id: string }[]
-    >`SELECT o.id FROM orders o WHERE o.status='PENDING' AND EXISTS (SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_method IN ('VNPAY','MOMO','ZALOPAY')) AND o.created_at + interval '15 minutes' <= clock_timestamp() ORDER BY o.created_at LIMIT 50`;
+    >`SELECT o.id FROM orders o WHERE o.status IN ('PENDING_PAYMENT','PENDING') AND EXISTS (SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_method IN ('SEPAY','VNPAY','MOMO','ZALOPAY')) AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.status='COMPLETED') AND o.created_at + interval '15 minutes' <= clock_timestamp() ORDER BY o.created_at LIMIT 50`;
     let count = 0;
     for (const row of rows) {
       try {
@@ -452,7 +467,8 @@ export class PaymentsService {
             await this.lock(tx, row.id);
             const [state] = await tx.$queryRaw<
               { shouldCancel: boolean }[]
-            >`SELECT o.status='PENDING' AND clock_timestamp()>=o.created_at+interval '15 minutes'
+            >`SELECT o.status IN ('PENDING_PAYMENT','PENDING') AND clock_timestamp()>=o.created_at+interval '15 minutes'
+            AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.status='COMPLETED')
             AND NOT (clock_timestamp()<o.created_at+interval '16 minutes' AND EXISTS (SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.first_paid_received_at<COALESCE(p.expires_at,o.created_at+interval '15 minutes'))) AS "shouldCancel"
             FROM orders o WHERE o.id=${row.id}::uuid`;
             if (!state?.shouldCancel) return;
@@ -475,7 +491,7 @@ export class PaymentsService {
   createGuest(sessionId: string, orderId: string, ip = '127.0.0.1') {
     return this.create(
       'guest',
-      'VNPAY',
+      'SEPAY',
       orderId,
       'WEB',
       ip,
@@ -509,9 +525,9 @@ export class PaymentsService {
       }>
     >`
       SELECT p.id AS "paymentId",p.order_id AS "orderId",p.payment_method AS method,p.status,p.status AS "paymentStatus",o.status AS "orderStatus",
-        CASE WHEN o.status='PENDING' AND clock_timestamp()<p.expires_at AND p.status IN ('PAYABLE','UNKNOWN','INITIATING') THEN p.payment_url END AS "paymentUrl",
-        CASE WHEN o.status='PENDING' AND clock_timestamp()<p.expires_at AND p.status IN ('PAYABLE','UNKNOWN','INITIATING') THEN p.wallet_deeplink END AS "walletDeeplink",
-        CASE WHEN o.status='PENDING' AND clock_timestamp()<p.expires_at AND p.status IN ('PAYABLE','UNKNOWN','INITIATING') THEN p.qr_code_data END AS "qrCodeData",
+        CASE WHEN o.status IN ('PENDING_PAYMENT','PENDING') AND clock_timestamp()<p.expires_at AND p.status IN ('PAYABLE','UNKNOWN','INITIATING') THEN p.payment_url END AS "paymentUrl",
+        CASE WHEN o.status IN ('PENDING_PAYMENT','PENDING') AND clock_timestamp()<p.expires_at AND p.status IN ('PAYABLE','UNKNOWN','INITIATING') THEN p.wallet_deeplink END AS "walletDeeplink",
+        CASE WHEN o.status IN ('PENDING_PAYMENT','PENDING') AND clock_timestamp()<p.expires_at AND p.status IN ('PAYABLE','UNKNOWN','INITIATING') THEN p.qr_code_data END AS "qrCodeData",
         p.return_url AS "returnUrl",COALESCE(p.expires_at,o.created_at+CASE WHEN p.payment_method='COD' THEN interval '30 minutes' ELSE interval '15 minutes' END) AS "expiresAt",
         p.verification_pending AS "verificationPending",EXISTS(SELECT 1 FROM refunds r WHERE r.payment_id=p.id AND r.status='PENDING') AS "refundPending",
         CASE WHEN p.first_paid_received_at<p.expires_at THEN p.expires_at+interval '60 seconds' END AS "verificationDeadline"

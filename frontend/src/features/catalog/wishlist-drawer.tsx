@@ -1,4 +1,5 @@
 "use client";
+import { ContentLoading } from "@/shared/ui/content-loading";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -103,7 +104,12 @@ export function WishlistDrawer({ open, onNavigate }: { open: boolean; onNavigate
             <p role="status">Đang đồng bộ danh sách yêu thích…</p>
           )}
         {query.isPending ? (
-          <p role="status">Đang tải sản phẩm yêu thích…</p>
+          <ContentLoading
+            variant="list"
+            label="Đang tải sản phẩm yêu thích…"
+            heading={false}
+            compact
+          />
         ) : query.isError ? (
           <p role="alert">
             Không tải được danh sách. <button onClick={() => void query.refetch()}>Thử lại</button>

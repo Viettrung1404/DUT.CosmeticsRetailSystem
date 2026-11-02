@@ -25,6 +25,7 @@ export const profileInputSchema = z
   })
   .strict();
 export const orderStatusSchema = z.enum([
+  "PENDING_PAYMENT",
   "PENDING",
   "CONFIRMED",
   "PROCESSING",
