@@ -42,48 +42,51 @@ async function bootstrap() {
   // Global Response Interceptor
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
-  // Swagger API Documentation
-  const config = new DocumentBuilder()
-    .setTitle('GlowUp Cosmetics Retail System API')
-    .setDescription(
-      'Hệ thống quản lý bán hàng và phân tích kinh doanh chuỗi bán lẻ mỹ phẩm GlowUp - Clean Architecture (NestJS + Prisma + Neon PostgreSQL 17)',
-    )
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Nhập JWT token',
-        in: 'header',
-      },
-      'JWT-auth',
-    )
-    .addTag(
-      'Auth (Xác thực & Người dùng)',
-      'API đăng ký, đăng nhập, xác thực email, OTP, JWT token',
-    )
-    .addTag(
-      'Customer - Products (Việt Trung)',
-      'API phục vụ Website / Mobile cho khách hàng',
-    )
-    .addTag(
-      'Customer - Categories (Việt Trung)',
-      'API phục vụ menu điều hướng danh mục Web / Mobile',
-    )
-    .addTag(
-      'Admin - Products (Thành Lập)',
-      'API phục vụ Dashboard quản trị cho Admin & Nhân viên',
-    )
-    .build();
+  // Swagger API Documentation (tắt bằng SWAGGER_ENABLED=false)
+  const swaggerEnabled = process.env.SWAGGER_ENABLED !== 'false';
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('GlowUp Cosmetics Retail System API')
+      .setDescription(
+        'Hệ thống quản lý bán hàng và phân tích kinh doanh chuỗi bán lẻ mỹ phẩm GlowUp - Clean Architecture (NestJS + Prisma + Neon PostgreSQL 17)',
+      )
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Nhập JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addTag(
+        'Auth (Xác thực & Người dùng)',
+        'API đăng ký, đăng nhập, xác thực email, OTP, JWT token',
+      )
+      .addTag(
+        'Customer - Products (Việt Trung)',
+        'API phục vụ Website / Mobile cho khách hàng',
+      )
+      .addTag(
+        'Customer - Categories (Việt Trung)',
+        'API phục vụ menu điều hướng danh mục Web / Mobile',
+      )
+      .addTag(
+        'Admin - Products (Thành Lập)',
+        'API phục vụ Dashboard quản trị cho Admin & Nhân viên',
+      )
+      .build();
 
-  const document = documentResponseEnvelopes(SwaggerModule.createDocument(app, config));
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+    const document = documentResponseEnvelopes(SwaggerModule.createDocument(app, config));
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+  }
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
@@ -91,7 +94,7 @@ async function bootstrap() {
   logger.log(
     `🚀 Ứng dụng GlowUp Backend đang chạy tại: http://localhost:${port}/${globalPrefix}`,
   );
-  logger.log(`📚 Swagger API Docs: http://localhost:${port}/api/docs`);
+  if (swaggerEnabled) logger.log(`📚 Swagger API Docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();
