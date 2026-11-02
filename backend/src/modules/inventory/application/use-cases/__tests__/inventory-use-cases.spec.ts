@@ -50,6 +50,7 @@ describe('Inventory use cases', () => {
       applyReceipt: jest.fn().mockResolvedValue({ ok: true, poStatus: 'PARTIALLY_RECEIVED', batchIds: ['b1'] }),
       findInventoryRow: jest.fn(),
       updateThresholds: jest.fn(),
+      findConsistencyRows: jest.fn(),
     };
     scope = { execute: jest.fn() };
     givenScope('STORE', ['wh', 's1']);

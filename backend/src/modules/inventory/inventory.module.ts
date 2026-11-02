@@ -7,6 +7,7 @@ import { StocktakeAdminController } from './presentation/controllers/stocktake-a
 import { BatchAdminController } from './presentation/controllers/batch-admin.controller';
 import { GetInventoryUseCase } from './application/use-cases/get-inventory.use-case';
 import { ReceivePurchaseOrderUseCase } from './application/use-cases/receive-purchase-order.use-case';
+import { CheckStockConsistencyUseCase } from './application/use-cases/check-stock-consistency.use-case';
 import { AdjustInventoryUseCase } from './application/use-cases/adjust-inventory.use-case';
 import { GetAdjustmentsUseCase } from './application/use-cases/get-adjustments.use-case';
 import { ReviewAdjustmentUseCase } from './application/use-cases/review-adjustment.use-case';
@@ -48,6 +49,7 @@ import { InventoryAlertScheduler } from './infrastructure/schedulers/inventory-a
   ],
   providers: [
     GetInventoryUseCase,
+    CheckStockConsistencyUseCase,
     ReceivePurchaseOrderUseCase,
     AdjustInventoryUseCase,
     GetAdjustmentsUseCase,

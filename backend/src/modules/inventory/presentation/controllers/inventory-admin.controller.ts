@@ -11,6 +11,7 @@ import {
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
+import { CheckStockConsistencyUseCase } from '../../application/use-cases/check-stock-consistency.use-case';
 import { GetInventoryUseCase } from '../../application/use-cases/get-inventory.use-case';
 import { ReceivePurchaseOrderUseCase } from '../../application/use-cases/receive-purchase-order.use-case';
 import { AdjustInventoryUseCase } from '../../application/use-cases/adjust-inventory.use-case';
@@ -25,6 +26,7 @@ import {
 } from '../dtos/inventory-request.dto';
 import {
   AdjustmentQueryDto,
+  ConsistencyCheckQueryDto,
   ReviewNoteDto,
   UpdateThresholdsDto,
 } from '../dtos/inventory-workflow-request.dto';
@@ -42,6 +44,7 @@ export class InventoryAdminController {
     private readonly reviewAdjustment: ReviewAdjustmentUseCase,
     private readonly cancelAdjustmentUseCase: CancelAdjustmentUseCase,
     private readonly updateThresholdsUseCase: UpdateInventoryThresholdsUseCase,
+    private readonly checkConsistency: CheckStockConsistencyUseCase,
   ) {}
 
   @Get()
@@ -62,6 +65,25 @@ export class InventoryAdminController {
     });
     const data = items.map((item) => InventoryItemResponseDto.fromDomain(item));
     return new PageDto(data, new PageMetaDto({ pageOptionsDto: query, itemCount: total }));
+  }
+
+  @Get('consistency-check')
+  @RequirePermissions('INVENTORY_CHECK')
+  @ApiOperation({
+    summary:
+      'Admin - Kiểm tra nhất quán tồn kho: so tồn với tổng lô và thẻ kho, giữ chỗ không vượt tồn. Chỉ đọc, không sửa dữ liệu',
+  })
+  @ApiForbiddenResponse({ description: 'Cửa hàng ngoài phạm vi của bạn' })
+  async consistencyCheck(
+    @CurrentUser('userId') userId: string,
+    @Query() query: ConsistencyCheckQueryDto,
+  ) {
+    const data = await this.checkConsistency.execute(userId, query.storeId);
+    const message =
+      data.summary.mismatchedRows === 0
+        ? 'Tồn kho nhất quán, không phát hiện chênh lệch'
+        : `Phát hiện ${data.summary.mismatchedRows} dòng tồn kho chênh lệch`;
+    return { message, data };
   }
 
   @Post('receive')

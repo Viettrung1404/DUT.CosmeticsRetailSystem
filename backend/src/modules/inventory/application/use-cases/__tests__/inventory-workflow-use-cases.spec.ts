@@ -51,6 +51,7 @@ const inventoryRepo = (): jest.Mocked<IInventoryRepository> => ({
   applyReceipt: jest.fn(),
   findInventoryRow: jest.fn().mockResolvedValue({ id: 'inv1', storeId: STORE, maxQuantity: 50 }),
   updateThresholds: jest.fn().mockResolvedValue({ id: 'inv1', minQuantity: 5, maxQuantity: 50 }),
+  findConsistencyRows: jest.fn(),
 });
 
 describe('Phiếu điều chỉnh', () => {
