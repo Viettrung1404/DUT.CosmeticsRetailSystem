@@ -1,5 +1,6 @@
 // Nguồn dữ liệu: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (53 quyền) và mục 5.1 (6 vai trò, 4 hạng thành viên)
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -126,6 +127,73 @@ const LOYALTY_TIERS = [
   { name: 'Diamond', minPoints: 15000, pointMultiplier: 2 },
 ];
 
+// BR-02: tích 1% giá trị thanh toán (nhân hệ số hạng); 1 điểm = 1đ khi dùng
+const SETTINGS: { key: string; value: Prisma.InputJsonValue; group: string; description: string }[] = [
+  {
+    key: 'loyalty_config',
+    value: { point_rate: 0.01 },
+    group: 'loyalty',
+    description: 'Tỷ lệ tích điểm theo giá trị thanh toán',
+  },
+  {
+    // Danh sách rỗng = chưa có quà đổi điểm; quản trị thêm sau
+    key: 'loyalty_rewards',
+    value: { rewards: [] },
+    group: 'loyalty',
+    description: 'Danh sách quà đổi điểm',
+  },
+  {
+    key: 'return_policy',
+    value: {
+      version: 'v1',
+      allocation: 'PROPORTIONAL',
+      refundPointsAs: 'POINTS',
+      exchangeShippingFee: 0,
+      quoteMinutes: 30,
+      allowDifferenceCod: true,
+    },
+    group: 'returns',
+    description: 'Chính sách đổi trả',
+  },
+  {
+    key: 'return_accounting',
+    value: {
+      earnedPointsReversal: 'PROPORTIONAL',
+      allowPointDebt: true,
+      stats: 'NET_CASH_VALUE',
+      totalOrdersMode: 'REMOVE_FULLY_RETURNED_ORDERS',
+    },
+    group: 'returns',
+    description: 'Cách hạch toán điểm và thống kê khi hoàn trả',
+  },
+];
+
+// Admin đầu tiên lấy từ biến môi trường; thiếu biến thì bỏ qua, đã có thì không đổi mật khẩu
+async function seedAdmin() {
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.log('Bỏ qua tạo Admin: chưa đặt SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD.');
+    return;
+  }
+  if (password.length < 8) throw new Error('SEED_ADMIN_PASSWORD phải có ít nhất 8 ký tự');
+  if (await prisma.user.findUnique({ where: { email } })) {
+    console.log('Admin đã tồn tại, giữ nguyên.');
+    return;
+  }
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await bcrypt.hash(password, 10),
+      fullName: process.env.SEED_ADMIN_NAME?.trim() || 'Quản trị viên',
+      roleId: 1,
+      emailVerified: true,
+      status: 'ACTIVE',
+    },
+  });
+  console.log('Đã tạo tài khoản Admin từ biến môi trường.');
+}
+
 async function main() {
   for (const [bitPosition, permissionCode, permissionName, module] of PERMISSIONS) {
     const data = { bitValue: 1n << BigInt(bitPosition), permissionCode, permissionName, module };
@@ -159,13 +227,12 @@ async function main() {
     }
   }
 
-  // BR-02: tích 1% giá trị thanh toán (nhân hệ số hạng); 1 điểm = 1đ khi dùng
-  const loyaltyConfig = { point_rate: 0.01 };
-  await prisma.setting.upsert({
-    where: { key: 'loyalty_config' },
-    update: { value: loyaltyConfig },
-    create: { key: 'loyalty_config', value: loyaltyConfig, group: 'loyalty', description: 'Tỷ lệ tích điểm theo giá trị thanh toán' },
-  });
+  // Chỉ tạo khi chưa có: giá trị quản trị viên đã chỉnh thì chạy lại seed không ghi đè
+  for (const s of SETTINGS) {
+    await prisma.setting.upsert({ where: { key: s.key }, update: {}, create: s });
+  }
+
+  await seedAdmin();
 
   console.log(`Đã seed ${PERMISSIONS.length} quyền và ${ROLES.length} vai trò (id ${ROLES.map((r) => r.id).join(', ')}).`);
   console.log(`Đã seed ${LOYALTY_TIERS.length} hạng thành viên: ${LOYALTY_TIERS.map((t) => t.name).join(', ')}.`);
