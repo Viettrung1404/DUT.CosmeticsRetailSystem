@@ -1,3 +1,4 @@
+import { ContentLoading } from "@/shared/ui/content-loading";
 import { Suspense } from "react";
 import { PaymentResult } from "@/features/checkout/payment-result";
 export const metadata = {
@@ -7,7 +8,7 @@ export const metadata = {
 export default function Page() {
   return (
     <main id="main-content" className="catalog-page site-container">
-      <Suspense fallback={<p>Đang tải…</p>}>
+      <Suspense fallback={<ContentLoading variant="detail" />}>
         <PaymentResult />
       </Suspense>
     </main>

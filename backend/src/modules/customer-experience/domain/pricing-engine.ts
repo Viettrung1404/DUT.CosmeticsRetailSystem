@@ -1,7 +1,16 @@
-import { BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { allocateMoney } from '@modules/customer-commerce/domain/money';
-import { calculatePointsRedemption, POINT_VALUE_VND } from '@core/utils/loyalty-policy.util';
+import { BadRequestException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { allocateMoney } from "@modules/customer-commerce/domain/money";
+import {
+  calculatePointsRedemption,
+  POINT_VALUE_VND,
+} from "@core/utils/loyalty-policy.util";
+
+export const STORE_SHIPPING_POLICY = {
+  fee: 30000,
+  freeFrom: 500000,
+  basis: "AFTER_DISCOUNTS",
+} as const;
 
 export interface PriceLine {
   variantId: string;
@@ -44,13 +53,13 @@ export function campaignApplies(campaign: Campaign, line: PriceLine): boolean {
   const products = campaign.applicableProducts,
     categories = campaign.applicableCategories;
   if (products !== null && products !== undefined && !Array.isArray(products))
-    throw new BadRequestException('INVALID_PROMOTION_SCOPE');
+    throw new BadRequestException("INVALID_PROMOTION_SCOPE");
   if (
     categories !== null &&
     categories !== undefined &&
     !Array.isArray(categories)
   )
-    throw new BadRequestException('INVALID_PROMOTION_SCOPE');
+    throw new BadRequestException("INVALID_PROMOTION_SCOPE");
   return (
     ((!Array.isArray(products) || !products.length) &&
       (!Array.isArray(categories) || !categories.length)) ||
@@ -69,14 +78,14 @@ function benefit(
     value < 0 ||
     (cap !== null && (!Number.isFinite(cap) || cap < 0))
   )
-    throw new BadRequestException('INVALID_DISCOUNT');
+    throw new BadRequestException("INVALID_DISCOUNT");
   let result: Prisma.Decimal;
-  if (type === 'PERCENTAGE') {
-    if (value > 100) throw new BadRequestException('INVALID_DISCOUNT');
+  if (type === "PERCENTAGE") {
+    if (value > 100) throw new BadRequestException("INVALID_DISCOUNT");
     result = decimal(base).mul(value).div(100);
-  } else if (type === 'FIXED_AMOUNT' || type === 'FIXED')
+  } else if (type === "FIXED_AMOUNT" || type === "FIXED")
     result = decimal(value);
-  else throw new BadRequestException('INVALID_DISCOUNT_TYPE');
+  else throw new BadRequestException("INVALID_DISCOUNT_TYPE");
   return money(Prisma.Decimal.min(base, result, cap === null ? base : cap));
 }
 export function calculateCommercePrice(input: {
@@ -99,13 +108,13 @@ export function calculateCommercePrice(input: {
         l.unitPrice < 0,
     )
   )
-    throw new BadRequestException('INVALID_PRICE_LINES');
+    throw new BadRequestException("INVALID_PRICE_LINES");
   if (
     !Number.isFinite(input.tierPercentage) ||
     input.tierPercentage < 0 ||
     input.tierPercentage > 100
   )
-    throw new BadRequestException('INVALID_TIER_DISCOUNT');
+    throw new BadRequestException("INVALID_TIER_DISCOUNT");
   const weights = input.lines.map((line) =>
     money(decimal(line.unitPrice).mul(line.quantity)),
   );
@@ -115,7 +124,7 @@ export function calculateCommercePrice(input: {
     .sort((a, b) => a.id.localeCompare(b.id))
     .filter((c) => c.minOrderAmount <= subtotal);
   for (const campaign of eligible) {
-    if (campaign.type === 'FREE_SHIPPING') continue;
+    if (campaign.type === "FREE_SHIPPING") continue;
     const eligibleWeights = input.lines.map((line, i) => {
       if (!campaignApplies(campaign, line)) return 0;
       const quota = campaign.quotas.find(
@@ -186,7 +195,7 @@ export function calculateCommercePrice(input: {
       subtotal < couponCampaign.minOrderAmount ||
       couponCampaign.isFlashSale)
   )
-    throw new BadRequestException('COUPON_CAMPAIGN_NOT_AVAILABLE');
+    throw new BadRequestException("COUPON_CAMPAIGN_NOT_AVAILABLE");
   const couponWeights = lines.map((line) =>
     !input.coupon?.promotionId ||
     (couponCampaign && campaignApplies(couponCampaign, line))
@@ -197,7 +206,7 @@ export function calculateCommercePrice(input: {
     couponWeights.reduce((sum, n) => sum.add(n), decimal(0)),
   );
   if (input.coupon && couponBase < input.coupon.minOrderAmount)
-    throw new BadRequestException('COUPON_MINIMUM_NOT_MET');
+    throw new BadRequestException("COUPON_MINIMUM_NOT_MET");
   const couponDiscount = input.coupon
     ? benefit(
         input.coupon.discountType,
@@ -208,7 +217,7 @@ export function calculateCommercePrice(input: {
     : 0;
   const couponShares = allocateMoney(couponDiscount, couponWeights);
   if (!Number.isSafeInteger(input.pointsRequested) || input.pointsRequested < 0)
-    throw new BadRequestException('INSUFFICIENT_POINTS');
+    throw new BadRequestException("INSUFFICIENT_POINTS");
   const pointsDiscount = input.pointsRequested
     ? calculatePointsRedemption(
         input.pointsRequested,
@@ -229,12 +238,14 @@ export function calculateCommercePrice(input: {
   );
   const shippingCampaign = eligible.find(
     (c) =>
-      c.type === 'FREE_SHIPPING' &&
+      c.type === "FREE_SHIPPING" &&
       !c.isFlashSale &&
       lines.some((l) => campaignApplies(c, l)),
   );
   const shippingFee =
-    merchandisePayable >= 500000 || shippingCampaign ? 0 : 30000;
+    merchandisePayable >= STORE_SHIPPING_POLICY.freeFrom || shippingCampaign
+      ? 0
+      : STORE_SHIPPING_POLICY.fee;
   const pricedLines = lines.map((line, i) => ({
     ...line,
     couponDiscount: couponShares[i],

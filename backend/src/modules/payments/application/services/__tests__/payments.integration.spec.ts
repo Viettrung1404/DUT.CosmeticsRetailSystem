@@ -9,6 +9,7 @@ import { PrismaOrderRepository } from '@modules/orders/infrastructure/repositori
 import { PaymentWorker } from '../../../infrastructure/workers/payment-worker';
 import { PrismaAdminOrderRepository } from '@modules/orders/infrastructure/repositories/prisma-admin-order.repository';
 import { GatewayCallNotStartedError } from '../../../domain/gateway-call-not-started.error';
+import { SepayAdapter } from '../../../infrastructure/gateways/sepay-adapter';
 
 const testUrl = process.env.TEST_DATABASE_URL;
 const integration = testUrl ? describe : describe.skip;
@@ -18,6 +19,7 @@ integration('Payment transactions on isolated PostgreSQL', () => {
   let user: any;
   let customer: any;
   let store: any;
+  const sepayQuery = jest.fn();
   const adapter: GatewayAdapter = {
     method: 'MOMO',
     prepare: (a) => ({ orderId: a.merchantReference }),
@@ -81,6 +83,16 @@ integration('Payment transactions on isolated PostgreSQL', () => {
       },
     });
     service = new PaymentsService(db, {
+      SEPAY: new SepayAdapter(
+        {
+          SEPAY_MODE: 'sandbox',
+          SEPAY_ACCOUNT_NUMBER: '0123456789',
+          SEPAY_BANK_ACCOUNT_ID: 'f9e8d7c6-b5a4-3210-fedc-ba0987654321',
+          SEPAY_BANK_CODE: 'ACB',
+          SEPAY_ACCOUNT_NAME: 'GLOWUP',
+        },
+        sepayQuery,
+      ),
       MOMO: adapter,
       VNPAY: { ...adapter, method: 'VNPAY' },
       ZALOPAY: { ...adapter, method: 'ZALOPAY' },
@@ -89,14 +101,26 @@ integration('Payment transactions on isolated PostgreSQL', () => {
   afterAll(async () => {
     if (db) await db.$disconnect();
   });
-  async function fixture(age = 0) {
+  async function fixture(age = 0, method: 'MOMO' | 'SEPAY' = 'MOMO') {
+    if (method === 'SEPAY')
+      Object.assign(process.env, {
+        SEPAY_ENABLED: 'true',
+        SEPAY_MODE: 'sandbox',
+        SEPAY_API_TOKEN: 'test',
+        SEPAY_WEBHOOK_SECRET: 'test',
+        SEPAY_ACCOUNT_NUMBER: '0123456789',
+        SEPAY_BANK_ACCOUNT_ID: 'f9e8d7c6-b5a4-3210-fedc-ba0987654321',
+        SEPAY_BANK_CODE: 'ACB',
+        SEPAY_ACCOUNT_NAME: 'GLOWUP',
+        SEPAY_MAX_QPS: '3',
+      });
     const order = await db.order.create({
       data: {
         orderNumber: randomUUID(),
         customerId: customer.id,
         storeId: store.id,
         orderType: 'ONLINE',
-        status: 'PENDING',
+        status: method === 'SEPAY' ? 'PENDING_PAYMENT' : 'PENDING',
         subtotal: 5000,
         totalAmount: 5000,
         createdAt: new Date(Date.now() - age),
@@ -105,17 +129,200 @@ integration('Payment transactions on isolated PostgreSQL', () => {
     await db.payment.create({
       data: {
         orderId: order.id,
-        paymentMethod: 'MOMO',
+        paymentMethod: method,
         amount: 5000,
         status: 'PENDING',
       },
     });
-    const result = await service.create(user.id, 'MOMO', order.id, 'MOBILE');
+    const result = await service.create(user.id, method, order.id, 'MOBILE');
     const payment = await db.payment.findUniqueOrThrow({
       where: { id: result.paymentId },
     });
     return { order, payment };
   }
+  async function sepayFixture() {
+    const result = await fixture(0, 'SEPAY');
+    const observation: Observation = {
+      gateway: 'SEPAY',
+      merchantReference: result.payment.merchantReference!,
+      merchantId: '0123456789',
+      transactionId: `FT${randomUUID().replace(/-/g, '')}`,
+      amount: 5000,
+      state: 'PAID',
+      code: 'PAID',
+      subCode: '',
+      kind: 'TRANSFER',
+      payload: { accountNumber: '0123456789' },
+    };
+    const apiTransaction = {
+      id: randomUUID(),
+      account_number: '0123456789',
+      bank_account_id: 'f9e8d7c6-b5a4-3210-fedc-ba0987654321',
+      transfer_type: 'in',
+      amount_in: 5000,
+      amount_out: 0,
+      code: observation.merchantReference,
+      transaction_content: observation.merchantReference,
+      reference_number: observation.transactionId,
+    };
+    return { ...result, observation, apiTransaction };
+  }
+  it('SePay moves to waiting shop confirmation after verification; webhook retries do not duplicate charges', async () => {
+    const { order, payment, observation, apiTransaction } =
+      await sepayFixture();
+    expect(await service.receive(observation)).toBe(false);
+    expect(await service.receive(observation)).toBe(true);
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('PENDING_PAYMENT');
+    sepayQuery.mockResolvedValue({ status: 'success', data: [apiTransaction] });
+    await service.process(payment.id);
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('PENDING');
+    expect(
+      await db.paymentCharge.count({ where: { paymentId: payment.id } }),
+    ).toBe(1);
+    expect(await db.refund.count({ where: { paymentId: payment.id } })).toBe(0);
+  });
+  it('SePay keeps its QR after empty polling and resumes the same payment and deadline', async () => {
+    const { order, payment } = await sepayFixture();
+    sepayQuery.mockResolvedValue({ status: 'success', data: [] });
+    await service.process(payment.id);
+    await service.process(payment.id);
+    const status = await service.status(user.id, payment.id);
+    expect(status.verificationPending).toBe(false);
+    expect(status.orderStatus).toBe('PENDING_PAYMENT');
+    expect(status.qrCodeData).toBeTruthy();
+    const resumed = await service.create(user.id, 'SEPAY', order.id, 'WEB');
+    expect(resumed.paymentId).toBe(payment.id);
+    expect(resumed.expiresAt).toEqual(payment.expiresAt);
+    expect(await db.payment.count({ where: { orderId: order.id } })).toBe(1);
+  });
+  it('SePay paid orders survive both expiry sweepers and require shop confirmation', async () => {
+    const { order, payment, observation, apiTransaction } =
+      await sepayFixture();
+    const admin = new PrismaAdminOrderRepository(db);
+    await expect(
+      admin.confirm({ orderId: order.id, changedBy: user.id }),
+    ).rejects.toThrow();
+    await service.receive(observation);
+    sepayQuery.mockResolvedValue({ status: 'success', data: [apiTransaction] });
+    await service.process(payment.id);
+    await service.process(payment.id);
+    await db.order.update({
+      where: { id: order.id },
+      data: { createdAt: new Date(Date.now() - 3600000) },
+    });
+    await service.expire();
+    await new PrismaOrderRepository(db).cancelExpiredPendingOrders(new Date());
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('PENDING');
+    expect(
+      await db.orderStatusHistory.count({
+        where: { orderId: order.id, status: 'PENDING' },
+      }),
+    ).toBe(1);
+    await admin.confirm({ orderId: order.id, changedBy: user.id });
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('CONFIRMED');
+  });
+  it('SePay extra transfers create one refund without cancelling the paid order awaiting shop confirmation', async () => {
+    const { order, payment, observation, apiTransaction } =
+      await sepayFixture();
+    await service.receive(observation);
+    sepayQuery.mockResolvedValue({ status: 'success', data: [apiTransaction] });
+    await service.process(payment.id);
+    const transactionId = `EXTRA${randomUUID().replace(/-/g, '')}`;
+    await service.receive({ ...observation, transactionId });
+    sepayQuery.mockResolvedValue({
+      status: 'success',
+      data: [
+        {
+          ...apiTransaction,
+          id: randomUUID(),
+          reference_number: transactionId,
+        },
+      ],
+    });
+    await service.process(payment.id);
+    await service.process(payment.id);
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('PENDING');
+    expect(await db.refund.count({ where: { paymentId: payment.id } })).toBe(1);
+  });
+  it('SePay keeps an order pending when the API cannot yet corroborate its webhook', async () => {
+    const { order, payment, observation } = await sepayFixture();
+    await service.receive(observation);
+    sepayQuery.mockResolvedValue({ status: 'success', data: [] });
+    await service.process(payment.id);
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('PENDING_PAYMENT');
+    expect(
+      (await db.payment.findUniqueOrThrow({ where: { id: payment.id } }))
+        .verificationPending,
+    ).toBe(true);
+  });
+  it('SePay customer cancellation after payment does not create a second refund on reconciliation', async () => {
+    const { order, payment, observation, apiTransaction } =
+      await sepayFixture();
+    await service.receive(observation);
+    sepayQuery.mockResolvedValue({ status: 'success', data: [apiTransaction] });
+    await service.process(payment.id);
+    await new PrismaOrderRepository(db).cancelOrderWithTransaction(
+      order.id,
+      customer.id,
+    );
+    await service.process(payment.id);
+    await service.process(payment.id);
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('CANCELLED');
+    expect(await db.refund.count({ where: { paymentId: payment.id } })).toBe(1);
+    expect((await service.status(user.id, payment.id)).refundPending).toBe(
+      true,
+    );
+  });
+  it('SePay cancellation closes an unpaid QR and prevents resuming a cancelled order', async () => {
+    const { order, payment } = await sepayFixture();
+    await new PrismaOrderRepository(db).cancelOrderWithTransaction(
+      order.id,
+      customer.id,
+    );
+    const status = await service.status(user.id, payment.id);
+    expect(status.orderStatus).toBe('CANCELLED');
+    expect(status.qrCodeData).toBeNull();
+    await expect(service.create(user.id, 'SEPAY', order.id)).rejects.toThrow();
+    expect(await db.refund.count({ where: { paymentId: payment.id } })).toBe(0);
+  });
+  it('SePay late money on an expired order creates a manual refund without reviving the order', async () => {
+    const { order, payment, observation, apiTransaction } =
+      await sepayFixture();
+    await db.order.update({
+      where: { id: order.id },
+      data: { createdAt: new Date(Date.now() - 1000000) },
+    });
+    await db.payment.update({
+      where: { id: payment.id },
+      data: { expiresAt: new Date(Date.now() - 100000) },
+    });
+    await service.expire();
+    await service.receive(observation);
+    sepayQuery.mockResolvedValue({ status: 'success', data: [apiTransaction] });
+    await service.process(payment.id);
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: order.id } })).status,
+    ).toBe('CANCELLED');
+    expect(
+      await db.refund.count({
+        where: { paymentId: payment.id, status: 'PENDING' },
+      }),
+    ).toBe(1);
+  });
   const paid = (
     p: any,
     txn = String(

@@ -1,5 +1,5 @@
-import { OrderItemEntity } from './order-item.entity';
-import { OrderStatus } from '../../../../core/domain/orders/order-status.enum';
+import { OrderItemEntity } from "./order-item.entity";
+import { OrderStatus } from "../../../../core/domain/orders/order-status.enum";
 
 export interface ShippingAddressVo {
   recipientName: string;
@@ -8,6 +8,8 @@ export interface ShippingAddressVo {
   ward?: string;
   district?: string;
   city: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export class OrderEntity {

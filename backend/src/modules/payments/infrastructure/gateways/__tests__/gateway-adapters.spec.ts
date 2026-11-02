@@ -1,4 +1,5 @@
 import { createHmac } from 'crypto';
+import { VnpayQueryError } from '../../../domain/vnpay-query.error';
 import {
   Attempt,
   MomoAdapter,
@@ -123,6 +124,98 @@ describe('Gateway protocol adapters', () => {
       }),
     ).toMatchObject({ amount: 5000, state: 'PAID' });
   });
+  it('verifies VNPay QueryDR signatures and binds the response to the merchant/reference', async () => {
+    const payload = {
+      vnp_ResponseId: 'response',
+      vnp_Command: 'querydr',
+      vnp_ResponseCode: '00',
+      vnp_Message: 'Success',
+      vnp_TmnCode: 'merchant',
+      vnp_TxnRef: a.merchantReference,
+      vnp_Amount: '500000',
+      vnp_BankCode: 'NCB',
+      vnp_PayDate: '20261011101500',
+      vnp_TransactionNo: '123456',
+      vnp_TransactionType: '01',
+      vnp_TransactionStatus: '00',
+      vnp_OrderInfo: 'GlowUp id',
+      vnp_SecureHash: hmac(
+        'secret',
+        'response|querydr|00|Success|merchant|261011_attempt|500000|NCB|20261011101500|123456|01|00|GlowUp id||',
+        'sha512',
+      ),
+    };
+    const http = jest.fn().mockResolvedValue(payload);
+    const adapter = new VnpayAdapter(
+      { VNPAY_TMN_CODE: 'merchant', VNPAY_HASH_SECRET: 'secret' },
+      http,
+    );
+    await expect(adapter.query(a)).resolves.toMatchObject({
+      state: 'PAID',
+      amount: 5000,
+      transactionId: '123456',
+    });
+    const [url, body] = http.mock.calls[0];
+    expect(url).toBe(
+      'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
+    );
+    expect(body.vnp_TransactionDate).toBe('20261011100000');
+    expect(body.vnp_SecureHash).toBe(
+      hmac(
+        'secret',
+        `${body.vnp_RequestId}|2.1.0|querydr|merchant|261011_attempt|20261011100000|${body.vnp_CreateDate}|127.0.0.1|Query id`,
+        'sha512',
+      ),
+    );
+    http.mockResolvedValueOnce({ ...payload, vnp_Amount: '100' });
+    await expect(adapter.query(a)).rejects.toThrow('Invalid signature');
+    const wrongMerchant =
+      'response|querydr|00|Success|other|261011_attempt|500000|NCB|20261011101500|123456|01|00|GlowUp id||';
+    http.mockResolvedValueOnce({
+      ...payload,
+      vnp_TmnCode: 'other',
+      vnp_SecureHash: hmac('secret', wrongMerchant, 'sha512'),
+    });
+    await expect(adapter.query(a)).rejects.toThrow(
+      'VNPay query response mismatch',
+    );
+  });
+  it.each(['91', '99'])(
+    'reports unsigned VNPay API error %s without accepting payment evidence',
+    async (code) => {
+      const http = jest.fn().mockResolvedValue({
+        vnp_ResponseCode: code,
+        vnp_Message: 'Unexpected error',
+        vnp_TransactionStatus: '00',
+      });
+      const adapter = new VnpayAdapter(
+        { VNPAY_TMN_CODE: 'merchant', VNPAY_HASH_SECRET: 'secret' },
+        http,
+      );
+      const error = await adapter.query(a).catch((error) => error);
+      expect(error).toBeInstanceOf(VnpayQueryError);
+      expect(error.getStatus()).toBe(503);
+      expect(error.getResponse()).toMatchObject({
+        code: 'VNPAY_QUERY_UNAVAILABLE',
+        responseCode: code,
+        requestId: http.mock.calls[0][1].vnp_RequestId,
+      });
+    },
+  );
+  it.each([
+    { vnp_ResponseCode: '00' },
+    { vnp_ResponseCode: '99', vnp_SecureHash: 'invalid' },
+    { vnp_ResponseCode: 'untrusted error text' },
+  ])(
+    'still rejects unsigned success and invalid VNPay signatures: %j',
+    async (payload) => {
+      const adapter = new VnpayAdapter(
+        { VNPAY_TMN_CODE: 'merchant', VNPAY_HASH_SECRET: 'secret' },
+        jest.fn().mockResolvedValue(payload),
+      );
+      await expect(adapter.query(a)).rejects.toThrow('Invalid signature');
+    },
+  );
   it('signs ZaloPay expiry remaining seconds and validates the original data string with key2', () => {
     const adapter = new ZalopayAdapter(
       {

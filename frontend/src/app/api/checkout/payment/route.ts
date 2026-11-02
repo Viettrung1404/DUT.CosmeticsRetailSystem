@@ -1,10 +1,19 @@
 import { z } from "zod";
 import { paymentSchema } from "@/features/checkout/contracts";
+import { paymentMethodsSchema } from "@/features/checkout/payment-methods";
 import { userSchema } from "@/shared/auth/contracts";
 import { authRuntime, sessionId, upstream } from "@/shared/auth/server";
 import { withGuestCheckout } from "@/shared/auth/checkout";
 import { failure, json, mutationBody } from "@/shared/auth/http";
 export const runtime = "nodejs";
+export async function GET() {
+  try {
+    return json(await upstream("/payments/methods", paymentMethodsSchema));
+  } catch (error) {
+    return failure(error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const input = z
@@ -19,7 +28,7 @@ export async function POST(request: Request) {
               id,
               (token) =>
                 upstream(
-                  "/payments/vnpay/create",
+                  "/payments/sepay/create",
                   paymentSchema,
                   { ...input, platform: "WEB" },
                   token,
@@ -28,7 +37,7 @@ export async function POST(request: Request) {
             ),
           ),
         (session) =>
-          upstream("/guest/payments/vnpay", paymentSchema, input, undefined, "POST", {
+          upstream("/guest/payments/sepay", paymentSchema, input, undefined, "POST", {
             "x-session-id": session,
           }),
         false,

@@ -9,8 +9,10 @@ export const addressInput = z
       .regex(/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/, "Số điện thoại di động Việt Nam chưa hợp lệ."),
     addressLine: text(255),
     city: text(100),
-    district: text(100),
+    district: z.string().trim().max(100).default(""),
     ward: text(100),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
     isDefault: z.boolean(),
   })
   .strict();

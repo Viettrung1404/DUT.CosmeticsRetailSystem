@@ -3,6 +3,7 @@ import { Interval } from '@nestjs/schedule';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { PaymentsService } from '../../application/services/payments.service';
+import { VnpayQueryError } from '../../domain/vnpay-query.error';
 @Injectable()
 export class PaymentWorker implements OnModuleDestroy {
   private readonly logger = new Logger(PaymentWorker.name);
@@ -98,10 +99,23 @@ export class PaymentWorker implements OnModuleDestroy {
     timer.unref();
     try {
       await this.service.process(row.id, row.claim_token);
-    } catch {
+    } catch (error) {
+      // Keep fast retries inside the confirmation grace period. Old VNPay
+      // provider errors need recovery, but no longer need a query every 15s.
+      const vnpayUnavailable = error instanceof VnpayQueryError;
+      if (error instanceof VnpayQueryError)
+        this.logger.warn({
+          code: 'VNPAY_QUERY_UNAVAILABLE',
+          paymentId: row.id,
+          requestId: error.requestId,
+          responseCode: error.responseCode,
+        });
       await this.db
         .$executeRaw`UPDATE payments SET claim_token=NULL,lease_until=NULL,
-        next_query_at=CASE WHEN recovery_until<=clock_timestamp() THEN NULL ELSE clock_timestamp()+interval '15 seconds' END,
+        next_query_at=CASE
+          WHEN recovery_until<=clock_timestamp() THEN NULL
+          WHEN ${vnpayUnavailable} AND expires_at+interval '60 seconds'<=clock_timestamp() THEN clock_timestamp()+interval '5 minutes'
+          ELSE clock_timestamp()+interval '15 seconds' END,
         status=CASE WHEN recovery_until<=clock_timestamp() AND status<>'COMPLETED' THEN 'NEEDS_REVIEW' ELSE status END
         WHERE id=${row.id}::uuid AND claim_token=${row.claim_token}::uuid AND lease_until>clock_timestamp()`.catch(
         () =>

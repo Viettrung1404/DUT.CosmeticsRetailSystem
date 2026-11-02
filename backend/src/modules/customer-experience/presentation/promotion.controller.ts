@@ -13,14 +13,15 @@ import {
   Query,
   Req,
   UseGuards,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
   ApiProperty,
   ApiPropertyOptional,
   ApiTags,
-} from '@nestjs/swagger';
+} from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -33,18 +34,24 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { Throttle } from '@nestjs/throttler';
-import { PrismaService } from '@infrastructure/database/prisma.service';
-import { Public } from '@core/decorators/public.decorator';
-import { UpstashRedisService } from '@core/cache/upstash-redis.service';
-import { CustomerOnlyGuard } from '@modules/customer-commerce/presentation/customer-only.guard';
-import { CommercePricingService } from '../application/commerce-pricing.service';
-import { PublicListDto } from './experience.dto';
-import { ExperienceResponse } from './experience.responses';
-import { CommerceErrors } from '@modules/customer-commerce/presentation/commerce.responses';
-import { publicUrl } from '../domain/public-content';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { Throttle } from "@nestjs/throttler";
+import { PrismaService } from "@infrastructure/database/prisma.service";
+import { Public } from "@core/decorators/public.decorator";
+import { UpstashRedisService } from "@core/cache/upstash-redis.service";
+import { CustomerOnlyGuard } from "@modules/customer-commerce/presentation/customer-only.guard";
+import { CommercePricingService } from "../application/commerce-pricing.service";
+import { PublicListDto } from "./experience.dto";
+import { ExperienceResponse } from "./experience.responses";
+import { CommerceErrors } from "@modules/customer-commerce/presentation/commerce.responses";
+import { publicUrl } from "../domain/public-content";
+import {
+  MIN_REDEEM_BALANCE_VND,
+  REDEEM_STEP_VND,
+  POINT_VALUE_VND,
+  MAX_REDEEM_RATIO,
+} from "@core/utils/loyalty-policy.util";
 
 class SelectionItemDto {
   @ApiProperty() @IsUUID() variantId: string;
@@ -82,6 +89,78 @@ const publicCampaign = {
 @Injectable()
 export class PromotionsService {
   constructor(private readonly db: PrismaService) {}
+  async checkoutBenefits(customerId: string) {
+    const now = new Date();
+    const [customer, coupons] = await Promise.all([
+      this.db.customer.findUniqueOrThrow({
+        where: { id: customerId },
+        select: { totalPoints: true },
+      }),
+      this.db.coupon.findMany({
+        where: {
+          isActive: true,
+          startDate: { lte: now },
+          endDate: { gt: now },
+          OR: [{ customerId: null }, { customerId }],
+          AND: [
+            {
+              OR: [
+                { maxUses: null },
+                { usedCount: { lt: this.db.coupon.fields.maxUses } },
+              ],
+            },
+          ],
+        },
+        orderBy: [{ endDate: "asc" }, { id: "asc" }],
+        take: 100,
+        include: {
+          _count: { select: { usages: { where: { customerId } } } },
+          promotion: {
+            select: {
+              isActive: true,
+              startDate: true,
+              endDate: true,
+              usageLimit: true,
+              usedCount: true,
+            },
+          },
+        },
+      }),
+    ]);
+    return {
+      coupons: coupons
+        .filter((coupon) => {
+          const p = coupon.promotion;
+          return (
+            coupon._count.usages < coupon.maxUsesPerCustomer &&
+            (!p ||
+              (p.isActive &&
+                p.startDate <= now &&
+                p.endDate > now &&
+                (p.usageLimit === null || p.usedCount < p.usageLimit)))
+          );
+        })
+        .map((coupon) => ({
+          id: coupon.id,
+          code: coupon.code,
+          discountType: coupon.discountType,
+          discountValue: Number(coupon.discountValue),
+          minOrderAmount: Number(coupon.minOrderAmount),
+          maxDiscountAmount:
+            coupon.maxDiscountAmount === null
+              ? null
+              : Number(coupon.maxDiscountAmount),
+          endDate: coupon.endDate.toISOString(),
+        })),
+      points: {
+        balance: customer.totalPoints,
+        value: POINT_VALUE_VND,
+        minimumBalance: MIN_REDEEM_BALANCE_VND / POINT_VALUE_VND,
+        step: REDEEM_STEP_VND / POINT_VALUE_VND,
+        maxRatio: MAX_REDEEM_RATIO,
+      },
+    };
+  }
   async flashCards(limit: number) {
     const now = new Date();
     const quotas = await this.db.promotionVariantQuota.findMany({
@@ -105,7 +184,7 @@ export class PromotionsService {
           },
         },
       },
-      orderBy: [{ promotion: { endDate: 'asc' } }, { id: 'asc' }],
+      orderBy: [{ promotion: { endDate: "asc" } }, { id: "asc" }],
       take: Math.min(limit * 5, 100),
       select: {
         id: true,
@@ -126,7 +205,7 @@ export class PromotionsService {
                 slug: true,
                 basePrice: true,
                 images: {
-                  orderBy: { sortOrder: 'asc' },
+                  orderBy: { sortOrder: "asc" },
                   take: 1,
                   select: { imageUrl: true },
                 },
@@ -179,7 +258,7 @@ export class PromotionsService {
     };
     const rows = await this.db.promotion.findMany({
       where,
-      orderBy: [{ endDate: 'asc' }, { id: 'asc' }],
+      orderBy: [{ endDate: "asc" }, { id: "asc" }],
       skip: (query.page - 1) * query.limit,
       take: query.limit,
       select: { ...publicCampaign, usageLimit: true, usedCount: true },
@@ -208,7 +287,7 @@ export class PromotionsService {
           },
         },
       },
-      orderBy: [{ promotionId: 'asc' }, { id: 'asc' }],
+      orderBy: [{ promotionId: "asc" }, { id: "asc" }],
       take: 500,
       select: {
         id: true,
@@ -257,7 +336,7 @@ export class PromotionsService {
       },
       select: publicCampaign,
     });
-    if (!promotion) throw new NotFoundException('PROMOTION_NOT_FOUND');
+    if (!promotion) throw new NotFoundException("PROMOTION_NOT_FOUND");
     const where = {
       promotionId: id,
       variant: {
@@ -272,7 +351,7 @@ export class PromotionsService {
     const [quotas, total] = await this.db.$transaction([
       this.db.promotionVariantQuota.findMany({
         where,
-        orderBy: { id: 'asc' },
+        orderBy: { id: "asc" },
         skip: (page - 1) * limit,
         take: limit,
         select: {
@@ -289,7 +368,7 @@ export class PromotionsService {
                   name: true,
                   slug: true,
                   images: {
-                    orderBy: { sortOrder: 'asc' },
+                    orderBy: { sortOrder: "asc" },
                     take: 1,
                     select: { imageUrl: true },
                   },
@@ -322,7 +401,7 @@ export class PromotionsService {
     };
   }
 }
-@ApiTags('Customer - Promotions')
+@ApiTags("Customer - Promotions")
 @CommerceErrors()
 @Controller()
 export class PromotionController {
@@ -331,56 +410,109 @@ export class PromotionController {
     private readonly pricing: CommercePricingService,
     private readonly redis: UpstashRedisService,
   ) {}
+  @Get("customers/me/checkout-benefits")
+  @UseGuards(CustomerOnlyGuard)
+  @ApiBearerAuth("JWT-auth")
+  @ApiOperation({
+    summary:
+      "Voucher của tài khoản và quy tắc dùng điểm tại checkout; chưa giữ lượt sử dụng",
+  })
+  @ApiOkResponse({
+    schema: {
+      type: "object",
+      required: ["coupons", "points"],
+      properties: {
+        coupons: {
+          type: "array",
+          items: {
+            type: "object",
+            required: [
+              "id",
+              "code",
+              "discountType",
+              "discountValue",
+              "minOrderAmount",
+              "maxDiscountAmount",
+              "endDate",
+            ],
+            properties: {
+              id: { type: "string", format: "uuid" },
+              code: { type: "string" },
+              discountType: { type: "string" },
+              discountValue: { type: "number" },
+              minOrderAmount: { type: "number" },
+              maxDiscountAmount: { type: "number", nullable: true },
+              endDate: { type: "string", format: "date-time" },
+            },
+          },
+        },
+        points: {
+          type: "object",
+          required: ["balance", "value", "minimumBalance", "step", "maxRatio"],
+          properties: {
+            balance: { type: "integer" },
+            value: { type: "number" },
+            minimumBalance: { type: "integer" },
+            step: { type: "integer" },
+            maxRatio: { type: "number" },
+          },
+        },
+      },
+    },
+  })
+  checkoutBenefits(@Req() req: { customerId: string }) {
+    return this.promotions.checkoutBenefits(req.customerId);
+  }
   @Public()
-  @Get('promotions/flash-sale/cards')
-  @ApiOperation({ summary: 'Card sản phẩm flash sale còn quota cho trang chủ' })
-  flashCards(@Query('limit') limit?: string) {
+  @Get("promotions/flash-sale/cards")
+  @ApiOperation({ summary: "Card sản phẩm flash sale còn quota cho trang chủ" })
+  flashCards(@Query("limit") limit?: string) {
     const requested = Number(limit ?? 5);
     return this.promotions.flashCards(
       Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 20) : 5,
     );
   }
   @Public()
-  @Get('promotions/active')
+  @Get("promotions/active")
   @ApiOperation({
     summary:
-      'Campaign đang hoạt động và điều kiện áp dụng, không trả mã coupon riêng',
+      "Campaign đang hoạt động và điều kiện áp dụng, không trả mã coupon riêng",
   })
-  @ExperienceResponse('promotions')
+  @ExperienceResponse("promotions")
   active(@Query() query: PublicListDto) {
     return this.promotions.active(query);
   }
   @Public()
-  @Get('promotions/flash-sale')
+  @Get("promotions/flash-sale")
   @ApiOperation({
     summary:
-      'Flash Sale và quota còn lại; checkout xác nhận lại giá và giữ quota',
+      "Flash Sale và quota còn lại; checkout xác nhận lại giá và giữ quota",
   })
-  @ExperienceResponse('promotions')
+  @ExperienceResponse("promotions")
   flash(@Query() query: PublicListDto) {
     return this.promotions.active(query, true);
   }
   @Public()
-  @Get('promotions/:id')
+  @Get("promotions/:id")
   @ApiOperation({
-    summary: 'Chi tiết campaign đang hoạt động và sản phẩm có quota',
+    summary: "Chi tiết campaign đang hoạt động và sản phẩm có quota",
   })
   detail(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Query() query: PublicListDto,
   ) {
     return this.promotions.detail(id, query.page, query.limit);
   }
-  @Post('coupons/validate')
+  @Post("coupons/validate")
   @HttpCode(200)
   @UseGuards(CustomerOnlyGuard)
-  @ApiBearerAuth('JWT-auth')
+  @ApiBearerAuth("JWT-auth")
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({
     summary:
-      'Kiểm tra coupon bằng cùng pricing engine; không giữ quota/điểm/lượt coupon',
+      "Kiểm tra coupon bằng cùng pricing engine; không giữ quota/điểm/lượt coupon",
   })
-  @ExperienceResponse('quote')
+  @ExperienceResponse("quote")
   async validate(
     @Req() req: { user: { userId: string }; customerId: string; ip: string },
     @Body() input: CouponValidationDto,
@@ -397,7 +529,7 @@ export class PromotionController {
         60000,
       );
       if (!userAllowed || !ipAllowed)
-        throw new HttpException('COUPON_RATE_LIMITED', 429);
+        throw new HttpException("COUPON_RATE_LIMITED", 429);
     }
     try {
       const { variants: _, ...quote } = await this.pricing.quote({
@@ -411,7 +543,7 @@ export class PromotionController {
       if (error instanceof BadRequestException)
         return {
           valid: false,
-          reasonCode: 'COUPON_OR_SELECTION_NOT_AVAILABLE',
+          reasonCode: "COUPON_OR_SELECTION_NOT_AVAILABLE",
         };
       throw error;
     }

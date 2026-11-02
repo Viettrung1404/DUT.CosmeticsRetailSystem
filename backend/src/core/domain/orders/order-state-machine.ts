@@ -6,16 +6,14 @@ export class OrderStateMachine {
    * Allowed state transitions map.
    * Defines the natural order lifecycle and permitted branching paths.
    */
-  private static readonly ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  private static readonly ALLOWED_TRANSITIONS: Record<
+    OrderStatus,
+    OrderStatus[]
+  > = {
+    [OrderStatus.PENDING_PAYMENT]: [OrderStatus.PENDING, OrderStatus.CANCELLED],
     [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-    [OrderStatus.CONFIRMED]: [
-      OrderStatus.PROCESSING,
-      OrderStatus.CANCELLED,
-    ],
-    [OrderStatus.PROCESSING]: [
-      OrderStatus.SHIPPING,
-      OrderStatus.CANCELLED,
-    ],
+    [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+    [OrderStatus.PROCESSING]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],
     [OrderStatus.SHIPPING]: [OrderStatus.DELIVERED, OrderStatus.RETURNED],
     [OrderStatus.DELIVERED]: [OrderStatus.COMPLETED, OrderStatus.RETURNED],
     [OrderStatus.COMPLETED]: [OrderStatus.RETURNED],
@@ -40,15 +38,26 @@ export class OrderStateMachine {
     switch (actor) {
       case 'CUSTOMER':
         // Customers are ONLY permitted to cancel when order is in PENDING state
-        return current === OrderStatus.PENDING && target === OrderStatus.CANCELLED;
+        return (
+          [OrderStatus.PENDING_PAYMENT, OrderStatus.PENDING].includes(
+            current,
+          ) && target === OrderStatus.CANCELLED
+        );
 
       case 'SYSTEM':
         // Automated workers/schedulers can cancel expired PENDING orders
-        return current === OrderStatus.PENDING && target === OrderStatus.CANCELLED;
+        return (
+          (current === OrderStatus.PENDING_PAYMENT &&
+            [OrderStatus.PENDING, OrderStatus.CANCELLED].includes(target)) ||
+          (current === OrderStatus.PENDING && target === OrderStatus.CANCELLED)
+        );
 
       case 'ADMIN':
         // Admins can execute standard lifecycle operations per ALLOWED_TRANSITIONS
-        return true;
+        return !(
+          current === OrderStatus.PENDING_PAYMENT &&
+          target === OrderStatus.PENDING
+        );
 
       default:
         return false;

@@ -164,7 +164,7 @@ export class PrismaOrderRepository implements IOrderRepository {
             customerId: data.customerId,
             storeId: data.storeId,
             orderType: data.orderType,
-            status: OrderStatus.PENDING,
+            status: data.paymentMethod === 'SEPAY' ? OrderStatus.PENDING_PAYMENT : OrderStatus.PENDING,
             subtotal: data.subtotal,
             discountAmount: data.discountAmount,
             shippingFee: data.shippingFee,
@@ -255,8 +255,8 @@ export class PrismaOrderRepository implements IOrderRepository {
         await notifyCustomer(
           tx,
           data.customerId,
-          `ORDER:${order.id}:PENDING`,
-          'Đã nhận đơn hàng',
+          `ORDER:${order.id}:${order.status}`,
+          data.paymentMethod === 'SEPAY' ? 'Đơn hàng đang chờ thanh toán' : 'Đã nhận đơn hàng',
           'ORDER',
           { orderId: order.id },
         );
@@ -275,7 +275,7 @@ export class PrismaOrderRepository implements IOrderRepository {
         await tx.orderStatusHistory.create({
           data: {
             orderId: order.id,
-            status: 'PENDING',
+          status: order.status,
             note: 'Đơn hàng được khởi tạo thành công',
           },
         });
@@ -556,7 +556,7 @@ export class PrismaOrderRepository implements IOrderRepository {
           },
         });
       await tx.payment.updateMany({
-        where: { orderId: existingRow.id, status: 'PENDING' },
+        where: { orderId: existingRow.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
         data: { status: 'CANCELLED' },
       });
 
@@ -613,6 +613,7 @@ export class PrismaOrderRepository implements IOrderRepository {
       where: {
         status: 'PENDING',
         orderType: { in: ['ONLINE', 'STORE_PICKUP'] },
+        payments: { none: { paymentMethod: { in: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] } } },
         createdAt: { lte: cutoffDate },
       },
       select: {

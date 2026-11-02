@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@infrastructure/database/prisma.service';
-import { ICustomerRepository } from '../../domain/repositories/customer.repository.interface';
-import { CustomerEntity } from '../../domain/entities/customer.entity';
-import { CustomerAddressEntity } from '../../domain/entities/customer-address.entity';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@infrastructure/database/prisma.service";
+import { ICustomerRepository } from "../../domain/repositories/customer.repository.interface";
+import { CustomerEntity } from "../../domain/entities/customer.entity";
+import { CustomerAddressEntity } from "../../domain/entities/customer-address.entity";
 
 @Injectable()
 export class PrismaCustomerRepository implements ICustomerRepository {
@@ -48,6 +48,8 @@ export class PrismaCustomerRepository implements ICustomerRepository {
       city: raw.city,
       district: raw.district,
       ward: raw.ward,
+      latitude: raw.latitude,
+      longitude: raw.longitude,
       isDefault: raw.isDefault,
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
@@ -96,15 +98,19 @@ export class PrismaCustomerRepository implements ICustomerRepository {
     return raw ? this.mapToCustomerEntity(raw) : null;
   }
 
-  async findAddressesByCustomerId(customerId: string): Promise<CustomerAddressEntity[]> {
+  async findAddressesByCustomerId(
+    customerId: string,
+  ): Promise<CustomerAddressEntity[]> {
     const list = await this.prisma.customerAddress.findMany({
       where: { customerId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     });
     return list.map((a) => this.mapToAddressEntity(a));
   }
 
-  async findAddressById(addressId: string): Promise<CustomerAddressEntity | null> {
+  async findAddressById(
+    addressId: string,
+  ): Promise<CustomerAddressEntity | null> {
     const raw = await this.prisma.customerAddress.findUnique({
       where: { id: addressId },
     });
@@ -119,7 +125,10 @@ export class PrismaCustomerRepository implements ICustomerRepository {
 
   async createAddress(
     customerId: string,
-    address: Omit<CustomerAddressEntity, 'id' | 'customerId' | 'createdAt' | 'updatedAt' | 'getFullAddress'>,
+    address: Omit<
+      CustomerAddressEntity,
+      "id" | "customerId" | "createdAt" | "updatedAt" | "getFullAddress"
+    >,
   ): Promise<CustomerAddressEntity> {
     const raw = await this.prisma.$transaction(async (tx) => {
       if (address.isDefault) {
@@ -139,6 +148,8 @@ export class PrismaCustomerRepository implements ICustomerRepository {
           city: address.city,
           district: address.district,
           ward: address.ward,
+          latitude: address.latitude,
+          longitude: address.longitude,
           isDefault: address.isDefault,
         },
       });
@@ -149,7 +160,12 @@ export class PrismaCustomerRepository implements ICustomerRepository {
 
   async updateAddress(
     addressId: string,
-    address: Partial<Omit<CustomerAddressEntity, 'id' | 'customerId' | 'createdAt' | 'updatedAt' | 'getFullAddress'>>,
+    address: Partial<
+      Omit<
+        CustomerAddressEntity,
+        "id" | "customerId" | "createdAt" | "updatedAt" | "getFullAddress"
+      >
+    >,
   ): Promise<CustomerAddressEntity> {
     const raw = await this.prisma.$transaction(async (tx) => {
       if (address.isDefault) {
@@ -169,13 +185,23 @@ export class PrismaCustomerRepository implements ICustomerRepository {
         where: { id: addressId },
         data: {
           ...(address.label !== undefined && { label: address.label }),
-          ...(address.recipientName !== undefined && { recipientName: address.recipientName }),
+          ...(address.recipientName !== undefined && {
+            recipientName: address.recipientName,
+          }),
           ...(address.phone !== undefined && { phone: address.phone }),
-          ...(address.addressLine !== undefined && { addressLine: address.addressLine }),
+          ...(address.addressLine !== undefined && {
+            addressLine: address.addressLine,
+          }),
           ...(address.city !== undefined && { city: address.city }),
           ...(address.district !== undefined && { district: address.district }),
           ...(address.ward !== undefined && { ward: address.ward }),
-          ...(address.isDefault !== undefined && { isDefault: address.isDefault }),
+          ...(address.latitude !== undefined && { latitude: address.latitude }),
+          ...(address.longitude !== undefined && {
+            longitude: address.longitude,
+          }),
+          ...(address.isDefault !== undefined && {
+            isDefault: address.isDefault,
+          }),
         },
       });
     });
@@ -196,7 +222,10 @@ export class PrismaCustomerRepository implements ICustomerRepository {
     });
   }
 
-  async setDefaultAddress(customerId: string, addressId: string): Promise<void> {
+  async setDefaultAddress(
+    customerId: string,
+    addressId: string,
+  ): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.customerAddress.updateMany({
         where: { customerId, isDefault: true },
@@ -230,7 +259,9 @@ export class PrismaCustomerRepository implements ICustomerRepository {
           ...(data.fullName !== undefined && { fullName: data.fullName }),
           ...(data.phone !== undefined && { phone: data.phone }),
           ...(data.gender !== undefined && { gender: data.gender }),
-          ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
+          ...(data.dateOfBirth !== undefined && {
+            dateOfBirth: data.dateOfBirth,
+          }),
         },
         include: {
           user: true,
@@ -238,7 +269,10 @@ export class PrismaCustomerRepository implements ICustomerRepository {
         },
       });
 
-      if (existing?.userId && (data.fullName !== undefined || data.phone !== undefined)) {
+      if (
+        existing?.userId &&
+        (data.fullName !== undefined || data.phone !== undefined)
+      ) {
         await tx.user.update({
           where: { id: existing.userId },
           data: {

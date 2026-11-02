@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+import { HeroCarousel } from "@/features/catalog/hero-carousel";
 import {
   getBrands,
   getCategories,
@@ -43,29 +45,70 @@ export default async function HomePage() {
     <main id="main-content" className="home-page site-container">
       <HomeMotion />
       <section className="home-hero">
-        <div
-          className="home-hero-main"
-          style={{
-            backgroundImage:
-              "linear-gradient(0deg,rgba(40,24,17,.85),rgba(40,24,17,.4) 45%,transparent),url('/images/stitch/home/editorial-1.jpg')",
-          }}
-        >
-          <div className="home-hero-copy">
-            <span className="home-hero-badge">
-              <Sparkles size={13} /> BỘ SƯU TẬP GLOWUP
-            </span>
-            <h1>Sắc Đẹp Theo Cách Của Bạn</h1>
-            <p>Khám phá thế giới mỹ phẩm và chăm sóc da dành riêng cho bạn.</p>
-            <div className="home-hero-actions">
-              <Link className="home-primary-button" href="/products">
-                Khám phá ngay <ArrowRight size={16} />
+        <HeroCarousel
+          slides={[
+            <div
+              key="glowup"
+              className="home-hero-main"
+              style={{
+                backgroundImage:
+                  "linear-gradient(0deg,rgba(40,24,17,.85),rgba(40,24,17,.4) 45%,transparent),url('/images/stitch/home/editorial-1.jpg')",
+              }}
+            >
+              <div className="home-hero-copy">
+                <span className="home-hero-badge">
+                  <Sparkles size={13} /> BỘ SƯU TẬP GLOWUP
+                </span>
+                <h1>Sắc Đẹp Theo Cách Của Bạn</h1>
+                <p>Khám phá thế giới mỹ phẩm và chăm sóc da dành riêng cho bạn.</p>
+                <div className="home-hero-actions">
+                  <Link className="home-primary-button" href="/products">
+                    Khám phá ngay <ArrowRight size={16} />
+                  </Link>
+                  <Link className="home-white-button" href="/promotions">
+                    Xem ưu đãi độc quyền
+                  </Link>
+                </div>
+              </div>
+            </div>,
+            ...[
+              {
+                image: "suncare",
+                alt: "Bright & Protected — chống nắng SPF50+ và serum vitamin C",
+                href: "/categories/chong-nang",
+              },
+              {
+                image: "party-makeup",
+                alt: "Đêm tiệc huyền ảo — bộ sưu tập trang điểm dạ tiệc",
+                href: "/categories/trang-diem",
+              },
+              {
+                image: "lua-beauty",
+                alt: "Rạng rỡ cùng Lụa Beauty — ưu đãi đặc biệt",
+                href: "/promotions",
+              },
+              {
+                image: "botanic-haus",
+                alt: "Botanic Haus — chăm sóc da từ rau má và trà xanh",
+                href: "/categories/cham-soc-da",
+              },
+              {
+                image: "hydrate-glow",
+                alt: "Hydrate & Glow — dưỡng ẩm và chăm sóc da mùa hè",
+                href: "/categories/kem-duong-da-mat-va-mat",
+              },
+            ].map((banner) => (
+              <Link key={banner.image} className="home-hero-image-link" href={banner.href}>
+                <Image
+                  src={`/images/home-banners/${banner.image}.webp`}
+                  alt={banner.alt}
+                  fill
+                  sizes="(max-width: 700px) 100vw, 66vw"
+                />
               </Link>
-              <Link className="home-white-button" href="/promotions">
-                Xem ưu đãi độc quyền
-              </Link>
-            </div>
-          </div>
-        </div>
+            )),
+          ]}
+        />
         <div className="home-hero-side">
           <Link
             href="/categories/cham-soc-da"

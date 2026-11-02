@@ -1,5 +1,5 @@
 // Generated from backend/docs/api/openapi.json. Do not edit.
-// SHA256: bc338a021ae79ae7bd46491149e1254ce7bc0412a519c6ec28c8f81e7fbfbd1b
+// SHA256: 1974307afca108cbb5da0523b13205177ebe3a6b22af16caadf2742fa8e44b16
 export interface paths {
     "/api/v1/auth/register": {
         parameters: {
@@ -779,8 +779,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Thông báo của tôi và số chưa đọc */
-        get: operations["CommerceController_listNotifications"];
+        /** Danh sÃ¡ch thÃ´ng bÃ¡o vÃ  tá»•ng chÆ°a Ä‘á»c */
+        get: operations["NotificationsController_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -797,8 +797,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Đánh dấu thông báo của tôi đã đọc */
-        put: operations["CommerceController_read"];
+        /** ÄÃ¡nh dáº¥u thÃ´ng bÃ¡o thuá»™c ngÆ°á»i dÃ¹ng Ä‘Ã£ Ä‘á»c */
+        put: operations["NotificationsController_read"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1654,7 +1654,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Tạo đơn guest COD/VNPAY với idempotency bền vững theo phiên */
+        /** Tạo đơn guest COD/SEPAY với idempotency bền vững theo phiên */
         post: operations["GuestCheckoutController_create"];
         delete?: never;
         options?: never;
@@ -1679,23 +1679,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/guest/payments/vnpay": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Tạo/khôi phục thanh toán VNPAY cho đơn thuộc phiên guest */
-        post: operations["GuestCheckoutController_payment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/guest/payments/{id}/status": {
         parameters: {
             query?: never;
@@ -1705,6 +1688,515 @@ export interface paths {
         };
         /** Trạng thái thanh toán thuộc phiên guest */
         get: operations["GuestCheckoutController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Đổi mật khẩu; giữ sid hiện tại và thu hồi refresh session khác */
+        put: operations["AuthController_changePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Há»“ sÆ¡ ngÆ°á»i dÃ¹ng hiá»‡n táº¡i */
+        get: operations["UsersController_get"];
+        /** Cáº­p nháº­t há»“ sÆ¡; phone thay Ä‘á»•i sáº½ cáº§n xÃ¡c minh láº¡i */
+        put: operations["UsersController_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/upload/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Avatar JPG/PNG/WebP tối đa 5 MB, resize 512×512 */
+        post: operations["UploadAvatarController_avatar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/products/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** POS - Quét mã vạch ra biến thể, giá và tồn bán được tại cửa hàng */
+        get: operations["PosProductController_scan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/products/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** POS - Tìm biến thể theo tên hoặc SKU (chỉ hàng đang bán) */
+        get: operations["PosProductController_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/customers/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** POS - Tìm khách theo số điện thoại (hạng, điểm hiện có) */
+        get: operations["PosCustomerController_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POS - Tạo nhanh khách tại quầy (số điện thoại + họ tên, chưa cần tài khoản) */
+        post: operations["PosCustomerController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/my-stores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** POS - Cửa hàng bạn được gán và có thể bán tại quầy (không gồm kho tổng) */
+        get: operations["PosStoreController_getMyStores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/orders/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POS - Tính tiền giỏ hàng (không ghi DB): khuyến mãi, voucher, điểm, tồn bán được */
+        post: operations["PosOrderController_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** POS - Bán hàng một bước: tạo đơn, trừ kho FEFO, thu tiền, tích điểm, hoa hồng */
+        post: operations["PosOrderController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pos/orders/{id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** POS - Dữ liệu biên lai (FE in khổ 80mm); NV bán chỉ xem đơn trong ca của mình */
+        get: operations["PosOrderController_receipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/products/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số lượng sản phẩm đang bán theo danh mục, thương hiệu và tag */
+        get: operations["ProductCustomerController_facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/products/search-hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Gợi ý từ khóa, thương hiệu và sản phẩm cho ô tìm kiếm */
+        get: operations["ProductCustomerController_searchHints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/products/{id}/try-on": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mã màu son đã được duyệt cho thử màu camera, có thể null nếu chưa cấu hình */
+        get: operations["ProductCustomerController_tryOnColors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/products/{id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số lượng khả dụng theo cửa hàng cho một biến thể */
+        get: operations["ProductCustomerController_availability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/variants/{id}/try-on-color": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Cập nhật mã màu thử son đã được duyệt cho biến thể */
+        patch: operations["ProductVariantAdminController_updateTryOnColor"];
+        trace?: never;
+    };
+    "/api/v1/guest/payments/sepay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tạo/khôi phục thanh toán SEPAY cho đơn thuộc phiên guest */
+        post: operations["GuestCheckoutController_payment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/me/checkout-benefits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Voucher của tài khoản và quy tắc dùng điểm tại checkout; chưa giữ lượt sử dụng */
+        get: operations["PromotionController_checkoutBenefits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/promotions/flash-sale/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Card sản phẩm flash sale còn quota cho trang chủ */
+        get: operations["PromotionController_flashCards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách thương hiệu đang hiển thị trên cửa hàng */
+        get: operations["BrandController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Available storefront payment methods; no merchant secrets */
+        get: operations["PaymentsController_methods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{gateway}/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Táº¡o hoáº·c tÃ¡i sá»­ dá»¥ng lÆ°á»£t thanh toÃ¡n online */
+        post: operations["PaymentsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tra cá»©u tráº¡ng thÃ¡i payment/order thuá»™c tÃ i khoáº£n */
+        get: operations["PaymentsController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/sepay/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** SePay HMAC-SHA256 webhook; durable receipt before acknowledgement */
+        post: operations["PaymentCallbacksController_sepay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/vnpay/ipn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** VNPay native GET IPN */
+        get: operations["PaymentCallbacksController_vnpay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/momo/ipn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** MoMo signed IPN; HTTP 204 after durable receipt */
+        post: operations["PaymentCallbacksController_momo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/zalopay/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ZaloPay callback; key2 HMAC of original data string */
+        post: operations["PaymentCallbacksController_zalo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/vnpay/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browser return; never confirms an order */
+        get: operations["PaymentCallbacksController_vnpReturn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/momo/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentCallbacksController_momoReturn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/zalopay/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PaymentCallbacksController_zaloReturn"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2267,7 +2759,7 @@ export interface components {
         AcceptExchangeDto: {
             quoteVersion: number;
             /** @enum {string} */
-            paymentMethod?: "COD" | "VNPAY" | "MOMO" | "ZALOPAY";
+            paymentMethod?: "COD" | "SEPAY" | "VNPAY" | "MOMO" | "ZALOPAY";
         };
         RedeemDto: {
             rewardCode: string;
@@ -2541,10 +3033,12 @@ export interface components {
             addressLine: string;
             /** @description Tỉnh / Thành phố */
             city: string;
-            /** @description Quận / Huyện */
-            district: string;
+            /** @description Quận / Huyện cũ (không cần với địa chỉ hai cấp) */
+            district?: string;
             /** @description Phường / Xã */
             ward: string;
+            latitude?: number | null;
+            longitude?: number | null;
             /**
              * @description Đặt làm địa chỉ nhận hàng mặc định
              * @default false
@@ -2566,6 +3060,8 @@ export interface components {
             district?: string;
             /** @description Phường / Xã */
             ward?: string;
+            latitude?: number | null;
+            longitude?: number | null;
             /** @description Đặt làm địa chỉ nhận hàng mặc định */
             isDefault?: boolean;
         };
@@ -2589,13 +3085,15 @@ export interface components {
             ward?: string;
             district?: string;
             city: string;
+            latitude?: number | null;
+            longitude?: number | null;
         };
         CreateOrderDto: {
             /** @description SHA256 quoteVersion từ POST /orders/preview; cần xác nhận lại nếu giá đổi */
             quoteVersion: string;
             shippingAddress: components["schemas"]["ShippingAddressDto"];
             /**
-             * @description COD or VNPAY when the VNPAY gateway is configured
+             * @description COD or SEPAY when the SEPAY gateway is configured
              * @default COD
              */
             paymentMethod: string;
@@ -2765,6 +3263,210 @@ export interface components {
             code: string;
             items: components["schemas"]["SelectionItemDto"][];
             usePoints?: number;
+        };
+        ChangePasswordDto: {
+            oldPassword: string;
+            newPassword: string;
+        };
+        UpdateProfileDto: {
+            fullName?: string;
+            phone?: Record<string, never> | null;
+            avatarUrl?: Record<string, never> | null;
+            /** Format: date */
+            dateOfBirth?: Record<string, never> | null;
+            /** @enum {string|null} */
+            gender?: "MALE" | "FEMALE" | "OTHER" | null;
+        };
+        CreatePosCustomerDto: {
+            /** @example 0905000003 */
+            phone: string;
+            /** @example Lê Văn Quầy */
+            fullName: string;
+        };
+        PosOrderItemDto: {
+            /** @description Biến thể sản phẩm (lấy từ API quét mã / tìm sản phẩm) */
+            variantId: string;
+            /** @example 1 */
+            quantity: number;
+        };
+        PreviewPosOrderDto: {
+            /** @description Cửa hàng đang bán */
+            storeId: string;
+            items: components["schemas"]["PosOrderItemDto"][];
+            /** @description Khách hàng (tra SĐT hoặc tạo nhanh); bắt buộc khi dùng voucher / điểm */
+            customerId?: string;
+            /**
+             * @description Tối đa một mã giảm giá (BR-11)
+             * @example GIAM40K
+             */
+            couponCode?: string;
+            /**
+             * @description Số điểm dùng (1 điểm = 1đ, bội số 10.000)
+             * @example 30000
+             */
+            pointsToUse?: number;
+        };
+        PosPricedLineResponseDto: {
+            variantId: string;
+            productName: string;
+            variantName?: Record<string, never>;
+            sku: string;
+            quantity: number;
+            unitPrice: number;
+            /** @description Đơn giá x số lượng, trước mọi giảm giá */
+            gross: number;
+            /** @description Chương trình khuyến mãi tự động đã áp */
+            promotionName?: Record<string, never>;
+            promotionDiscount: number;
+            /** @description Phần voucher chia cho dòng này */
+            couponDiscount: number;
+            /** @description Phần điểm chia cho dòng này */
+            pointsDiscount: number;
+            /** @description gross - khuyến mãi - voucher (chưa trừ điểm) */
+            lineTotal: number;
+        };
+        PosPreviewResponseDto: {
+            lines: components["schemas"]["PosPricedLineResponseDto"][];
+            /** @description Tạm tính, trước giảm giá */
+            subtotal: number;
+            promotionDiscount: number;
+            couponDiscount: number;
+            pointsDiscount: number;
+            /** @description Số điểm sẽ trừ */
+            pointsUsed: number;
+            /** @description Số tiền khách phải trả */
+            total: number;
+            /** @description Dòng thiếu hàng bán được; rỗng là đủ hàng */
+            shortages: string[];
+            canCheckout: boolean;
+            customer?: Record<string, never>;
+        };
+        PosPaymentDto: {
+            /** @enum {string} */
+            method: "CASH" | "CARD" | "TRANSFER";
+            /**
+             * @description Số tiền khách đưa theo phương thức này (CASH được phép dư để thối)
+             * @example 500000
+             */
+            amount: number;
+        };
+        CreatePosOrderDto: {
+            /** @description Cửa hàng đang bán */
+            storeId: string;
+            items: components["schemas"]["PosOrderItemDto"][];
+            /** @description Khách hàng (tra SĐT hoặc tạo nhanh); bắt buộc khi dùng voucher / điểm */
+            customerId?: string;
+            /**
+             * @description Tối đa một mã giảm giá (BR-11)
+             * @example GIAM40K
+             */
+            couponCode?: string;
+            /**
+             * @description Số điểm dùng (1 điểm = 1đ, bội số 10.000)
+             * @example 30000
+             */
+            pointsToUse?: number;
+            /** @description Mỗi phương thức khai báo một lần; đơn 0đ thì để mảng rỗng */
+            payments: components["schemas"]["PosPaymentDto"][];
+            note?: string;
+        };
+        PosReceiptResponseDto: {
+            orderId: string;
+            orderNumber: string;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+            store: Record<string, never>;
+            sessionCode?: Record<string, never>;
+            cashierName?: Record<string, never>;
+            customer?: Record<string, never>;
+            items: Record<string, never>;
+            subtotal: number;
+            promotionDiscount: number;
+            couponDiscount: number;
+            couponCode?: Record<string, never>;
+            pointsUsed: number;
+            pointsDiscount: number;
+            total: number;
+            pointsEarned: number;
+            payments: Record<string, never>;
+            /** @description Tổng khách đưa */
+            totalReceived: number;
+            /** @description Tiền thừa đã thối lại */
+            change: number;
+        };
+        TryOnColorDto: {
+            /**
+             * @description Mã màu được duyệt từ ảnh swatch của biến thể
+             * @example #B9465E
+             */
+            colorHex: string;
+        };
+        ApiResponseDto: {
+            /** @example 200 */
+            statusCode: number;
+            /** @example true */
+            success: boolean;
+            /** @example Thành công */
+            message: string;
+            data?: Record<string, never>;
+            /** @example 2026-09-20T10:00:00.000Z */
+            timestamp: string;
+        };
+        PaymentResultDto: {
+            /** Format: uuid */
+            paymentId: string;
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            method: "SEPAY" | "VNPAY" | "MOMO" | "ZALOPAY" | "COD";
+            /** @enum {string} */
+            status: "PENDING" | "INITIATING" | "PAYABLE" | "UNKNOWN" | "FAILED" | "COMPLETED" | "CANCELLED" | "NEEDS_REVIEW";
+            paymentUrl: string | null;
+            walletDeeplink: string | null;
+            qrCodeData: string | null;
+            returnUrl: string | null;
+            /** Format: date-time */
+            expiresAt: string | null;
+        };
+        PaymentStatusDto: {
+            /** Format: uuid */
+            paymentId: string;
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            method: "SEPAY" | "VNPAY" | "MOMO" | "ZALOPAY" | "COD";
+            /** @enum {string} */
+            status: "PENDING" | "INITIATING" | "PAYABLE" | "UNKNOWN" | "FAILED" | "COMPLETED" | "CANCELLED" | "NEEDS_REVIEW";
+            paymentUrl: string | null;
+            walletDeeplink: string | null;
+            qrCodeData: string | null;
+            returnUrl: string | null;
+            /** Format: date-time */
+            expiresAt: string | null;
+            paymentStatus: string;
+            /**
+             * @description SePay: PENDING_PAYMENT before payment, PENDING after reconciliation, CONFIRMED after shop confirmation.
+             * @enum {string}
+             */
+            orderStatus: "PENDING_PAYMENT" | "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPING" | "DELIVERED" | "COMPLETED" | "CANCELLED" | "RETURNED";
+            verificationPending: boolean;
+            refundPending: boolean;
+            /** Format: date-time */
+            verificationDeadline: string | null;
+        };
+        PaymentMethodsDto: {
+            COD: boolean;
+            SEPAY: boolean;
+        };
+        CreatePaymentDto: {
+            /** Format: uuid */
+            orderId: string;
+            /**
+             * @default WEB
+             * @enum {string}
+             */
+            platform: "WEB" | "MOBILE";
         };
     };
     responses: never;
@@ -6553,10 +7255,14 @@ export interface operations {
                 order?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;
+                /** @description Nhiều danh mục UUID, phân tách bằng dấu phẩy */
+                categoryIds?: string;
                 /** @description Lọc theo ID danh mục (UUID) */
                 categoryId?: string;
                 /** @description Lọc theo ID thương hiệu (UUID) */
                 brandId?: string;
+                /** @description Nhiều thương hiệu UUID, phân tách bằng dấu phẩy */
+                brandIds?: string;
                 /** @description Giá tối thiểu (VNĐ) */
                 minPrice?: number;
                 /** @description Giá tối đa (VNĐ) */
@@ -6565,6 +7271,8 @@ export interface operations {
                 rating?: number;
                 /** @description Lọc theo tag sản phẩm */
                 tag?: string;
+                /** @description Nhiều tag tình trạng da, phân tách bằng dấu phẩy */
+                tags?: string;
                 /** @description Sắp xếp kết quả */
                 sortBy?: "price_asc" | "price_desc" | "newest" | "bestseller" | "rating";
             };
@@ -6727,10 +7435,14 @@ export interface operations {
                 order?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;
+                /** @description Nhiều danh mục UUID, phân tách bằng dấu phẩy */
+                categoryIds?: string;
                 /** @description Lọc theo ID danh mục (UUID) */
                 categoryId?: string;
                 /** @description Lọc theo ID thương hiệu (UUID) */
                 brandId?: string;
+                /** @description Nhiều thương hiệu UUID, phân tách bằng dấu phẩy */
+                brandIds?: string;
                 /** @description Giá tối thiểu (VNĐ) */
                 minPrice?: number;
                 /** @description Giá tối đa (VNĐ) */
@@ -6739,6 +7451,8 @@ export interface operations {
                 rating?: number;
                 /** @description Lọc theo tag sản phẩm */
                 tag?: string;
+                /** @description Nhiều tag tình trạng da, phân tách bằng dấu phẩy */
+                tags?: string;
                 /** @description Sắp xếp kết quả */
                 sortBy?: "price_asc" | "price_desc" | "newest" | "bestseller" | "rating";
                 /** @description Từ khóa tìm kiếm (tên, thương hiệu, thành phần, danh mục, tag...) */
@@ -11025,10 +11739,9 @@ export interface operations {
             };
         };
     };
-    CommerceController_listNotifications: {
+    NotificationsController_list: {
         parameters: {
             query?: {
-                order?: "ASC" | "DESC";
                 page?: number;
                 limit?: number;
             };
@@ -11045,111 +11758,103 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @example 200 */
-                        statusCode?: number;
+                        statusCode: number;
                         /** @example true */
-                        success?: boolean;
-                        message?: string;
-                        data?: {
-                            items?: Record<string, never>[];
-                            page?: number;
-                            limit?: number;
-                            total?: number;
-                            unreadCount?: number;
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
                         };
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Validation failed */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Authentication or active session required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Access denied */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
-                        code?: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
-                        code?: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Rate limited; Retry-After is seconds */
             429: {
                 headers: {
                     "Retry-After"?: number;
@@ -11157,32 +11862,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Thiếu policy hoặc provider cần thiết; chưa phát sinh giao dịch */
+            /** @description Required dependency unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
         };
     };
-    CommerceController_read: {
+    NotificationsController_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -11200,109 +11917,103 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @example 200 */
-                        statusCode?: number;
+                        statusCode: number;
                         /** @example true */
-                        success?: boolean;
-                        message?: string;
-                        data?: {
-                            /** Format: uuid */
-                            id?: string;
-                            isRead?: boolean;
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
                         };
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Validation failed */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Authentication or active session required */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Access denied */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
-                        code?: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
-                        code?: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            /** @description Rate limited; Retry-After is seconds */
             429: {
                 headers: {
                     "Retry-After"?: number;
@@ -11310,26 +12021,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
-            /** @description Thiếu policy hoặc provider cần thiết; chưa phát sinh giao dịch */
+            /** @description Required dependency unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        statusCode?: number;
-                        success?: boolean;
-                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
                         code?: string;
-                        message?: string;
+                        message: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
                     };
                 };
             };
@@ -16470,7 +17193,7 @@ export interface operations {
                 limit?: number;
                 /** @description Tìm theo mã đơn */
                 search?: string;
-                status?: "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPING" | "DELIVERED" | "COMPLETED" | "CANCELLED" | "RETURNED";
+                status?: "PENDING_PAYMENT" | "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPING" | "DELIVERED" | "COMPLETED" | "CANCELLED" | "RETURNED";
                 orderType?: "ONLINE" | "POS";
                 storeId?: string;
                 /** @description Lọc đơn của một khách (xem lịch sử mua hàng) */
@@ -21159,6 +21882,2819 @@ export interface operations {
             };
         };
     };
+    GuestCheckoutController_status: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-session-id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    AuthController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    UsersController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    UsersController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    UploadAvatarController_avatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 201 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosProductController_scan: {
+        parameters: {
+            query: {
+                /** @description Mã vạch của biến thể */
+                barcode: string;
+                /** @description Cửa hàng đang bán */
+                storeId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Không được gán cửa hàng này */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Không có biến thể với mã vạch này */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosProductController_search: {
+        parameters: {
+            query: {
+                order?: "ASC" | "DESC";
+                page?: number;
+                limit?: number;
+                /** @description Tên sản phẩm hoặc SKU */
+                q: string;
+                /** @description Cửa hàng đang bán */
+                storeId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kho tổng hoặc cửa hàng ngừng hoạt động */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Không được gán cửa hàng này */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosCustomerController_lookup: {
+        parameters: {
+            query: {
+                phone: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Chưa có khách với số điện thoại này */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosCustomerController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePosCustomerDto"];
+            };
+        };
+        responses: {
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Số điện thoại đã có khách */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosStoreController_getMyStores: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosOrderController_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewPosOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: components["schemas"]["PosPreviewResponseDto"];
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Voucher / điểm không hợp lệ, sản phẩm ngừng bán */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Không được gán cửa hàng này hoặc thiếu quyền áp mã */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosOrderController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePosOrderDto"];
+            };
+        };
+        responses: {
+            /** @description Tiền thu sai, voucher / điểm không hợp lệ */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Không được gán cửa hàng này */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Chưa mở ca tại cửa hàng này, hoặc không đủ hàng */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PosOrderController_receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: components["schemas"]["PosReceiptResponseDto"];
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Đơn không thuộc ca của bạn / ngoài phạm vi */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Không tìm thấy đơn bán tại quầy */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    ProductCustomerController_facets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    ProductCustomerController_searchHints: {
+        parameters: {
+            query: {
+                /** @description Từ khóa bắt đầu gõ để tìm kiếm gợi ý */
+                q: string;
+                /** @description Số lượng kết quả gợi ý trả về */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    ProductCustomerController_tryOnColors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    ProductCustomerController_availability: {
+        parameters: {
+            query: {
+                variantId: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    ProductVariantAdminController_updateTryOnColor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryOnColorDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
     GuestCheckoutController_payment: {
         parameters: {
             query?: never;
@@ -21318,19 +24854,337 @@ export interface operations {
             };
         };
     };
-    GuestCheckoutController_status: {
+    PromotionController_checkoutBenefits: {
         parameters: {
             query?: never;
-            header: {
-                "x-session-id": string;
-            };
-            path: {
-                id: string;
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            coupons: {
+                                /** Format: uuid */
+                                id: string;
+                                code: string;
+                                discountType: string;
+                                discountValue: number;
+                                minOrderAmount: number;
+                                maxDiscountAmount: number | null;
+                                /** Format: date-time */
+                                endDate: string;
+                            }[];
+                            points: {
+                                balance: number;
+                                value: number;
+                                minimumBalance: number;
+                                step: number;
+                                maxRatio: number;
+                            };
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Thiếu policy hoặc provider cần thiết; chưa phát sinh giao dịch */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    PromotionController_flashCards: {
+        parameters: {
+            query: {
+                limit: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Lỗi xác thực, dữ liệu, ownership hoặc xung đột nghiệp vụ */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Thiếu policy hoặc provider cần thiết; chưa phát sinh giao dịch */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode?: number;
+                        success?: boolean;
+                        /** @description Mã nghiệp vụ ổn định nếu có */
+                        code?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    BrandController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thương hiệu công khai, ưu tiên thương hiệu nổi bật */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -21476,6 +25330,632 @@ export interface operations {
                         timestamp: string;
                     };
                 };
+            };
+        };
+    };
+    PaymentsController_methods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: components["schemas"]["PaymentMethodsDto"];
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PaymentsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gateway: "sepay" | "vnpay" | "momo" | "zalopay";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePaymentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: components["schemas"]["ApiResponseDto"] & {
+                            data?: components["schemas"]["PaymentResultDto"];
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Khá»Ÿi táº¡o chÆ°a rÃµ káº¿t quáº£; dÃ¹ng status Ä‘á»ƒ Ä‘á»‘i soÃ¡t */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 202 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: components["schemas"]["ApiResponseDto"] & {
+                            data?: components["schemas"]["PaymentResultDto"];
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PaymentsController_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example 200 */
+                        statusCode: number;
+                        /** @example true */
+                        success: boolean;
+                        message: string;
+                        data: components["schemas"]["ApiResponseDto"] & {
+                            data?: components["schemas"]["PaymentStatusDto"];
+                        };
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Validation failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Authentication or active session required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Rate limited; Retry-After is seconds */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+            /** @description Required dependency unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        statusCode: number;
+                        /** @example false */
+                        success: boolean;
+                        message: string;
+                        code?: string;
+                        details?: {
+                            [key: string]: unknown;
+                        };
+                        path: string;
+                        /** Format: date-time */
+                        timestamp: string;
+                    };
+                };
+            };
+        };
+    };
+    PaymentCallbacksController_sepay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                    };
+                };
+            };
+        };
+    };
+    PaymentCallbacksController_vnpay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentCallbacksController_momo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentCallbacksController_zalo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentCallbacksController_vnpReturn: {
+        parameters: {
+            query: {
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentCallbacksController_momoReturn: {
+        parameters: {
+            query: {
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PaymentCallbacksController_zaloReturn: {
+        parameters: {
+            query: {
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

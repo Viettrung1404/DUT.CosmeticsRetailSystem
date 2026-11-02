@@ -44,6 +44,7 @@ Thumbs.db
 !/scripts/export-db-schema.cjs
 !/scripts/catalog/
 !/scripts/demo/
+!/scripts/payments/
 
 # Downloaded public catalog snapshots, local images and execution reports
 /.catalog-data/

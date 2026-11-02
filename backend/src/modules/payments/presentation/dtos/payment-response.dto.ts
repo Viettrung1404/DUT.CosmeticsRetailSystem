@@ -1,8 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { OrderStatus } from '@core/domain/orders/order-status.enum';
+export class PaymentMethodsDto {
+  @ApiProperty() COD: boolean;
+  @ApiProperty() SEPAY: boolean;
+}
+
 export class PaymentResultDto {
   @ApiProperty({ format: 'uuid' }) paymentId: string;
   @ApiProperty({ format: 'uuid' }) orderId: string;
-  @ApiProperty({ enum: ['VNPAY', 'MOMO', 'ZALOPAY', 'COD'] }) method: string;
+  @ApiProperty({ enum: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY', 'COD'] })
+  method: string;
   @ApiProperty({
     enum: [
       'PENDING',
@@ -25,7 +32,12 @@ export class PaymentResultDto {
 }
 export class PaymentStatusDto extends PaymentResultDto {
   @ApiProperty() paymentStatus: string;
-  @ApiProperty() orderStatus: string;
+  @ApiProperty({
+    enum: OrderStatus,
+    description:
+      'SePay: PENDING_PAYMENT before payment, PENDING after reconciliation, CONFIRMED after shop confirmation.',
+  })
+  orderStatus: string;
   @ApiProperty() verificationPending: boolean;
   @ApiProperty() refundPending: boolean;
   @ApiProperty({ type: String, format: 'date-time', nullable: true })

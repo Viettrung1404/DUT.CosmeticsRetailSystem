@@ -20,6 +20,8 @@ export function documentResponseEnvelopes(document: OpenAPIObject): OpenAPIObjec
     for (const method of ['get', 'post', 'put', 'patch', 'delete'] as const) {
       const operation = path?.[method];
       if (!operation) continue;
+      // Gateway acknowledgements use the provider's native protocol via @Res().
+      if (operation.tags?.includes('Payment callbacks')) continue;
       if (!operation.tags?.includes('SEO')) {
         for (const [status, response] of Object.entries(operation.responses)) {
           if (!response || !/^2\d\d$/.test(status) || status === '204' || '$ref' in response)

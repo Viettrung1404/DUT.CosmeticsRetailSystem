@@ -6,12 +6,14 @@ Ngày cập nhật: **28/10/2026**. Trạng thái: **đã triển khai FE-00 và
 
 **Cập nhật triển khai 29/10:** FE-02–06 đã có code trong `frontend/`; đang rà lại FE-03–06 theo HTML sau phản hồi của người dùng, chưa đồng nghĩa nghiệm thu cuối. Guest cart/checkout không yêu cầu đăng nhập; API thiếu được phép bổ sung theo yêu cầu triển khai. Xem [bảng sửa UI](../../../frontend/docs/fe-03-06-design-review.md) và [gate FE-06/07](../../../frontend/docs/fe-06-07-checklist.md). Dòng trạng thái ngày 28/10 ở trên là mốc lịch sử trước lượt triển khai này.
 
+**Cập nhật thanh toán 01/11/2026:** checkout hiện tại dùng COD và SePay VietQR, đã nghiệm thu luồng SePay Test mode. Hướng dẫn cấu hình, webhook và kết quả kiểm tra nằm tại [hướng dẫn SePay](../../../backend/docs/sepay-setup.md). Các mốc triển khai cũ bên dưới giữ ngữ cảnh của bộ kế hoạch.
+
 - Làm website cho Guest/Customer bằng Next.js App Router; không bao gồm Admin, POS hoặc Mobile.
 - Dựng đầy đủ các trang và tương tác trong `docs/4-stitch_design` (tên thư mục thực tế).
 - **Navbar/header trong `code.html` trang Danh mục chăm sóc da là chuẩn layout chung**, theo [HTML hiện tại](../../4-stitch_design/danh_m_c_ch_m_s_c_da_glowup/code.html) và ảnh navbar mới người dùng gửi ngày 28/10/2026. Áp dụng trang chủ, checkout và account; auth không có header/footer theo D11; active state theo route thực. **Mọi màn lấy `code.html` làm chuẩn; `screen.png` đã cũ.** Lỗi toàn ứng dụng có thể dùng shell tối giản để vẫn phục hồi được khi layout hỏng.
 - **Sidebar trang Sổ địa chỉ là chuẩn cho cụm tài khoản**. Giữ hình thức, phân nhóm, khoảng cách, active state; bổ sung Tổng quan/Đổi trả/Bảo mật và các liên kết còn thiếu. Ví voucher dẫn tới Đổi ưu đãi.
 - **Màu chủ đạo #C85A70; làm đủ blueprint; footer theo trang chủ.** Đổi trả 7 ngày, verify đăng ký bằng link email; các quy tắc còn lại theo backend. Bỏ CTA phụ chưa có API.
-- **VNPAY + COD bắt buộc trong bản đầu.** COD-only là mốc trung gian, không đủ nghiệm thu cuối.
+- **SePay VietQR + COD là hai phương thức checkout hiện tại.** Thanh toán online cần được xác minh ở backend qua webhook và API SePay.
 - **Sửa nhóm API O01/O02/O03/O05 trước tích hợp liên quan:** bỏ giá vốn khỏi public response, hoàn thiện schema, bổ sung dữ liệu flash/promotion và tách view-count khỏi GET blog.
 - Next.js phụ trách giao diện, SEO, UI state và tích hợp. BFF chỉ phụ trách session/token, adapter response và orchestration khi cần. Backend hiện có quyết định giá, tồn, khuyến mãi, điểm, đơn hàng, thanh toán và nghiệp vụ chuỗi cửa hàng. Frontend/BFF không truy cập database nghiệp vụ.
 - Server Components gọi backend trực tiếp qua server API client; không gọi HTTP vòng qua Route Handler của chính Next.js.
@@ -40,7 +42,7 @@ Ngày cập nhật: **28/10/2026**. Trạng thái: **đã triển khai FE-00 và
 ## 4. Những điểm quyết định tiến độ
 
 1. Bootstrap frontend theo màu/layout/sidebar đã chốt; đối chiếu đủ screen IDs.
-2. Backend bàn giao VNPAY và nhóm O01/O02/O03/O05 trước phần FE integration tương ứng.
+2. Backend bàn giao hợp đồng thanh toán SePay và nhóm O01/O02/O03/O05 trước phần FE integration tương ứng.
 3. Đóng contract public brand/store, chuẩn bị CMS/asset và kiểm chứng lại môi trường auth/storage/provider.
 4. Làm đủ UI trong preview không có nghĩa mọi tính năng đã sẵn sàng production. Nghiệm thu tách **UI hoàn chỉnh**, **tích hợp API**, **chạy thật trên staging**; không đánh dấu hoàn thành luồng nghiệp vụ bằng dữ liệu giả.
 
@@ -52,7 +54,7 @@ Ngày cập nhật: **28/10/2026**. Trạng thái: **đã triển khai FE-00 và
 - [Functional requirements](../../1-requirement/07_functional_requirements.md), [Sprint plan chung](../08_sprint_plan.md).
 - [OpenAPI](../../../backend/docs/api/openapi.json), [Handoff Next.js/Expo](../../../backend/docs/api/nextjs-expo-handoff.md), [Sprint 6 backend](../../../backend/docs/sprint-6.md).
 - Controller, DTO và service backend liên quan được dùng để xác minh hành vi, đặc biệt checkout, promotions, public catalog, auth, tracking và địa chỉ.
-- Đã kiểm tra tài liệu Next.js và VNPAY chính thức khi lập kế hoạch; các lựa chọn kiến trúc và nguồn nằm trong [01](01_architecture.md), [03](03_api_contracts_and_gaps.md).
+- Các lựa chọn kiến trúc và nguồn khi lập kế hoạch nằm trong [01](01_architecture.md), [03](03_api_contracts_and_gaps.md). Tài liệu thanh toán hiện hành và nguồn SePay chính thức nằm trong [hướng dẫn SePay](../../../backend/docs/sepay-setup.md).
 
 ## 6. Quy tắc cập nhật kế hoạch
 
