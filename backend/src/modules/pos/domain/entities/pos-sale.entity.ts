@@ -37,6 +37,7 @@ export interface PosCouponRule {
   discountType: PosDiscountType;
   discountValue: number;
   minOrderAmount: number;
+  maxDiscountAmount: number | null;
   maxUses: number | null;
   usedCount: number;
   maxUsesPerCustomer: number;

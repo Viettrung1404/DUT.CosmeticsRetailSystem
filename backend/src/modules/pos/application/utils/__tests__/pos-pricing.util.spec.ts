@@ -49,6 +49,7 @@ const coupon = (over: Partial<PosCouponRule> = {}): PosCouponRule => ({
   discountType: 'FIXED_AMOUNT',
   discountValue: 40000,
   minOrderAmount: 0,
+  maxDiscountAmount: null,
   maxUses: null,
   usedCount: 0,
   maxUsesPerCustomer: 1,
@@ -226,6 +227,14 @@ describe('buildPosPricing - đơn chị Hoa', () => {
         availablePoints: 100000,
       }),
     ).toThrow('tối đa 50%');
+  });
+});
+
+describe('calculateCouponDiscount - trần giảm tối đa của voucher', () => {
+  it('voucher % bị chặn ở maxDiscountAmount', () => {
+    const pct = coupon({ discountType: 'PERCENTAGE', discountValue: 10, maxDiscountAmount: 50000 });
+    expect(calculateCouponDiscount(pct, 1604000, 'kh', 0, NOW)).toBe(50000);
+    expect(calculateCouponDiscount(pct, 300000, 'kh', 0, NOW)).toBe(30000);
   });
 });
 
