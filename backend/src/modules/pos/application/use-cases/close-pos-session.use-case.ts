@@ -50,11 +50,17 @@ export class ClosePosSessionUseCase {
       throw new ConflictException('Ca này đã đóng rồi');
     }
 
-    const systemCash = await this.repository.sumCompletedCash(session.id);
-    session.close(input.countedCash, systemCash, input.note?.trim() || null, new Date());
-    if (!(await this.repository.saveClosed(session))) {
-      throw new ConflictException('Ca này vừa được đóng ở nơi khác, vui lòng tải lại');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const systemCash = await this.repository.sumCompletedCash(session.id);
+      session.close(input.countedCash, systemCash, input.note?.trim() || null, new Date());
+      const result = await this.repository.saveClosed(session);
+      if (result === 'saved') {
+        return session;
+      }
+      if (result === 'already_closed') {
+        throw new ConflictException('Ca này vừa được đóng ở nơi khác, vui lòng tải lại');
+      }
     }
-    return session;
+    throw new ConflictException('Ca đang có giao dịch phát sinh liên tục, vui lòng thử đóng ca lại');
   }
 }

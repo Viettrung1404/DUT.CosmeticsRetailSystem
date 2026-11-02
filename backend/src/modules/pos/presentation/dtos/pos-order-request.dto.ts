@@ -71,6 +71,7 @@ export class PosPaymentDto {
   @ApiProperty({ example: 500000, description: 'Số tiền khách đưa theo phương thức này (CASH được phép dư để thối)' })
   @IsInt({ message: 'Số tiền phải là số nguyên (đồng)' })
   @Min(1, { message: 'Số tiền phải lớn hơn 0' })
+  @Max(1_000_000_000, { message: 'Số tiền tối đa là 1.000.000.000đ' })
   readonly amount: number;
 }
 

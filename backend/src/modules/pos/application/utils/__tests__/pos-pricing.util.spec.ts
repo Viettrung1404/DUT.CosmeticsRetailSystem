@@ -67,8 +67,19 @@ describe('allocateProportionally', () => {
   });
 
   it('tổng các phần luôn bằng số cần chia', () => {
-    const shares = allocateProportionally(100, [1, 1, 1]);
+    const shares = allocateProportionally(100, [33, 33, 34]);
     expect(shares.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
+  it('phần lẻ không làm phần nào vượt giá trị dòng', () => {
+    const weights = [1000, 1000, 1000];
+    const shares = allocateProportionally(2999, weights);
+    expect(shares.reduce((a, b) => a + b, 0)).toBe(2999);
+    shares.forEach((v, i) => expect(v).toBeLessThanOrEqual(weights[i]));
+  });
+
+  it('chia hết toàn bộ giá trị thì mỗi dòng đúng bằng giá trị của nó', () => {
+    expect(allocateProportionally(3000, [1000, 1000, 1000])).toEqual([1000, 1000, 1000]);
   });
 
   it('không có gì để chia thì trả 0', () => {

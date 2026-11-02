@@ -11,6 +11,8 @@ import {
 import { PosSessionEntity } from '../../domain/entities/pos-session.entity';
 import { POS_SESSION_INCLUDE, PosSessionMapper } from '../mappers/pos-session.mapper';
 
+class StaleSystemCashError extends Error {}
+
 @Injectable()
 export class PrismaPosSessionRepository implements IPosSessionRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -75,19 +77,37 @@ export class PrismaPosSessionRepository implements IPosSessionRepository {
     return Number(result._sum.amount ?? 0);
   }
 
-  async saveClosed(session: PosSessionEntity): Promise<boolean> {
-    const { count } = await this.prisma.posSession.updateMany({
-      where: { id: session.id, status: 'OPEN' },
-      data: {
-        status: session.status,
-        closedAt: session.closedAt,
-        systemCash: session.systemCash,
-        countedCash: session.countedCash,
-        difference: session.difference,
-        note: session.note,
-      },
+  // Khóa dòng ca bằng cách đóng trước, rồi đối chiếu lại tiền mặt: đơn vừa ghi xen vào giữa thì hoàn tác để tính lại
+  saveClosed(session: PosSessionEntity): Promise<'saved' | 'already_closed' | 'stale'> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.posSession.updateMany({
+        where: { id: session.id, status: 'OPEN' },
+        data: {
+          status: session.status,
+          closedAt: session.closedAt,
+          systemCash: session.systemCash,
+          countedCash: session.countedCash,
+          difference: session.difference,
+          note: session.note,
+        },
+      });
+      if (count === 0) {
+        return 'already_closed' as const;
+      }
+      const cash = await tx.payment.aggregate({
+        where: { posSessionId: session.id, paymentMethod: 'CASH', status: 'COMPLETED' },
+        _sum: { amount: true },
+      });
+      if (Number(cash._sum.amount ?? 0) !== session.systemCash) {
+        throw new StaleSystemCashError();
+      }
+      return 'saved' as const;
+    }).catch((error) => {
+      if (error instanceof StaleSystemCashError) {
+        return 'stale' as const;
+      }
+      throw error;
     });
-    return count > 0;
   }
 
   saveReconciled(session: PosSessionEntity, reconciledAt: Date): Promise<boolean> {

@@ -26,20 +26,22 @@ export interface PosPricingInput {
 
 const sum = (values: number[]): number => values.reduce((a, b) => a + b, 0);
 
-// Chia amount theo tỷ lệ weights, phần lẻ dồn vào phần tử lớn nhất nên tổng các phần luôn bằng amount
+// Chia amount theo tỷ lệ weights; phần lẻ dồn vào dòng còn nhiều chỗ nhất (không vượt giá trị dòng) nên tổng luôn bằng amount
 export const allocateProportionally = (amount: number, weights: number[]): number[] => {
   const totalWeight = sum(weights);
   if (amount <= 0 || totalWeight <= 0) {
     return weights.map(() => 0);
   }
   const shares = weights.map((w) => Math.floor((amount * w) / totalWeight));
-  const remainder = amount - sum(shares);
-  if (remainder !== 0) {
-    let largest = 0;
-    weights.forEach((w, i) => {
-      if (w > weights[largest]) largest = i;
-    });
-    shares[largest] += remainder;
+  let remainder = amount - sum(shares);
+  const byRoom = weights
+    .map((w, i) => ({ i, room: w - shares[i] }))
+    .sort((a, b) => b.room - a.room || a.i - b.i);
+  for (const { i, room } of byRoom) {
+    if (remainder <= 0) break;
+    const add = Math.min(remainder, Math.max(room, 0));
+    shares[i] += add;
+    remainder -= add;
   }
   return shares;
 };
@@ -71,7 +73,7 @@ const promotionDiscount = (promotion: PosPromotionRule, unitPrice: number, quant
     return Math.min(capped, gross);
   }
   // FIXED_AMOUNT: giảm cứng trên mỗi đơn vị sản phẩm
-  return Math.min(promotion.value * quantity, gross);
+  return Math.min(Math.round(promotion.value * quantity), gross);
 };
 
 // Nhiều khuyến mãi cùng áp một dòng thì lấy mức giảm lớn nhất, không cộng dồn
@@ -117,7 +119,7 @@ export const calculateCouponDiscount = (
   const raw =
     coupon.discountType === 'PERCENTAGE'
       ? Math.round((base * coupon.discountValue) / 100)
-      : coupon.discountValue;
+      : Math.round(coupon.discountValue);
   return Math.min(raw, base);
 };
 
