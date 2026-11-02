@@ -85,7 +85,22 @@ export type ReceiptResult =
   | { ok: false; reason: 'STATUS_CHANGED' | 'OVER_RECEIVED' }
   | { ok: false; reason: 'BATCH_EXPIRY_MISMATCH'; batchNumber: string };
 
+export interface StockConsistencyRow {
+  store: { id: string; code: string; name: string };
+  variant: { id: string; sku: string; productName: string };
+  quantity: number;
+  reservedQuantity: number;
+  hasInventoryRow: boolean;
+  batchCount: number;
+  activeBatchQuantity: number;
+  inactiveBatchQuantity: number;
+  negativeBatchCount: number;
+  ledgerCount: number;
+  ledgerQuantity: number;
+}
+
 export interface IInventoryRepository {
+  findConsistencyRows(storeIds?: string[]): Promise<StockConsistencyRow[]>;
   findStore(storeId: string): Promise<StoreInfo | null>;
   variantExists(productVariantId: string): Promise<boolean>;
   findMany(filter: InventoryListFilter): Promise<{ items: InventoryListItem[]; total: number }>;

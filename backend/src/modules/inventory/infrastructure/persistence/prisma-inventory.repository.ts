@@ -9,6 +9,7 @@ import {
   PurchaseOrderSnapshot,
   ReceiptCommand,
   ReceiptResult,
+  StockConsistencyRow,
   StoreInfo,
 } from '../../domain/repositories/inventory.repository.interface';
 import { allocateByExpiry, weightedAverageCost } from '../../domain/services/stock-calculation';
@@ -149,6 +150,84 @@ export class PrismaInventoryRepository implements IInventoryRepository {
         unitCost: Number(i.unitCost),
       })),
     };
+  }
+
+  async findConsistencyRows(storeIds?: string[]): Promise<StockConsistencyRow[]> {
+    if (storeIds && storeIds.length === 0) {
+      return [];
+    }
+    const storeFilter = storeIds
+      ? Prisma.sql`WHERE k.store_id = ANY(${storeIds}::uuid[])`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<
+      {
+        store_id: string;
+        store_code: string;
+        store_name: string;
+        variant_id: string;
+        sku: string;
+        product_name: string;
+        quantity: number | null;
+        reserved_quantity: number | null;
+        batch_count: number;
+        active_qty: number;
+        inactive_qty: number;
+        negative_batches: number;
+        ledger_count: number;
+        ledger_qty: number;
+      }[]
+    >`
+      WITH keys AS (
+        SELECT store_id, product_variant_id FROM inventory
+        UNION
+        SELECT store_id, product_variant_id FROM batches
+      ),
+      b AS (
+        SELECT store_id, product_variant_id,
+               COUNT(*)::int AS batch_count,
+               COALESCE(SUM(quantity) FILTER (WHERE is_active), 0)::int AS active_qty,
+               COALESCE(SUM(quantity) FILTER (WHERE NOT is_active), 0)::int AS inactive_qty,
+               COUNT(*) FILTER (WHERE quantity < 0)::int AS negative_batches
+        FROM batches GROUP BY store_id, product_variant_id
+      ),
+      t AS (
+        SELECT store_id, product_variant_id,
+               COUNT(*)::int AS ledger_count,
+               COALESCE(SUM(quantity), 0)::int AS ledger_qty
+        FROM inventory_transactions GROUP BY store_id, product_variant_id
+      )
+      SELECT k.store_id, s.code AS store_code, s.name AS store_name,
+             k.product_variant_id AS variant_id, v.sku, p.name AS product_name,
+             i.quantity, i.reserved_quantity,
+             COALESCE(b.batch_count, 0) AS batch_count,
+             COALESCE(b.active_qty, 0) AS active_qty,
+             COALESCE(b.inactive_qty, 0) AS inactive_qty,
+             COALESCE(b.negative_batches, 0) AS negative_batches,
+             COALESCE(t.ledger_count, 0) AS ledger_count,
+             COALESCE(t.ledger_qty, 0) AS ledger_qty
+      FROM keys k
+      JOIN stores s ON s.id = k.store_id
+      JOIN product_variants v ON v.id = k.product_variant_id
+      JOIN products p ON p.id = v.product_id
+      LEFT JOIN inventory i ON i.store_id = k.store_id AND i.product_variant_id = k.product_variant_id
+      LEFT JOIN b ON b.store_id = k.store_id AND b.product_variant_id = k.product_variant_id
+      LEFT JOIN t ON t.store_id = k.store_id AND t.product_variant_id = k.product_variant_id
+      ${storeFilter}
+      ORDER BY s.code, p.name, v.sku`;
+
+    return rows.map((r) => ({
+      store: { id: r.store_id, code: r.store_code, name: r.store_name },
+      variant: { id: r.variant_id, sku: r.sku, productName: r.product_name },
+      quantity: r.quantity ?? 0,
+      reservedQuantity: r.reserved_quantity ?? 0,
+      hasInventoryRow: r.quantity !== null,
+      batchCount: r.batch_count,
+      activeBatchQuantity: r.active_qty,
+      inactiveBatchQuantity: r.inactive_qty,
+      negativeBatchCount: r.negative_batches,
+      ledgerCount: r.ledger_count,
+      ledgerQuantity: r.ledger_qty,
+    }));
   }
 
   applyReceipt(command: ReceiptCommand): Promise<ReceiptResult> {

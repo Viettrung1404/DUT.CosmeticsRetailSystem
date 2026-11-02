@@ -285,3 +285,10 @@ export class LockBatchDto {
   @MaxLength(500)
   readonly reason?: string;
 }
+
+export class ConsistencyCheckQueryDto {
+  @ApiPropertyOptional({ description: 'Chỉ kiểm tra một cửa hàng; bỏ trống = toàn bộ phạm vi dữ liệu của bạn' })
+  @IsOptional()
+  @IsUUID('4', { message: 'storeId không hợp lệ' })
+  readonly storeId?: string;
+}
