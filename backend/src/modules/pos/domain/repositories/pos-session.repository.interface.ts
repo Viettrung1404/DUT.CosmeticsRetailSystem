@@ -41,7 +41,7 @@ export interface IPosSessionRepository {
   create(data: CreatePosSessionData): Promise<PosSessionEntity | null>;
   sumCompletedCash(sessionId: string): Promise<number>;
   // Trả false khi ca đã bị người khác đóng / chốt trước (chỉ ghi nếu trạng thái còn như lúc đọc)
-  saveClosed(session: PosSessionEntity): Promise<boolean>;
+  saveClosed(session: PosSessionEntity): Promise<'saved' | 'already_closed' | 'stale'>;
   saveReconciled(session: PosSessionEntity, reconciledAt: Date): Promise<boolean>;
   findMany(
     filter: PosSessionListFilter,

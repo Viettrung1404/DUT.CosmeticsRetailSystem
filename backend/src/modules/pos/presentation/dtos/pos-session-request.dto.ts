@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -15,6 +15,7 @@ export class OpenPosSessionDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Tiền đầu ca phải là số' })
   @Min(0, { message: 'Tiền đầu ca không được âm' })
+  @Max(9_999_999_999, { message: 'Tiền đầu ca quá lớn' })
   readonly openingCash: number;
 
   @ApiPropertyOptional()
@@ -29,6 +30,7 @@ export class ClosePosSessionDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Tiền đếm được phải là số' })
   @Min(0, { message: 'Tiền đếm được không được âm' })
+  @Max(9_999_999_999, { message: 'Tiền đếm được quá lớn' })
   readonly countedCash: number;
 
   @ApiPropertyOptional({ description: 'Giải trình nếu két lệch' })

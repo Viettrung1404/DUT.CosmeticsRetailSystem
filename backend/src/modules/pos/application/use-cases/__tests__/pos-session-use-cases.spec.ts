@@ -53,7 +53,7 @@ describe('POS session use cases', () => {
       countOpenedBetween: jest.fn().mockResolvedValue(0),
       create: jest.fn(),
       sumCompletedCash: jest.fn().mockResolvedValue(0),
-      saveClosed: jest.fn().mockResolvedValue(true),
+      saveClosed: jest.fn().mockResolvedValue('saved'),
       saveReconciled: jest.fn().mockResolvedValue(true),
       findMany: jest.fn().mockResolvedValue({ items: [], total: 0 }),
     };
@@ -166,11 +166,31 @@ describe('POS session use cases', () => {
 
     it('bấm đóng hai lần cùng lúc, lần sau không ghi đè → 409', async () => {
       repo.findById.mockResolvedValue(makeSession());
-      repo.saveClosed.mockResolvedValue(false);
+      repo.saveClosed.mockResolvedValue('already_closed');
       await expect(
         new ClosePosSessionUseCase(repo, scopeUseCase()).execute('cashier', [], 'p1', {
           countedCash: 0,
         }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('ClosePosSessionUseCase - tiền mặt phát sinh khi đang đóng', () => {
+    it('tính lại tiền mặt khi saveClosed báo lệch rồi đóng được', async () => {
+      repo.findById.mockResolvedValue(makeSession());
+      repo.saveClosed.mockResolvedValueOnce('stale').mockResolvedValueOnce('saved');
+      const session = await new ClosePosSessionUseCase(repo, scopeUseCase()).execute('cashier', [], 'p1', {
+        countedCash: 0,
+      });
+      expect(session.status).toBe('CLOSED');
+      expect(repo.sumCompletedCash).toHaveBeenCalledTimes(2);
+    });
+
+    it('lệch liên tục 3 lần thì báo 409', async () => {
+      repo.findById.mockResolvedValue(makeSession());
+      repo.saveClosed.mockResolvedValue('stale');
+      await expect(
+        new ClosePosSessionUseCase(repo, scopeUseCase()).execute('cashier', [], 'p1', { countedCash: 0 }),
       ).rejects.toBeInstanceOf(ConflictException);
     });
   });
