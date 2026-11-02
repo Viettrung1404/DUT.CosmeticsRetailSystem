@@ -1,4 +1,5 @@
 "use client";
+import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -80,9 +81,12 @@ export function CartContents({
   }
   if (!hydrated || isPending)
     return (
-      <div className="catalog-empty" role="status">
-        Đang tải giỏ hàng…
-      </div>
+      <ContentLoading
+        variant={compact ? "list" : "cart"}
+        label="Đang tải giỏ hàng…"
+        compact={compact}
+        heading={!compact}
+      />
     );
   if (isError)
     return (
@@ -348,7 +352,7 @@ export function CartContents({
                 <LockKeyhole />
                 <p>
                   <strong>Bảo mật thông tin đơn hàng</strong>
-                  <small>Thanh toán COD hoặc qua VNPAY</small>
+                  <small>Thanh toán COD hoặc qua SEPAY</small>
                 </p>
               </div>
               <div>

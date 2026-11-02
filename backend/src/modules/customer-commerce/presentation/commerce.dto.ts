@@ -73,9 +73,9 @@ export class ReturnQueryDto extends PageOptionsDto {
 }
 export class AcceptExchangeDto {
   @ApiProperty() @IsInt() @Min(1) quoteVersion: number;
-  @ApiPropertyOptional({ enum: ['COD', 'VNPAY', 'MOMO', 'ZALOPAY'] })
+  @ApiPropertyOptional({ enum: ['COD', 'SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] })
   @IsOptional()
-  @IsIn(['COD', 'VNPAY', 'MOMO', 'ZALOPAY'])
+  @IsIn(['COD', 'SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'])
   paymentMethod?: string;
 }
 export class RedeemDto {

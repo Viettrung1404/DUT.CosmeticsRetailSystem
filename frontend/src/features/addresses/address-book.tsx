@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Check, House, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
 import { z } from "zod";
@@ -9,6 +9,8 @@ import { FormField } from "@/shared/ui/form-field";
 import { authMessage } from "@/features/authentication/client";
 import { addressInput, addressesSchema, type Address, type AddressInput } from "./contracts";
 import { useHydrated } from "@/shared/lib/use-hydrated";
+import { AddressFields } from "./address-fields";
+import { isCurrentAddress } from "./vietnam-divisions";
 
 async function addressRequest(
   path = "",
@@ -27,6 +29,8 @@ const blank: AddressInput = {
   district: "",
   ward: "",
   isDefault: false,
+  latitude: null,
+  longitude: null,
 };
 
 export function AddressBook({ initial, userId }: { initial: Address[]; userId: string }) {
@@ -49,8 +53,11 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
     handleSubmit,
     reset,
     setError,
+    control,
+    setValue,
     formState: { errors },
   } = useForm<AddressInput>({ defaultValues: blank });
+  const values = useWatch({ control });
   useEffect(() => {
     if (open) editor.current?.querySelector("input")?.focus();
     else editTrigger.current?.focus();
@@ -68,7 +75,7 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
     onSuccess: async () => {
       setOpen(false);
       setMessage("Đã cập nhật sổ địa chỉ.");
-      await queryClient.invalidateQueries({ queryKey: key });
+      await queryClient.invalidateQueries({ queryKey: ["addresses"] });
     },
     onError: (error) => setMessage(authMessage(error)),
   });
@@ -87,6 +94,8 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
             district: address.district,
             ward: address.ward,
             isDefault: address.isDefault,
+            latitude: address.latitude,
+            longitude: address.longitude,
           }
         : blank,
     );
@@ -94,7 +103,11 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
     setOpen(true);
   };
   function save(values: AddressInput) {
-    const parsed = addressInput.safeParse(values);
+    if (!isCurrentAddress({ ...values, district: "" })) {
+      setMessage("Vui lòng chọn tỉnh/thành và phường/xã hiện tại trong danh sách.");
+      return;
+    }
+    const parsed = addressInput.safeParse({ ...values, district: "" });
     if (!parsed.success) {
       for (const issue of parsed.error.issues)
         setError(
@@ -162,7 +175,9 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
               </div>
               <p>
                 <MapPin size={15} />
-                {[address.addressLine, address.ward, address.district, address.city].join(", ")}
+                {[address.addressLine, address.ward, address.district, address.city]
+                  .filter(Boolean)
+                  .join(", ")}
               </p>
               <div className="address-actions">
                 {!address.isDefault && (
@@ -261,59 +276,34 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
             }}
             noValidate
           >
-            <div className="form-grid">
-              <FormField
-                id="recipientName"
-                label="Tên người nhận"
-                autoComplete="name"
-                required
-                error={errors.recipientName?.message}
-                {...register("recipientName")}
-              />
-              <FormField
-                id="addressPhone"
-                label="Số điện thoại"
-                type="tel"
-                autoComplete="tel"
-                required
-                error={errors.phone?.message}
-                {...register("phone")}
-              />
-            </div>
-            <div className="form-grid address-location">
-              <FormField
-                id="city"
-                label="Tỉnh / Thành phố"
-                autoComplete="address-level1"
-                required
-                error={errors.city?.message}
-                {...register("city")}
-              />
-              <FormField
-                id="district"
-                label="Quận / Huyện"
-                autoComplete="address-level2"
-                required
-                error={errors.district?.message}
-                {...register("district")}
-              />
-              <FormField
-                id="ward"
-                label="Phường / Xã"
-                autoComplete="address-level3"
-                required
-                error={errors.ward?.message}
-                {...register("ward")}
-              />
-            </div>
-            <FormField
-              id="addressLine"
-              label="Địa chỉ cụ thể (số nhà, tên đường)"
-              autoComplete="address-line1"
-              required
-              error={errors.addressLine?.message}
-              {...register("addressLine")}
+            <AddressFields
+              value={{
+                recipientName: values.recipientName ?? "",
+                phone: values.phone ?? "",
+                city: values.city ?? "",
+                ward: values.ward ?? "",
+                district: values.district ?? "",
+                addressLine: values.addressLine ?? "",
+                latitude: values.latitude,
+                longitude: values.longitude,
+              }}
+              onChange={(next) => {
+                setValue("recipientName", next.recipientName);
+                setValue("phone", next.phone);
+                setValue("city", next.city);
+                setValue("ward", next.ward ?? "");
+                setValue("district", next.district ?? "");
+                setValue("addressLine", next.addressLine);
+                setValue("latitude", next.latitude ?? null);
+                setValue("longitude", next.longitude ?? null);
+              }}
+              prefix="account-address"
             />
+            {Object.values(errors).length > 0 && (
+              <p role="alert" className="cart-warning">
+                Vui lòng kiểm tra tên, số điện thoại và địa chỉ nhận hàng.
+              </p>
+            )}
             <FormField
               id="label"
               label="Nhãn địa chỉ (không bắt buộc)"

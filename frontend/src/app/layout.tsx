@@ -5,6 +5,9 @@ import { Providers } from "./providers";
 import "./globals.css";
 import "@/features/catalog/content.css";
 import "@/features/account/commerce.css";
+import "@/features/checkout/payment.css";
+import "leaflet/dist/leaflet.css";
+import "@/features/checkout/checkout.css";
 
 const bodyFont = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],

@@ -2,10 +2,10 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-export type Gateway = 'VNPAY' | 'MOMO' | 'ZALOPAY';
+export type Gateway = 'SEPAY' | 'VNPAY' | 'MOMO' | 'ZALOPAY';
 export type GatewayState =
   'PAID' | 'PAYABLE' | 'PENDING' | 'FAILED' | 'UNKNOWN';
-export const ONLINE_METHODS: Gateway[] = ['VNPAY', 'MOMO', 'ZALOPAY'];
+export const ONLINE_METHODS: Gateway[] = ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'];
 export function validatePaymentAmount(
   method: string,
   amount: number,
@@ -94,7 +94,7 @@ export function canConfirm(
   orderStatus: string,
 ): boolean {
   return (
-    orderStatus === 'PENDING' &&
+    ['PENDING_PAYMENT', 'PENDING'].includes(orderStatus) &&
     receiptAt !== null &&
     receiptAt.getTime() < expiresAt.getTime() &&
     now.getTime() < expiresAt.getTime() + 60_000

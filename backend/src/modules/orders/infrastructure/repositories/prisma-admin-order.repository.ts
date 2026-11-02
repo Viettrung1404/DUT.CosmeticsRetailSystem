@@ -228,12 +228,16 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
       const online = await tx.payment.findFirst({
         where: {
           orderId: order.id,
-          paymentMethod: { in: ['VNPAY', 'MOMO', 'ZALOPAY'] },
+          paymentMethod: { in: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] },
         },
       });
-      if (online)
+      const sepayPaid = online?.paymentMethod === 'SEPAY' && await tx.payment.findFirst({
+        where: { orderId: order.id, paymentMethod: 'SEPAY', status: 'COMPLETED', verificationPending: false, charges: { some: { fulfilled: true, verifiedAt: { not: null } } } },
+      });
+      const pendingRefund = sepayPaid && await tx.refund.count({ where: { orderId: order.id, status: 'PENDING' } });
+      if (online && (!sepayPaid || pendingRefund))
         throw new BadRequestException(
-          'Đơn online phải được worker xác minh thanh toán; admin không thể xác nhận thủ công',
+          'Đơn online cần được xác minh thanh toán đầy đủ trước khi cửa hàng xác nhận',
         );
 
       const items = await tx.orderItem.findMany({

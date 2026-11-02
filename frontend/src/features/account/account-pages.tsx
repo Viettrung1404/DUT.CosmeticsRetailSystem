@@ -1,4 +1,5 @@
 "use client";
+import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import {
   Sparkles,
@@ -23,6 +24,7 @@ import { useState } from "react";
 import { formatPrice } from "@/features/catalog/components";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
+import { ContinueSepayPayment } from "@/features/checkout/continue-sepay-payment";
 import {
   orderDetailSchema,
   ordersSchema,
@@ -35,6 +37,7 @@ import {
 const date = (value: string) =>
   new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" }).format(new Date(value));
 const statusText: Record<string, string> = {
+  PENDING_PAYMENT: "Chờ thanh toán",
   PENDING: "Chờ xác nhận",
   CONFIRMED: "Đã xác nhận",
   PROCESSING: "Đang chuẩn bị",
@@ -104,7 +107,7 @@ export function AccountOverview({ name, email }: { name: string; email: string }
           <Link href="/account/orders">Xem tất cả →</Link>
         </div>
         {orders.isPending ? (
-          <p role="status">Đang tải đơn hàng…</p>
+          <ContentLoading variant="list" label="Đang tải đơn hàng…" heading={false} />
         ) : orders.isError ? (
           <p role="alert">Chưa tải được đơn hàng.</p>
         ) : orders.data.orders.length ? (
@@ -159,7 +162,7 @@ export function ProfilePage() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  if (query.isPending) return <p role="status">Đang tải hồ sơ…</p>;
+  if (query.isPending) return <ContentLoading variant="profile" label="Đang tải hồ sơ…" />;
   if (query.isError)
     return (
       <p role="alert">
@@ -376,7 +379,7 @@ export function OrdersPage() {
         </form>
       </div>
       {query.isPending ? (
-        <p role="status">Đang tải đơn hàng…</p>
+        <ContentLoading variant="list" label="Đang tải đơn hàng…" heading={false} />
       ) : query.isError ? (
         <div className="account-surface" role="alert">
           Không tải được đơn hàng. <button onClick={() => query.refetch()}>Thử lại</button>
@@ -453,9 +456,16 @@ export function OrderDetail({ id }: { id: string }) {
   const query = useQuery({
     queryKey: ["order-detail", id],
     queryFn: ({ signal }) => readBff(`/api/account/orders/${id}`, orderDetailSchema, signal),
+    refetchInterval: (query) =>
+      ["PENDING_PAYMENT", "PENDING"].includes(query.state.data?.status ?? "") ? 5000 : false,
   });
   async function cancel() {
-    if (!window.confirm("Bạn muốn hủy đơn hàng đang chờ xác nhận?")) return;
+    if (
+      !window.confirm(
+        "Bạn muốn hủy đơn hàng này? Nếu đã thanh toán, cửa hàng sẽ kiểm tra hoàn tiền.",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     try {
@@ -471,7 +481,7 @@ export function OrderDetail({ id }: { id: string }) {
       setBusy(false);
     }
   }
-  if (query.isPending) return <p role="status">Đang tải đơn hàng…</p>;
+  if (query.isPending) return <ContentLoading variant="detail" label="Đang tải đơn hàng…" />;
   if (query.isError)
     return (
       <p role="alert">
@@ -535,6 +545,7 @@ export function OrderDetail({ id }: { id: string }) {
         </aside>
       </div>
       <nav className="account-shortcuts">
+        <ContinueSepayPayment orderId={id} orderStatus={order.status} payments={order.payments} />
         <Link href={`/account/orders/${id}/tracking`}>
           <Truck size={18} />
           Theo dõi vận chuyển
@@ -542,7 +553,7 @@ export function OrderDetail({ id }: { id: string }) {
         {order.status === "COMPLETED" && (
           <Link href={`/account/returns/new?orderId=${id}`}>Yêu cầu đổi trả</Link>
         )}
-        {order.status === "PENDING" && (
+        {["PENDING_PAYMENT", "PENDING"].includes(order.status) && (
           <button
             className="button button-outline"
             type="button"
@@ -562,7 +573,7 @@ export function TrackingPage({ id }: { id: string }) {
     queryKey: ["tracking", id],
     queryFn: ({ signal }) => readBff(`/api/account/orders/${id}/tracking`, trackingSchema, signal),
   });
-  if (query.isPending) return <p role="status">Đang tải vận chuyển…</p>;
+  if (query.isPending) return <ContentLoading variant="detail" label="Đang tải vận chuyển…" />;
   if (query.isError)
     return (
       <p role="alert">

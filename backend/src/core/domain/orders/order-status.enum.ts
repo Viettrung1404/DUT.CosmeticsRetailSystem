@@ -3,6 +3,7 @@
  * Standardized for both End-user (Customer) and Admin/POS (Back-office).
  */
 export enum OrderStatus {
+  PENDING_PAYMENT = 'PENDING_PAYMENT',
   PENDING = 'PENDING',
   CONFIRMED = 'CONFIRMED',
   PROCESSING = 'PROCESSING',

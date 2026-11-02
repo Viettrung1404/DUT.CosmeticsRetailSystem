@@ -21,6 +21,8 @@ import {
 } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
+import { Public } from '@core/decorators/public.decorator';
+import { gatewayAvailable } from '../../domain/gateway-readiness';
 import { JwtPayload } from '@core/guards/jwt-auth.guard';
 import { ApiResponseDto } from '@core/common/api-response.dto';
 import { Gateway, ONLINE_METHODS } from '../../domain/payment-policy';
@@ -29,6 +31,7 @@ import { CreatePaymentDto } from '../dtos/create-payment.dto';
 import {
   PaymentResultDto,
   PaymentStatusDto,
+  PaymentMethodsDto,
 } from '../dtos/payment-response.dto';
 
 const envelope = (model: Function) => ({
@@ -39,17 +42,35 @@ const envelope = (model: Function) => ({
 });
 
 @ApiTags('Customer - Payments (Viá»‡t Trung)')
-@ApiExtraModels(ApiResponseDto, PaymentResultDto, PaymentStatusDto)
+@ApiExtraModels(
+  ApiResponseDto,
+  PaymentResultDto,
+  PaymentStatusDto,
+  PaymentMethodsDto,
+)
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly service: PaymentsService) {}
+  @Public()
+  @Get('methods')
+  @ApiOperation({
+    summary: 'Available storefront payment methods; no merchant secrets',
+  })
+  @ApiOkResponse({ type: PaymentMethodsDto })
+  methods(): PaymentMethodsDto {
+    return { COD: true, SEPAY: gatewayAvailable('SEPAY') };
+  }
+
   @Post(':gateway/create')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Táº¡o hoáº·c tÃ¡i sá»­ dá»¥ng lÆ°á»£t thanh toÃ¡n online' })
-  @ApiParam({ name: 'gateway', enum: ['vnpay', 'momo', 'zalopay'] })
+  @ApiOperation({
+    summary: 'Táº¡o hoáº·c tÃ¡i sá»­ dá»¥ng lÆ°á»£t thanh toÃ¡n online',
+  })
+  @ApiParam({ name: 'gateway', enum: ['sepay', 'vnpay', 'momo', 'zalopay'] })
   @ApiOkResponse({ schema: envelope(PaymentResultDto) })
   @ApiAcceptedResponse({
-    description: 'Khá»Ÿi táº¡o chÆ°a rÃµ káº¿t quáº£; dÃ¹ng status Ä‘á»ƒ Ä‘á»‘i soÃ¡t',
+    description:
+      'Khá»Ÿi táº¡o chÆ°a rÃµ káº¿t quáº£; dÃ¹ng status Ä‘á»ƒ Ä‘á»‘i soÃ¡t',
     schema: envelope(PaymentResultDto),
   })
   async create(
@@ -78,7 +99,9 @@ export class PaymentsController {
   }
   @Get(':id/status')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Tra cá»©u tráº¡ng thÃ¡i payment/order thuá»™c tÃ i khoáº£n' })
+  @ApiOperation({
+    summary: 'Tra cá»©u tráº¡ng thÃ¡i payment/order thuá»™c tÃ i khoáº£n',
+  })
   @ApiOkResponse({ schema: envelope(PaymentStatusDto) })
   status(
     @CurrentUser() user: JwtPayload,
@@ -87,4 +110,3 @@ export class PaymentsController {
     return this.service.status(user.userId, id);
   }
 }
-

@@ -1,3 +1,7 @@
+import {
+  SepayAdapter,
+  createSepayTransport,
+} from './infrastructure/gateways/sepay-adapter';
 import { Module } from '@nestjs/common';
 import {
   PaymentsService,
@@ -22,6 +26,7 @@ import { createGatewayTransport } from './infrastructure/gateways/gateway-http.t
       useFactory: () => {
         const env = process.env as Record<string, string>;
         return {
+          SEPAY: new SepayAdapter(env, createSepayTransport(env)),
           MOMO: new MomoAdapter(env, createGatewayTransport('MOMO')),
           VNPAY: new VnpayAdapter(env, createGatewayTransport('VNPAY')),
           ZALOPAY: new ZalopayAdapter(env, createGatewayTransport('ZALOPAY')),

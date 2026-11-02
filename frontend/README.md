@@ -1,6 +1,20 @@
 # GlowUp frontend — FE-00 đến FE-05
 
+Người mới clone/pull: xem [README gốc](../README.md) để chuẩn bị database/Redis và env riêng. Checkout online dùng **SePay VietQR**, xem [cấu hình và nghiệm thu](../backend/docs/sepay-setup.md). Frontend không giữ token SePay. Khách quét QR trên trang `/payment/return`; Test mode chỉ hiển thị thông tin mô phỏng.
+
 Next.js App Router cho Guest/Customer, cổng **3001**; backend NestJS cổng **3000**. Đã có foundation, auth/session, catalog, checkout FE-03, tài khoản/đơn hàng FE-04 và các luồng sau mua FE-05. Xem [checklist FE-03](docs/fe-03-checklist.md), [FE-04](docs/fe-04-checklist.md) và [FE-05](docs/fe-05-checklist.md) để biết kết quả kiểm thử và các gate backend/provider còn lại.
+
+## Checkout và địa chỉ nhận hàng
+
+Checkout đối chiếu `docs/4-stitch_design/thanh_to_n_glowup/code.html`: địa chỉ tài khoản dạng thẻ chọn, thêm/chỉnh sửa ngay tại checkout; khách vãng lai dùng biểu mẫu. Địa chỉ mới dùng tỉnh/thành → phường/xã/đặc khu, không yêu cầu quận/huyện. Địa chỉ cũ được giữ nguyên và có hướng dẫn cập nhật trước khi đặt đơn.
+
+Dropdown dùng snapshot **34 tỉnh/thành, 3.321 phường/xã/đặc khu**, phiên bản `2026.10.8`, từ [tinhthanhpho.com](https://tinhthanhpho.com/en/api-docs#open-data), giấy phép [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Bản rút gọn chỉ giữ mã, tên, quan hệ tỉnh–xã và tâm bản đồ. Cập nhật bằng `npm run addresses:update`, xem diff và chạy test dữ liệu trước khi đưa lên môi trường chạy.
+
+Bản đồ dùng Leaflet; hỗ trợ chạm để ghim, kéo ghim và lấy vị trí hiện tại. Tọa độ lưu cùng sổ địa chỉ và snapshot giao hàng của đơn. Ghim không tự thay thế tỉnh/xã hoặc số nhà; khách kiểm tra các trường địa chỉ trước khi lưu. Có thể đổi nhà cung cấp tile bằng `NEXT_PUBLIC_MAP_TILE_URL` và `NEXT_PUBLIC_MAP_ATTRIBUTION`; mặc định [OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/) với attribution, HTTP Referer và cache trình duyệt, không tải trước/offline. Không dùng Nominatim/geocoding tự động. Định vị cần HTTPS hoặc localhost và quyền của người dùng.
+
+Kho voucher và quy tắc xu lấy từ `/api/checkout/benefits` (BFF → `/customers/me/checkout-benefits`). Nhập mã chỉ kiểm tra khi bấm **Áp dụng**; chọn mã cũng kiểm tra lại bằng pricing engine. Không mặc định mã hay số xu. Quy tắc hiện tại: 1 xu = 1đ, số dư tối thiểu 50.000, dùng theo mức 10.000 và tối đa 50% tiền hàng sau giảm giá; UI đọc chính sách từ backend. Phí giao hàng lấy từ báo giá backend và hiển thị chính sách cửa hàng, chưa có tên hãng hoặc ETA giả lập.
+
+Backend cần migration `20261101000000_address_map_location` (`npx prisma migrate deploy`) và Prisma client hiện tại. Test tự động UI: `tests/e2e/checkout-layout.spec.ts`; smoke backend thật: `node scripts/accept-checkout-layout.mjs` (tài khoản demo, thêm rồi xóa địa chỉ QA; không tạo đơn hoặc chuyển tiền).
 
 ## Chạy local
 
@@ -8,11 +22,13 @@ Node 22.14.0 (hoặc Node 24 LTS), npm 10+. Từ thư mục `frontend`:
 
 ```powershell
 npm ci
-Copy-Item .env.example .env.local
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
 npm run dev
 ```
 
 Mở http://localhost:3001. `BACKEND_API_BASE_URL` gồm prefix `/api/v1`; `SITE_URL` là origin frontend, không có path. Cấu hình `SESSION_REDIS_URL` trong `.env.local` bằng kết nối TLS Upstash (có thể dùng chung database với backend), với prefix riêng `glowup:frontend:local:session:`. Không commit `.env.local`. Shell/auth UI có thể render khi backend/store offline; đăng nhập và trang private cần cả hai dịch vụ.
+
+Khi thử thanh toán SePay ở local, giữ ba terminal: `npm run start:dev` trong `backend`, `npm run payment:tunnel` trong `backend`, và `npm run dev:https` trong `frontend`. Đợi backend readiness 200 trước khi mở tunnel, rồi truy cập **https://localhost:3001**. Sau mỗi lần tắt máy cần chạy lại các tiến trình này; domain ngrok cố định giúp giữ nguyên URL webhook. Không chạy đồng thời frontend HTTP và HTTPS ở cổng 3001. Xem [README gốc](../README.md#3-chạy-và-test-sepay) để cấu hình lần đầu và mô phỏng giao dịch.
 
 `SESSION_MAX_AGE_SECONDS` bắt buộc, không vượt thời hạn refresh của backend. Backend hiện trả opaque refresh token không kèm expiry; mặc định mẫu là 7 ngày, phải đối chiếu `JWT_REFRESH_EXPIRES_IN` khi triển khai. Cookie và record có cùng deadline cố định, refresh không kéo dài deadline web. Không có fallback session trong memory.
 
@@ -46,7 +62,7 @@ Build tải font qua next/font; cần network đến Google Fonts ở build time
 - `npm run contracts:generate` lấy `../backend/docs/api/openapi.json`, pin snapshot SHA256 trong `src/shared/api/generated/openapi.d.ts`. `contracts:check` fail khi spec/types drift. Không chỉnh generated bằng tay.
 - Runtime schema Zod cho mỗi endpoint; generic schemas trong spec chưa đủ làm integration. Envelope chỉ unwrap một lần. Lỗi giữ status/code/details/Retry-After, không hiển thị upstream body.
 - Các server client có `server-only`, endpoint allowlist, no-store, timeout và redirect:error. Browser dùng BFF same-origin; mutation kiểm tra Origin/content-type/body size. Không forward Authorization/cookie/IP do browser chọn sang backend.
-- API backend thiếu giữ blocker trong `capabilities.ts`; toàn bộ integration status vẫn false. VNPAY bắt buộc, không được bật giả khi thiếu G01.
+- API backend thiếu giữ blocker trong `capabilities.ts`; toàn bộ integration status vẫn false. SePay chỉ bật khi API phương thức thanh toán báo khả dụng.
 - Hướng import: app → widgets/features → entities/shared. `(site)` dùng chung navbar/footer, `(auth)` là sibling không header/footer; account layout xác thực qua backend và dùng menu Sổ địa chỉ ở `navigation.ts`.
 - Route inventory được sinh từ kế hoạch: S01–S41 + B01–B05, S24 là overlay, S28 có hai route, lỗi là boundary. Registry không tự tạo 46 trang rỗng. CMS cần published allowlist + reserved slug guard.
 
@@ -65,7 +81,7 @@ Mặc định noindex; sitemap/robots proxy được khóa bằng `SEO_INDEXING_
 
 FE-06/07: xem [checklist nghiệm thu](docs/fe-06-07-checklist.md). `SEO_INDEXING_ENABLED=false` mặc định; sitemap/robots chỉ mở khi cả frontend và backend bật indexing với cùng website origin. Store directory backend mặc định ẩn vì seed hiện là dữ liệu demo; chỉ bật `PUBLIC_STORE_DIRECTORY_ENABLED=true` sau khi có danh sách showroom được duyệt.
 
-Lượt sửa FE-03–06 theo `code.html`: xem [bảng đối chiếu](docs/fe-03-06-design-review.md). Guest có thể thêm giỏ và đặt hàng COD/VNPAY mà không đăng nhập; đơn và thanh toán guest được bảo vệ theo phiên trình duyệt, mã ưu đãi/điểm thành viên vẫn theo quyền backend. `node scripts/create-stitch-report.mjs` tạo trang đối chiếu từ ảnh local sau khi chạy các script review.
+Lượt sửa FE-03–06 theo `code.html`: xem [bảng đối chiếu](docs/fe-03-06-design-review.md). Guest có thể thêm giỏ và đặt hàng COD/SEPAY mà không đăng nhập; đơn và thanh toán guest được bảo vệ theo phiên trình duyệt, mã ưu đãi/điểm thành viên vẫn theo quyền backend. `node scripts/create-stitch-report.mjs` tạo trang đối chiếu từ ảnh local sau khi chạy các script review.
 
 `MAINTENANCE_MODE=true` trả 503 cho site/BFF và `Retry-After`; `/maintenance` luôn trả 503. Restart server sau khi đổi cờ. Lỗi backend thông thường dùng error boundary và nút thử lại, không tự bật bảo trì. OAuth continuation giữ challenge/nonce trong store có TTL; login/register có Google Identity Services/Facebook JS SDK, callback qua BFF. Bật tính năng không đồng nghĩa đã nghiệm thu provider thật; xem cấu hình bên dưới.
 

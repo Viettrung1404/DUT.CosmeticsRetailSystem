@@ -1,0 +1,198 @@
+.sepay-transfer {
+  margin-block: 28px;
+  overflow: hidden;
+  border: 1px solid #eadfe3;
+  border-radius: 20px;
+  text-align: left;
+}
+.status-pending_payment { background: #fff3dd; color: #9e6500; }
+.continue-payment { margin-block: 12px; }
+.sepay-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+  background: #fff8f9;
+  border-bottom: 1px solid #eadfe3;
+}
+.sepay-heading > div > span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #9d394f;
+}
+.sepay-heading h2 {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.sepay-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: #fff0d7;
+  color: #805200;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.sepay-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px;
+  padding: 14px;
+  border: 1px solid #eed39b;
+  border-radius: 10px;
+  background: #fffaef;
+  color: #765000;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.sepay-notice svg,
+.sepay-waiting svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.sepay-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+}
+.sepay-qr-panel,
+.sepay-details {
+  min-width: 0;
+  padding: 24px;
+}
+.sepay-qr-panel {
+  text-align: center;
+  border-right: 1px solid #eadfe3;
+}
+.sepay-transfer h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.sepay-qr-frame {
+  width: min(100%, 300px);
+  margin-inline: auto;
+  border: 1px solid #eadfe3;
+  border-radius: 14px;
+  background: white;
+  overflow: hidden;
+}
+.sepay-qr-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.sepay-qr-placeholder {
+  display: flex;
+  min-height: 300px;
+  padding: 24px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #776d6d;
+  background: #faf8f9;
+}
+.sepay-qr-panel p,
+.sepay-instruction {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #776d6d;
+}
+.sepay-qr-panel > p {
+  margin-top: 16px;
+}
+.sepay-detail {
+  padding-block: 12px;
+  border-bottom: 1px solid #f1e9ec;
+}
+.sepay-detail:first-child {
+  padding-top: 0;
+}
+.sepay-detail dt {
+  margin-bottom: 5px;
+  color: #776d6d;
+  font-size: 12px;
+}
+.sepay-detail dd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  font-size: 14px;
+}
+.sepay-detail strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.sepay-copy {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid #eadfe3;
+  border-radius: 8px;
+  color: #9d394f;
+  cursor: pointer;
+}
+.sepay-detail .sepay-reference {
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.sepay-copy:hover {
+  background: #fff1f5;
+}
+.sepay-copy:focus-visible {
+  outline: 2px solid #9d394f;
+  outline-offset: 3px;
+}
+.sepay-copy-status {
+  min-height: 22px;
+  margin-block: 8px;
+  font-size: 12px;
+  color: #227a55;
+}
+.sepay-instruction {
+  padding: 12px;
+  background: #fff8f9;
+  border-radius: 8px;
+}
+.sepay-waiting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 24px;
+  background: #f3f8f5;
+  border-top: 1px solid #e0ebe4;
+  color: #286344;
+  font-size: 12px;
+  line-height: 1.8;
+}
+@media (max-width: 640px) {
+  .sepay-heading,
+  .sepay-qr-panel,
+  .sepay-details {
+    padding: 18px;
+  }
+  .sepay-heading h2 {
+    font-size: 16px;
+  }
+  .sepay-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sepay-qr-panel {
+    border-right: 0;
+    border-bottom: 1px solid #eadfe3;
+  }
+}

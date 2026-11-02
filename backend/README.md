@@ -1,8 +1,12 @@
 # GlowUp Backend — Clean Architecture with NestJS & Prisma
 
+Thanh toán online dùng **SePay VietQR**: [kế hoạch, cấu hình Test mode/Live và checklist nghiệm thu](docs/sepay-setup.md).
+
+Người mới clone/pull: xem [README gốc — thiết lập env và thứ tự chạy backend/frontend/tunnel](../README.md). File `.env` không đi theo Git; cần cấu hình database, Redis và provider trước khi dùng các luồng tương ứng.
+
 Dự án Backend cho Hệ thống Quản lý Bán lẻ Mỹ phẩm **GlowUp**, được xây dựng bằng **NestJS**, **Prisma ORM**, kết nối **PostgreSQL 17 (Neon Database)** theo mô hình **Clean Architecture (Module-centric)**.
 
-Sprint 3 backend end-user: [thiết kế, decision log, cấu hình và nghiệm thu](docs/sprint-3.md), [Postman](docs/sprint-3.postman_collection.json), [hợp đồng Mobile](docs/sprint-3-mobile.md). Ba cổng thanh toán mặc định tắt cho đến khi merchant sandbox và callback HTTPS sẵn sàng. Dùng Node.js ≥20.9; đã kiểm chứng trên Node.js 22.14.
+Sprint 3 backend end-user: [thiết kế, decision log, cấu hình và nghiệm thu](docs/sprint-3.md), [Postman](docs/sprint-3.postman_collection.json), [hợp đồng Mobile](docs/sprint-3-mobile.md). Checkout hiện tại dùng COD/SePay; SePay chỉ khả dụng khi cấu hình tài khoản, token, webhook HMAC và worker đầy đủ theo hướng dẫn trên. Khi chạy cả frontend/backend, dùng Node.js 22.14+ thuộc nhánh 22 hoặc Node.js 24.
 
 ---
 
@@ -60,9 +64,7 @@ Theo phân công Sprint 1:
 
 ## 3. Cài đặt và Chạy dự án
 
-```bash
-Stop-Process -Name node -Force
-```
+Chạy frontend/backend ở terminal riêng; dừng đúng server bằng `Ctrl+C` trong terminal của nó.
 
 ### 3.1 Cài đặt dependencies
 ```bash
@@ -80,7 +82,7 @@ npm ci
 > Hiện tại team thống nhất **giữ NestJS 10** để đảm bảo ổn định.
 
 ### 3.2 Cấu hình môi trường (`.env`)
-Mở file `.env` và điền chuỗi kết nối từ tài khoản **Neon** của bạn:
+Nếu chưa có `.env`, sao chép `.env.example` rồi điền database, JWT và Redis theo [hướng dẫn chạy chung](../README.md). Không ghi đè file đã có. Ví dụ chuỗi kết nối **Neon**:
 ```env
 DATABASE_URL="postgresql://[user]:[password]@[neon_hostname]/[dbname]?sslmode=require"
 ```
@@ -90,12 +92,14 @@ DATABASE_URL="postgresql://[user]:[password]@[neon_hostname]/[dbname]?sslmode=re
 # Sinh Prisma Client
 npm run prisma:generate
 
-# Hoặc tạo migration lên Neon PostgreSQL
-npx prisma migrate dev --name init_db
+# Chỉ áp dụng migration đã có lên database riêng cần thiết lập
+npx prisma migrate deploy
 ```
 
 ### 3.4 Khởi động Server
 ```bash
+npm run payment:tunnel
+
 # Chế độ phát triển (Watch mode)
 npm run start:dev
 
@@ -121,7 +125,7 @@ chọn chế độ portable và cấu hình `pg_dump`/Docker.
 
 ## Guest checkout cho web
 
-API `/api/v1/guest/orders/preview`, `/guest/orders`, `/guest/orders/:id`, `/guest/payments/vnpay`, `/guest/payments/:id/status` dùng header bí mật `x-session-id` (UUID v4). Tạo đơn cần `Idempotency-Key`; cùng phiên/key/payload trả cùng đơn, đổi payload trả conflict. Guest dùng cùng quy tắc giá/tồn/khuyến mãi trực tiếp và COD/VNPAY; điểm và mã quyền lợi tài khoản cần đăng nhập. Không tạo customer giả.
+API `/api/v1/guest/orders/preview`, `/guest/orders`, `/guest/orders/:id`, `/guest/payments/sepay`, `/guest/payments/:id/status` dùng header bí mật `x-session-id` (UUID v4). Tạo đơn cần `Idempotency-Key`; cùng phiên/key/payload trả cùng đơn, đổi payload trả conflict. Guest dùng cùng quy tắc giá/tồn/khuyến mãi trực tiếp và COD/SEPAY; điểm và mã quyền lợi tài khoản cần đăng nhập. Không tạo customer giả.
 
 BFF giữ secret trong Redis và chỉ đưa cookie opaque HttpOnly ra trình duyệt. Không đưa session secret vào URL hay link chia sẻ. Đọc đơn/thanh toán luôn ràng buộc hash phiên; response không trả pricing snapshot, giá vốn hoặc dữ liệu gateway riêng. Phiên guest web có hạn 7 ngày; receipt mở lại trong trình duyệt đã đặt hàng.
 

@@ -11,7 +11,7 @@ export async function cancelReservedOrder(
   await tx.$queryRaw`SELECT i.id FROM inventory i JOIN orders o ON o.store_id=i.store_id WHERE o.id=${orderId}::uuid
     AND i.product_variant_id IN (SELECT product_variant_id FROM order_items WHERE order_id=${orderId}::uuid) ORDER BY i.id FOR UPDATE OF i`;
   const rows = await tx.$queryRaw<{ id: string }[]>`WITH changed AS (
-    UPDATE orders SET status='CANCELLED',updated_at=clock_timestamp() WHERE id=${orderId}::uuid AND status='PENDING'
+    UPDATE orders SET status='CANCELLED',updated_at=clock_timestamp() WHERE id=${orderId}::uuid AND status IN ('PENDING_PAYMENT','PENDING')
     RETURNING id,store_id,customer_id,coupon_id,loyalty_points_used,order_number
   ), stock AS (
     UPDATE inventory i SET reserved_quantity=i.reserved_quantity-q.quantity,updated_at=clock_timestamp()

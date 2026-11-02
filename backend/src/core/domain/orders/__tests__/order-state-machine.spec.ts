@@ -3,6 +3,36 @@ import { OrderStatus } from '../order-status.enum';
 import { OrderStateMachine } from '../order-state-machine';
 
 describe('OrderStateMachine (Shared Domain Kernel)', () => {
+  it('reserves the paid transition to the system and allows cancelling an unpaid order', () => {
+    expect(
+      OrderStateMachine.canTransition(
+        OrderStatus.PENDING_PAYMENT,
+        OrderStatus.PENDING,
+        'SYSTEM',
+      ),
+    ).toBe(true);
+    expect(
+      OrderStateMachine.canTransition(
+        OrderStatus.PENDING_PAYMENT,
+        OrderStatus.PENDING,
+        'ADMIN',
+      ),
+    ).toBe(false);
+    expect(
+      OrderStateMachine.canTransition(
+        OrderStatus.PENDING_PAYMENT,
+        OrderStatus.CONFIRMED,
+        'ADMIN',
+      ),
+    ).toBe(false);
+    expect(
+      OrderStateMachine.canTransition(
+        OrderStatus.PENDING_PAYMENT,
+        OrderStatus.CANCELLED,
+        'CUSTOMER',
+      ),
+    ).toBe(true);
+  });
   describe('Customer Transitions', () => {
     it('should allow customer to cancel order when status is PENDING', () => {
       expect(

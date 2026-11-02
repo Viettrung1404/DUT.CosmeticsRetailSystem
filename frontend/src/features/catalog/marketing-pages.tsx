@@ -495,7 +495,7 @@ export async function HelpScreen() {
     {
       icon: ReceiptText,
       title: "Đơn hàng & Thanh toán",
-      body: "Tra cứu đơn hàng và hướng dẫn thanh toán bằng COD hoặc VNPAY.",
+      body: "Tra cứu đơn hàng và hướng dẫn thanh toán bằng COD hoặc SEPAY.",
       href: "/account/orders",
       link: "Theo dõi đơn hàng",
     },

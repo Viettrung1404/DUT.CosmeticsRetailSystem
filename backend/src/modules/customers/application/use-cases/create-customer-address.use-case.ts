@@ -1,6 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { CUSTOMER_REPOSITORY, ICustomerRepository } from '../../domain/repositories/customer.repository.interface';
-import { CustomerAddressEntity } from '../../domain/entities/customer-address.entity';
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import {
+  CUSTOMER_REPOSITORY,
+  ICustomerRepository,
+} from "../../domain/repositories/customer.repository.interface";
+import { CustomerAddressEntity } from "../../domain/entities/customer-address.entity";
 
 export interface CreateCustomerAddressInput {
   customerId: string;
@@ -9,8 +12,10 @@ export interface CreateCustomerAddressInput {
   phone: string;
   addressLine: string;
   city: string;
-  district: string;
+  district?: string;
   ward: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault?: boolean;
 }
 
@@ -21,10 +26,20 @@ export class CreateCustomerAddressUseCase {
     private readonly customerRepository: ICustomerRepository,
   ) {}
 
-  async execute(input: CreateCustomerAddressInput): Promise<CustomerAddressEntity> {
-    const totalAddresses = await this.customerRepository.countAddresses(input.customerId);
+  async execute(
+    input: CreateCustomerAddressInput,
+  ): Promise<CustomerAddressEntity> {
+    if ((input.latitude == null) !== (input.longitude == null))
+      throw new BadRequestException(
+        "Vui lòng cung cấp đủ tọa độ vị trí nhận hàng",
+      );
+    const totalAddresses = await this.customerRepository.countAddresses(
+      input.customerId,
+    );
     if (totalAddresses >= 10) {
-      throw new BadRequestException('Khách hàng chỉ được lưu tối đa 10 địa chỉ');
+      throw new BadRequestException(
+        "Khách hàng chỉ được lưu tối đa 10 địa chỉ",
+      );
     }
 
     const shouldBeDefault = totalAddresses === 0 || input.isDefault === true;
@@ -39,8 +54,10 @@ export class CreateCustomerAddressUseCase {
       phone: input.phone,
       addressLine: input.addressLine,
       city: input.city,
-      district: input.district,
+      district: input.district ?? "",
       ward: input.ward,
+      latitude: input.latitude,
+      longitude: input.longitude,
       isDefault: shouldBeDefault,
     });
   }
