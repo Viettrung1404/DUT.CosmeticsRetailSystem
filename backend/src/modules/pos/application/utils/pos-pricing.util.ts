@@ -120,7 +120,11 @@ export const calculateCouponDiscount = (
     coupon.discountType === 'PERCENTAGE'
       ? Math.round((base * coupon.discountValue) / 100)
       : Math.round(coupon.discountValue);
-  return Math.min(raw, base);
+  const capped =
+    coupon.maxDiscountAmount && coupon.maxDiscountAmount > 0
+      ? Math.min(raw, coupon.maxDiscountAmount)
+      : raw;
+  return Math.min(capped, base);
 };
 
 // Thứ tự: khuyến mãi tự động -> tối đa 1 voucher (BR-11) -> điểm. Voucher và điểm được chia xuống từng dòng

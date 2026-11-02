@@ -149,6 +149,8 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
             discountType: coupon.discountType as PosDiscountType,
             discountValue: Number(coupon.discountValue),
             minOrderAmount: Number(coupon.minOrderAmount),
+            maxDiscountAmount:
+              coupon.maxDiscountAmount === null ? null : Number(coupon.maxDiscountAmount),
             maxUses: coupon.maxUses,
             usedCount: coupon.usedCount,
             maxUsesPerCustomer: coupon.maxUsesPerCustomer,
