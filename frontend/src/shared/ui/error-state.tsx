@@ -10,6 +10,7 @@ export function ErrorState({
   const Container = embedded ? "section" : "main";
   return (
     <Container id={embedded ? undefined : "main-content"} className="site-container state-main">
+      <title>Đã xảy ra lỗi | GlowUp</title>
       <div className="state-icon">
         <CloudLightning size={50} />
       </div>

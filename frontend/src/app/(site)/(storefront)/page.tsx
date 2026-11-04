@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 export const metadata = {
-  title: "GlowUp | Mỹ phẩm và chăm sóc sắc đẹp",
+  title: { absolute: "GlowUp | Mỹ phẩm và chăm sóc sắc đẹp" },
   description: "Khám phá sản phẩm chăm sóc da và trang điểm tại GlowUp.",
 };
 export default async function HomePage() {

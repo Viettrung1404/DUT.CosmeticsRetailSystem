@@ -1,6 +1,14 @@
 import { notFound } from "next/navigation";
 import { findCategory, getCategories } from "@/features/catalog/server";
 import { ProductListing, type ListingParams } from "@/features/catalog/listing";
+import { metadataTitle } from "@/shared/config/metadata";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const category = findCategory(await getCategories(), (await params).slug);
+  if (!category) notFound();
+  return { title: metadataTitle(category.name, "Danh mục sản phẩm") };
+}
+
 export default async function CategoryPage({
   params,
   searchParams,

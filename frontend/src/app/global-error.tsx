@@ -3,6 +3,10 @@ import Link from "next/link";
 export default function GlobalError({ reset }: { reset: () => void }) {
   return (
     <html lang="vi">
+      <head>
+        <title>Đã xảy ra lỗi | GlowUp</title>
+        <link rel="icon" href="/images/stitch/glowup-logo.webp" type="image/webp" />
+      </head>
       <body
         style={{ margin: 0, background: "#f9ecee", color: "#412e27", fontFamily: "sans-serif" }}
       >

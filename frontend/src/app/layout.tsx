@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
 import { getServerEnv } from "@/shared/config/env";
+import { PAGE_TITLE_TEMPLATE } from "@/shared/config/metadata";
 import { Providers } from "./providers";
 import "./globals.css";
 import "@/features/catalog/content.css";
@@ -25,8 +26,11 @@ export function generateMetadata(): Metadata {
   const index = getServerEnv().SEO_INDEXING_ENABLED === "true";
   return {
     metadataBase: new URL(getServerEnv().SITE_URL),
-    title: { default: "GlowUp", template: "%s | GlowUp" },
+    title: { default: "GlowUp", template: PAGE_TITLE_TEMPLATE },
     description: "GlowUp — Chăm sóc vẻ đẹp của bạn.",
+    icons: {
+      icon: { url: "/images/stitch/glowup-logo.webp", type: "image/webp", sizes: "160x160" },
+    },
     robots: { index, follow: index },
   };
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CartContents } from "@/features/catalog/cart-contents";
 import { ProductGrid } from "@/features/catalog/components";
 import { getProducts } from "@/features/catalog/server";
-export const metadata = { title: "Giỏ hàng | GlowUp", robots: { index: false, follow: false } };
+export const metadata = { title: "Giỏ hàng", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 export default async function CartPage() {
   const products = await getProducts({ limit: 4 });

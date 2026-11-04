@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { metadataTitle } from "@/shared/config/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/shared/api/errors";
@@ -40,7 +41,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await load(slug);
   return {
-    title: `${product.name} | GlowUp`,
+    title: metadataTitle(product.name, "Chi tiết sản phẩm"),
     description: product.shortDescription || product.name,
     openGraph: product.primaryImage ? { images: [product.primaryImage] } : undefined,
   };

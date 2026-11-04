@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Check } from "lucide-react";
 import { z } from "zod";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
@@ -8,6 +10,7 @@ import { TryOnCamera } from "./try-on-camera";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { emptyCart, optimisticCartAdd, type Cart } from "./commerce-state";
+import { useHydrated } from "@/shared/lib/use-hydrated";
 
 interface Variant {
   id?: string;
@@ -47,7 +50,10 @@ export function ProductPurchase({
   const [quantity, setQuantity] = useState(1);
   const addQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingUnits = useRef(0);
-  const [message, setMessage] = useState("");
+  const toastTimer = useRef<NodeJS.Timeout | null>(null);
+  const hydrated = useHydrated();
+  const [error, setError] = useState("");
+  const [showToast, setShowToast] = useState(false);
   const [stores, setStores] = useState<z.infer<typeof availabilitySchema>>([]);
   const [storeError, setStoreError] = useState(false);
   const variant = variants[selected];
@@ -55,6 +61,12 @@ export function ProductPurchase({
     !!variant?.id &&
     variant.isActive !== false &&
     (variant.stockQuantity === undefined || variant.stockQuantity > 0);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
   useEffect(() => {
     if (!variant?.id) return;
     const controller = new AbortController();
@@ -76,13 +88,17 @@ export function ProductPurchase({
     if (!variant?.id) return;
     const variantId = variant.id;
     const units = quantity;
-    setMessage("");
+    setError("");
     void queryClient.cancelQueries({ queryKey: ["cart"] });
     pendingUnits.current += units;
     queryClient.setQueryData<Cart>(["cart"], (current) =>
       optimisticCartAdd(current ?? emptyCart(), units),
     );
-    if (!buyNow) setMessage("Đã thêm vào giỏ hàng.");
+    if (!buyNow) {
+      setShowToast(true);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setShowToast(false), 2200);
+    }
     addQueue.current = addQueue.current.then(async () => {
       try {
         const result = await requestBff(
@@ -99,13 +115,14 @@ export function ProductPurchase({
           totalQuantity: result.totalQuantity + pendingUnits.current,
         }));
         if (buyNow) router.push("/cart");
-      } catch (error) {
+      } catch (err) {
+        setShowToast(false);
         pendingUnits.current -= units;
         queryClient.setQueryData<Cart>(["cart"], (current) => ({
           ...(current ?? emptyCart()),
           totalQuantity: Math.max(0, (current?.totalQuantity ?? units) - units),
         }));
-        setMessage(apiErrorMessage(error));
+        setError(apiErrorMessage(err));
       } finally {
         if (pendingUnits.current === 0) void queryClient.invalidateQueries({ queryKey: ["cart"] });
       }
@@ -179,9 +196,9 @@ export function ProductPurchase({
           Mua ngay
         </button>
       </div>
-      {message && (
-        <p role="status" className="pdp-message">
-          {message}
+      {error && (
+        <p role="alert" className="cart-warning">
+          {error}
         </p>
       )}
       <details className="store-availability">
@@ -204,6 +221,19 @@ export function ProductPurchase({
           <p>Đang cập nhật tồn kho cửa hàng.</p>
         )}
       </details>
+      {hydrated &&
+        showToast &&
+        createPortal(
+          <div className="cart-toast-overlay" role="status" aria-live="polite">
+            <div className="cart-toast">
+              <div className="cart-toast-icon">
+                <Check size={32} strokeWidth={3} />
+              </div>
+              <p className="cart-toast-text">Sản phẩm đã được thêm vào Giỏ hàng</p>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
