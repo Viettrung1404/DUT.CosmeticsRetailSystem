@@ -20,7 +20,9 @@ export class StoreController {
   ) {}
 
   private get published() {
-    return this.config.get('PUBLIC_STORE_DIRECTORY_ENABLED') === 'true';
+    const flag = this.config.get('PUBLIC_STORE_DIRECTORY_ENABLED');
+    if (flag !== undefined && flag !== '') return flag === 'true';
+    return process.env.NODE_ENV !== 'production';
   }
 
   private readonly fields = {

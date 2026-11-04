@@ -2,7 +2,7 @@ import { ContentLoading } from "@/shared/ui/content-loading";
 import { Suspense } from "react";
 import { PaymentResult } from "@/features/checkout/payment-result";
 export const metadata = {
-  title: "Kết quả thanh toán | GlowUp",
+  title: "Kết quả thanh toán",
   robots: { index: false, follow: false },
 };
 export default function Page() {

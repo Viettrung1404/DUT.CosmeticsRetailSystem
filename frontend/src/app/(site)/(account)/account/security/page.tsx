@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LockKeyhole, ShieldCheck, Mail, ArrowRight } from "lucide-react";
 import { AccountHeading } from "@/features/account/account-ui";
-export const metadata = { title: "Bảo mật tài khoản | GlowUp" };
+export const metadata = { title: "Bảo mật tài khoản" };
 export default function Page() {
   return (
     <section className="account-screen">

@@ -37,16 +37,22 @@ export function LocationPicker({
           initialView.current.zoom,
         );
         map.current = instance;
-        L.tileLayer(
-          process.env.NEXT_PUBLIC_MAP_TILE_URL || "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            maxZoom: 19,
-            attribution:
-              process.env.NEXT_PUBLIC_MAP_ATTRIBUTION ||
-              '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
-            referrerPolicy: "strict-origin-when-cross-origin",
-          },
-        )
+        const tileUrl =
+          process.env.NEXT_PUBLIC_MAP_TILE_URL ||
+          "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+        const isGoogle = tileUrl.includes("google.com");
+
+        L.tileLayer(tileUrl, {
+          maxZoom: 20,
+          // Override the page's no-referrer policy for tile provider identification.
+          referrerPolicy: "strict-origin-when-cross-origin",
+          subdomains: isGoogle ? ["mt0", "mt1", "mt2", "mt3"] : ["a", "b", "c"],
+          attribution:
+            process.env.NEXT_PUBLIC_MAP_ATTRIBUTION ||
+            (isGoogle
+              ? "&copy; Google Maps"
+              : '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'),
+        })
           .on("tileerror", () => {
             if (active)
               setMessage(
@@ -54,6 +60,12 @@ export function LocationPicker({
               );
           })
           .addTo(instance);
+
+        setTimeout(() => {
+          if (active && map.current) {
+            map.current.invalidateSize();
+          }
+        }, 200);
         instance.on("click", (event) =>
           change.current({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
         );

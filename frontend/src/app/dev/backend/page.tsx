@@ -4,6 +4,11 @@ import { getBackendHealth } from "@/shared/api/server";
 import { ApiError, apiErrorMessage } from "@/shared/api/errors";
 import { getServerEnv } from "@/shared/config/env";
 
+export const metadata = {
+  title: "Kiểm tra kết nối backend",
+  robots: { index: false, follow: false },
+};
+
 export default async function BackendDiagnosticPage() {
   await connection();
   if (process.env.NODE_ENV === "production" || getServerEnv().FE_DIAGNOSTICS !== "true") notFound();

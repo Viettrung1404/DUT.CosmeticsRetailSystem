@@ -74,7 +74,7 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
     }) => addressRequest(path, method, body),
     onSuccess: async () => {
       setOpen(false);
-      setMessage("Đã cập nhật sổ địa chỉ.");
+      setMessage("");
       await queryClient.invalidateQueries({ queryKey: ["addresses"] });
     },
     onError: (error) => setMessage(authMessage(error)),
@@ -143,7 +143,7 @@ export function AddressBook({ initial, userId }: { initial: Address[]; userId: s
         </button>
       </section>
       {!open && (message || loadError) && (
-        <p role="status" className="notice">
+        <p role="alert" className="notice notice-error">
           {loadError ? authMessage(loadError) : message}
         </p>
       )}

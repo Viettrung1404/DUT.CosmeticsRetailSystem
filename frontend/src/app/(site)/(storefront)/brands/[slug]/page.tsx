@@ -1,11 +1,12 @@
 import { BrandScreen, publicDetail } from "@/features/catalog/marketing-pages";
 import { getBrand } from "@/features/catalog/server";
+import { metadataTitle } from "@/shared/config/metadata";
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props) {
   const b = await publicDetail(() => params.then(({ slug }) => getBrand(slug)));
   return {
-    title: b.metaTitle || b.name,
+    title: metadataTitle(b.metaTitle, `Mỹ phẩm ${b.name}`),
     description: b.metaDescription || b.description || undefined,
     alternates: { canonical: `/brands/${b.slug}` },
   };

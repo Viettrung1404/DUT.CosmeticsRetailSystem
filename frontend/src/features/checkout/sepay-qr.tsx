@@ -161,7 +161,7 @@ export function SepayQr({
               </div>
             ))}
           </dl>
-          <p className="sepay-copy-status" role="status">
+          <p className="sepay-copy-status sr-only" role="status">
             {copyStatus}
           </p>
           <p className="sepay-instruction">

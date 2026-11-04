@@ -1,6 +1,6 @@
 import { getCategories } from "@/features/catalog/server";
 import { ProductListing, type ListingParams } from "@/features/catalog/listing";
-export const metadata = { title: "Tất cả sản phẩm | GlowUp" };
+export const metadata = { title: "Tất cả sản phẩm" };
 export default async function ProductsPage({
   searchParams,
 }: {

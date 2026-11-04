@@ -6,6 +6,13 @@ import { ApiError } from "@/shared/api/errors";
 import { ChevronRight } from "lucide-react";
 import { ContentBadge, ContentBreadcrumb } from "./content-layout";
 import { articleHeadings } from "./editorial-pages";
+import { metadataTitle } from "@/shared/config/metadata";
+
+const policyTitles: Record<string, string> = {
+  "chinh-sach-giao-hang": "Chính sách giao hàng",
+  "chinh-sach-doi-tra": "Chính sách đổi trả và hoàn tiền",
+  "chinh-sach-bao-mat": "Chính sách bảo mật",
+};
 
 async function load(slug: string) {
   try {
@@ -18,7 +25,7 @@ async function load(slug: string) {
 export async function cmsMetadata(slug: string): Promise<Metadata> {
   const page = await load(slug);
   return {
-    title: page.metaTitle || page.title,
+    title: metadataTitle(page.metaTitle, policyTitles[slug] || page.title),
     description: page.metaDescription || undefined,
     alternates: { canonical: `/${page.slug}` },
   };

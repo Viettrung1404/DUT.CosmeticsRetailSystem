@@ -589,11 +589,6 @@ export function CheckoutPage() {
             <br />
             Kiểm tra thông tin nhận hàng trước khi đặt đơn.
           </small>
-          {orderId && (
-            <p>
-              Đơn đã tạo. <Link href={`/order-success/${orderId}`}>Xem đơn hàng</Link>
-            </p>
-          )}
           {error && (
             <p role="alert" className="cart-warning">
               {error}
