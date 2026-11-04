@@ -7,7 +7,7 @@ const escapeHtml = (value: string) =>
 
 // S30 stays a standalone document when React or the session store is unavailable.
 export function maintenanceDocument(message?: string) {
-  return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Bảo trì | GlowUp</title><style>
+  return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Hệ thống đang bảo trì | GlowUp</title><link rel="icon" href="/images/stitch/glowup-logo.webp" type="image/webp"><style>
   :root{--primary:#c85a70;--action:#9d394f;--background:#f9ecee;--foreground:#412e27}
   *{box-sizing:border-box}body{margin:0;background:var(--background);color:var(--foreground);font:15px/1.7 system-ui,sans-serif}
   a{color:inherit;text-decoration:none}a:focus-visible{outline:2px solid var(--action);outline-offset:4px}

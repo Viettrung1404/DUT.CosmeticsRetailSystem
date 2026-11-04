@@ -183,11 +183,6 @@ export function CartContents({
             </div>
           )}
           <div className="cart-items">
-            {updatingAddedItem && (
-              <p className="cart-updating" role="status">
-                Đang cập nhật sản phẩm vừa thêm…
-              </p>
-            )}
             {compact && <div className="cart-compact-select-all">{selectAllControl}</div>}
             {!compact && (
               <div className="cart-table-head">

@@ -161,7 +161,7 @@ export function ProfilePage() {
   });
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   if (query.isPending) return <ContentLoading variant="profile" label="Đang tải hồ sơ…" />;
   if (query.isError)
     return (
@@ -173,7 +173,7 @@ export function ProfilePage() {
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setMessage("");
+    setError("");
     const input = profileInputSchema.safeParse({
       fullName: (draft.fullName ?? profile.fullName ?? "").trim(),
       phone: draft.phone || profile.phone || undefined,
@@ -181,7 +181,7 @@ export function ProfilePage() {
       dateOfBirth: draft.dateOfBirth || profile.dateOfBirth?.slice(0, 10) || undefined,
     });
     if (!input.success) {
-      setMessage("Vui lòng kiểm tra thông tin đã nhập.");
+      setError("Vui lòng kiểm tra thông tin đã nhập.");
       setBusy(false);
       return;
     }
@@ -193,9 +193,9 @@ export function ProfilePage() {
       client.setQueryData(["profile"], result);
       void client.invalidateQueries({ queryKey: ["session"] });
       setDraft({});
-      setMessage("Đã lưu hồ sơ.");
-    } catch (error) {
-      setMessage(apiErrorMessage(error));
+      setError("");
+    } catch (err) {
+      setError(apiErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -278,9 +278,9 @@ export function ProfilePage() {
               {busy ? "Đang lưu…" : "Lưu thay đổi"}
             </button>
           </div>
-          {message && (
-            <p className="full-width" role="status">
-              {message}
+          {error && (
+            <p className="full-width field-error" role="alert">
+              {error}
             </p>
           )}
         </form>

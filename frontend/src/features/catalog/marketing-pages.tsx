@@ -33,6 +33,7 @@ import { FavoriteButton } from "./favorite-button";
 import { FlashCountdown } from "./home-motion";
 import { BrandDirectory } from "./brand-directory";
 import { FaqList } from "./faq-list";
+import { StoreLocator } from "./store-locator";
 import {
   ContentBadge,
   ContentBreadcrumb,
@@ -378,56 +379,27 @@ export async function BrandScreen({ slug }: { slug: string }) {
 }
 
 export async function StoresScreen() {
-  const stores = await getStores();
+  const stores = await getStores().catch(() => []);
   return (
-    <main id="main-content" className="content-page">
-      <div className="content-container">
-        <ContentBreadcrumb current="Hệ thống cửa hàng" />
-        <section className="store-header">
-          <ContentBadge>
-            <MapPin size={14} /> KHÔNG GIAN LÀM ĐẸP GLOWUP
-          </ContentBadge>
-          <h1>Hệ thống Showroom GlowUp</h1>
-          <p>
-            Tìm thông tin địa chỉ, giờ hoạt động và liên hệ cửa hàng để chuẩn bị cho chuyến ghé thăm
-            của bạn.
-          </p>
-        </section>
-        <section className="content-section">
-          {stores.length ? (
-            <div className="store-directory">
-              {stores.map((store) => (
-                <article className="store-info" key={store.id}>
-                  <ContentBadge>{store.city}</ContentBadge>
-                  <h2>{store.name}</h2>
-                  <p>
-                    <MapPin size={15} style={{ display: "inline", marginRight: 5 }} />
-                    {store.address}, {store.district}
-                  </p>
-                  {store.phone && <p>{store.phone}</p>}
-                  <Link href={`/stores/${store.id}`}>
-                    Xem thông tin cửa hàng <ArrowRight size={16} />
-                  </Link>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <ContentEmpty title="Thông tin showroom đang được cập nhật">
-              Danh sách địa chỉ và giờ hoạt động sẽ được công bố tại đây khi có thông tin chính
-              thức.
-            </ContentEmpty>
-          )}
-        </section>
-      </div>
+    <main id="main-content">
+      <StoreLocator initialStores={stores} />
     </main>
   );
 }
+
 export async function StoreScreen({ id }: { id: string }) {
   const store = await publicDetail(() => getStore(id));
-  const hours =
+  const rawHours =
     store.openingHours && typeof store.openingHours === "object"
-      ? Object.entries(store.openingHours)
-      : [];
+      ? (store.openingHours as Record<string, unknown>)
+      : {};
+  const displayHours =
+    typeof rawHours.display === "string"
+      ? rawHours.display
+      : typeof rawHours.mon_sun === "string"
+        ? rawHours.mon_sun
+        : "08:00 - 22:00";
+
   return (
     <main id="main-content" className="content-page">
       <div className="content-container">
@@ -466,16 +438,14 @@ export async function StoreScreen({ id }: { id: string }) {
               <Clock3 />
             </span>
             <h2>Giờ hoạt động &amp; liên hệ</h2>
-            {hours.map(([day, value]) => (
-              <p key={day}>
-                {day}: {String(value)}
-              </p>
-            ))}
+            <p>Giờ mở cửa: {displayHours}</p>
             {store.phone && (
-              <a href={`tel:${store.phone}`}>
-                <Phone size={16} />
-                {store.phone}
-              </a>
+              <p>
+                <a href={`tel:${store.phone.replace(/\s+/g, "")}`}>
+                  <Phone size={16} style={{ display: "inline", marginRight: 6 }} />
+                  {store.phone}
+                </a>
+              </p>
             )}
             {store.email && (
               <p>

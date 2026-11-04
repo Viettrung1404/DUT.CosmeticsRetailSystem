@@ -5,7 +5,6 @@ import {
   Heart,
   ShoppingBag,
   Gem,
-  Gift,
   Sparkles,
   Coins,
   Bell,
@@ -253,7 +252,7 @@ export function RewardsPage() {
   const client = useQueryClient();
   const keys = useRef(new Map<string, string>());
   const [busy, setBusy] = useState("");
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [coupon, setCoupon] = useState<z.infer<typeof redemptionSchema>["coupon"] | null>(null);
   const query = useQuery({
     queryKey: ["rewards"],
@@ -266,7 +265,7 @@ export function RewardsPage() {
   async function redeem(code: string) {
     if (!window.confirm("Bạn muốn dùng điểm để đổi ưu đãi này?")) return;
     setBusy(code);
-    setMessage("");
+    setError("");
     const storageKey = `glowup-redeem:${code}`;
     let saved: string | null = null;
     try {
@@ -295,10 +294,10 @@ export function RewardsPage() {
         /* storage unavailable */
       }
       setCoupon(result.coupon);
-      setMessage("Đổi ưu đãi thành công. Mã chỉ áp dụng theo điều kiện và hạn sử dụng hiển thị.");
+      setError("");
       void client.invalidateQueries({ queryKey: ["loyalty"] });
     } catch (e) {
-      setMessage(apiErrorMessage(e));
+      setError(apiErrorMessage(e));
     } finally {
       setBusy("");
     }
@@ -367,11 +366,10 @@ export function RewardsPage() {
           Các quyền lợi đổi điểm mới sẽ được cập nhật tại đây.
         </ContentEmpty>
       )}
-      {message && (
-        <div className="account-tip" role="status">
-          <Gift size={22} />
-          <p>{message}</p>
-        </div>
+      {error && (
+        <p role="alert" className="cart-warning" style={{ marginBlock: 16 }}>
+          {error}
+        </p>
       )}
       {coupon && (
         <div className="account-surface">

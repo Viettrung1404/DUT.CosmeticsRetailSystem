@@ -1,6 +1,6 @@
 import { getCategories } from "@/features/catalog/server";
 import { ProductListing, type ListingParams } from "@/features/catalog/listing";
-export const metadata = { title: "Hàng mới về | GlowUp" };
+export const metadata = { title: "Hàng mới về" };
 export default async function NewArrivalsPage({
   searchParams,
 }: {

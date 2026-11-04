@@ -60,16 +60,15 @@ export function OrderProgress({ status }: { status: string }) {
     { text: "Đang giao", icon: Package },
     { text: "Hoàn thành", icon: Check },
   ];
-  const current =
-    ["PENDING_PAYMENT", "PENDING"].includes(status)
-      ? 0
-      : ["CONFIRMED", "PROCESSING"].includes(status)
-        ? 1
-        : status === "SHIPPING"
-          ? 2
-          : ["DELIVERED", "COMPLETED"].includes(status)
-            ? 3
-            : -1;
+  const current = ["PENDING_PAYMENT", "PENDING"].includes(status)
+    ? 0
+    : ["CONFIRMED", "PROCESSING"].includes(status)
+      ? 1
+      : status === "SHIPPING"
+        ? 2
+        : ["DELIVERED", "COMPLETED"].includes(status)
+          ? 3
+          : -1;
   return (
     <ol className="order-progress" aria-label="Tiến trình đơn hàng">
       {stages.map((stage, index) => (

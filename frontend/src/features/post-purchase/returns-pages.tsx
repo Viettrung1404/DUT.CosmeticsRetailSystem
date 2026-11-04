@@ -541,7 +541,6 @@ export function ReturnDetailPage({ id }: { id: string }) {
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [accepted, setAccepted] = useState<z.infer<typeof exchangeSchema> | null>(null);
   const key = useRef<{ version: number; value: string } | null>(null);
   const query = useQuery({
     queryKey: ["return", id],
@@ -579,16 +578,11 @@ export function ReturnDetailPage({ id }: { id: string }) {
     setBusy(true);
     setError("");
     try {
-      const result = await requestBff(
-        `/api/account/commerce/returns/${id}/accept`,
-        exchangeSchema,
-        {
-          method: "POST",
-          body: { quoteVersion: data.quoteVersion, paymentMethod: "COD", idempotencyKey: value },
-        },
-      );
+      await requestBff(`/api/account/commerce/returns/${id}/accept`, exchangeSchema, {
+        method: "POST",
+        body: { quoteVersion: data.quoteVersion, paymentMethod: "COD", idempotencyKey: value },
+      });
       key.current = null;
-      setAccepted(result);
       void client.invalidateQueries({ queryKey: ["return", id] });
     } catch (e) {
       setError(apiErrorMessage(e));
@@ -719,12 +713,6 @@ export function ReturnDetailPage({ id }: { id: string }) {
           </dl>
           <p className="muted">{data.settlement.status}</p>
         </section>
-      )}
-      {accepted && (
-        <p role="status">
-          Đã ghi nhận chấp nhận báo giá.{" "}
-          <Link href={`/account/orders/${accepted.replacementOrderId}`}>Xem đơn thay thế</Link>
-        </p>
       )}
       {data.refunds.length > 0 && (
         <section className="account-surface">

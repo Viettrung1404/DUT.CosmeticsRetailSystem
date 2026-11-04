@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
 import { reviewInputSchema, reviewResultSchema } from "./contracts";
@@ -10,7 +11,7 @@ export function ReviewForm({ productId }: { productId: string }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -22,11 +23,11 @@ export function ReviewForm({ productId }: { productId: string }) {
       content: content.trim() || undefined,
     });
     if (!input.success) {
-      setMessage("Đánh giá chưa hợp lệ.");
+      setError("Đánh giá chưa hợp lệ. Vui lòng kiểm tra lại nội dung.");
       return;
     }
     setBusy(true);
-    setMessage("");
+    setError("");
     try {
       await requestBff("/api/account/commerce/reviews", reviewResultSchema, {
         method: "POST",
@@ -38,12 +39,20 @@ export function ReviewForm({ productId }: { productId: string }) {
         },
       });
       setDone(true);
-      setMessage("Đánh giá đã được gửi và đang chờ duyệt.");
-    } catch (error) {
-      setMessage(apiErrorMessage(error));
+      setError("");
+    } catch (err) {
+      setError(apiErrorMessage(err));
     } finally {
       setBusy(false);
     }
+  }
+  if (done) {
+    return (
+      <div className="account-tip" role="status">
+        <Check size={20} />
+        <p>Đánh giá đã được gửi và đang chờ duyệt. Cảm ơn bạn đã phản hồi!</p>
+      </div>
+    );
   }
   return (
     <form className="account-form" onSubmit={(event) => void submit(event)}>
@@ -74,10 +83,14 @@ export function ReviewForm({ productId }: { productId: string }) {
           onChange={(event) => setContent(event.target.value)}
         />
       </label>
-      <button className="button" disabled={busy || done}>
+      <button className="button" disabled={busy}>
         {busy ? "Đang gửi…" : "Gửi đánh giá"}
       </button>
-      {message && <p role="status">{message}</p>}
+      {error && (
+        <p role="alert" className="cart-warning">
+          {error}
+        </p>
+      )}
     </form>
   );
 }
