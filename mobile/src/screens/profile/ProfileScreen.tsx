@@ -62,6 +62,15 @@ export default function ProfileScreen({ navigation }: any) {
         <View style={styles.headerRightActions}>
           <TouchableOpacity
             style={styles.circleBtn}
+            onPress={() => navigation.navigate('NotificationCenter')}
+          >
+            <Ionicons name="notifications-outline" size={20} color={theme.colors.textDark} />
+            <View style={styles.notifBadge}>
+              <Text style={styles.notifBadgeText}>2</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.circleBtn, { marginLeft: 8 }]}
             onPress={() => Alert.alert('Quét mã', 'Mở máy quét mã QR/Barcode tại cửa hàng.')}
           >
             <Ionicons name="qr-code-outline" size={20} color={theme.colors.textDark} />
@@ -71,7 +80,11 @@ export default function ProfileScreen({ navigation }: any) {
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* 2. Thẻ Tóm Tắt Thông Tin User */}
-        <View style={styles.userCard}>
+        <TouchableOpacity
+          style={styles.userCard}
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
           <View style={styles.userRow}>
             <View style={styles.avatarWrapper}>
               <Image
@@ -99,7 +112,7 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* 3. Luxury Diamond VIP Membership Card (Stitch Design) */}
         <View style={styles.vipCard}>
@@ -302,15 +315,32 @@ export default function ProfileScreen({ navigation }: any) {
           {/* Thông tin cá nhân */}
           <TouchableOpacity
             style={styles.settingsRow}
-            onPress={() => Alert.alert('Thông tin cá nhân', 'Chức năng chỉnh sửa thông tin đang hoàn thiện.')}
+            onPress={() => navigation.navigate('EditProfile')}
           >
             <View style={styles.settingsRowLeft}>
               <View style={styles.settingsIconBox}>
                 <Ionicons name="person-outline" size={18} color={theme.colors.textDark} />
               </View>
               <View>
-                <Text style={styles.settingsTitle}>Thông tin cá nhân & Ngày sinh</Text>
-                <Text style={styles.settingsSub}>Nhận quà sinh nhật Bloom Luxe</Text>
+                <Text style={styles.settingsTitle}>Thông tin cá nhân & Hồ sơ da</Text>
+                <Text style={styles.settingsSub}>Nhận gợi ý routine & quà Bloom Luxe</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Đổi mật khẩu */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => navigation.navigate('ChangePassword')}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Đổi mật khẩu tài khoản</Text>
+                <Text style={styles.settingsSub}>Bảo vệ an toàn thông tin & điểm tích luỹ</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
@@ -415,6 +445,26 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceSubtle,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    minWidth: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+  },
+  notifBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   content: {
     flex: 1,

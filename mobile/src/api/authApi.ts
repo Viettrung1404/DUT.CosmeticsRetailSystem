@@ -24,4 +24,16 @@ export const authApi = {
     const response = await apiClient.get('/customers/me');
     return response.data;
   },
+
+  // 5. Cập nhật thông tin hồ sơ
+  updateProfile: async (data: { full_name?: string; phone?: string; birthday?: string; gender?: string; skin_type?: string }) => {
+    const response = await apiClient.put('/users/me', data);
+    return response.data;
+  },
+
+  // 6. Đổi mật khẩu
+  changePassword: async (data: { currentPassword?: string; newPassword: string }) => {
+    const response = await apiClient.put('/auth/change-password', data);
+    return response.data;
+  },
 };

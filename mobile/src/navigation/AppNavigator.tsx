@@ -9,6 +9,9 @@ import ProductDetailScreen from '../screens/product/ProductDetailScreen';
 import SearchScreen from '../screens/search/SearchScreen';
 import CheckoutScreen from '../screens/cart/CheckoutScreen';
 import OrderSuccessScreen from '../screens/cart/OrderSuccessScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
+import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
+import NotificationCenterScreen from '../screens/profile/NotificationCenterScreen';
 import { COLORS } from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
@@ -38,6 +41,9 @@ export default function AppNavigator() {
                         <Stack.Screen name="Search" component={SearchScreen} />
                         <Stack.Screen name="Checkout" component={CheckoutScreen} />
                         <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} />
+                        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+                        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+                        <Stack.Screen name="NotificationCenter" component={NotificationCenterScreen} />
                     </>
                 ) : (
                     <Stack.Screen name="AuthStack" component={AuthStack} />

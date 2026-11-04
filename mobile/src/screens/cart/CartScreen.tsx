@@ -279,7 +279,7 @@ export default function CartScreen({ navigation }: any) {
                 )}
               </View>
             </View>
-          ) : null
+          ) : undefined
         }
         ListFooterComponent={
           items.length > 0 ? (
@@ -305,7 +305,7 @@ export default function CartScreen({ navigation }: any) {
                 </View>
               </View>
             </View>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
