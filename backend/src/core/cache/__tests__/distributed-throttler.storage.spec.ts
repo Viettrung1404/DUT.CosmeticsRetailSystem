@@ -1,10 +1,11 @@
 import { ConfigService } from '@nestjs/config';
+import { configFixture } from '../../../../test/support/config';
 import { DistributedThrottlerStorage, THROTTLE_SCRIPT } from '../distributed-throttler.storage';
 describe('Distributed throttler storage', () => {
   it('uses atomic Redis script, same keys across instances and millisecond-to-second expiry conversion', async () => {
     const command = jest.fn().mockResolvedValue([6, 12500, 8000]);
     const redis = { configured: true, command };
-    const config = new ConfigService({ REDIS_KEY_PREFIX: 'unit:s6:' });
+    const config = configFixture({ REDIS_KEY_PREFIX: 'unit:s6:' });
     const a = new DistributedThrottlerStorage(redis as any, config),
       b = new DistributedThrottlerStorage(redis as any, config);
     const result = await a.increment('user-private-value', 60000, 5, 8000, 'default');

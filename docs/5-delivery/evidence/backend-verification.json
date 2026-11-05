@@ -1,0 +1,131 @@
+{
+  "checkedAt": "2026-11-05T04:41:31.652Z",
+  "scope": "Local unit + isolated PostgreSQL integration/E2E after final compatible dependency updates; no live providers",
+  "counts": {
+    "unit": {
+      "execution": {
+        "stage": "unit",
+        "runId": "70cfbe1c4d8d42b0b91ab3a5e92a066f",
+        "testPattern": null,
+        "node": "v22.14.0",
+        "completedAt": "2026-11-05T04:39:01.076Z",
+        "environment": "isolated local PostgreSQL, providers disabled/stubbed",
+        "stages": [
+          {
+            "label": "unit and coverage (DB suites intentionally skipped)",
+            "exitCode": 0
+          }
+        ],
+        "exitCode": 0
+      },
+      "passedSuites": 97,
+      "failedSuites": 0,
+      "skippedSuites": 7,
+      "passedTests": 614,
+      "failedTests": 0,
+      "skippedTests": 49
+    },
+    "integration": {
+      "execution": {
+        "stage": "integration",
+        "runId": "835d91459785470e9905204b9c5420d8",
+        "testPattern": null,
+        "node": "v22.14.0",
+        "completedAt": "2026-11-05T04:39:39.847Z",
+        "environment": "isolated local PostgreSQL, providers disabled/stubbed",
+        "stages": [
+          {
+            "label": "migration",
+            "exitCode": 0
+          },
+          {
+            "label": "PostgreSQL integration (optional load suite excluded)",
+            "exitCode": 0
+          }
+        ],
+        "exitCode": 0
+      },
+      "passedSuites": 6,
+      "failedSuites": 0,
+      "skippedSuites": 0,
+      "passedTests": 48,
+      "failedTests": 0,
+      "skippedTests": 0
+    },
+    "e2e": {
+      "execution": {
+        "stage": "e2e",
+        "runId": "8fa5edf0335246648dfb361e429a3639",
+        "testPattern": null,
+        "node": "v22.14.0",
+        "completedAt": "2026-11-05T04:40:38.953Z",
+        "environment": "isolated local PostgreSQL, providers disabled/stubbed",
+        "stages": [
+          {
+            "label": "HTTP/PostgreSQL E2E",
+            "exitCode": 0
+          }
+        ],
+        "exitCode": 0
+      },
+      "passedSuites": 3,
+      "failedSuites": 0,
+      "skippedSuites": 0,
+      "passedTests": 60,
+      "failedTests": 0,
+      "skippedTests": 0
+    }
+  },
+  "coverage": {
+    "method": "Istanbul coverage-map merge of current production sources; percentages are not added",
+    "files": 354,
+    "summary": {
+      "lines": {
+        "total": 8694,
+        "covered": 6913,
+        "skipped": 0,
+        "pct": 79.51
+      },
+      "statements": {
+        "total": 9593,
+        "covered": 7568,
+        "skipped": 0,
+        "pct": 78.89
+      },
+      "functions": {
+        "total": 1712,
+        "covered": 1119,
+        "skipped": 0,
+        "pct": 65.36
+      },
+      "branches": {
+        "total": 3659,
+        "covered": 2187,
+        "skipped": 0,
+        "pct": 59.77
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": "Unknown"
+      }
+    },
+    "inputs": [
+      "backend\\coverage\\coverage-final.json",
+      ".tmp\\development-readiness\\coverage-integration\\coverage-final.json",
+      ".tmp\\development-readiness\\coverage-e2e\\coverage-final.json"
+    ],
+    "inputSha256": [
+      "52e0c74196ed97681ce10a0161060c56f2accaf2cb1241a8983d1798c1cc0588",
+      "af27f42a4d877c93a24038423ea51233bd04f372bada869f28358f3652ca3740",
+      "b6885c4c700052ebe3c5924c1192b58b9041bf94641f19d9018726b8a745d3a5"
+    ]
+  },
+  "productionSourceSha256": {
+    "src/modules/customer-commerce/infrastructure/commands.ts": "6677b288ed9ba2e1ae8733343d65d2138ff07e6f1ee9d7ac117f9d8252a044b1",
+    "src/modules/orders/application/services/commerce-checkout.service.ts": "f8f163b06e55d81bbac3d89c97c0890e2f184409209ab69f13110c6fb5c5901b",
+    "src/modules/products/application/services/public-catalog.service.ts": "2f362236ffd62d00d306ec74f013e3a0a8e58f4e2fc677044a57903bb88a0350",
+    "package-lock.json": "0a8026a394f7d0739400dac385c1bb939e878ae62bc9e156d9bb919ad8cfef1e"
+  }
+}

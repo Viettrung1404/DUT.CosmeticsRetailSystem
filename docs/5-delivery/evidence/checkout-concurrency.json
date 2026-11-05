@@ -1,0 +1,50 @@
+{
+  "scope": "Targeted checkout transaction and concurrency regression; not full E2E acceptance",
+  "baseCommit": "c59ed918060c2bbe5468ae9a7b8b83f71d27e87c",
+  "worktreeChangesRequired": true,
+  "execution": {
+    "stage": "e2e",
+    "runId": "604ebb5dac0a4ae6b962678b8ce056fd",
+    "testPattern": "second connection|TX-0",
+    "node": "v22.14.0",
+    "completedAt": "2026-11-05T03:19:20.677Z",
+    "environment": "isolated local PostgreSQL, providers disabled/stubbed",
+    "stages": [
+      {
+        "label": "HTTP/PostgreSQL E2E",
+        "exitCode": 0
+      }
+    ],
+    "exitCode": 0
+  },
+  "passed": 4,
+  "failed": 0,
+  "skipped": 54,
+  "cases": [
+    {
+      "fullName": "Sprint 5 — isolated PostgreSQL and HTTP checkout does not require a second connection inside its customer transaction",
+      "status": "passed",
+      "duration": 342
+    },
+    {
+      "fullName": "Sprint 5 — isolated PostgreSQL and HTTP checkout does not require a second connection inside its guest transaction",
+      "status": "passed",
+      "duration": 160
+    },
+    {
+      "fullName": "Sprint 5 — isolated PostgreSQL and HTTP TX-01: allocates exactly 10 units to 50 independent customers across 20 contention rounds",
+      "status": "passed",
+      "duration": 16958
+    },
+    {
+      "fullName": "Sprint 5 — isolated PostgreSQL and HTTP TX-02: 20 simultaneous retries and a later replay reserve stock and create an order only once",
+      "status": "passed",
+      "duration": 231
+    }
+  ],
+  "environment": {
+    "postgres": "17, Docker local, 1 CPU, 512 MiB",
+    "pool": "10 connections; dedicated regression uses 1 connection",
+    "providers": "disabled/stubbed"
+  }
+}

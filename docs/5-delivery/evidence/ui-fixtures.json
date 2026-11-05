@@ -1,0 +1,639 @@
+{
+  "scope": "All existing browser UI/auth/OAuth/payment-layout contract fixtures; not provider or real-backend acceptance",
+  "execution": {
+    "completedAt": "2026-11-05T04:44:30.880Z",
+    "node": "v22.14.0",
+    "args": [
+      "node_modules/@playwright/test/cli.js",
+      "test",
+      "--reporter=json",
+      "--max-failures=3"
+    ],
+    "environment": "Isolated development frontend; HTTP contract fixture at 3100 and dedicated Redis at 56379; not real backend/provider acceptance",
+    "exitCode": 0
+  },
+  "stats": {
+    "startTime": "2026-11-05T04:41:01.017Z",
+    "duration": 209749.213,
+    "expected": 53,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "name": "skincare navbar follows the current HTML pills and keeps search usable",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 6891
+        }
+      ]
+    },
+    {
+      "name": "Stitch auth layouts keep their distinct composition without site chrome",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 16951
+        }
+      ]
+    },
+    {
+      "name": "Stitch failure screens preserve HTTP status and working recovery links",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1825
+        }
+      ]
+    },
+    {
+      "name": "all auth routes exclude site header and footer, including after client navigation",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 8317
+        }
+      ]
+    },
+    {
+      "name": "guest private access preserves returnTo and rejects forged CSRF/proxy input",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2200
+        }
+      ]
+    },
+    {
+      "name": "sensitive forms cannot submit credentials before hydration",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 947
+        }
+      ]
+    },
+    {
+      "name": "validation, wrong credentials, network errors and Retry-After retain the draft",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2643
+        }
+      ]
+    },
+    {
+      "name": "registration uses an email link, verification is explicit and expired reset can recover",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3687
+        }
+      ]
+    },
+    {
+      "name": "opaque login cookie, address CRUD, logout and user switch isolate private data",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 16363
+        }
+      ]
+    },
+    {
+      "name": "mobile menu closes with Escape and restores its trigger",
+      "project": "chromium",
+      "status": "skipped",
+      "results": [
+        {
+          "status": "skipped",
+          "durationMs": 265
+        }
+      ]
+    },
+    {
+      "name": "skincare navbar follows the current HTML pills and keeps search usable",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3635
+        }
+      ]
+    },
+    {
+      "name": "Stitch auth layouts keep their distinct composition without site chrome",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 9931
+        }
+      ]
+    },
+    {
+      "name": "Stitch failure screens preserve HTTP status and working recovery links",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1827
+        }
+      ]
+    },
+    {
+      "name": "all auth routes exclude site header and footer, including after client navigation",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 5799
+        }
+      ]
+    },
+    {
+      "name": "guest private access preserves returnTo and rejects forged CSRF/proxy input",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1242
+        }
+      ]
+    },
+    {
+      "name": "sensitive forms cannot submit credentials before hydration",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 492
+        }
+      ]
+    },
+    {
+      "name": "validation, wrong credentials, network errors and Retry-After retain the draft",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1420
+        }
+      ]
+    },
+    {
+      "name": "registration uses an email link, verification is explicit and expired reset can recover",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2658
+        }
+      ]
+    },
+    {
+      "name": "opaque login cookie, address CRUD, logout and user switch isolate private data",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 10197
+        }
+      ]
+    },
+    {
+      "name": "mobile menu closes with Escape and restores its trigger",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1276
+        }
+      ]
+    },
+    {
+      "name": "guest uses province/ward dropdowns and can pin a delivery point without a district",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3720
+        }
+      ]
+    },
+    {
+      "name": "signed-in customer selects saved addresses and adds a two-level address with map coordinates",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3815
+        }
+      ]
+    },
+    {
+      "name": "voucher entry is explicit, invalid codes preserve the quote, wallet and coins update the server quote",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 5031
+        }
+      ]
+    },
+    {
+      "name": "guest uses province/ward dropdowns and can pin a delivery point without a district",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2413
+        }
+      ]
+    },
+    {
+      "name": "signed-in customer selects saved addresses and adds a two-level address with map coordinates",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2921
+        }
+      ]
+    },
+    {
+      "name": "voucher entry is explicit, invalid codes preserve the quote, wallet and coins update the server quote",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 4084
+        }
+      ]
+    },
+    {
+      "name": "Vietnamese shell renders without client errors or horizontal overflow",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1612
+        }
+      ]
+    },
+    {
+      "name": "SSR calls upstream directly and does not send the browser to the backend",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1435
+        }
+      ]
+    },
+    {
+      "name": "Vietnamese shell renders without client errors or horizontal overflow",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1005
+        }
+      ]
+    },
+    {
+      "name": "SSR calls upstream directly and does not send the browser to the backend",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 707
+        }
+      ]
+    },
+    {
+      "name": "Google SDK callback creates an opaque session and preserves returnTo (fixture)",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 5356
+        }
+      ]
+    },
+    {
+      "name": "Facebook SDK callback creates an opaque session and preserves returnTo (fixture)",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1885
+        }
+      ]
+    },
+    {
+      "name": "OAuth email challenge requires proof, consumes flow and returns to the requested page (fixture)",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 4188
+        }
+      ]
+    },
+    {
+      "name": "OAuth linking requires login to the target account before proof can succeed (fixture)",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 5242
+        }
+      ]
+    },
+    {
+      "name": "provider cancellation and rejection keep email login usable (fixture)",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2959
+        }
+      ]
+    },
+    {
+      "name": "blocked SDK reports failure and leaves password login available",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1553
+        }
+      ]
+    },
+    {
+      "name": "Facebook SDK refusal on HTTP explains how to switch to HTTPS",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1702
+        }
+      ]
+    },
+    {
+      "name": "Google SDK callback creates an opaque session and preserves returnTo (fixture)",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1943
+        }
+      ]
+    },
+    {
+      "name": "Facebook SDK callback creates an opaque session and preserves returnTo (fixture)",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2201
+        }
+      ]
+    },
+    {
+      "name": "OAuth email challenge requires proof, consumes flow and returns to the requested page (fixture)",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3108
+        }
+      ]
+    },
+    {
+      "name": "OAuth linking requires login to the target account before proof can succeed (fixture)",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3136
+        }
+      ]
+    },
+    {
+      "name": "provider cancellation and rejection keep email login usable (fixture)",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2150
+        }
+      ]
+    },
+    {
+      "name": "blocked SDK reports failure and leaves password login available",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 886
+        }
+      ]
+    },
+    {
+      "name": "Facebook SDK refusal on HTTP explains how to switch to HTTPS",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 946
+        }
+      ]
+    },
+    {
+      "name": "VietQR shows exact transfer details, copies reference and fits the viewport",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2095
+        }
+      ]
+    },
+    {
+      "name": "sandbox shows a labelled test QR and links to the transaction simulator",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1594
+        }
+      ]
+    },
+    {
+      "name": "expired transfers hide the QR and copy controls",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1420
+        }
+      ]
+    },
+    {
+      "name": "polling recovers after a connection error and hides instructions once confirmed",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 6970
+        }
+      ]
+    },
+    {
+      "name": "transfers awaiting verification hide the payment instructions",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2127
+        }
+      ]
+    },
+    {
+      "name": "VietQR shows exact transfer details, copies reference and fits the viewport",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1339
+        }
+      ]
+    },
+    {
+      "name": "sandbox shows a labelled test QR and links to the transaction simulator",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1179
+        }
+      ]
+    },
+    {
+      "name": "expired transfers hide the QR and copy controls",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1212
+        }
+      ]
+    },
+    {
+      "name": "polling recovers after a connection error and hides instructions once confirmed",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 6517
+        }
+      ]
+    },
+    {
+      "name": "transfers awaiting verification hide the payment instructions",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1458
+        }
+      ]
+    }
+  ],
+  "intentionalSkip": "Mobile menu test is inapplicable to desktop; mobile project executes it",
+  "frontendCheck": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "log": ".tmp/development-readiness/frontend-check-final.log",
+    "unitPassed": 66,
+    "unitSkipped": 14,
+    "redisEnabledUnitSeparate": {
+      "passed": 80,
+      "skipped": 0
+    }
+  },
+  "sourceSha256": {
+    "frontend/src/features/addresses/location-picker.tsx": "65ce21cf2153984199c9afb7de2cdaa725006cd49146e2aca82f94ac452773f3",
+    "frontend/scripts/run-readiness-ui.mjs": "4980d09166629c253ed6a9e6ef3e69ec5d8488de507428aa28c8e5170fb8349e",
+    "frontend/tests/e2e/auth.spec.ts": "a18c6b31c8f0b0c7913a97938cd1efbce7ec307b27a0105452a8fe267ef35310",
+    "frontend/tests/e2e/checkout-layout.spec.ts": "fa7d90e57b6b859105d1e6b68085e0792f3d8e8543ed8363b3ef6efe0b3a4273",
+    "frontend/tests/e2e/foundation.spec.ts": "c7ae34cc111399feb7d8080f281560a91379c74941a299d591328808127313dc",
+    "frontend/tests/fixtures/health-server.mjs": "539e413fc93abc6a69c4bd700845e7817204cadb71ed1cb3c8a66cb5c9da2905"
+  }
+}

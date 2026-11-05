@@ -68,7 +68,7 @@ export class CustomerCommands {
     const requestHash = createHash('sha256')
       .update(JSON.stringify(canonical(input)))
       .digest('hex');
-    return this.prisma.$transaction(
+    return this.prisma.transaction(
       async (tx) => {
         const customerId = await customerContext(tx, userId);
         const identity = `${userId}:${operation}:${key}`;
@@ -99,7 +99,7 @@ export class CustomerCommands {
         });
         return stored as T;
       },
-      { timeout: 20000 },
+      { maxWait: 5000, timeout: 20000 },
     );
   }
 }

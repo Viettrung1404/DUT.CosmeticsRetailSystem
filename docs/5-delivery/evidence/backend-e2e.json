@@ -1,0 +1,266 @@
+{
+  "scope": "Full backend HTTP/PostgreSQL E2E; external adapters disabled or stubbed",
+  "execution": {
+    "stage": "e2e",
+    "runId": "8fa5edf0335246648dfb361e429a3639",
+    "testPattern": null,
+    "node": "v22.14.0",
+    "completedAt": "2026-11-05T04:40:38.953Z",
+    "environment": "isolated local PostgreSQL, providers disabled/stubbed",
+    "stages": [
+      {
+        "label": "HTTP/PostgreSQL E2E",
+        "exitCode": 0
+      }
+    ],
+    "exitCode": 0
+  },
+  "passedSuites": 3,
+  "failedSuites": 0,
+  "skippedSuites": 0,
+  "passedTests": 60,
+  "failedTests": 0,
+  "skippedTests": 0,
+  "cases": [
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP migrates review uniqueness, generated inventory, quota CHECK and DB-backed pricing",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP keeps SQL catalog pricing equal to the shared engine for single-unit tier/campaign/cap combinations",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP uses the new engine over HTTP, ignores manual salePrice and whitelists cost data",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP serializes two checkouts competing for the last quota; loser needs a new quote",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP replays checkout once and rejects changed payload under the same key",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP checkout does not require a second connection inside its customer transaction",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP checkout does not require a second connection inside its guest transaction",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP TX-01: allocates exactly 10 units to 50 independent customers across 20 contention rounds",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP TX-02: 20 simultaneous retries and a later replay reserve stock and create an order only once",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP TX-05: POS and web cannot both sell the final unit across 20 real transaction races",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP TX-06: shipping rejects expired-only batches atomically and allocates eligible batches by FEFO",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP consumes on confirmation and releases once for cancellation, including consumed quota",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP connects real customer/cron cancellation to quota, coupon and inventory release",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP does not reserve on preview and rolls back every write if inventory cannot be held",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP keeps private coupons private and records only coupon money, separately from points",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP allows only one checkout to consume the last coupon use",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP serializes concurrent spending of the same point balance without losing excess points",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP rolls back allocations, inventory, events and order when the final command receipt fails",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP prices EXCHANGE with the shared engine, preserves historical cash credit and reserves new quota",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP requires purchase proof, unique review, and approved-only aggregates under repeated moderation",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP enforces CMS publication, safe HTML, scheduled boundaries and atomic view increments",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP orders and filters effective catalog prices before pagination, with DB fallback and hidden ES results removed",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP freezes broadcast audience and retries without duplicate notifications/devices",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP retains indexing jobs across ES failure and fences a stale version after a concurrent DB update",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 5 — isolated PostgreSQL and HTTP records EXPLAIN evidence and includes the real new routes in OpenAPI",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP requires auth and validates DTO, including forbidden client refund amount",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP creates RMA with a receipt; retry returns same resource and foreign owner sees 404",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP serializes two requests for the last returnable unit",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP uses COMPLETED history rather than recently updated order time",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP does not create customer profiles for staff or a user without CRM profile",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP redeem is atomic under concurrent requests and retries do not issue another voucher",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP wishlist toggle is idempotent and owner scoped",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP exchange acceptance reserves stock and creates exactly one replacement order",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP rejects stale quotes without reserving stock",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP tracking supports no shipments and never reveals another customer order",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP reassigns devices without delivering the previous owner notification",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP rolls back a failed command together with its receipt",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP handles cheaper/more expensive exchange and compensates cancellation without fake payments",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP serializes checkout points, coupon limits and the last stock unit on real PostgreSQL",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP only emits refund success from a completed original payment and deduplicates provider retry",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP does not lose points across two fractional partial returns and records a debt if earned points were spent",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP traces replacement returns to real source payments without minting credit",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP preserves handwritten inventory invariants after the new migration",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 4 — PostgreSQL and HTTP wires the complete application and documents the real routes without contacting providers",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts creates exactly one customer/identity under simultaneous first Google sign-in",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts uses the normal auth contract and immediately rejects a revoked session",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts blocks disabled linked users and never changes internal email from provider claims",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts requires current-account login and fresh email proof before linking even a verified Google email",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts onboards missing/untrusted provider email only after one-time email verification",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts expires onboarding challenges and does not activate accounts when email delivery fails",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts rotates a password refresh token only once under concurrent requests",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts registers exactly one CRM profile and never inherits an unverified POS phone",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts serves raw XML/text with stable ETag, published data only, encoded slugs and fixed host",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts invalidates CMS/category metadata across instances, rejects stale fills, and rolls revision back with writer",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts rejects role injection and exposes the shared Facebook onboarding contract over HTTP",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts enforces CORS allowlist and auth limits without trusting spoofed forwarded IP",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts exposes liveness and dependency readiness without connection details",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts accepts Next.js preflight for Bearer, guest cart and idempotent commands",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts supports Expo-style native Bearer calls with no browser Origin header",
+      "status": "passed"
+    },
+    {
+      "name": "Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts exports OpenAPI from the real application for Apidog without credentials",
+      "status": "passed"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import { configFixture } from '../../../../../test/support/config';
 import { generateKeyPairSync } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { OAuthProviderService } from './oauth-provider.service';
@@ -9,7 +9,7 @@ describe('OAuth provider verification', () => {
     global.fetch = originalFetch;
   });
   const config = () =>
-    new ConfigService({
+    configFixture({
       GOOGLE_OAUTH_CLIENT_IDS: 'web-client,mobile-client',
       FACEBOOK_APP_ID: '123',
       FACEBOOK_APP_SECRET: 'test-app-secret',
@@ -148,7 +148,7 @@ describe('OAuth provider verification', () => {
     );
   });
   it('fails closed without provider configuration', async () => {
-    const service = new OAuthProviderService(new ConfigService());
+    const service = new OAuthProviderService(configFixture({}));
     await expect(service.google('token')).rejects.toThrow('GOOGLE_OAUTH_NOT_CONFIGURED');
     await expect(service.facebook('token')).rejects.toThrow('FACEBOOK_OAUTH_NOT_CONFIGURED');
   });

@@ -168,7 +168,7 @@ export class CommerceCheckoutService {
       throw new BadRequestException("INVALID_PAYMENT_METHOD");
     if (method === "SEPAY") assertGatewayReady(method);
     const requestHash = checkoutRequestHash(input);
-    return this.db.$transaction(
+    return this.db.transaction(
       async (tx) => {
         const identity = `guest-checkout:${sessionHash}:${key}`;
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${identity},0))::text`;
@@ -206,7 +206,7 @@ export class CommerceCheckoutService {
           requestHash,
         });
       },
-      { timeout: 20000 },
+      { maxWait: 5000, timeout: 20000 },
     );
   }
 

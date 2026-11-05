@@ -42,6 +42,7 @@ describe('Gateway readiness', () => {
     expect(gatewayAvailable('SEPAY')).toBe(true);
   });
   it('allows COD and configured MoMo but rejects missing keys or an unconfirmed quota', () => {
+    process.env.PAYMENT_WORKER_ENABLED = 'true';
     expect(() => assertGatewayReady('COD')).not.toThrow();
     process.env.MOMO_ENABLED = 'true';
     process.env.MOMO_PARTNER_CODE = 'merchant';
@@ -58,11 +59,15 @@ describe('Gateway readiness', () => {
     expect(() => assertGatewayReady('MOMO')).toThrow();
   });
   it('rejects checkout before reservation when public return URLs are not configured', () => {
+    process.env.PAYMENT_WORKER_ENABLED = 'true';
     process.env.MOMO_ENABLED = 'true';
     process.env.MOMO_PARTNER_CODE = 'merchant';
     process.env.MOMO_ACCESS_KEY = 'access';
     process.env.MOMO_SECRET_KEY = 'secret';
     process.env.MOMO_MAX_QPS = '50';
+    process.env.PAYMENT_PUBLIC_BASE_URL = 'https://api.test/api/v1';
+    process.env.PAYMENT_WEB_RETURN_URL = 'https://shop.test/payment/return';
+    expect(() => assertGatewayReady('MOMO')).not.toThrow();
     delete process.env.PAYMENT_PUBLIC_BASE_URL;
     expect(() => assertGatewayReady('MOMO')).toThrow();
   });

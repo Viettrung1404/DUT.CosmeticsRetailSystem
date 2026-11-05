@@ -58,6 +58,9 @@ integration('Notifications and durable email outbox', () => {
         recipient: user.email,
         subject: 'Test',
         text: 'Test',
+        // This case exercises retry of an already-due message, independent of
+        // clock skew between the Prisma process and the Docker database.
+        nextAttemptAt: new Date(0),
       },
     });
     const mailer = {
