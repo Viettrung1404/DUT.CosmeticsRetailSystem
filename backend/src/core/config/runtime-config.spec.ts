@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+import { configFixture } from '../../../test/support/config';
 import {
   corsOptions,
   redisCommandTimeout,
@@ -52,7 +52,7 @@ describe('Runtime deployment configuration', () => {
       expect(() => webOrigin(url)).toThrow();
     expect(
       corsOptions(
-        new ConfigService({
+        configFixture({
           CORS_ALLOWED_ORIGINS:
             'https://web.example.test, https://admin.example.test',
         }),

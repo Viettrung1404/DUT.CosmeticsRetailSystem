@@ -38,13 +38,18 @@ integration(
         create: { id: 6, name: 'Customer', displayName: 'Customer' },
         update: {},
       });
+      await db.setting.upsert({
+        where: { key: 'loyalty_config' },
+        create: { key: 'loyalty_config', value: { point_value_vnd: 1 } },
+        update: { value: { point_value_vnd: 1 } },
+      });
     });
     beforeEach(async () => {
       const user = await db.user.create({
         data: { email: `${randomUUID()}@test.example`, fullName: 'Test' },
       });
       customer = await db.customer.create({
-        data: { userId: user.id, totalPoints: 10 },
+        data: { userId: user.id, totalPoints: 50000 },
       });
       store = await db.store.create({
         data: {
@@ -64,7 +69,7 @@ integration(
           name: 'Test',
           slug: randomUUID(),
           sku: randomUUID(),
-          basePrice: 20000,
+          basePrice: 100000,
         },
       });
       variants = [];
@@ -74,7 +79,7 @@ integration(
             productId: product.id,
             sku: randomUUID(),
             option1Value: String(i),
-            price: 20000,
+            price: 100000,
             costPrice: 10000,
           },
         });
@@ -105,7 +110,7 @@ integration(
             create: variants.map((v) => ({
               productVariantId: v.id,
               quantity: 1,
-              unitPrice: 20000,
+              unitPrice: 100000,
             })),
           },
         },
@@ -119,11 +124,14 @@ integration(
       customerId: customer.id,
       storeId: store.id,
       orderType: 'ONLINE',
-      subtotal: 40000,
-      discountAmount: points * 1000 + (withCoupon ? 1000 : 0),
-      shippingFee: 0,
+      subtotal: 200000,
+      discountAmount: withCoupon ? 1000 : 0,
+      couponDiscount: withCoupon ? 1000 : 0,
+      pointsDiscount: points,
+      pointsValueVnd: 1,
+      shippingFee: 30000,
       taxAmount: 0,
-      totalAmount: 40000 - points * 1000 - (withCoupon ? 1000 : 0),
+      totalAmount: 230000 - points - (withCoupon ? 1000 : 0),
       shippingAddress: {
         recipientName: 'Test',
         phone: '0901234567',
@@ -139,16 +147,16 @@ integration(
         productName: 'Test',
         variantName: v.sku,
         quantity: 1,
-        unitPrice: 20000,
+        unitPrice: 100000,
         unitCost: 10000,
         discountAmount: 0,
-        totalPrice: 20000,
+        totalPrice: 100000,
       })),
     });
     it('rolls back stock, points, coupon, cart, notifications and outbox together', async () => {
       await expect(
         db.transaction(async () => {
-          await repo.createOrderWithTransaction(input(10, true));
+          await repo.createOrderWithTransaction(input(50000, true));
           throw new Error('Injected after checkout');
         }),
       ).rejects.toThrow('Injected after checkout');
@@ -159,7 +167,7 @@ integration(
       expect(
         (await db.customer.findUniqueOrThrow({ where: { id: customer.id } }))
           .totalPoints,
-      ).toBe(10);
+      ).toBe(50000);
       expect(
         (await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } }))
           .usedCount,
@@ -178,8 +186,8 @@ integration(
     });
     it('prevents two concurrent checkouts from spending the same points', async () => {
       const results = await Promise.allSettled([
-        repo.createOrderWithTransaction(input(10)),
-        repo.createOrderWithTransaction(input(10, false, true)),
+        repo.createOrderWithTransaction(input(50000)),
+        repo.createOrderWithTransaction(input(50000, false, true)),
       ]);
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
       expect(
@@ -199,7 +207,7 @@ integration(
       ).toBe(1);
     });
     it('releases multiple reservations and returns points/coupon once under cancellation race', async () => {
-      const order = await repo.createOrderWithTransaction(input(10, true));
+      const order = await repo.createOrderWithTransaction(input(50000, true));
       const cancel = () =>
         db.transaction(async (tx) => {
           await tx.$queryRaw`SELECT id FROM orders WHERE id=${order.id}::uuid FOR UPDATE`;
@@ -216,7 +224,7 @@ integration(
       expect(
         (await db.customer.findUniqueOrThrow({ where: { id: customer.id } }))
           .totalPoints,
-      ).toBe(10);
+      ).toBe(50000);
       expect(
         (await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } }))
           .usedCount,

@@ -1,0 +1,72 @@
+{
+  "scope": "UI fixture regression: save a delivery point and close editor before Leaflet zoom fallback completes",
+  "cause": "Leaflet zoom transition timeout ran after map.remove destroyed its pane",
+  "red": {
+    "startTime": "2026-11-05T04:33:17.387Z",
+    "duration": 20154.259000000002,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  },
+  "green": {
+    "startTime": "2026-11-05T04:34:03.502Z",
+    "duration": 26543.346,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "execution": {
+    "completedAt": "2026-11-05T04:34:30.085Z",
+    "node": "v22.14.0",
+    "args": [
+      "node_modules/@playwright/test/cli.js",
+      "test",
+      "--reporter=json",
+      "--max-failures=3",
+      "--grep",
+      "signed-in customer selects"
+    ],
+    "environment": "Isolated development frontend; HTTP contract fixture at 3100 and dedicated Redis at 56379; not real backend/provider acceptance",
+    "exitCode": 0
+  },
+  "fix": "Disable Leaflet zoomAnimation for this transient location picker; preserve coordinates and map selection",
+  "sourceSha256": "65ce21cf2153984199c9afb7de2cdaa725006cd49146e2aca82f94ac452773f3",
+  "limit": "Contract fixture browser test; not live map-provider acceptance",
+  "currentSourceFullSuiteVerification": {
+    "evidence": "ui-fixtures.json",
+    "stats": {
+      "startTime": "2026-11-05T04:41:01.017Z",
+      "duration": 209749.213,
+      "expected": 53,
+      "skipped": 1,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "cases": [
+      {
+        "name": "signed-in customer selects saved addresses and adds a two-level address with map coordinates",
+        "project": "chromium",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "durationMs": 3815
+          }
+        ]
+      },
+      {
+        "name": "signed-in customer selects saved addresses and adds a two-level address with map coordinates",
+        "project": "mobile",
+        "status": "expected",
+        "results": [
+          {
+            "status": "passed",
+            "durationMs": 2921
+          }
+        ]
+      }
+    ]
+  }
+}

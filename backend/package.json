@@ -46,6 +46,14 @@
     "demo:verify": "node --env-file=.env scripts/demo/verify.cjs",
     "demo:test": "node --test scripts/demo/fixtures.test.cjs scripts/demo/enrichment.test.cjs",
     "test": "jest",
+    "test:readiness:env": "node --test test/readiness-env.test.cjs",
+    "test:readiness:tools": "node --test test/readiness-env.test.cjs test/export-collection.test.cjs",
+    "test:readiness:unit": "node test/run-readiness.cjs unit",
+    "test:readiness:integration": "node test/run-readiness.cjs integration",
+    "test:readiness:e2e": "node test/run-readiness.cjs e2e",
+    "test:readiness:benchmark": "node test/run-readiness.cjs benchmark",
+    "test:readiness:restore": "node test/run-readiness-restore.cjs",
+    "test:readiness:api": "node test/run-readiness-api.cjs",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -109,6 +117,13 @@
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+  "overrides": {
+    "body-parser@^1": "1.20.9",
+    "multer@^2": "2.5.0",
+    "lodash@^4": "4.18.1",
+    "js-yaml@^4": "4.3.2",
+    "glob@^10": "10.5.0"
   },
   "jest": {
     "moduleFileExtensions": [

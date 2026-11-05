@@ -7,10 +7,10 @@ test("skincare navbar follows the current HTML pills and keeps search usable", a
   await page.goto("/categories/cham-soc-da");
   await expect(page.locator("header .mobile-only").first()).toBeEnabled();
   const navigation = page.getByRole("navigation", { name: "Điều hướng chính", exact: true });
-  const skincare = navigation.getByRole("link", { name: "Chăm Sóc Da Mặt", exact: true });
+  const skincare = navigation.getByRole("link", { name: "Chăm sóc da", exact: true });
   await expect(skincare).toHaveAttribute("aria-current", "page");
   await expect(skincare).toHaveCSS("background-color", "rgb(217, 249, 157)");
-  await expect(navigation.getByRole("link", { name: "Khuyến mãi hot", exact: true })).toHaveCSS("background-color", "rgb(254, 215, 170)");
+  await expect(navigation.getByRole("link", { name: "Khuyến mãi", exact: true })).toHaveCSS("background-color", "rgb(254, 215, 170)");
   await expect(page.locator(".announcement")).toContainText("Đơn từ 129k→ Freeship 15k");
   if (isMobile) {
     await page.getByRole("button", { name: "Xem tiếp danh mục" }).click();
@@ -24,8 +24,8 @@ test("skincare navbar follows the current HTML pills and keeps search usable", a
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.locator("header").screenshot({ path: testInfo.outputPath("navbar-code-html.png"), style: "nextjs-portal { display: none; }" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.getByRole("search").first().getByRole("searchbox").fill("serum");
-  await page.getByRole("search").first().getByRole("searchbox").press("Enter");
+  await page.getByRole("search").first().getByRole("combobox", { name: "Tìm kiếm sản phẩm" }).fill("serum");
+  await page.getByRole("search").first().getByRole("combobox", { name: "Tìm kiếm sản phẩm" }).press("Enter");
   await expect(page).toHaveURL(/\/search\?q=serum$/);
 });
 
@@ -134,7 +134,9 @@ test("opaque login cookie, address CRUD, logout and user switch isolate private 
   const dialog = page.getByRole("region", { name: /Thêm địa chỉ mới|Chỉnh sửa địa chỉ/ });
   await expect(dialog.getByLabel("Tên người nhận")).toBeFocused();
   await dialog.getByLabel("Tên người nhận").fill("Lan FE01"); await dialog.getByLabel("Số điện thoại").fill("0901234567");
-  await dialog.getByLabel("Địa chỉ cụ thể").fill("1 Đường A"); await dialog.getByLabel("Tỉnh / Thành phố").fill("Đà Nẵng"); await dialog.getByLabel("Quận / Huyện").fill("Hải Châu"); await dialog.getByLabel("Phường / Xã").fill("Hòa Cường");
+  await dialog.getByLabel("Tỉnh / thành phố").selectOption("79");
+  await dialog.getByLabel("Phường / xã / đặc khu").selectOption({ label: "Phường Sài Gòn" });
+  await dialog.getByLabel("Số nhà, tên đường").fill("1 Đường A");
   await dialog.getByRole("button", { name: "Lưu địa chỉ" }).click(); await expect(dialog).not.toBeVisible();
   const address = page.locator("article").filter({ hasText: "Lan FE01" }).last(); await expect(address).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -146,7 +148,7 @@ test("opaque login cookie, address CRUD, logout and user switch isolate private 
   await page.getByRole("button", { name: "Đăng xuất →" }).click(); await expect(page).toHaveURL(/\/login$/);
   expect((await context.cookies()).find((item) => item.name === "glowup-session")).toBeUndefined();
   await page.getByLabel("Địa chỉ email").fill(`b+${testInfo.project.name}@example.com`); await page.getByLabel(/^Mật khẩu/).fill("GlowUp2026"); await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
-  await expect(page).toHaveURL(/\/account$/); await expect(page.getByRole("heading", { name: "Xin chào, Bảo" })).toBeVisible();
+  await expect(page).toHaveURL(/\/account$/); await expect(page.getByRole("heading", { name: "Rất vui được gặp lại bạn, Bảo!" })).toBeVisible();
   await page.goto("/account/addresses"); await expect(page.getByText("Lan đã sửa", { exact: true })).toHaveCount(0);
 });
 test("mobile menu closes with Escape and restores its trigger", async ({ page, isMobile }) => {

@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { getCategories } from "@/features/catalog/server";
 import { ProductListing, type ListingParams } from "@/features/catalog/listing";
-export async function generateMetadata({
-  searchParams,
-}: {
-  searchParams: Promise<ListingParams>;
-}) {
+export async function generateMetadata({ searchParams }: { searchParams: Promise<ListingParams> }) {
   const query = (await searchParams).q?.trim().slice(0, 200);
   return {
     title: query ? `Tìm kiếm: ${query}` : "Tìm kiếm sản phẩm",

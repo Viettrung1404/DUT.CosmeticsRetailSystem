@@ -111,7 +111,9 @@ async function checkout(page: Page, signedIn = true) {
       },
     });
   });
-  await page.route("https://tile.openstreetmap.org/**", (route) =>
+  await page.route((url) =>
+    (url.hostname.endsWith("google.com") && url.pathname.startsWith("/vt/")) ||
+    url.hostname.endsWith("tile.openstreetmap.org"), (route) =>
     route.fulfill({
       contentType: "image/png",
       body: Buffer.from(
@@ -148,6 +150,8 @@ test("guest uses province/ward dropdowns and can pin a delivery point without a 
 test("signed-in customer selects saved addresses and adds a two-level address with map coordinates", async ({
   page,
 }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.stack ?? error.message));
   const state = await checkout(page);
   await expect(page.locator(".checkout-address-card input[type=radio]")).toBeChecked();
   await expect(page.locator("#delivery-name")).toHaveCount(0);
@@ -173,6 +177,9 @@ test("signed-in customer selects saved addresses and adds a two-level address wi
     longitude: expect.any(Number),
   });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  // Leaflet's zoom fallback runs on a 250 ms timer, after the editor unmounts.
+  await page.waitForTimeout(350);
+  expect(errors).toEqual([]);
 });
 
 test("voucher entry is explicit, invalid codes preserve the quote, wallet and coins update the server quote", async ({

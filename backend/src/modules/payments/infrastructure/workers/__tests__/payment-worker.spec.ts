@@ -5,6 +5,12 @@ import { PrismaService } from '@infrastructure/database/prisma.service';
 import { PaymentsService } from '../../../application/services/payments.service';
 import { VnpayQueryError } from '../../../domain/vnpay-query.error';
 describe('Payment worker scheduling', () => {
+  const originalWorker = process.env.PAYMENT_WORKER_ENABLED;
+  beforeEach(() => { process.env.PAYMENT_WORKER_ENABLED = 'true'; });
+  afterEach(() => {
+    if (originalWorker === undefined) delete process.env.PAYMENT_WORKER_ENABLED;
+    else process.env.PAYMENT_WORKER_ENABLED = originalWorker;
+  });
   it('logs VNPay query diagnostics and schedules recovery without confirming payment', async () => {
     const db = { $executeRaw: jest.fn().mockResolvedValue(1) };
     const service = {

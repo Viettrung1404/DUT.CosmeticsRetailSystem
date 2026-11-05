@@ -20,6 +20,13 @@ import { ContentService } from '../src/modules/customer-experience/application/c
 import { BroadcastService } from '../src/modules/customer-experience/application/broadcast.service';
 import { PrismaOrderRepository } from '../src/modules/orders/infrastructure/repositories/prisma-order.repository';
 import { ReturnsService } from '../src/modules/customer-commerce/application/returns.service';
+import { CustomerCommands } from '../src/modules/customer-commerce/infrastructure/commands';
+import { StoreResolverService } from '../src/modules/orders/application/services/store-resolver.service';
+import { PrismaStoreInventoryAdapter } from '../src/modules/orders/infrastructure/adapters/prisma-store-inventory.adapter';
+import { PublicCatalogService } from '../src/modules/products/application/services/public-catalog.service';
+import { ProductFilterDto } from '../src/modules/products/presentation/dtos/product-filter.dto';
+import { PrismaPosOrderRepository } from '../src/modules/pos/infrastructure/persistence/prisma-pos-order.repository';
+import { PrismaAdminOrderRepository } from '../src/modules/orders/infrastructure/repositories/prisma-admin-order.repository';
 
 describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
   let app: INestApplication,
@@ -104,7 +111,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
         email: `${randomUUID()}@test.local`,
         fullName: 'Customer A',
         roleId: 6,
-        customer: { create: { fullName: 'Public reviewer', totalPoints: 100 } },
+        customer: { create: { fullName: 'Public reviewer', totalPoints: 100000 } },
       },
       include: { customer: true },
     });
@@ -113,7 +120,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
         email: `${randomUUID()}@test.local`,
         fullName: 'Customer B',
         roleId: 6,
-        customer: { create: { totalPoints: 100 } },
+        customer: { create: { totalPoints: 100000 } },
       },
       include: { customer: true },
     });
@@ -149,7 +156,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       where: { key: 'loyalty_config' },
       create: {
         key: 'loyalty_config',
-        value: { point_value_vnd: 1000, point_rate: 10000 },
+        value: { point_value_vnd: 1, point_rate: 100 },
       },
       update: {},
     });
@@ -302,6 +309,17 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
           { price: string }[]
         >`SELECT sprint5_variant_price(${variant.id}::uuid,10::numeric)::text AS price`;
         expect(Number(rows[0].price)).toBe(quote.items[0].effectivePrice);
+        const catalog = new PublicCatalogService(db);
+        const expected = quote.items[0].effectivePrice;
+        const matching = await catalog.list(Object.assign(new ProductFilterDto(), {
+          page: 1, limit: 20, sortBy: 'price_asc', minPrice: expected, maxPrice: expected,
+        }), userId, product.name);
+        expect(matching.total).toBe(1);
+        expect(matching.items[0]).toMatchObject({ id: product.id, effectivePrice: expected });
+        const excluded = await catalog.list(Object.assign(new ProductFilterDto(), {
+          page: 1, limit: 20, maxPrice: expected - 0.01,
+        }), userId, product.name);
+        expect(excluded.items).toHaveLength(0);
       }
     } finally {
       await db.customer.update({
@@ -397,6 +415,170 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     await expect(checkout.create({ ...input, note: 'changed' })).rejects.toThrow(
       'IDEMPOTENCY_PAYLOAD_MISMATCH',
     );
+  });
+  it.each(['customer', 'guest'] as const)('checkout does not require a second connection inside its %s transaction', async (kind) => {
+    const url = new URL(process.env.SPRINT5_TEST_DATABASE_URL!);
+    url.searchParams.set('connection_limit', '1');
+    url.searchParams.set('pool_timeout', '1');
+    const previous = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = url.toString();
+    const single = new PrismaService();
+    process.env.DATABASE_URL = previous;
+    await single.$connect();
+    const service = new CommerceCheckoutService(
+      single,
+      new CommercePricingService(single),
+      new CustomerCommands(single),
+      new StoreResolverService(new PrismaStoreInventoryAdapter(single)),
+    );
+    try {
+      const { variant } = await fixture();
+      const items = [{ variantId: variant.id, quantity: 1 }];
+      const session = randomUUID();
+      const quote = kind === 'customer'
+        ? await service.preview({ customerId, items, storeId })
+        : await service.previewGuest({ items }, session);
+      const input = { items, shippingAddress, quoteVersion: quote.quoteVersion, idempotencyKey: randomUUID() };
+      const order = kind === 'customer'
+        ? await service.create({ ...input, customerId, storeId })
+        : await service.createGuest(input, session);
+      expect(await single.orderItem.count({ where: { orderId: order.id } })).toBe(1);
+      expect(await single.inventory.findUniqueOrThrow({
+        where: { storeId_productVariantId: { storeId, productVariantId: variant.id } },
+      })).toMatchObject({ reservedQuantity: 1 });
+    } finally {
+      await single.$disconnect();
+    }
+  });
+  it('TX-01: allocates exactly 10 units to 50 independent customers across 20 contention rounds', async () => {
+    const customers: string[] = [];
+    for (let index = 0; index < 50; index++) {
+      const user = await db.user.create({
+        data: {
+          email: `readiness-${randomUUID()}@test.local`,
+          fullName: 'Readiness buyer',
+          roleId: 6,
+          customer: { create: { totalPoints: 0 } },
+        },
+        include: { customer: true },
+      });
+      customers.push(user.customer!.id);
+    }
+    for (let round = 0; round < 20; round++) {
+      const { variant } = await fixture();
+      await db.inventory.update({
+        where: { storeId_productVariantId: { storeId, productVariantId: variant.id } },
+        data: { quantity: 10 },
+      });
+      const inputs = await Promise.all(customers.map(async (buyer) => {
+        const items = [{ variantId: variant.id, quantity: 1 }];
+        const quote = await checkout.preview({ customerId: buyer, items, storeId });
+        return { customerId: buyer, items, storeId, shippingAddress,
+          quoteVersion: quote.quoteVersion, idempotencyKey: randomUUID() };
+      }));
+      const outcomes = await Promise.allSettled(inputs.map((input) => checkout.create(input)));
+      const accepted = outcomes.filter((outcome) => outcome.status === 'fulfilled');
+      const rejected = outcomes.filter((outcome) => outcome.status === 'rejected');
+      expect({ round, accepted: accepted.length, rejected: rejected.length }).toEqual({ round, accepted: 10, rejected: 40 });
+      expect(rejected.filter((outcome) => outcome.status === 'rejected' && typeof outcome.reason.getStatus !== 'function')
+        .map((outcome) => outcome.status === 'rejected' ? String(outcome.reason) : '')).toEqual([]);
+      for (const outcome of rejected) {
+        if (outcome.status === 'rejected') {
+          expect(outcome.reason.getStatus()).toBeGreaterThanOrEqual(400);
+          expect(outcome.reason.getStatus()).toBeLessThan(500);
+        }
+      }
+      expect(await db.inventory.findUniqueOrThrow({
+        where: { storeId_productVariantId: { storeId, productVariantId: variant.id } },
+      })).toMatchObject({ quantity: 10, reservedQuantity: 10, availableQuantity: 0 });
+      const lines = await db.orderItem.findMany({ where: { productVariantId: variant.id } });
+      expect(lines).toHaveLength(10);
+      expect(lines.reduce((total, line) => total + line.quantity, 0)).toBe(10);
+    }
+  }, 180000);
+  it('TX-02: 20 simultaneous retries and a later replay reserve stock and create an order only once', async () => {
+    const { variant } = await fixture();
+    const items = [{ variantId: variant.id, quantity: 1 }];
+    const quote = await checkout.preview({ customerId, items, storeId });
+    const input = { customerId, items, storeId, shippingAddress,
+      quoteVersion: quote.quoteVersion, idempotencyKey: randomUUID() };
+    const responses = await Promise.all(Array.from({ length: 20 }, () => checkout.create(input)));
+    const replay = await checkout.create(input);
+    expect(new Set([...responses, replay].map((order) => order.id)).size).toBe(1);
+    expect(await db.orderItem.count({ where: { productVariantId: variant.id } })).toBe(1);
+    expect(await db.inventory.findUniqueOrThrow({
+      where: { storeId_productVariantId: { storeId, productVariantId: variant.id } },
+    })).toMatchObject({ quantity: 100, reservedQuantity: 1, availableQuantity: 99 });
+  });
+  it('TX-05: POS and web cannot both sell the final unit across 20 real transaction races', async () => {
+    const session = await db.posSession.create({ data: { sessionCode: `RD-${randomUUID()}`, storeId, cashierId: otherUser } });
+    const pos = new PrismaPosOrderRepository(db);
+    let posWins = 0;
+    for (let round = 0; round < 20; round++) {
+      const { product, variant } = await fixture();
+      await db.inventory.update({ where: { storeId_productVariantId: { storeId, productVariantId: variant.id } }, data: { quantity: 1 } });
+      const items = [{ variantId: variant.id, quantity: 1 }];
+      const quote = await checkout.preview({ customerId, items, storeId });
+      const web = () => checkout.create({ customerId, items, storeId, shippingAddress, quoteVersion: quote.quoteVersion, idempotencyKey: randomUUID() });
+      const sale = () => pos.createSale({
+        orderNumberDate: new Date(), storeId, sessionId: session.id, cashierUserId: otherUser,
+        customerId: null, couponId: null, note: 'Readiness POS/web race', employee: null, pointRate: null, promotionIds: [],
+        pricing: { lines: [{ variantId: variant.id, productId: product.id, productName: product.name, variantName: null, sku: variant.sku,
+          quantity: 1, unitPrice: 100000, unitCost: 1000, gross: 100000, promotionId: null, promotionName: null,
+          promotionDiscount: 0, couponDiscount: 0, discountAmount: 0, pointsDiscount: 0, lineTotal: 100000 }],
+          subtotal: 100000, promotionDiscount: 0, couponDiscount: 0, pointsDiscount: 0, pointsUsed: 0, total: 100000 },
+        settlement: { payments: [{ method: 'CASH', amount: 100000, tenderedAmount: 100000 }], totalReceived: 100000, change: 0 },
+      });
+      const work = round % 2 ? [sale, web] : [web, sale];
+      const results = await Promise.allSettled(work.map((operation) => operation()));
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.find((result) => result.status === 'rejected');
+      expect(rejected?.status === 'rejected' && typeof rejected.reason.getStatus === 'function').toBe(true);
+      const inventory = await db.inventory.findUniqueOrThrow({ where: { storeId_productVariantId: { storeId, productVariantId: variant.id } } });
+      expect(inventory.quantity - inventory.reservedQuantity).toBe(0);
+      expect([0, 1]).toContain(inventory.quantity);
+      expect([0, 1]).toContain(inventory.reservedQuantity);
+      expect(await db.orderItem.count({ where: { productVariantId: variant.id } })).toBe(1);
+      if (inventory.quantity === 0) posWins++;
+    }
+    expect(Number((await db.posSession.findUniqueOrThrow({ where: { id: session.id } })).systemCash)).toBe(posWins * 100000);
+  }, 60000);
+  it('TX-06: shipping rejects expired-only batches atomically and allocates eligible batches by FEFO', async () => {
+    const { variant } = await fixture();
+    const inventoryKey = { storeId_productVariantId: { storeId, productVariantId: variant.id } };
+    await db.inventory.update({ where: inventoryKey, data: { quantity: 7 } });
+    const expired = await db.batch.create({ data: { storeId, productVariantId: variant.id, batchNumber: randomUUID(), quantity: 7, expiryDate: new Date('2000-01-01') } });
+    const admin = new PrismaAdminOrderRepository(db);
+    const blocked = await purchase(variant.id);
+    await admin.confirm({ orderId: blocked.id, changedBy: userId });
+    await admin.updateStatus({ orderId: blocked.id, target: 'PROCESSING', changedBy: userId });
+    await expect(admin.updateStatus({ orderId: blocked.id, target: 'SHIPPING', changedBy: userId })).rejects.toThrow('3 tháng');
+    expect(await db.order.findUniqueOrThrow({ where: { id: blocked.id } })).toMatchObject({ status: 'PROCESSING' });
+    expect(await db.inventory.findUniqueOrThrow({ where: inventoryKey })).toMatchObject({ quantity: 7, reservedQuantity: 1 });
+    expect(await db.inventoryTransaction.count({ where: { referenceId: blocked.id } })).toBe(0);
+    await admin.cancelByAdmin({ orderId: blocked.id, changedBy: userId, reason: 'Readiness expired-stock cleanup' });
+    const batch = (quantity: number, days: number) => db.batch.create({ data: {
+      storeId, productVariantId: variant.id, batchNumber: randomUUID(), quantity, expiryDate: new Date(Date.now() + days * 86400000),
+    } });
+    const near = await batch(5, 30), first = await batch(1, 150), later = await batch(2, 250);
+    await db.inventory.update({ where: inventoryKey, data: { quantity: 15 } });
+    const order = await purchase(variant.id, customerId, { items: [{ variantId: variant.id, quantity: 2 }] });
+    await admin.confirm({ orderId: order.id, changedBy: userId });
+    await admin.updateStatus({ orderId: order.id, target: 'PROCESSING', changedBy: userId });
+    const shipped = await admin.updateStatus({ orderId: order.id, target: 'SHIPPING', changedBy: userId });
+    expect(shipped.stockDeducted).toBe(true);
+    expect(await db.inventory.findUniqueOrThrow({ where: inventoryKey })).toMatchObject({ quantity: 13, reservedQuantity: 0 });
+    const remaining = await db.batch.findMany({ where: { productVariantId: variant.id } });
+    expect(remaining).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: expired.id, quantity: 7 }), expect.objectContaining({ id: near.id, quantity: 5 }),
+      expect.objectContaining({ id: first.id, quantity: 0 }), expect.objectContaining({ id: later.id, quantity: 1 }),
+    ]));
+    const lines = await db.orderItem.findMany({ where: { orderId: order.id }, select: { id: true } });
+    const allocations = await db.orderItemBatch.findMany({ where: { orderItemId: { in: lines.map((line) => line.id) } } });
+    expect(allocations).toHaveLength(2);
+    expect(allocations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ batchId: first.id, quantity: 1 }), expect.objectContaining({ batchId: later.id, quantity: 1 }),
+    ]));
   });
   it('consumes on confirmation and releases once for cancellation, including consumed quota', async () => {
     const { product, variant } = await fixture();
@@ -519,17 +701,17 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       .send({
         code: coupon.code,
         items: [{ variantId: variant.id, quantity: 1 }],
-        usePoints: 5,
+        usePoints: 10000,
       })
       .expect(200);
     expect(validation.body.data).toMatchObject({
       valid: true,
       couponDiscount: 20000,
-      pointsDiscount: 5000,
+      pointsDiscount: 10000,
     });
     const order = await purchase(variant.id, customerId, {
       couponCode: coupon.code,
-      usePoints: 5,
+      usePoints: 10000,
     });
     expect(
       Number(
@@ -545,9 +727,9 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     });
     expect(item.pricingSnapshot).toMatchObject({
       couponDiscount: 20000,
-      pointsUsed: 5,
-      pointsValue: 5000,
-      cashValue: 75000,
+      pointsUsed: 10000,
+      pointsValue: 10000,
+      cashValue: 70000,
     });
   });
   it('allows only one checkout to consume the last coupon use', async () => {
@@ -598,16 +780,16 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     expect((await db.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount).toBe(1);
   });
   it('serializes concurrent spending of the same point balance without losing excess points', async () => {
-    const { variant } = await fixture(10000);
+    const { variant } = await fixture(100000);
     await db.customer.update({
       where: { id: customerId },
-      data: { totalPoints: 5 },
+      data: { totalPoints: 50000 },
     });
     const input = {
       customerId,
       items: [{ variantId: variant.id, quantity: 1 }],
       storeId,
-      usePoints: 5,
+      usePoints: 50000,
     };
     const quote = await checkout.preview(input);
     const results = await Promise.allSettled(
@@ -626,7 +808,7 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
     );
     await db.customer.update({
       where: { id: customerId },
-      data: { totalPoints: 100 },
+      data: { totalPoints: 100000 },
     });
   });
   it('rolls back allocations, inventory, events and order when the final command receipt fails', async () => {
@@ -837,6 +1019,21 @@ describe('Sprint 5 — isolated PostgreSQL and HTTP', () => {
       data: { publishedAt: new Date(Date.now() - 1000) },
     });
     await Promise.all([content.post(post.slug), content.post(post.slug)]);
+    expect((await db.blogPost.findUniqueOrThrow({ where: { id: post.id } })).viewsCount).toBe(0);
+    const identities = new Set<string>();
+    const views = new ContentService(db, undefined, {
+      configured: true,
+      rateLimit: async (key: string) => {
+        if (identities.has(key)) return false;
+        identities.add(key);
+        return true;
+      },
+    } as unknown as UpstashRedisService);
+    await Promise.all([
+      views.recordView(post.slug, 'reader-a'),
+      views.recordView(post.slug, 'reader-b'),
+      views.recordView(post.slug, 'reader-a'),
+    ]);
     expect((await db.blogPost.findUniqueOrThrow({ where: { id: post.id } })).viewsCount).toBe(2);
     await db.banner.createMany({
       data: [

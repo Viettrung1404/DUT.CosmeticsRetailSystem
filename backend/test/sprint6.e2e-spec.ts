@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'fs';
+import { join, resolve } from 'path';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/infrastructure/database/prisma.service';
@@ -576,10 +577,12 @@ describe('Sprint 6 — isolated PostgreSQL, OAuth and public HTTP contracts', ()
       Object.values(value).forEach(visit);
     };
     visit(doc);
-    mkdirSync('docs/api', { recursive: true });
-    writeFileSync('docs/api/openapi.json', JSON.stringify(doc, null, 2) + '\n');
+    mkdirSync('.tmp', { recursive: true });
+    const output = mkdtempSync(join('.tmp', 'sprint6-api-'));
+    writeFileSync(join(output, 'openapi.json'), JSON.stringify(doc, null, 2) + '\n');
     execFileSync(process.execPath, ['scripts/sprint6-export-collection.cjs'], {
       stdio: 'pipe',
+      env: { ...process.env, API_EXPORT_DIR: resolve(output) },
     });
   });
 });

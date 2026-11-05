@@ -23,7 +23,7 @@ describe('Guest checkout ownership and retries', () => {
       $queryRaw: jest.fn().mockResolvedValue([]),
       order: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    const db = { ...tx, $transaction: jest.fn((callback) => callback(tx)) };
+    const db = { ...tx, transaction: jest.fn((callback) => callback(tx)) };
     const service = new CommerceCheckoutService(
       db as never,
       {} as never,

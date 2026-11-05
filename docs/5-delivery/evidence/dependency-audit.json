@@ -1,0 +1,88 @@
+{
+  "checkedAt": "2026-11-05T04:39:22.276640+00:00",
+  "status": "open findings; SEC-07 not accepted",
+  "countsAre": "package findings in dependency graph, not independent exploits",
+  "backendBefore": {
+    "info": 0,
+    "low": 7,
+    "moderate": 31,
+    "high": 15,
+    "critical": 0,
+    "total": 53
+  },
+  "backendAfter": {
+    "info": 0,
+    "low": 11,
+    "moderate": 21,
+    "high": 5,
+    "critical": 0,
+    "total": 37
+  },
+  "backendOmitDev": {
+    "info": 0,
+    "low": 0,
+    "moderate": 14,
+    "high": 3,
+    "critical": 0,
+    "total": 17
+  },
+  "frontendAllDependencies": {
+    "info": 0,
+    "low": 0,
+    "moderate": 18,
+    "high": 0,
+    "critical": 0,
+    "total": 18
+  },
+  "compatibleUpdates": [
+    "body-parser 1.20.9",
+    "multer 2.5.0",
+    "lodash 4.18.1",
+    "js-yaml 4.3.2",
+    "glob 10.5.0 within major 10; CLI command-injection advisory patched",
+    "npm audit fix without --force; lockfile updated"
+  ],
+  "remainingBackendHigh": [
+    {
+      "package": "@prisma/config",
+      "via": [
+        "deepmerge-ts"
+      ],
+      "fixAvailable": true
+    },
+    {
+      "package": "deepmerge-ts",
+      "via": [
+        {
+          "source": 1145093,
+          "name": "deepmerge-ts",
+          "dependency": "deepmerge-ts",
+          "title": "DeepmergeTS has stack exhaustion when merging recursive object graphs",
+          "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx",
+          "severity": "high",
+          "cwe": [
+            "CWE-674"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<8.0.0"
+        }
+      ],
+      "fixAvailable": true
+    },
+    {
+      "package": "prisma",
+      "via": [
+        "@prisma/config"
+      ],
+      "fixAvailable": true
+    }
+  ],
+  "triage": "Remaining high: deepmerge-ts through Prisma config/CLI and Prisma peer dependency. glob CLI high was patched within major 10; other moderate glob/minimatch findings remain. No direct application use of the affected APIs identified, but absence of exploitability is not proven. Continue compatible remediation and test major upgrades separately.",
+  "lockfileSha256": {
+    "backend/package-lock.json": "0a8026a394f7d0739400dac385c1bb939e878ae62bc9e156d9bb919ad8cfef1e",
+    "frontend/package-lock.json": "184a16bd896db20eb0b447f8dce3a7cbb4fe0ab0b4da167659b13e2d8a321b9e"
+  }
+}

@@ -22,6 +22,16 @@ function issue(user) {
 createServer(async (request, response) => {
   const path = request.url?.replace(/^\/api\/v1/, "");
   if (path === "/health/live") return envelope(response, { status: "ok" });
+  // Public storefront contracts must stay public in this auth/UI fixture too.
+  const resource = path?.split("?")[0];
+  if (resource === "/categories/tree") return envelope(response, [
+    { id: "fixture-skincare", name: "Chăm sóc da", slug: "cham-soc-da", children: [] },
+  ]);
+  if (resource === "/products") return envelope(response, {
+    data: [], meta: { page: 1, limit: 20, itemCount: 0, pageCount: 0 },
+  });
+  if (["/brands", "/banners", "/promotions/flash-sale/cards"].includes(resource)) return envelope(response, []);
+  if (resource === "/blog/posts") return envelope(response, { items: [], total: 0 });
   const chunks = []; for await (const chunk of request) chunks.push(chunk);
   const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
   if (["/auth/oauth/google", "/auth/oauth/facebook"].includes(path)) {

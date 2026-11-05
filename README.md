@@ -118,7 +118,7 @@ Invoke-RestMethod http://localhost:3000/api/v1/payments/methods
 
 Readiness phải trả 200 và API phương thức thanh toán phải có `data.SEPAY=true`. Sau đó mở **https://localhost:3001**, tin cậy chứng chỉ phát triển và dùng cùng trình duyệt/origin trong suốt checkout.
 
-Đặt **đơn mới**, chọn **SePay**, lấy đúng số tiền và toàn bộ mã nội dung `GU...` từ trang thanh toán. Trên SePay Test mode → Mô phỏng giao dịch, chọn đúng tài khoản, **Tiền vào**, nhập số tiền và nội dung vừa lấy rồi gửi trước khi đơn hết hạn 15 phút. Webhook phải trả **200 / success:true**; sau đối soát API, payment chuyển `COMPLETED` và đơn chuyển `CONFIRMED`. Test mode dùng giao dịch mô phỏng, không chuyển tiền thật. Không dùng nội dung thử tùy ý vì backend cần mã payment của đơn.
+Đặt **đơn mới**, chọn **SePay**, lấy đúng số tiền và toàn bộ mã nội dung `GU...` từ trang thanh toán. Trên SePay Test mode → Mô phỏng giao dịch, chọn đúng tài khoản, **Tiền vào**, nhập số tiền và nội dung vừa lấy rồi gửi trước khi đơn hết hạn 15 phút. Webhook phải trả **200 / success:true**; sau đối soát API, payment chuyển `COMPLETED` và đơn chuyển từ `PENDING_PAYMENT` sang `PENDING` để chờ nhân viên xác nhận. Sau khi nhân viên xác nhận, đơn mới chuyển `CONFIRMED`. Test mode dùng giao dịch mô phỏng, không chuyển tiền thật. Không dùng nội dung thử tùy ý vì backend cần mã payment của đơn.
 
 ### Sau khi tắt máy hoặc đóng terminal
 

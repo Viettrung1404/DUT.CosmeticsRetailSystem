@@ -1,11 +1,11 @@
-import { ConfigService } from '@nestjs/config';
+import { configFixture } from '../../../../test/support/config';
 import { Logger } from '@nestjs/common';
 import { UpstashRedisService } from '../upstash-redis.service';
 describe('Upstash cache and distributed rate limiting', () => {
   const original = global.fetch;
   const service = () =>
     new UpstashRedisService(
-      new ConfigService({
+      configFixture({
         UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
         UPSTASH_REDIS_REST_TOKEN: 'test-token',
         REDIS_KEY_PREFIX: 'unit:',
@@ -67,7 +67,7 @@ describe('Upstash cache and distributed rate limiting', () => {
       .fn()
       .mockRejectedValue(new Error('network token-secret'));
     const redis = new UpstashRedisService(
-      new ConfigService({
+      configFixture({
         UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
         UPSTASH_REDIS_REST_TOKEN: 'secret',
         UPSTASH_REDIS_TIMEOUT_MS: '3500',

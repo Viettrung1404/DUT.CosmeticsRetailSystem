@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-11-05T04:46:05.508Z",
+  "backupStartedAt": "2026-11-05T04:46:01.839Z",
+  "backupDurationMs": 2146.1411,
+  "restoreAndVerifyMs": 1519.9387000000002,
+  "environment": "Dedicated local PostgreSQL 17 Docker project; restore into a new database, original orders untouched",
+  "scope": "4-order fixture: schema, monetary totals, order items, payments, inventory, idempotency receipts and inventory constraint",
+  "snapshotSha256": "5dbfbbff5d3606b094486dd931a5f7cfa1bc92694ccf11ef948a1fc3b3ea66b3",
+  "counts": {
+    "users": 2,
+    "orders": 4,
+    "items": 4,
+    "payments": 4,
+    "inventory": 1,
+    "receipts": 2
+  },
+  "beforeBackupMarkerRecovered": true,
+  "afterBackupMarkerRecovered": false,
+  "limitation": "One small local snapshot rehearsal; does not establish production RPO/PITR, RTO, object-storage recovery or bank reconciliation"
+}

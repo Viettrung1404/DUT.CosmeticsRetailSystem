@@ -32,7 +32,12 @@ export function LocationPicker({
     void import("leaflet")
       .then((L) => {
         if (!active || !host.current) return;
-        const instance = L.map(host.current, { scrollWheelZoom: false }).setView(
+        // This picker can unmount as soon as a point is saved. Leaflet's zoom
+        // transition fallback can otherwise run after remove() destroys its pane.
+        const instance = L.map(host.current, {
+          scrollWheelZoom: false,
+          zoomAnimation: false,
+        }).setView(
           [initialView.current.point.latitude, initialView.current.point.longitude],
           initialView.current.zoom,
         );
