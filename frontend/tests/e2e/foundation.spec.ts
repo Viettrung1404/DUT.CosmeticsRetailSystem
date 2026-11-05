@@ -5,7 +5,7 @@ test("Vietnamese shell renders without client errors or horizontal overflow", as
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "vi");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Chăm sóc vẻ đẹp của bạn.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sắc Đẹp Theo Cách Của Bạn");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });

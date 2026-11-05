@@ -619,19 +619,19 @@ describe('Sprint 4 — PostgreSQL and HTTP', () => {
     });
     await db.setting.upsert({
       where: { key: 'loyalty_config' },
-      create: { key: 'loyalty_config', value: { point_value_vnd: 1000 } },
-      update: { value: { point_value_vnd: 1000 } },
+      create: { key: 'loyalty_config', value: { point_value_vnd: 1 } },
+      update: { value: { point_value_vnd: 1 } },
     });
     await db.customer.update({
       where: { id: customer },
-      data: { totalPoints: 100 },
+      data: { totalPoints: 50000 },
     });
     const points = {
-      loyaltyPointsUsed: 100,
-      pointsValueVnd: 1000,
-      pointsDiscount: 100000,
-      discountAmount: 100000,
-      totalAmount: 30000,
+      loyaltyPointsUsed: 50000,
+      pointsValueVnd: 1,
+      pointsDiscount: 50000,
+      discountAmount: 50000,
+      totalAmount: 80000,
     };
     const pointResults = await Promise.allSettled([
       repository.createOrderWithTransaction(input(customer, points)),

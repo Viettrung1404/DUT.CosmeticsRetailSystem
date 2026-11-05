@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { execFileSync } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
 import { performance } from 'perf_hooks';
 import { PublicCatalogService } from '../src/modules/products/application/services/public-catalog.service';
 import { ProductFilterDto } from '../src/modules/products/presentation/dtos/product-filter.dto';
@@ -24,8 +25,12 @@ async function run() {
     log: [{ level: 'query', emit: 'event' }],
   });
   let queryCount = 0;
-  db.$on('query', () => {
+  let catalogQuery: { query: string; params: string } | undefined;
+  db.$on('query', (event) => {
     queryCount++;
+    if (/WITH RECURSIVE selected_categories/.test(event.query)) {
+      catalogQuery = { query: event.query, params: event.params };
+    }
   });
   try {
     await db.$executeRaw`INSERT INTO categories(id,name,slug) SELECT md5('s6-cat-'||n)::uuid,'Benchmark category '||n,'s6-bench-cat-'||n FROM generate_series(1,100) n ON CONFLICT DO NOTHING`;
@@ -46,6 +51,11 @@ async function run() {
         limit: 20,
         sortBy: 'price_asc',
       }),
+    );
+    if (!catalogQuery) throw new Error('The catalog SQL query was not observed');
+    const catalogExplain = await db.$queryRawUnsafe(
+      `EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) ${catalogQuery.query}`,
+      ...JSON.parse(catalogQuery.params),
     );
     queryCount = 0;
     const times: number[] = [];
@@ -109,12 +119,22 @@ async function run() {
       queriesPerRequest: measuredQueries / times.length,
       queriesForPage100,
       explain,
+      catalogExplain,
       blogExplain,
     };
-    mkdirSync('.tmp', { recursive: true });
-    writeFileSync('.tmp/sprint6-benchmark.json', JSON.stringify(evidence, null, 2) + '\n');
-    console.log(JSON.stringify({ ...evidence, explain: 'saved', blogExplain: 'saved' }));
+    const output = process.env.READINESS_BENCHMARK_OUTPUT ?? '.tmp/sprint6-benchmark.json';
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, JSON.stringify(evidence, null, 2) + '\n');
+    console.log(JSON.stringify({ ...evidence, explain: 'saved', catalogExplain: 'saved', blogExplain: 'saved' }));
     if (errors) process.exitCode = 1;
+    if (process.env.READINESS_MAX_P95_MS) {
+      const maximum = Number(process.env.READINESS_MAX_P95_MS);
+      if (!Number.isFinite(maximum) || maximum <= 0) throw new Error('Invalid p95 acceptance threshold');
+      if (evidence.p95Ms > maximum) {
+        console.error(`Catalog p95 ${evidence.p95Ms.toFixed(1)} ms exceeds the ${maximum} ms local budget`);
+        process.exitCode = 1;
+      }
+    }
   } finally {
     await db.$disconnect();
   }

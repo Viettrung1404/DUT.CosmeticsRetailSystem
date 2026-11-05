@@ -90,8 +90,8 @@ export class PublicCatalogService {
       { id: string; effective_price: Prisma.Decimal; total: bigint }[]
     >(Prisma.sql`
       WITH RECURSIVE selected_categories AS (SELECT id FROM categories WHERE id=${filter.categoryId ?? null}::uuid OR id=ANY(${filter.categoryIds ?? []}::uuid[]) UNION ALL SELECT c.id FROM categories c JOIN selected_categories parent ON c.parent_id=parent.id),
-      priced AS (
-        SELECT p.id,p.created_at,p.avg_rating,p.total_sold,MIN(sprint5_variant_price(v.id,${tier}::numeric)) AS effective_price
+      candidate_variants AS (
+        SELECT p.id,p.created_at,p.avg_rating,p.total_sold,p.category_id,v.id AS variant_id,v.price
         FROM products p JOIN categories c ON c.id=p.category_id
         LEFT JOIN brands b ON b.id=p.brand_id
         JOIN product_variants v ON v.product_id=p.id AND v.is_active=true
@@ -102,7 +102,28 @@ export class PublicCatalogService {
         AND (${filter.tag ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name ILIKE ${'%' + (filter.tag ?? '') + '%'}))
         AND (cardinality(${filter.tags ?? []}::text[])=0 OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name=ANY(${filter.tags ?? []}::text[])))
         AND (${query ?? null}::text IS NULL OR p.name ILIKE ${'%' + (query ?? '') + '%'} OR p.description ILIKE ${'%' + (query ?? '') + '%'} OR b.name ILIKE ${'%' + (query ?? '') + '%'} OR p.id=ANY(${hintIds}::uuid[]) OR EXISTS(SELECT 1 FROM product_ingredients i WHERE i.product_id=p.id AND i.ingredient_name ILIKE ${'%' + (query ?? '') + '%'}))
-        GROUP BY p.id
+      ), active_campaigns AS MATERIALIZED (
+        SELECT id,type,value,max_discount_amount,applicable_products,applicable_categories,is_flash_sale
+        FROM promotions WHERE is_active AND start_date<=now() AND end_date>now()
+          AND min_order_amount=0 AND (usage_limit IS NULL OR used_count<usage_limit)
+          AND type IN ('PERCENTAGE','FIXED_AMOUNT')
+      ), campaign_discounts AS (
+        SELECT candidate.variant_id,MAX(LEAST(candidate.price,
+          CASE WHEN campaign.type='PERCENTAGE' THEN trunc(candidate.price*campaign.value/100,2) ELSE campaign.value END,
+          COALESCE(campaign.max_discount_amount,candidate.price))) AS discount
+        FROM candidate_variants candidate JOIN active_campaigns campaign ON (
+          (COALESCE(campaign.applicable_products,'[]'::jsonb)='[]'::jsonb AND COALESCE(campaign.applicable_categories,'[]'::jsonb)='[]'::jsonb)
+          OR campaign.applicable_products ? candidate.id::text OR campaign.applicable_categories ? candidate.category_id::text)
+        LEFT JOIN promotion_variant_quotas quota ON quota.promotion_id=campaign.id AND quota.product_variant_id=candidate.variant_id
+        WHERE NOT campaign.is_flash_sale OR quota.quota-quota.reserved_quantity-quota.consumed_quantity>=1
+        GROUP BY candidate.variant_id
+      ), priced AS (
+        SELECT candidate.id,candidate.created_at,candidate.avg_rating,candidate.total_sold,
+          MIN(GREATEST(0,candidate.price-GREATEST(
+            trunc(candidate.price*LEAST(100,GREATEST(0,${tier}::numeric))/100,2),
+            COALESCE(campaign_discounts.discount,0)))) AS effective_price
+        FROM candidate_variants candidate LEFT JOIN campaign_discounts USING (variant_id)
+        GROUP BY candidate.id,candidate.created_at,candidate.avg_rating,candidate.total_sold
       ), filtered AS (SELECT * FROM priced WHERE (${filter.minPrice ?? null}::numeric IS NULL OR effective_price>=${filter.minPrice ?? null}) AND (${filter.maxPrice ?? null}::numeric IS NULL OR effective_price<=${filter.maxPrice ?? null}))
       SELECT id,effective_price,count(*) OVER() AS total FROM filtered ORDER BY ${sort},id LIMIT ${limit} OFFSET ${(page - 1) * limit}`);
     const ids = rows.map((row) => row.id);

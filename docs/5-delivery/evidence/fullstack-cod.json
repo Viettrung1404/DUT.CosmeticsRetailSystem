@@ -1,0 +1,100 @@
+{
+  "scope": "Production-built frontend over local HTTPS + Nest app + PostgreSQL + TLS Redis, COD customer/guest; external providers disabled",
+  "baseCommit": "c59ed918060c2bbe5468ae9a7b8b83f71d27e87c",
+  "worktreeChangesRequired": true,
+  "execution": {
+    "completedAt": "2026-11-05T04:45:49.192Z",
+    "node": "v22.14.0",
+    "skipBuild": false,
+    "args": [],
+    "environment": "Next production build; isolated local Nest/PostgreSQL/Redis; external providers disabled",
+    "stages": [
+      {
+        "label": "Next.js production build",
+        "exitCode": 0
+      },
+      {
+        "label": "Browser full-stack checkout",
+        "exitCode": 0
+      },
+      {
+        "label": "Post-browser database invariants",
+        "exitCode": 0
+      }
+    ],
+    "exitCode": 0
+  },
+  "stats": {
+    "startTime": "2026-11-05T04:45:07.286Z",
+    "duration": 41676.958999999995,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "name": "customer buys COD through browser, BFF, real API, PostgreSQL and Redis",
+      "project": "chromium",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 5405
+        }
+      ]
+    },
+    {
+      "name": "guest buys COD through browser, BFF, real API, PostgreSQL and Redis",
+      "project": "chromium",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2377
+        }
+      ]
+    },
+    {
+      "name": "customer buys COD through browser, BFF, real API, PostgreSQL and Redis",
+      "project": "mobile",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 2491
+        }
+      ]
+    },
+    {
+      "name": "guest buys COD through browser, BFF, real API, PostgreSQL and Redis",
+      "project": "mobile",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 1496
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Login/cart setup uses real BFF APIs; checkout/address/order result uses browser UI",
+    "Desktop Chromium and Chromium mobile emulation, not Safari/iOS hardware",
+    "Backend uses test bootstrap and in-memory rate limiter; not production provider/distributed backend Redis acceptance"
+  ],
+  "databaseVerification": {
+    "checkedAt": "2026-11-05T04:45:49.170Z",
+    "status": "passed",
+    "orders": 4,
+    "cancelledCustomerOrders": 2,
+    "pendingGuestOrders": 2,
+    "quantity": 100,
+    "reserved": 2,
+    "available": 98,
+    "totalAmountPerOrder": 130000,
+    "completedPayments": 0
+  },
+  "limitation": "Chromium desktop and mobile viewport emulation, four COD cases; no Safari/WebKit, real device, live payments, full WCAG or production capacity acceptance",
+  "sourceSha256": {
+    "frontend/src/features/addresses/location-picker.tsx": "65ce21cf2153984199c9afb7de2cdaa725006cd49146e2aca82f94ac452773f3",
+    "frontend/scripts/run-readiness.mjs": "fcd0cd951b2b68c0851c7843728769245fd9ba4c9fb105ae66dc0c823ab85b62",
+    "backend/package-lock.json": "0a8026a394f7d0739400dac385c1bb939e878ae62bc9e156d9bb919ad8cfef1e"
+  }
+}

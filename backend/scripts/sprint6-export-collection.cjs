@@ -1,5 +1,7 @@
 const fs = require('node:fs');
-const spec = JSON.parse(fs.readFileSync('docs/api/openapi.json', 'utf8'));
+const path = require('node:path');
+const output = process.env.API_EXPORT_DIR || 'docs/api';
+const spec = JSON.parse(fs.readFileSync(path.join(output, 'openapi.json'), 'utf8'));
 function item(name, method, path, body, {publicRoute = false, idempotent = false, tests = []} = {}) {
   const specPath = '/api/v1' + path.replace(/\{\{(\w+)\}\}/g, (_, key) => '{' + ({orderId:'id',returnId:'id',productSlug:'slug'}[key] ?? key) + '}');
   if (!spec.paths[specPath]?.[method.toLowerCase()]) throw new Error(`Request is missing from OpenAPI: ${method} ${specPath}`);
@@ -40,9 +42,9 @@ const collection = {info:{name:'GlowUp end-user — Sprint 6',schema:'https://sc
   ]},
   {name:'05 SEO/readiness',item:[item('Sitemap index','GET','/sitemap.xml',undefined,{publicRoute:true}),item('Robots','GET','/robots.txt',undefined,{publicRoute:true}),item('Readiness','GET','/health/ready',undefined,{publicRoute:true})]},
 ]};
-fs.writeFileSync('docs/api/end-user.postman_collection.json',JSON.stringify(collection,null,2)+'\n');
+fs.writeFileSync(path.join(output, 'end-user.postman_collection.json'),JSON.stringify(collection,null,2)+'\n');
 for(const name of ['local','staging']) {
   const values={baseUrl:name==='local'?'http://localhost:3000/api/v1':'https://api.example.test/api/v1',email:'',password:'',accessToken:'',refreshToken:'',googleIdToken:'',facebookAccessToken:'',clientNonce:'',oauthChallenge:'',emailVerificationToken:'',variantId:'',replacementVariantId:'',productSlug:'',quoteVersion:'',orderId:'',orderItemId:'',returnId:'',idempotencyKey:''};
-  fs.writeFileSync(`docs/api/${name}.postman_environment.json`,JSON.stringify({name:`GlowUp ${name} placeholders`,values:Object.entries(values).map(([key,value])=>({key,value,enabled:true,type:'default'})),_postman_variable_scope:'environment'},null,2)+'\n');
+  fs.writeFileSync(path.join(output, `${name}.postman_environment.json`),JSON.stringify({name:`GlowUp ${name} placeholders`,values:Object.entries(values).map(([key,value])=>({key,value,enabled:true,type:'default'})),_postman_variable_scope:'environment'},null,2)+'\n');
 }
 console.log('Apidog-compatible collection and placeholder environments exported; every request checked against OpenAPI.');
