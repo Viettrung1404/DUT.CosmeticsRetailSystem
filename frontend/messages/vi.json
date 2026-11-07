@@ -1,0 +1,265 @@
+{
+  "common": {
+    "loading": "Đang tải...",
+    "error": "Đã có lỗi xảy ra",
+    "retry": "Thử lại",
+    "search": "Tìm kiếm",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "back": "Quay lại",
+    "viewAll": "Xem tất cả",
+    "close": "Đóng"
+  },
+  "nav": {
+    "home": "Trang Chủ",
+    "shop": "Cửa Hàng",
+    "products": "Sản Phẩm",
+    "categories": "Danh Mục",
+    "science": "Khoa Học Làn Da",
+    "blog": "Cẩm Nang",
+    "offers": "Ưu Đãi",
+    "stores": "Cửa Hàng",
+    "about": "Về GlowUp",
+    "contact": "Liên Hệ",
+    "cart": "Giỏ Hàng",
+    "wishlist": "Yêu Thích",
+    "account": "Tài Khoản",
+    "login": "Đăng Nhập",
+    "register": "Đăng Ký",
+    "logout": "Đăng Xuất",
+    "admin": "Quản Trị",
+    "searchPlaceholder": "Tìm tinh chất, kem dưỡng, peptide..."
+  },
+  "product": {
+    "catalogTitle": "Khám Phá Mỹ Phẩm Sinh Học Thụy Sĩ",
+    "catalogSubtitle": "Tất cả sản phẩm đều được kiểm nghiệm lâm sàng, chiết xuất thảo dược vùng Alpine và cam kết 100% chính hãng.",
+    "addToCart": "Cho Vào Giỏ",
+    "adding": "Đang thêm...",
+    "added": "Đã Thêm Vào Giỏ",
+    "buyNow": "Mua Ngay",
+    "outOfStock": "Hết hàng",
+    "price": "Giá",
+    "originalPrice": "Giá gốc",
+    "savings": "Tiết kiệm",
+    "rating": "Đánh giá",
+    "reviews": "Đánh giá",
+    "stock": "Tồn kho",
+    "inStock": "Còn hàng",
+    "lowStock": "Sắp hết hàng",
+    "description": "Mô tả sản phẩm",
+    "ingredients": "Thành phần sinh học",
+    "usage": "Hướng dẫn sử dụng",
+    "variants": "Phân loại",
+    "selectOption": "Chọn phân loại",
+    "quantity": "Số lượng",
+    "relatedProducts": "Sản phẩm liên quan",
+    "filterByCategory": "Danh Mục Sản Phẩm",
+    "filterByPrice": "Khoảng Giá",
+    "allCategories": "Tất cả danh mục",
+    "allPrices": "Tất cả mức giá",
+    "under300k": "Dưới 300.000₫",
+    "from300kTo600k": "300.000₫ - 600.000₫",
+    "from600kTo900k": "600.000₫ - 900.000₫",
+    "over900k": "Trên 900.000₫",
+    "sortBy": "Sắp xếp",
+    "sortNewest": "Mới nhất",
+    "sortPriceAsc": "Giá tăng dần",
+    "sortPriceDesc": "Giá giảm dần",
+    "sortRating": "Đánh giá cao nhất",
+    "sortBestseller": "Bán chạy nhất",
+    "showingProducts": "Hiển thị {count} / {total} sản phẩm",
+    "noProductsFound": "Không tìm thấy sản phẩm nào phù hợp.",
+    "clearFilters": "Xóa bộ lọc",
+    "size": "Dung tích:",
+    "viewDetails": "Xem Chi Tiết",
+    "wishlist": "Yêu thích",
+    "addToWishlist": "Thêm vào yêu thích"
+  },
+  "auth": {
+    "loginTitle": "Đăng Nhập Tài Khoản",
+    "loginSubtitle": "Chào mừng bạn trở lại với trải nghiệm chăm sóc da sinh học Thụy Sĩ",
+    "registerTitle": "Tạo Tài Khoản Mới",
+    "registerSubtitle": "Bắt đầu hành trình làn da rạng rỡ cùng GlowUp Swiss Atelier",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "confirmPassword": "Xác nhận mật khẩu",
+    "fullName": "Họ và tên",
+    "phone": "Số điện thoại",
+    "signIn": "Đăng Nhập",
+    "signUp": "Đăng Ký",
+    "rememberMe": "Ghi nhớ đăng nhập",
+    "forgotPassword": "Quên mật khẩu?",
+    "resetPassword": "Đặt Lại Mật Khẩu",
+    "dontHaveAccount": "Chưa có tài khoản?",
+    "alreadyHaveAccount": "Đã có tài khoản?",
+    "orContinueWith": "Hoặc tiếp tục với",
+    "verifyEmailTitle": "Xác Thực Email Của Bạn",
+    "backToLogin": "Quay lại đăng nhập"
+  },
+  "flashSale": {
+    "title": "FLASH DEALS",
+    "badge": "GIÁ SỐC MỖI NGÀY",
+    "subtitle": "Cam kết chính hãng 100% · Giảm sâu đến 50% · Giao nhanh trong 2H",
+    "endingIn": "KẾT THÚC TRONG",
+    "startingIn": "BẮT ĐẦU TRONG",
+    "ended": "ĐÃ KẾT THÚC",
+    "seeAll": "Xem Tất Cả",
+    "sold": "ĐÃ BÁN",
+    "almostSoldOut": "SẮP CHÁY HÀNG",
+    "remindMe": "Nhắc Tôi Khi Mở Bán",
+    "reminded": "Đã Đặt Nhắc Nhở",
+    "guarantee": "Cam kết 100% Chính Hãng (Đền 200%)",
+    "fastDelivery": "Giao Nhanh Miễn Phí 2H",
+    "easyReturn": "Đổi Trả Miễn Phí 14 Ngày",
+    "allSlots": "Tất cả deal khung giờ"
+  },
+  "newsletter": {
+    "club": "The Radiance Club",
+    "title": "Nhận Ưu Đãi 15% Cho Liệu Trình Thụy Sĩ Đầu Tiên",
+    "description": "Nhận lời mời riêng tư trải nghiệm các công thức theo mùa, ấn phẩm nghiên cứu lâm sàng và quà tặng đặc quyền.",
+    "placeholder": "Nhập địa chỉ email của bạn...",
+    "join": "Gia Nhập CLB",
+    "successToast": "Chào mừng bạn gia nhập The Radiance Club! Mã ưu đãi 15% đã được gửi qua email."
+  },
+  "footer": {
+    "tagline": "Mỹ phẩm tế bào sinh học Thụy Sĩ - Nuôi dưỡng vẻ đẹp rạng ngời từ sâu bên trong.",
+    "brandDesc": "Phòng thí nghiệm Mỹ phẩm Glow-Up Geneva. Công thức lâm sàng thuần khiết kết hợp khoa học thảo dược, men sinh học vùng núi cao Alpine và màng chắn ánh sáng sinh học.",
+    "locations": "Geneva · New York · Paris · Tokyo",
+    "columns": {
+      "ourScience": "Khoa Học Sinh Học",
+      "ritualsShop": "Liệu Trình & Cửa Hàng",
+      "clientCare": "Chăm Sóc Khách Hàng"
+    },
+    "links": {
+      "cleanScience": "Công Thức Sạch Lâm Sàng",
+      "photometric": "Độ Ổn Định Quang Học",
+      "alpineBio": "Men Sinh Học Alpine",
+      "heritage": "Di Sản & Viện Nghiên Cứu Geneva",
+      "locations": "Hệ Thống Atelier Toàn Cầu",
+      "allFormulations": "Tất Cả Sản Phẩm",
+      "curatedCategories": "Danh Mục Tuyển Chọn",
+      "brandDirectory": "Danh Mục Thương Hiệu",
+      "exclusiveOffers": "Ưu Đãi Độc Quyền",
+      "beautyGuide": "Cẩm Nang Làm Đẹp",
+      "concierge": "Hỗ Trợ Concierge",
+      "shipping": "Giao Hàng Quốc Tế",
+      "returns": "Đổi Trả Miễn Phí",
+      "privacy": "Chính Sách Bảo Mật",
+      "terms": "Điều Khoản & Điều Kiện"
+    },
+    "copyright": "© {year} Glow-Up Cosmetics Laboratoires Geneva. Bảo lưu mọi quyền.",
+    "swissMedic": "Swiss Medic Số CH-88902",
+    "isoCertified": "Chứng Nhận Thủy Tinh Biophotonic ISO"
+  },
+  "switcher": {
+    "title": "Ngôn ngữ",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "home": {
+    "ticker": {
+      "gift": "Tặng Gua Sha thạch anh hồng & 2 mẫu thử mini cao cấp cho đơn hàng trên 1.500.000₫",
+      "explore": "Khám Phá Ưu Đãi"
+    },
+    "hero": {
+      "badge": "CÔNG THỨC TỎA SÁNG THUẦN KHIẾT",
+      "titlePart1": "Vẻ đẹp của bạn.",
+      "titlePart2": "Tỏa sáng rạng ngời.",
+      "description": "Khám phá các công thức y sinh chuẩn Thụy Sĩ giúp đánh thức vẻ rạng rỡ tự nhiên và nuôi dưỡng da chuyên sâu từ cấp độ tế bào. Tuyển tập tinh hoa chăm sóc hàng ngày cho làn da căng tràn sức sống.",
+      "exploreCollection": "Khám Phá Bộ Sưu Tập",
+      "takeQuiz": "Chẩn Đoán Làn Da",
+      "vegan": "100% Thuần Chay (Thảo Dược Alps)",
+      "swissTested": "Kiểm Nghiệm Thụy Sĩ (Hiệu Quả Lâm Sàng)",
+      "crueltyFree": "Không Thử Nghiệm Trên Động Vật",
+      "zoomImage": "Phóng to ảnh",
+      "prevImage": "Ảnh trước",
+      "nextImage": "Ảnh tiếp theo",
+      "quickAdd": "Thêm Nhanh",
+      "slide1Badge": "ĐIỂM NHẤN ATELIER",
+      "slide1Caption": "Liệu trình dưỡng sáng da và căng bóng tế bào Peptide Glaze Elixir chuẩn Thụy Sĩ.",
+      "slide2Badge": "LIỆU TRÌNH LÂM SÀNG",
+      "slide2Caption": "Tái tạo hàng rào biểu bì và khóa ẩm chuyên sâu suốt 24 giờ với công thức Peptide 412.",
+      "slide3Badge": "THUẦN KHIẾT THỤY SĨ",
+      "slide3Caption": "Chiết xuất tế bào thực vật tuyết hữu cơ thu hoạch ở độ cao trên 2.000m tại rặng núi Alps.",
+      "slide4Badge": "CHỨNG NHẬN ISO-22716",
+      "slide4Caption": "Quy trình vô trùng y sinh kiểm soát vi sinh tuyệt đối đảm bảo độ tinh khiết tối thượng."
+    },
+    "rituals": {
+      "badge": "DANH MỤC TUYỂN CHỌN",
+      "title": "Chăm Sóc Theo Liệu Trình",
+      "subtitle": "Các công thức chuyên biệt được thiết kế để hoàn thiện chu trình dưỡng da ngày & đêm của bạn.",
+      "explore": "Khám Phá Liệu Trình",
+      "categories": {
+        "skincare": {
+          "title": "Dưỡng Da",
+          "pill": "Chuẩn Y Sinh",
+          "desc": "Cấp ẩm căng bóng, tinh chất peptide & màng lọc UV bảo vệ mỗi ngày"
+        },
+        "makeup": {
+          "title": "Trang Điểm",
+          "pill": "Lớp Nền Mỏng Nhẹ",
+          "desc": "Kem nền mỏng nhẹ như sương, son bóng dưỡng ẩm & dầu dưỡng môi nhung mịn"
+        },
+        "haircare": {
+          "title": "Chăm Sóc Tóc",
+          "pill": "Phục Hồi Nang Tóc",
+          "desc": "Serum phục hồi da đầu, xả lipid sinh học & xịt dưỡng bóng mượt"
+        },
+        "bodycare": {
+          "title": "Chăm Sóc Cơ Thể",
+          "pill": "Tinh Chất Thảo Mộc",
+          "desc": "Bơ dưỡng thể đậm đặc, tẩy tế bào chết & dầu dưỡng óng ả"
+        }
+      }
+    },
+    "trending": {
+      "badge": "YÊU THÍCH BỞI CỘNG ĐỒNG",
+      "title": "Xu Hướng Nổi Bật",
+      "subtitle": "Các sản phẩm chăm sóc da sạch đạt giải thưởng được hơn 50.000 tín đồ làm đẹp tin dùng.",
+      "tabs": {
+        "all": "Tất Cả",
+        "bestsellers": "Bán Chạy Nhất",
+        "new": "Mới Ra Mắt",
+        "awards": "Đạt Giải Thưởng"
+      },
+      "cta": {
+        "badge": "50+ Công Thức Sinh Học Thụy Sĩ",
+        "title": "Khám Phá Trọn Bộ Sưu Tập",
+        "subtitle": "Khám phá trọn bộ hơn 50+ công thức chăm sóc da, phục hồi tế bào & tinh chất tế bào sinh học chuẩn Geneva.",
+        "button": "XEM TẤT CẢ BỘ SƯU TẬP"
+      }
+    },
+    "botanical": {
+      "badge": "CAM KẾT THẢO DƯỢC THỤY SĨ",
+      "titlePart1": "Tiêu Chuẩn GlowUp:",
+      "titlePart2": "Độ Tinh Khiết & Đẳng Cấp Tuyệt Đối",
+      "description": "Chúng tôi không thỏa hiệp giữa công thức sạch và hiệu quả vượt trội. Mọi sản phẩm GlowUp đều được phát triển tại phòng thí nghiệm Thụy Sĩ, không chứa paraben, sulfat, hương liệu nhân tạo hay silicone.",
+      "features": {
+        "f1Title": "Hiệp Đồng Hoạt Chất Lâm Sàng",
+        "f1Desc": "Hoạt chất nồng độ cao giúp cân bằng và tối ưu hóa tuổi thọ tế bào biểu bì.",
+        "f2Title": "Không Sulfates & Phthalates",
+        "f2Desc": "Kết cấu phục hồi dịu nhẹ mà không gây tổn hại đến hàng rào sinh học tự nhiên.",
+        "f3Title": "Kiểm Nghiệm Da Liễu Quốc Tế",
+        "f3Desc": "Được thử nghiệm lâm sàng nghiêm ngặt trên nhiều loại da và mức độ nhạy cảm khác nhau."
+      },
+      "readScience": "Khám Phá Di Sản Khoa Học",
+      "zoomImage": "Phóng to xem ảnh"
+    },
+    "stories": {
+      "badge": "CÂU CHUYỆN RẠNG RỠ THỰC TẾ",
+      "title": "Được Yêu Thích Bởi Sự Tỏa Sáng",
+      "subtitle": "Gia nhập cùng hơn 50.000 khách hàng đã thay đổi hàng rào da cùng GlowUp.",
+      "r1Text": "Peptide Glaze Elixir mang lại hiệu ứng da thủy tinh thực sự mà không hề nhờn rít. Lớp nền của tôi trông đẹp hơn gấp mười lần và tình trạng ửng đỏ biến mất chỉ trong hai tuần!",
+      "r1Location": "Khách hàng xác thực • New York",
+      "r2Text": "Cuối cùng cũng có một thương hiệu làm đẹp cao cấp với thành phần lành tính thực sự giữ đúng cam kết. Cloud Ceramides Cream đã cứu rỗi hoàn toàn làn da khô nẻ mùa đông của tôi.",
+      "r2Location": "Khách hàng xác thực • Zurich",
+      "r3Text": "Dầu dưỡng môi luôn có sẵn trong túi xách của tôi. Dưỡng ẩm nhẹ tênh với lớp bóng dewy mềm mượt không bết dính. Đánh giá 10/10 cho phong cách no-makeup-makeup!",
+      "r3Location": "Khách hàng xác thực • London"
+    },
+    "toasts": {
+      "wishlistAdded": "Đã thêm \"{name}\" vào danh sách yêu thích!",
+      "wishlistRemoved": "Đã bỏ \"{name}\" khỏi danh sách yêu thích",
+      "cartAdded": "Đã thêm \"{name}\" vào giỏ hàng!"
+    }
+  }
+}

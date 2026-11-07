@@ -11,6 +11,9 @@ import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
 import { UploadsModule } from '@modules/uploads/uploads.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { CartModule } from './modules/cart/cart.module';
+import { CustomersModule } from './modules/customers/customers.module';
 
 @Module({
   imports: [
@@ -26,6 +29,9 @@ import { UploadsModule } from '@modules/uploads/uploads.module';
     PermissionsModule,
     CategoriesModule,
     BrandsModule,
+    OrdersModule,
+    CartModule,
+    CustomersModule,
   ],
   providers: [
     {

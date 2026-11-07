@@ -1,0 +1,265 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Try Again",
+    "search": "Search",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "viewAll": "View All",
+    "close": "Close"
+  },
+  "nav": {
+    "home": "Home",
+    "shop": "Shop",
+    "products": "Products",
+    "categories": "Categories",
+    "science": "Our Science",
+    "blog": "Beauty Guide",
+    "offers": "Offers",
+    "stores": "Store Locator",
+    "about": "About GlowUp",
+    "contact": "Contact",
+    "cart": "Cart",
+    "wishlist": "Wishlist",
+    "account": "Account",
+    "login": "Sign In",
+    "register": "Sign Up",
+    "logout": "Sign Out",
+    "admin": "Admin Portal",
+    "searchPlaceholder": "Search serums, creams, peptides..."
+  },
+  "product": {
+    "catalogTitle": "Discover Swiss Bio-Cosmetics",
+    "catalogSubtitle": "Clinically tested formulations with Alpine botanical extracts. 100% authentic guarantee.",
+    "addToCart": "Add to Cart",
+    "adding": "Adding...",
+    "added": "Added to Cart",
+    "buyNow": "Buy Now",
+    "outOfStock": "Out of Stock",
+    "price": "Price",
+    "originalPrice": "Original Price",
+    "savings": "Save",
+    "rating": "Rating",
+    "reviews": "Reviews",
+    "stock": "Stock",
+    "inStock": "In Stock",
+    "lowStock": "Low Stock",
+    "description": "Description",
+    "ingredients": "Botanical Ingredients",
+    "usage": "Application Ritual",
+    "variants": "Variants",
+    "selectOption": "Select Option",
+    "quantity": "Quantity",
+    "relatedProducts": "Related Rituals",
+    "filterByCategory": "Product Categories",
+    "filterByPrice": "Price Range",
+    "allCategories": "All Categories",
+    "allPrices": "All Prices",
+    "under300k": "Under 300,000 VND",
+    "from300kTo600k": "300,000 - 600,000 VND",
+    "from600kTo900k": "600,000 - 900,000 VND",
+    "over900k": "Over 900,000 VND",
+    "sortBy": "Sort By",
+    "sortNewest": "Newest",
+    "sortPriceAsc": "Price: Low to High",
+    "sortPriceDesc": "Price: High to Low",
+    "sortRating": "Highest Rated",
+    "sortBestseller": "Bestsellers",
+    "showingProducts": "Showing {count} of {total} products",
+    "noProductsFound": "No matching products found.",
+    "clearFilters": "Clear Filters",
+    "size": "Size:",
+    "viewDetails": "View Details",
+    "wishlist": "Wishlist",
+    "addToWishlist": "Add to wishlist"
+  },
+  "auth": {
+    "loginTitle": "Sign In to Your Account",
+    "loginSubtitle": "Welcome back to your luxury Swiss bio-skincare journey",
+    "registerTitle": "Create Your Account",
+    "registerSubtitle": "Begin your radiant skin ritual with GlowUp Swiss Atelier",
+    "email": "Email Address",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "fullName": "Full Name",
+    "phone": "Phone Number",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "resetPassword": "Reset Password",
+    "dontHaveAccount": "Don't have an account?",
+    "alreadyHaveAccount": "Already have an account?",
+    "orContinueWith": "Or continue with",
+    "verifyEmailTitle": "Verify Your Email Address",
+    "backToLogin": "Back to Sign In"
+  },
+  "flashSale": {
+    "title": "FLASH DEALS",
+    "badge": "DAILY EXCLUSIVES",
+    "subtitle": "100% Authentic Guarantee · Up to 50% Off · 2H Express Delivery",
+    "endingIn": "ENDS IN",
+    "startingIn": "STARTS IN",
+    "ended": "ENDED",
+    "seeAll": "View All",
+    "sold": "SOLD",
+    "almostSoldOut": "ALMOST GONE",
+    "remindMe": "Notify When Live",
+    "reminded": "Reminder Set",
+    "guarantee": "100% Authentic (200% Refund)",
+    "fastDelivery": "Free 2H Express Delivery",
+    "easyReturn": "14-Day Free Returns",
+    "allSlots": "All Time Slots"
+  },
+  "newsletter": {
+    "club": "The Radiance Club",
+    "title": "Receive 15% Off Your First Swiss Ritual",
+    "description": "Enjoy private invites to seasonal formulations, clinical journal insights, and complimentary concierge gifts.",
+    "placeholder": "Enter your email address...",
+    "join": "Join Club",
+    "successToast": "Welcome to The Radiance Club! Your 15% welcome voucher has been sent via email."
+  },
+  "footer": {
+    "tagline": "Swiss cellular bio-cosmetics — cultivating radiant beauty from within.",
+    "brandDesc": "Glow-Up Cosmetics Laboratoires Geneva. Clean clinical formulations backed by botanical science, high-altitude alpine bio-ferments, and biophotonic light shielding.",
+    "locations": "Geneva · New York · Paris · Tokyo",
+    "columns": {
+      "ourScience": "Our Science",
+      "ritualsShop": "Rituals & Shop",
+      "clientCare": "Client Care"
+    },
+    "links": {
+      "cleanScience": "Clean Science Formulation",
+      "photometric": "Photometric Stability",
+      "alpineBio": "Alpine Bio-Ferments",
+      "heritage": "Geneva Heritage & Lab",
+      "locations": "Atelier Locations",
+      "allFormulations": "All Formulations",
+      "curatedCategories": "Curated Categories",
+      "brandDirectory": "Brand Directory",
+      "exclusiveOffers": "Exclusive Archive Offers",
+      "beautyGuide": "Beauty & Skin Guide",
+      "concierge": "Concierge Support",
+      "shipping": "Worldwide Shipping",
+      "returns": "Complimentary Returns",
+      "privacy": "Privacy Policy",
+      "terms": "Terms & Conditions"
+    },
+    "copyright": "© {year} Glow-Up Cosmetics Laboratoires Geneva. All rights reserved.",
+    "swissMedic": "Swiss Medic No. CH-88902",
+    "isoCertified": "Biophotonic ISO-Glass Certified"
+  },
+  "switcher": {
+    "title": "Language",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "home": {
+    "ticker": {
+      "gift": "Complimentary Rose Quartz Gua Sha & 2 Deluxe Minis on orders over 1,500,000 VND",
+      "explore": "Explore Tasting Radiance"
+    },
+    "hero": {
+      "badge": "THE CLEAN RADIANCE FORMULA",
+      "titlePart1": "Your beauty.",
+      "titlePart2": "Your glow.",
+      "description": "Discover clean, science-backed formulas crafted to illuminate your natural radiance and nourish from within. Selected everyday essentials and weightless elixirs designed for skin that breathes.",
+      "exploreCollection": "Explore Collection",
+      "takeQuiz": "Take Skin Quiz",
+      "vegan": "100% Vegan (Botanical Actives)",
+      "swissTested": "Swiss-Tested (Clinical Efficacy)",
+      "crueltyFree": "Cruelty-Free (Leaping Bunny)",
+      "zoomImage": "Zoom Image",
+      "prevImage": "Previous Slide",
+      "nextImage": "Next Slide",
+      "quickAdd": "Quick Add",
+      "slide1Badge": "ATELIER HIGHLIGHT",
+      "slide1Caption": "Radiance and cellular glass skin peptide glaze ritual crafted to Geneva standards.",
+      "slide2Badge": "CLINICAL RITUAL",
+      "slide2Caption": "Epidermal barrier repair and 24-hour intensive hydration with formula Peptide 412.",
+      "slide3Badge": "SWISS PURITY",
+      "slide3Caption": "Organic snow botanical cell extracts harvested above 2,000m in the Swiss Alps.",
+      "slide4Badge": "ISO-22716 CERTIFIED",
+      "slide4Caption": "Sterile biomedical cleanroom process with absolute microbial control for supreme purity."
+    },
+    "rituals": {
+      "badge": "CURATED CATEGORIES",
+      "title": "Shop by Ritual",
+      "subtitle": "Targeted formulations calibrated to anchor your day-to-night self-care regimens.",
+      "explore": "Explore Ritual",
+      "categories": {
+        "skincare": {
+          "title": "Skincare",
+          "pill": "Clean & Clinical",
+          "desc": "Hydra-luminosity, peptide concentrates & daily UV shields"
+        },
+        "makeup": {
+          "title": "Makeup",
+          "pill": "Weightless Finish",
+          "desc": "Weightless skin tints, dewy gloss & velvet lip oils"
+        },
+        "haircare": {
+          "title": "Haircare",
+          "pill": "Follicle Revival",
+          "desc": "Scalp revival serums, lipid conditioners & fine gloss mists"
+        },
+        "bodycare": {
+          "title": "Body Care",
+          "pill": "Botanical Nectar",
+          "desc": "Nourishing butters, body polish & glowing elixir oils"
+        }
+      }
+    },
+    "trending": {
+      "badge": "COMMUNITY FAVORITES",
+      "title": "Trending Right Now",
+      "subtitle": "Award-winning clean beauty essentials loved by over 50,000 glowing skin enthusiasts.",
+      "tabs": {
+        "all": "All",
+        "bestsellers": "Bestsellers",
+        "new": "New In",
+        "awards": "Award Winners"
+      },
+      "cta": {
+        "badge": "50+ Swiss Bio-Formulations",
+        "title": "Discover the Complete Collection",
+        "subtitle": "Explore the complete suite of 50+ skincare formulas, cellular repair elixirs and Geneva-standard bio-essences.",
+        "button": "VIEW ALL COLLECTIONS"
+      }
+    },
+    "botanical": {
+      "badge": "OUR BOTANICAL COMMITMENT",
+      "titlePart1": "The Glow Standard:",
+      "titlePart2": "Uncompromising Purity & Elegance",
+      "description": "We reject the choice between clean formulations and high-performance results. Every Glow-Up product is engineered in our Swiss botanical lab with zero parabens, sulfates, synthetic fragrances, or silicones.",
+      "features": {
+        "f1Title": "Clinical Active Synergy",
+        "f1Desc": "High-concentration actives balance and optimize cellular longevity.",
+        "f2Title": "Sulfates & Phthalates Free",
+        "f2Desc": "Restorative texture without compromising organic bio-cellular shields.",
+        "f3Title": "Dermatologically Tested",
+        "f3Desc": "Rigorous international clinical testing on diverse dermis and sensitivity profiles."
+      },
+      "readScience": "Read Our Science & Heritage",
+      "zoomImage": "Zoom Image"
+    },
+    "stories": {
+      "badge": "REAL GLOW STORIES",
+      "title": "Loved for the Radiance",
+      "subtitle": "Join over 50,000 customers who transformed their skin barrier with Glow-Up.",
+      "r1Text": "The Peptide Glaze Elixir gives a true glass skin finish without any greasy feel. My foundation looks ten times better, and my redness vanished within two weeks!",
+      "r1Location": "Verified Buyer • New York",
+      "r2Text": "Finally a luxury beauty brand with clean ingredients that actually performs on its promises. The Cloud Ceramides Cream has rescued my dry winter skin completely.",
+      "r2Location": "Verified Buyer • Zurich",
+      "r3Text": "The serum oil is in my bag at all times. Weightless hydration with a flattering dewy sheen that isn't sticky. 10/10 - my recommendation for no-makeup-makeup lovers!",
+      "r3Location": "Verified Buyer • London"
+    },
+    "toasts": {
+      "wishlistAdded": "Added \"{name}\" to your wishlist!",
+      "wishlistRemoved": "Removed \"{name}\" from your wishlist",
+      "cartAdded": "Added \"{name}\" to cart!"
+    }
+  }
+}
