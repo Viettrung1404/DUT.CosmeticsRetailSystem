@@ -12,6 +12,19 @@ export interface CreateOrderPayload {
   couponCode?: string;
 }
 
+export interface CreateRmaPayload {
+  orderId: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    reason: string;
+  }>;
+  reasonCategory: string;
+  evidenceImages?: string[];
+  resolutionMethod: 'GLOW_POINTS' | 'ORIGINAL_PAYMENT';
+  note?: string;
+}
+
 export const orderApi = {
   // Xem trước giá & phí ship (Preview Order)
   previewOrder: async (payload: any) => {
@@ -42,6 +55,24 @@ export const orderApi = {
   // Hủy đơn hàng PENDING (FR-04.05)
   cancelOrder: async (orderId: string, reason?: string) => {
     const response = await apiClient.put(`/orders/${orderId}/cancel`, { reason });
+    return response.data;
+  },
+
+  // Gửi yêu cầu đổi trả / hoàn tiền RMA (FR-04.06)
+  createReturnRequest: async (payload: CreateRmaPayload) => {
+    const response = await apiClient.post('/returns', payload);
+    return response.data;
+  },
+
+  // Lấy danh sách yêu cầu RMA
+  getMyReturns: async () => {
+    const response = await apiClient.get('/returns/me');
+    return response.data;
+  },
+
+  // Lấy chi tiết tiến trình RMA
+  getReturnDetail: async (returnId: string) => {
+    const response = await apiClient.get(`/returns/${returnId}`);
     return response.data;
   },
 };

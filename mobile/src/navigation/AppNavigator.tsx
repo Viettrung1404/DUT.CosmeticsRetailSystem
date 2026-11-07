@@ -12,6 +12,11 @@ import OrderSuccessScreen from '../screens/cart/OrderSuccessScreen';
 import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
 import NotificationCenterScreen from '../screens/profile/NotificationCenterScreen';
+import WishlistScreen from '../screens/profile/WishlistScreen';
+import RmaRequestScreen from '../screens/order/RmaRequestScreen';
+import RmaTrackingScreen from '../screens/order/RmaTrackingScreen';
+import ShipmentTrackingScreen from '../screens/order/ShipmentTrackingScreen';
+import LoyaltyScreen from '../screens/profile/LoyaltyScreen';
 import { COLORS } from '../constants/theme';
 
 const Stack = createNativeStackNavigator();
@@ -44,6 +49,11 @@ export default function AppNavigator() {
                         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
                         <Stack.Screen name="NotificationCenter" component={NotificationCenterScreen} />
+                        <Stack.Screen name="Wishlist" component={WishlistScreen} />
+                        <Stack.Screen name="RmaRequest" component={RmaRequestScreen} />
+                        <Stack.Screen name="RmaTracking" component={RmaTrackingScreen} />
+                        <Stack.Screen name="ShipmentTracking" component={ShipmentTrackingScreen} />
+                        <Stack.Screen name="Loyalty" component={LoyaltyScreen} />
                     </>
                 ) : (
                     <Stack.Screen name="AuthStack" component={AuthStack} />

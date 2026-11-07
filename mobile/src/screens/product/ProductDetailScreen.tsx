@@ -5,6 +5,7 @@ import { COLORS, SPACING } from '../../constants/theme';
 import apiClient from '../../api/apiClient';
 
 import { useCartStore } from '../../store/useCartStore';
+import { useWishlistStore } from '../../store/useWishlistStore';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
     const { slug } = route.params || {};
@@ -12,6 +13,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [selectedVariant, setSelectedVariant] = useState('30ml');
     const { addItem } = useCartStore();
+    const { toggleWishlist, isInWishlist } = useWishlistStore();
 
     useEffect(() => {
         fetchDetail();
@@ -25,7 +27,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         } catch {
             // Mock Fallback
             setProduct({
-                id: 'prod-vc',
+                id: slug || 'prod-vc',
                 name: 'GlowUp Vitamin C Glow Serum',
                 brand: 'GlowUp Beauty',
                 rating: 4.9,
@@ -40,6 +42,32 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         } finally {
             setLoading(false);
         }
+    };
+
+    const isFav = product ? isInWishlist(product.id || slug || 'prod-vc') : false;
+
+    const handleToggleHeart = () => {
+        if (!product) return;
+        const productId = product.id || slug || 'prod-vc';
+        const added = toggleWishlist({
+            productId,
+            name: product.name,
+            brand: product.brand || 'GLOWUP LAB',
+            price: product.price || 350000,
+            originalPrice: product.original_price,
+            imageUrl: product.image_url || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+            category: 'Serum',
+            rating: product.rating || 4.9,
+            reviewsCount: product.reviews_count || 128,
+            stockStatus: 'in_stock',
+        });
+
+        Alert.alert(
+            added ? 'Đã lưu yêu thích ❤️' : 'Đã bỏ yêu thích 💔',
+            added
+                ? `"${product.name}" đã được thêm vào bộ sưu tập Wishlist của bạn.`
+                : `"${product.name}" đã được xóa khỏi Wishlist.`
+        );
     };
 
     const handleAddToCart = () => {
@@ -82,8 +110,12 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                     <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
                     </TouchableOpacity>
-                    <TouchableOpacity>
-                        <Ionicons name="heart-outline" size={24} color={COLORS.primary} />
+                    <TouchableOpacity onPress={handleToggleHeart}>
+                        <Ionicons
+                            name={isFav ? 'heart' : 'heart-outline'}
+                            size={24}
+                            color={COLORS.primary}
+                        />
                     </TouchableOpacity>
                 </View>
 

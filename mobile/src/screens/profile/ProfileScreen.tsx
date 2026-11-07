@@ -115,7 +115,7 @@ export default function ProfileScreen({ navigation }: any) {
         </TouchableOpacity>
 
         {/* 3. Luxury Diamond VIP Membership Card (Stitch Design) */}
-        <View style={styles.vipCard}>
+        <TouchableOpacity style={styles.vipCard} activeOpacity={0.92} onPress={() => navigation.navigate('Loyalty')}>
           {/* Card Top */}
           <View style={styles.vipCardTop}>
             <View>
@@ -204,7 +204,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.barcodeNumber}>8892 9401 2289 1102</Text>
             </View>
           )}
-        </View>
+        </TouchableOpacity>
 
         {/* 4. Quick Loyalty Grid Actions */}
         <View style={styles.quickGrid}>
@@ -228,7 +228,7 @@ export default function ProfileScreen({ navigation }: any) {
           {/* Yêu thích */}
           <TouchableOpacity
             style={styles.gridCard}
-            onPress={() => Alert.alert('Yêu thích', 'Danh sách 12 món mỹ phẩm bạn đã lưu.')}
+            onPress={() => navigation.navigate('Wishlist')}
           >
             <View style={[styles.gridIconCircle, { backgroundColor: theme.colors.primaryFixed }]}>
               <Ionicons name="heart" size={20} color={theme.colors.primary} />
