@@ -19,6 +19,7 @@ export interface IUserSessionRepository {
   } | null>;
 
   revokeById(id: string): Promise<void>;
+  consume(id: string): Promise<boolean>;
 
   rotateActive(
     oldToken: string,

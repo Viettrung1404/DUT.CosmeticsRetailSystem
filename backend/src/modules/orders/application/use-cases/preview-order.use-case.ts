@@ -1,4 +1,5 @@
-import { Injectable, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, Optional } from '@nestjs/common';
+import { CommerceCheckoutService } from '../services/commerce-checkout.service';
 import {
   ORDER_REPOSITORY,
   IOrderRepository,
@@ -58,9 +59,11 @@ export class PreviewOrderUseCase {
     private readonly catalogProvider: IVariantCatalogProvider,
     @Inject(CART_REPOSITORY)
     private readonly cartRepo: ICartRepository,
+    @Optional() private readonly commerce?: CommerceCheckoutService,
   ) {}
 
   async execute(input: PreviewOrderInput): Promise<PreviewOrderResult> {
+    if (this.commerce) return this.commerce.preview(input);
     const { customerId, couponCode, usePoints, storeId } = input;
 
     // 1. Determine items from input or cart
@@ -70,10 +73,12 @@ export class PreviewOrderUseCase {
       if (!cart || !cart.items || cart.items.length === 0) {
         throw new BadRequestException('Giỏ hàng của bạn đang trống');
       }
-      requestedItems = cart.items.map((i) => ({
-        variantId: i.productVariantId,
-        quantity: i.quantity,
-      }));
+      requestedItems = cart.items
+        .filter((i) => i.isSelected !== false)
+        .map((i) => ({
+          variantId: i.productVariantId,
+          quantity: i.quantity,
+        }));
     }
 
     // 2. Fetch Variant details
@@ -119,12 +124,17 @@ export class PreviewOrderUseCase {
       };
     });
 
+    const pointsValueVnd = usePoints
+      ? await this.pricingService.configuredPointValue()
+      : 0;
     const pricing = this.pricingService.calculatePricing({
       items: pricingItems,
       coupon,
       customerCouponUsageCount,
       pointsToUse: usePoints,
       customerAvailablePoints: customerPoints,
+      pointsValueVnd,
+      customerId,
     });
 
     // 7. Map Items with Snapshot

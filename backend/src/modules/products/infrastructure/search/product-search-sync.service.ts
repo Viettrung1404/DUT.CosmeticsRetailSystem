@@ -3,6 +3,7 @@ import { PrismaService } from '@infrastructure/database/prisma.service';
 import { ProductMapper } from '../mappers/product.mapper';
 import { productIncludeConfig } from '../persistence/prisma-product.repository';
 import { ElasticsearchProductService } from './elasticsearch-product.service';
+import { CatalogIndexWorker } from './catalog-index.worker';
 
 // Ghi DB thành công mà ghi Elasticsearch lỗi thì chỉ số tìm kiếm bị lệch;
 // mỗi lần server khởi động và kết nối được Elasticsearch, đồng bộ lại toàn bộ từ DB
@@ -14,14 +15,20 @@ export class ProductSearchSyncService implements OnApplicationBootstrap {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly esService?: ElasticsearchProductService,
+    @Optional() private readonly durable?: CatalogIndexWorker,
   ) {}
 
   onApplicationBootstrap(): void {
+    if (this.durable) {
+      void this.durable.ensureJobs().catch(() => this.logger.warn('Catalog checkpoint initialization deferred'));
+      return;
+    }
     // Chạy nền để không làm chậm lúc server khởi động
     void this.reindexAll();
   }
 
   async reindexAll(): Promise<number> {
+    if (this.durable) return this.durable.reindexAll();
     if (!this.esService?.isAvailable) return 0;
 
     let indexed = 0;

@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { CustomerExperienceModule } from '@modules/customer-experience/customer-experience.module';
+import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
+import { CommerceCheckoutService } from './application/services/commerce-checkout.service';
 import { CustomerOrderController } from './presentation/controllers/order-customer.controller';
 import { ORDER_REPOSITORY } from './domain/repositories/order.repository.interface';
 import { PrismaOrderRepository } from './infrastructure/repositories/prisma-order.repository';
@@ -28,9 +31,10 @@ import { UpdateAdminOrderStatusUseCase } from './application/use-cases/update-ad
 import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-order.use-case';
 
 @Module({
-  imports: [CartModule, PermissionsModule],
+  imports: [CartModule, PermissionsModule, CustomerExperienceModule, CustomerCommerceModule],
   controllers: [CustomerOrderController, OrderAdminController],
   providers: [
+    CommerceCheckoutService,
     CustomerContextService,
     OrderPricingService,
     PrismaStoreInventoryAdapter,
