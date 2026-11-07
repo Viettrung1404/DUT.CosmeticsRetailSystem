@@ -13,30 +13,30 @@ import {
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
-import { orderApi } from '../../api/orderApi';
+import { orderApi, ReturnReasonType } from '../../api/orderApi';
 
-const RMA_REASONS = [
-  { id: 'damaged', label: 'Bị đổ vỡ, hư hỏng do vận chuyển', icon: 'alert-triangle' },
-  { id: 'allergic', label: 'Dị ứng da, kích ứng khi thử sản phẩm', icon: 'shield-alert' },
-  { id: 'wrong_item', label: 'Giao nhầm mã màu, sai dung tích', icon: 'repeat' },
-  { id: 'expired', label: 'Sản phẩm có dấu hiệu hết hạn hoặc đổi mùi', icon: 'clock' },
-  { id: 'other', label: 'Lý do cá nhân khác', icon: 'help-circle' },
+const RMA_REASONS: Array<{ id: ReturnReasonType; label: string; icon: string }> = [
+  { id: 'DEFECTIVE', label: 'Bị đổ vỡ, hư hỏng hoặc lỗi kỹ thuật', icon: 'alert-triangle' },
+  { id: 'ALLERGIC', label: 'Dị ứng da, kích ứng khi thử sản phẩm', icon: 'shield-alert' },
+  { id: 'WRONG_ITEM', label: 'Giao nhầm mã màu, sai dung tích hoặc mẫu', icon: 'repeat' },
+  { id: 'EXPIRED', label: 'Sản phẩm có dấu hiệu hết hạn hoặc đổi mùi', icon: 'clock' },
+  { id: 'CUSTOMER_CHANGE_MIND', label: 'Đổi ý hoặc lý do cá nhân', icon: 'help-circle' },
 ];
 
 const RESOLUTION_METHODS = [
   {
-    id: 'GLOW_POINTS',
-    title: 'Hoàn tiền vào ví GlowPoints',
-    sub: 'Cộng điểm khả dụng ngay lập tức kèm voucher bồi thường +20.000₫.',
-    badge: 'Khuyên dùng • Nhanh nhất',
+    id: 'REFUND',
+    title: 'Hoàn tiền (Refund)',
+    sub: 'Hoàn lại số tiền theo chính sách đổi trả của đơn hàng.',
+    badge: 'Khuyên dùng',
     icon: 'sparkles',
   },
   {
-    id: 'ORIGINAL_PAYMENT',
-    title: 'Hoàn về tài khoản thanh toán ban đầu',
-    sub: 'Chuyển thẳng về thẻ / ngân hàng đã thanh toán (1 - 3 ngày làm việc).',
-    badge: '1-3 ngày',
-    icon: 'card',
+    id: 'EXCHANGE',
+    title: 'Đổi sản phẩm khác (Exchange)',
+    sub: 'Đổi sang phân loại hoặc sản phẩm tương đương.',
+    badge: 'Đổi hàng',
+    icon: 'repeat',
   },
 ];
 
@@ -44,11 +44,11 @@ export default function RmaRequestScreen({ route, navigation }: any) {
   const { orderId = 'GU-89241', items: routeItems } = route.params || {};
 
   const [selectedItems, setSelectedItems] = useState<{ [key: string]: boolean }>({
-    'prod-1': true,
+    'item-1': true,
   });
 
-  const [selectedReason, setSelectedReason] = useState('damaged');
-  const [selectedResolution, setSelectedResolution] = useState<'GLOW_POINTS' | 'ORIGINAL_PAYMENT'>('GLOW_POINTS');
+  const [selectedReason, setSelectedReason] = useState<ReturnReasonType>('DEFECTIVE');
+  const [selectedType, setSelectedType] = useState<'REFUND' | 'EXCHANGE'>('REFUND');
   const [note, setNote] = useState('');
   const [evidenceImages, setEvidenceImages] = useState<string[]>([
     'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
@@ -58,7 +58,8 @@ export default function RmaRequestScreen({ route, navigation }: any) {
 
   const orderProducts = routeItems || [
     {
-      id: 'prod-1',
+      id: 'item-1',
+      orderItemId: 'item-1',
       name: 'Serum Rose Berry B5 Phục Hồi Hàng Rào Ẩm 50ml',
       brand: 'GLOWUP LAB',
       price: 345000,
@@ -67,7 +68,8 @@ export default function RmaRequestScreen({ route, navigation }: any) {
       quantity: 1,
     },
     {
-      id: 'prod-2',
+      id: 'item-2',
+      orderItemId: 'item-2',
       name: 'Kem Dưỡng Glass Skin Barrier Cream 50g',
       brand: 'GLOWUP LAB',
       price: 390000,
@@ -114,7 +116,7 @@ export default function RmaRequestScreen({ route, navigation }: any) {
 
   const selectedCount = Object.values(selectedItems).filter(Boolean).length;
   const totalRefund = orderProducts
-    .filter((p: any) => selectedItems[p.id])
+    .filter((p: any) => selectedItems[p.id || p.orderItemId])
     .reduce((sum: number, p: any) => sum + p.price * p.quantity, 0);
 
   const handleSubmit = async () => {
@@ -125,24 +127,23 @@ export default function RmaRequestScreen({ route, navigation }: any) {
 
     setIsSubmitting(true);
     try {
+      const itemsToReturn = orderProducts
+        .filter((p: any) => selectedItems[p.id || p.orderItemId])
+        .map((p: any) => ({
+          orderItemId: p.orderItemId || p.id,
+          quantity: p.quantity || 1,
+        }));
+
       await orderApi.createReturnRequest({
         orderId,
-        items: orderProducts
-          .filter((p: any) => selectedItems[p.id])
-          .map((p: any) => ({
-            productId: p.id,
-            quantity: p.quantity,
-            reason: selectedReason,
-          })),
-        reasonCategory: selectedReason,
-        evidenceImages,
-        resolutionMethod: selectedResolution,
-        note,
+        type: selectedType,
+        reason: selectedReason,
+        items: itemsToReturn,
       });
 
       Alert.alert(
         'Tạo yêu cầu thành công! ✨',
-        `Mã yêu cầu đổi trả #RMA-${orderId} đã được tiếp nhận. Đội ngũ GlowUp Care sẽ liên hệ kiểm định trong vòng 24H.`,
+        `Mã yêu cầu đổi trả cho đơn #${orderId} đã được tiếp nhận. Đội ngũ GlowUp Care sẽ liên hệ kiểm định trong vòng 24H.`,
         [
           {
             text: 'Theo dõi tiến trình',
@@ -150,18 +151,12 @@ export default function RmaRequestScreen({ route, navigation }: any) {
           },
         ]
       );
-    } catch {
-      // Offline fallback
-      Alert.alert(
-        'Đã gửi yêu cầu thành công! ✨',
-        `Yêu cầu đổi trả cho đơn #${orderId} đã được tạo thành công. Chúng tôi sẽ thu hồi sản phẩm tận nơi miễn phí.`,
-        [
-          {
-            text: 'Theo dõi tiến trình',
-            onPress: () => navigation.replace('RmaTracking', { rmaId: `RMA-${orderId}` }),
-          },
-        ]
-      );
+    } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Không thể gửi yêu cầu đổi trả. Vui lòng kiểm tra lại đơn hàng và thử lại.';
+      Alert.alert('Gửi yêu cầu thất bại', errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -302,16 +297,16 @@ export default function RmaRequestScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* Bước 4: Phương thức hoàn tiền */}
+        {/* Bước 4: Phương thức hoàn tiền / đổi hàng */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>4. Chọn giải pháp hoàn tiền</Text>
+          <Text style={styles.sectionTitle}>4. Chọn hình thức xử lý</Text>
           {RESOLUTION_METHODS.map((res) => {
-            const isSelected = selectedResolution === res.id;
+            const isSelected = selectedType === res.id;
             return (
               <TouchableOpacity
                 key={res.id}
                 style={[styles.resolutionCard, isSelected && styles.resolutionCardActive]}
-                onPress={() => setSelectedResolution(res.id as any)}
+                onPress={() => setSelectedType(res.id as any)}
                 activeOpacity={0.88}
               >
                 <View style={styles.resolutionHeader}>

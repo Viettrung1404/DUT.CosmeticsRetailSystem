@@ -89,21 +89,12 @@ export default function CheckoutScreen({ navigation }: any) {
             ? 'Ví MoMo'
             : 'VnPay / Thẻ ngân hàng',
       });
-    } catch {
-      // 2. Cơ chế Fallback an toàn (Khi Backend chưa bật hoặc chưa có API /orders)
-      const mockOrderCode = `GLOW-${Math.floor(100000 + Math.random() * 900000)}`;
-      clearCart();
-
-      navigation.replace('OrderSuccess', {
-        orderCode: mockOrderCode,
-        totalAmount: grandTotal,
-        paymentMethod:
-          paymentMethod === 'COD'
-            ? 'Thanh toán khi nhận hàng (COD)'
-            : paymentMethod === 'MOMO'
-            ? 'Ví MoMo'
-            : 'VnPay / Thẻ ngân hàng',
-      });
+    } catch (error: any) {
+      const errorMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Không thể tạo đơn hàng. Vui lòng kiểm tra lại kết nối và thử lại.';
+      Alert.alert('Đặt hàng thất bại', errorMsg);
     } finally {
       setIsSubmitting(false);
     }

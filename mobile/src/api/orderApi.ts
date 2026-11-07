@@ -12,17 +12,26 @@ export interface CreateOrderPayload {
   couponCode?: string;
 }
 
+export type ReturnReasonType =
+  | 'WRONG_ITEM'
+  | 'DEFECTIVE'
+  | 'EXPIRED'
+  | 'ALLERGIC'
+  | 'CUSTOMER_CHANGE_MIND';
+
 export interface CreateRmaPayload {
   orderId: string;
+  type: 'REFUND' | 'EXCHANGE';
+  reason: ReturnReasonType;
   items: Array<{
-    productId: string;
+    orderItemId: string;
     quantity: number;
-    reason: string;
   }>;
-  reasonCategory: string;
-  evidenceImages?: string[];
-  resolutionMethod: 'GLOW_POINTS' | 'ORIGINAL_PAYMENT';
-  note?: string;
+  attachmentIds?: string[];
+  replacements?: Array<{
+    productVariantId: string;
+    quantity: number;
+  }>;
 }
 
 export const orderApi = {
@@ -58,21 +67,43 @@ export const orderApi = {
     return response.data;
   },
 
-  // Gửi yêu cầu đổi trả / hoàn tiền RMA (FR-04.06)
+  // Upload ảnh chứng từ đổi trả (trả về { attachmentId, mimeType, size })
+  uploadReturnImage: async (formData: FormData) => {
+    const response = await apiClient.post('/uploads/return-images', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Gửi yêu cầu đổi trả / hoàn tiền RMA (POST /returns)
   createReturnRequest: async (payload: CreateRmaPayload) => {
-    const response = await apiClient.post('/returns', payload);
+    const idempotencyKey =
+      'rma-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+    const response = await apiClient.post('/returns', payload, {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    });
     return response.data;
   },
 
-  // Lấy danh sách yêu cầu RMA
-  getMyReturns: async () => {
-    const response = await apiClient.get('/returns/me');
+  // Lấy danh sách yêu cầu RMA của tôi (GET /returns)
+  getMyReturns: async (params?: { page?: number; limit?: number; status?: string }) => {
+    const response = await apiClient.get('/returns', { params });
     return response.data;
   },
 
-  // Lấy chi tiết tiến trình RMA
+  // Lấy chi tiết tiến trình RMA (GET /returns/:id)
   getReturnDetail: async (returnId: string) => {
     const response = await apiClient.get(`/returns/${returnId}`);
+    return response.data;
+  },
+
+  // Lấy thông tin tracking nhiều kiện hàng của đơn (GET /orders/:id/tracking)
+  getOrderTracking: async (orderId: string) => {
+    const response = await apiClient.get(`/orders/${orderId}/tracking`);
     return response.data;
   },
 };
