@@ -4,6 +4,7 @@ import {
   IBrandRepository,
 } from '../../domain/repositories/brand.repository.interface';
 import { BrandEntity, BrandProps } from '../../domain/entities/brand.entity';
+import { autoSeo } from '@core/utils/seo.util';
 
 export type CreateBrandInput = Omit<BrandProps, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -18,6 +19,12 @@ export class CreateBrandUseCase {
     if (await this.brandRepository.findBySlug(input.slug)) {
       throw new ConflictException(`Slug "${input.slug}" đã được thương hiệu khác sử dụng`);
     }
-    return this.brandRepository.create(new BrandEntity(input));
+    const seo = autoSeo({
+      title: input.name,
+      description: input.description,
+      metaTitle: input.metaTitle,
+      metaDescription: input.metaDescription,
+    });
+    return this.brandRepository.create(new BrandEntity({ ...input, ...seo }));
   }
 }
