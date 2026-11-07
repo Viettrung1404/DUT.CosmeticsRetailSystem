@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply text-text-primary font-poppins antialiased overflow-x-hidden;
+    /* Nền Gradient đa tầng chuẩn mỹ phẩm xa xỉ Thụy Sĩ: Rose Quartz, Dewy Nectar & Champagne */
+    background: 
+      radial-gradient(1000px circle at 85% 8%, rgba(255, 166, 201, 0.48) 0%, rgba(255, 214, 228, 0.3) 40%, transparent 65%),
+      radial-gradient(900px circle at 10% 20%, rgba(254, 220, 230, 0.4) 0%, rgba(255, 235, 240, 0.22) 45%, transparent 60%),
+      radial-gradient(1100px circle at 85% 60%, rgba(255, 182, 206, 0.35) 0%, rgba(254, 225, 235, 0.2) 50%, transparent 65%),
+      radial-gradient(950px circle at 15% 88%, rgba(255, 195, 218, 0.35) 0%, transparent 55%),
+      linear-gradient(180deg, #FFF5F8 0%, #FFF0F5 25%, #FFF7F9 50%, #FFF0F5 75%, #FDF0F4 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Utility Gradient Classes cho các Khối / Thẻ / Section */
+  .bg-gradient-glow-radial {
+    background: radial-gradient(circle at 50% 0%, rgba(255, 166, 201, 0.28) 0%, rgba(255, 255, 255, 0) 70%);
+  }
+
+  .bg-gradient-pearl {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 245, 248, 0.85) 100%);
+  }
+
+  .bg-gradient-accent-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 240, 245, 0.75) 50%, rgba(255, 250, 252, 0.9) 100%);
+  }
+
+  .border-gradient-glow {
+    border-image: linear-gradient(to bottom right, rgba(255, 166, 201, 0.6), rgba(214, 193, 199, 0.3), rgba(255, 166, 201, 0.4)) 1;
+  }
+
+  /* Luxury Floating Card Utility - Đổ bóng êm ái chống cụt khối */
+  .luxury-card {
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 12px 32px -4px rgba(143, 71, 102, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  }
+
+  .luxury-card-hover {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .luxury-card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 48px -8px rgba(143, 71, 102, 0.18), 0 8px 20px -4px rgba(0, 0, 0, 0.06);
+    border-color: rgba(255, 166, 201, 0.5);
+  }
+
+  /* Hiệu ứng quét sáng Shimmer Sweep qua banner Flash Deals */
+  @keyframes shimmer-sweep {
+    0% { transform: translateX(-150%) skewX(-20deg); }
+    50%, 100% { transform: translateX(250%) skewX(-20deg); }
+  }
+  .animate-shimmer-sweep {
+    animation: shimmer-sweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  /* Hiệu ứng hào quang hồng đập nhẹ cho Timer */
+  @keyframes pink-pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 12px rgba(255, 166, 201, 0.5), 0 0 24px rgba(222, 93, 131, 0.3);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(255, 166, 201, 0.8), 0 0 36px rgba(222, 93, 131, 0.5);
+      transform: scale(1.03);
+    }
+  }
+  .animate-pink-pulse-glow {
+    animation: pink-pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* Hiệu ứng sọc chuyển động trên thanh tiến trình số lượng đã bán */
+  @keyframes progress-stripes-move {
+    0% { background-position: 40px 0; }
+    100% { background-position: 0 0; }
+  }
+  .animate-progress-stripes {
+    background-image: linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.25) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.25) 50%,
+      rgba(255, 255, 255, 0.25) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 28px 28px;
+    animation: progress-stripes-move 1.5s linear infinite;
+  }
+
+  /* Hiệu ứng icon nổi bồng bềnh thu hút thị giác */
+  @keyframes float-icon {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-4px) scale(1.08); }
+  }
+  .animate-float-icon {
+    animation: float-icon 2.5s ease-in-out infinite;
+  }
+}
+
