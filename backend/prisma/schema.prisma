@@ -675,6 +675,8 @@ model Order {
   @@index([storeId, status])
   @@index([posSessionId])
   @@index([shippingAddress], type: Gin, map: "idx_orders_shipping_address")
+  @@index([salesStaffId])
+  @@index([status, createdAt])
   @@map("orders")
 }
 
@@ -703,6 +705,8 @@ model OrderItem {
   pricingSnapshot  Json?             @map("pricing_snapshot") @db.JsonB
 
   @@index([promotionId])
+  @@index([orderId])
+  @@index([productVariantId])
   @@map("order_items")
 }
 
@@ -895,6 +899,7 @@ model Payment {
 
   @@index([nextQueryAt, leaseUntil])
   @@index([orderId, createdAt])
+  @@index([status, createdAt])
   @@map("payments")
 }
 
@@ -968,6 +973,7 @@ model Customer {
   gender        String?   @db.VarChar(10)
   referralCode  String?   @unique @map("referral_code") @db.VarChar(20)
   referredBy    String?   @map("referred_by") @db.Uuid
+  emailOptOut   Boolean   @default(false) @map("email_opt_out")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -976,6 +982,7 @@ model Customer {
   referrer            Customer?                  @relation("CustomerReferral", fields: [referredBy], references: [id])
   referees            Customer[]                 @relation("CustomerReferral")
   addresses           CustomerAddress[]
+  tags                CustomerTag[]
   loyaltyTransactions LoyaltyPointsTransaction[]
   wishlists           Wishlist[]
   reviews             Review[]
@@ -1119,6 +1126,7 @@ model Employee {
   commissions        Commission[]
   ordersAsSalesStaff Order[]
 
+  @@index([storeId])
   @@map("employees")
 }
 
@@ -1152,6 +1160,8 @@ model Attendance {
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   shift    Shift?   @relation(fields: [shiftId], references: [id])
 
+  @@index([employeeId, date])
+  @@index([date])
   @@map("attendance")
 }
 
@@ -1169,6 +1179,8 @@ model Commission {
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   order    Order    @relation(fields: [orderId], references: [id])
 
+  @@index([employeeId, status])
+  @@index([orderId])
   @@map("commissions")
 }
 
@@ -1573,6 +1585,7 @@ model EmailOutbox {
   recipient String @db.VarChar(255)
   subject String @db.VarChar(255)
   text String @db.Text
+  html String? @db.Text
   status String @default("PENDING") @db.VarChar(20)
   attempts Int @default(0)
   nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz
@@ -1843,4 +1856,68 @@ model PublicCacheRevision {
   generation BigInt @default(0)
 
   @@map("public_cache_revision")
+}
+
+model MarketingCampaign {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @db.VarChar(200)
+  channel        String    @db.VarChar(10)
+  audienceType   String    @map("audience_type") @db.VarChar(20)
+  audienceValue  Json?     @map("audience_value") @db.JsonB
+  title          String    @db.VarChar(255)
+  content        String    @db.Text
+  route          String?   @db.VarChar(30)
+  resourceId     String?   @map("resource_id") @db.Uuid
+  status         String    @default("DRAFT") @db.VarChar(20)
+  scheduledAt    DateTime? @map("scheduled_at") @db.Timestamptz
+  sentAt         DateTime? @map("sent_at") @db.Timestamptz
+  recipientCount Int       @default(0) @map("recipient_count")
+  sendVersion    Int       @default(0) @map("send_version")
+  createdBy      String    @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  emailEvents MarketingEmailEvent[]
+
+  @@index([status, scheduledAt])
+  @@index([createdAt])
+  @@map("marketing_campaigns")
+}
+
+model MarketingEmailEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  campaignId String   @map("campaign_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  type       String   @db.VarChar(10)
+  url        String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  campaign MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, type])
+  @@map("marketing_email_events")
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(150)
+  subject   String   @db.VarChar(255)
+  html      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("email_templates")
+}
+
+model CustomerTag {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  tag        String   @db.VarChar(50)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, tag])
+  @@index([tag])
+  @@map("customer_tags")
 }

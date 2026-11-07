@@ -16,6 +16,7 @@ import { CustomerAdminController } from './presentation/controllers/customer-adm
 import { ADMIN_CUSTOMER_REPOSITORY } from './domain/repositories/admin-customer.repository.interface';
 import { PrismaAdminCustomerRepository } from './infrastructure/persistence/prisma-admin-customer.repository';
 import { GetAdminCustomersUseCase } from './application/use-cases/get-admin-customers.use-case';
+import { ManageCustomerTagsUseCase } from './application/use-cases/manage-customer-tags.use-case';
 
 @Module({
   imports: [PrismaModule, PermissionsModule],
@@ -38,6 +39,7 @@ import { GetAdminCustomersUseCase } from './application/use-cases/get-admin-cust
       useClass: PrismaAdminCustomerRepository,
     },
     GetAdminCustomersUseCase,
+    ManageCustomerTagsUseCase,
   ],
   exports: [
     CUSTOMER_REPOSITORY,

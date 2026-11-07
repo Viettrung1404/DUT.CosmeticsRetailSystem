@@ -47,6 +47,7 @@ export class NotificationWorker {
         recipient: string;
         subject: string;
         text: string;
+        html: string | null;
         attempts: number;
       }[]
     >`
@@ -54,7 +55,7 @@ export class NotificationWorker {
         lease_until=now()+interval '2 minutes', attempts=attempts+1
       WHERE id IN (SELECT id FROM email_outbox WHERE status IN ('PENDING','PROCESSING') AND next_attempt_at<=now()
         AND (lease_until IS NULL OR lease_until<now()) ORDER BY next_attempt_at,id LIMIT 10 FOR UPDATE SKIP LOCKED)
-      RETURNING id,recipient,subject,text,attempts`;
+      RETURNING id,recipient,subject,text,html,attempts`;
     const port = Number(this.config.get('SMTP_PORT', 587));
     const transport = nodemailer.createTransport({
       host: this.config.get('SMTP_HOST'),
@@ -82,6 +83,7 @@ export class NotificationWorker {
           to: job.recipient,
           subject: job.subject,
           text: job.text,
+          ...(job.html ? { html: job.html } : {}),
           messageId: `<${job.id}@glowup.notifications>`,
         });
         await this.prisma.emailOutbox.updateMany({

@@ -4,6 +4,7 @@ import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
   AdminCustomerListItem,
   AdminCustomerListQuery,
+  AdminCustomerScopeFilter,
   IAdminCustomerRepository,
 } from '../../domain/repositories/admin-customer.repository.interface';
 
@@ -33,6 +34,7 @@ export class PrismaAdminCustomerRepository implements IAdminCustomerRepository {
           createdAt: true,
           user: { select: { fullName: true, phone: true, email: true } },
           loyaltyTier: { select: { id: true, name: true } },
+          tags: { select: { tag: true }, orderBy: { tag: 'asc' } },
         },
       }),
       this.prisma.customer.count({ where }),
@@ -48,21 +50,57 @@ export class PrismaAdminCustomerRepository implements IAdminCustomerRepository {
       totalPoints: row.totalPoints,
       totalSpent: Number(row.totalSpent),
       totalOrders: row.totalOrders,
+      tags: row.tags.map((t) => t.tag),
       createdAt: row.createdAt,
     }));
 
     return { items, total };
   }
 
-  private buildWhere(query: AdminCustomerListQuery): Prisma.CustomerWhereInput {
-    const conditions: Prisma.CustomerWhereInput[] = [];
-    const { orderStoreIds, orderSalesStaffId } = query.scope;
+  async exists(id: string) {
+    return (await this.prisma.customer.count({ where: { id } })) > 0;
+  }
 
-    if (orderStoreIds) {
-      conditions.push({ orders: { some: { storeId: { in: orderStoreIds } } } });
+  async isVisible(id: string, scope: AdminCustomerScopeFilter) {
+    const where = { AND: [{ id }, ...this.scopeConditions(scope)] };
+    return (await this.prisma.customer.count({ where })) > 0;
+  }
+
+  async listTags() {
+    const rows = await this.prisma.customerTag.groupBy({
+      by: ['tag'],
+      _count: { customerId: true },
+      orderBy: { tag: 'asc' },
+    });
+    return rows.map((r) => ({ tag: r.tag, customers: r._count.customerId }));
+  }
+
+  async replaceTags(customerId: string, tags: string[]) {
+    await this.prisma.$transaction([
+      this.prisma.customerTag.deleteMany({ where: { customerId, tag: { notIn: tags } } }),
+      this.prisma.customerTag.createMany({
+        data: tags.map((tag) => ({ customerId, tag })),
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
+  private scopeConditions(scope: AdminCustomerScopeFilter): Prisma.CustomerWhereInput[] {
+    const conditions: Prisma.CustomerWhereInput[] = [];
+    if (scope.orderStoreIds) {
+      conditions.push({ orders: { some: { storeId: { in: scope.orderStoreIds } } } });
     }
-    if (orderSalesStaffId) {
-      conditions.push({ orders: { some: { salesStaffId: orderSalesStaffId } } });
+    if (scope.orderSalesStaffId) {
+      conditions.push({ orders: { some: { salesStaffId: scope.orderSalesStaffId } } });
+    }
+    return conditions;
+  }
+
+  private buildWhere(query: AdminCustomerListQuery): Prisma.CustomerWhereInput {
+    const conditions = this.scopeConditions(query.scope);
+
+    if (query.tag) {
+      conditions.push({ tags: { some: { tag: query.tag } } });
     }
     if (query.storeId) {
       conditions.push({ orders: { some: { storeId: query.storeId } } });
