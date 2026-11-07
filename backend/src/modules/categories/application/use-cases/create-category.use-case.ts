@@ -1,3 +1,4 @@
+import { autoSeo } from '@core/utils/seo.util';
 import {
   BadRequestException,
   ConflictException,
@@ -38,7 +39,13 @@ export class CreateCategoryUseCase {
       }
     }
 
-    const category = new CategoryEntity({ ...input, name: input.name.trim() });
+    const seo = autoSeo({
+      title: input.name,
+      description: input.description,
+      metaTitle: input.metaTitle,
+      metaDescription: input.metaDescription,
+    });
+    const category = new CategoryEntity({ ...input, ...seo, name: input.name.trim() });
     const created = await this.categoryRepository.create(category);
     await this.cacheService.del(CATEGORY_TREE_CACHE_KEY);
     return created;
