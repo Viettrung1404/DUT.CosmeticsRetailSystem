@@ -131,7 +131,7 @@ const LOYALTY_TIERS = [
 const SETTINGS: { key: string; value: Prisma.InputJsonValue; group: string; description: string }[] = [
   {
     key: 'loyalty_config',
-    value: { point_rate: 0.01 },
+    value: { point_rate: 0.01, point_value_vnd: 1 },
     group: 'loyalty',
     description: 'Tỷ lệ tích điểm theo giá trị thanh toán',
   },
