@@ -1,5 +1,16 @@
 import { Module } from '@nestjs/common';
+import { PublicCatalogService } from './application/services/public-catalog.service';
+import { CatalogIndexWorker } from './infrastructure/search/catalog-index.worker';
+import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { ProductCustomerController } from './presentation/controllers/product-customer.controller';
+import { ProductImportAdminController } from './presentation/controllers/product-import-admin.controller';
+import { ProductTagAdminController } from './presentation/controllers/product-tag-admin.controller';
+import { ImportProductsUseCase } from './application/use-cases/import-products.use-case';
+import { ListProductTagsUseCase } from './application/use-cases/list-product-tags.use-case';
+import { PRODUCT_IMPORT_REPOSITORY } from './domain/repositories/product-import.repository.interface';
+import { PRODUCT_TAG_REPOSITORY } from './domain/repositories/product-tag.repository.interface';
+import { PrismaProductImportRepository } from './infrastructure/persistence/prisma-product-import.repository';
+import { PrismaProductTagRepository } from './infrastructure/persistence/prisma-product-tag.repository';
 import { ProductAdminController } from './presentation/controllers/product-admin.controller';
 import { ProductVariantAdminController } from './presentation/controllers/product-variant-admin.controller';
 import { GetProductsUseCase } from './application/use-cases/get-products.use-case';
@@ -23,8 +34,17 @@ import { ElasticsearchProductService } from './infrastructure/search/elasticsear
 import { ProductSearchSyncService } from './infrastructure/search/product-search-sync.service';
 
 @Module({
-  controllers: [ProductCustomerController, ProductAdminController, ProductVariantAdminController],
+  imports: [CustomerCommerceModule],
+  controllers: [
+    ProductCustomerController,
+    ProductImportAdminController,
+    ProductTagAdminController,
+    ProductAdminController,
+    ProductVariantAdminController,
+  ],
   providers: [
+    PublicCatalogService,
+    CatalogIndexWorker,
     // Use Cases
     GetProductsUseCase,
     GetProductDetailUseCase,
@@ -39,6 +59,8 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     CreateProductVariantUseCase,
     UpdateProductVariantUseCase,
     DeleteProductVariantUseCase,
+    ImportProductsUseCase,
+    ListProductTagsUseCase,
 
     // Search Engine
     ElasticsearchProductService,
@@ -53,6 +75,8 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
       provide: PRODUCT_VARIANT_REPOSITORY,
       useClass: PrismaProductVariantRepository,
     },
+    { provide: PRODUCT_IMPORT_REPOSITORY, useClass: PrismaProductImportRepository },
+    { provide: PRODUCT_TAG_REPOSITORY, useClass: PrismaProductTagRepository },
   ],
   exports: [
     PRODUCT_REPOSITORY,

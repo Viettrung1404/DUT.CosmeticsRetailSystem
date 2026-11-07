@@ -11,7 +11,15 @@ export interface PermissionDefinition {
   permissionCode: string;
 }
 
+export interface UserScopeInfo {
+  dataScope: string;
+  assignedStoreIds: string[];
+  employeeId: string | null;
+  employeeStoreId: string | null;
+}
+
 export interface IPermissionRepository {
   findUserPermissionMasks(userId: string): Promise<UserPermissionMasks | null>;
   findAllDefinitions(): Promise<PermissionDefinition[]>;
+  findUserScopeInfo(userId: string): Promise<UserScopeInfo | null>;
 }

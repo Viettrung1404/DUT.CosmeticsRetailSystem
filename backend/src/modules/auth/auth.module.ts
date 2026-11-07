@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case';
 import { AuthController } from './presentation/controllers/auth.controller';
 import { RegisterUseCase } from './application/use-cases/register.use-case';
 import { LoginUseCase } from './application/use-cases/login.use-case';
@@ -20,13 +21,18 @@ import { BcryptService } from './infrastructure/adapters/bcrypt.service';
 import { JwtTokenService } from './infrastructure/adapters/jwt.service';
 import { NodemailerEmailService } from './infrastructure/adapters/nodemailer-email.service';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
+import { OAuthController } from './presentation/controllers/oauth.controller';
+import { OAuthService } from './application/oauth.service';
+import { OAuthProviderService } from './infrastructure/adapters/oauth-provider.service';
 
 @Module({
   imports: [PermissionsModule],
-  controllers: [AuthController],
+  controllers: [AuthController, OAuthController],
   providers: [
     // Use Cases
     RegisterUseCase,
+    OAuthService,
+    OAuthProviderService,
     LoginUseCase,
     VerifyEmailUseCase,
     ResendOtpUseCase,
@@ -35,6 +41,7 @@ import { PermissionsModule } from '@modules/permissions/permissions.module';
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
     GetMeUseCase,
+    ChangePasswordUseCase,
 
     // Adapters & Services
     BcryptService,
@@ -70,4 +77,3 @@ import { PermissionsModule } from '@modules/permissions/permissions.module';
   ],
 })
 export class AuthModule {}
-

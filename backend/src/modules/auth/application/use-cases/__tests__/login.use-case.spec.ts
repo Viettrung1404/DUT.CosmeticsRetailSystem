@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LoginUseCase } from '../login.use-case';
-import { USER_REPOSITORY, IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import {
+  USER_REPOSITORY,
+  IUserRepository,
+} from '../../../domain/repositories/user.repository.interface';
 import {
   USER_SESSION_REPOSITORY,
   IUserSessionRepository,
@@ -36,8 +39,12 @@ describe('LoginUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
+      rotateActive: jest
+        .fn()
+        .mockResolvedValue({ id: 'session-1', userId: 'user-1' }),
     };
 
     bcryptService = {
@@ -47,6 +54,7 @@ describe('LoginUseCase', () => {
 
     jwtService = {
       generateAccessToken: jest.fn().mockReturnValue('mock-access-token'),
+      refreshExpiresAt: jest.fn().mockImplementation(() => new Date(Date.now() + 7 * 86400000)),
       generateRefreshToken: jest.fn().mockReturnValue('mock-refresh-token'),
       verifyAccessToken: jest.fn(),
     } as any;
@@ -62,7 +70,10 @@ describe('LoginUseCase', () => {
         { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo },
         { provide: BcryptService, useValue: bcryptService },
         { provide: JwtTokenService, useValue: jwtService },
-        { provide: GetUserEffectivePermissionsUseCase, useValue: getPermissionsUseCase },
+        {
+          provide: GetUserEffectivePermissionsUseCase,
+          useValue: getPermissionsUseCase,
+        },
       ],
     }).compile();
 
@@ -94,6 +105,9 @@ describe('LoginUseCase', () => {
     });
 
     expect(result.accessToken).toBe('mock-access-token');
+    expect(jwtService.generateAccessToken).toHaveBeenCalledWith(
+      expect.objectContaining({ sid: 'session-1' }),
+    );
     expect(result.refreshToken).toBe('mock-refresh-token');
     expect(result.user.email).toBe('user@glowup.vn');
     expect(userRepo.updateLastLogin).toHaveBeenCalledWith('user-1');
@@ -149,4 +163,3 @@ describe('LoginUseCase', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 });
-

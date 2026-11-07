@@ -21,6 +21,7 @@ import {
   ProductVariantProps,
   variantOptionKey,
 } from '../../domain/entities/product.entity';
+import { autoSeo } from '@core/utils/seo.util';
 import { assertVariantCodesUnique } from '../variant-rules';
 
 export type CreateProductInput = Required<Pick<ProductChanges, 'categoryId' | 'name' | 'slug' | 'sku' | 'basePrice'>> &
@@ -66,6 +67,12 @@ export class CreateProductUseCase {
 
     const product = new ProductEntity({
       ...productFields,
+      ...autoSeo({
+        title: input.name,
+        description: input.description ?? input.shortDescription,
+        metaTitle: input.metaTitle,
+        metaDescription: input.metaDescription,
+      }),
       name: input.name.trim(),
       variants: variants.map((v) => ({ ...v, isActive: v.isActive ?? true })),
       images: normalizeImages(images),

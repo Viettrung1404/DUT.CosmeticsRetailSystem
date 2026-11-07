@@ -25,6 +25,10 @@ export interface UserProps {
  * Completely framework-agnostic (independent of NestJS, Prisma, etc.).
  */
 export class UserEntity {
+  private readonly _changes: Partial<UserProps> = {};
+  get changes(): Readonly<Partial<UserProps>> {
+    return { ...this._changes };
+  }
   private _id?: string;
   private _roleId: number;
   private _email: string;
@@ -66,29 +70,68 @@ export class UserEntity {
   }
 
   // Getters
-  get id(): string | undefined { return this._id; }
-  get roleId(): number { return this._roleId; }
-  get email(): string { return this._email; }
-  get passwordHash(): string | null | undefined { return this._passwordHash; }
-  get phone(): string | null | undefined { return this._phone; }
-  get fullName(): string { return this._fullName; }
-  get avatarUrl(): string | null | undefined { return this._avatarUrl; }
-  get status(): string { return this._status; }
-  get emailVerified(): boolean { return this._emailVerified; }
-  get phoneVerified(): boolean { return this._phoneVerified; }
-  get extraPermissions(): bigint { return this._extraPermissions; }
-  get revokedPermissions(): bigint { return this._revokedPermissions; }
-  get lastLoginAt(): Date | null | undefined { return this._lastLoginAt; }
-  get createdAt(): Date | undefined { return this._createdAt; }
-  get updatedAt(): Date | undefined { return this._updatedAt; }
-  get roleName(): string | undefined { return this._roleName; }
-  get rolePermissions(): bigint | undefined { return this._rolePermissions; }
-  get dataScope(): string | undefined { return this._dataScope; }
+  get id(): string | undefined {
+    return this._id;
+  }
+  get roleId(): number {
+    return this._roleId;
+  }
+  get email(): string {
+    return this._email;
+  }
+  get passwordHash(): string | null | undefined {
+    return this._passwordHash;
+  }
+  get phone(): string | null | undefined {
+    return this._phone;
+  }
+  get fullName(): string {
+    return this._fullName;
+  }
+  get avatarUrl(): string | null | undefined {
+    return this._avatarUrl;
+  }
+  get status(): string {
+    return this._status;
+  }
+  get emailVerified(): boolean {
+    return this._emailVerified;
+  }
+  get phoneVerified(): boolean {
+    return this._phoneVerified;
+  }
+  get extraPermissions(): bigint {
+    return this._extraPermissions;
+  }
+  get revokedPermissions(): bigint {
+    return this._revokedPermissions;
+  }
+  get lastLoginAt(): Date | null | undefined {
+    return this._lastLoginAt;
+  }
+  get createdAt(): Date | undefined {
+    return this._createdAt;
+  }
+  get updatedAt(): Date | undefined {
+    return this._updatedAt;
+  }
+  get roleName(): string | undefined {
+    return this._roleName;
+  }
+  get rolePermissions(): bigint | undefined {
+    return this._rolePermissions;
+  }
+  get dataScope(): string | undefined {
+    return this._dataScope;
+  }
 
   // ==================== Business Rules ====================
 
   /** Validates password complexity: min 8 chars, uppercase, lowercase, digit */
-  static validatePassword(password: string): { valid: boolean; message?: string } {
+  static validatePassword(password: string): {
+    valid: boolean;
+    message?: string;
+  } {
     if (password.length < 8) {
       return { valid: false, message: 'Mật khẩu phải có tối thiểu 8 ký tự' };
     }
@@ -96,7 +139,10 @@ export class UserEntity {
       return { valid: false, message: 'Mật khẩu phải chứa ít nhất 1 chữ hoa' };
     }
     if (!/[a-z]/.test(password)) {
-      return { valid: false, message: 'Mật khẩu phải chứa ít nhất 1 chữ thường' };
+      return {
+        valid: false,
+        message: 'Mật khẩu phải chứa ít nhất 1 chữ thường',
+      };
     }
     if (!/[0-9]/.test(password)) {
       return { valid: false, message: 'Mật khẩu phải chứa ít nhất 1 chữ số' };
@@ -123,21 +169,24 @@ export class UserEntity {
   /** Mark email as verified */
   verifyEmail(): void {
     this._emailVerified = true;
+    this._changes.emailVerified = true;
   }
 
   /** Mark phone as verified */
   verifyPhone(): void {
     this._phoneVerified = true;
+    this._changes.phoneVerified = true;
   }
 
   /** Update last login timestamp */
   updateLastLogin(): void {
     this._lastLoginAt = new Date();
+    this._changes.lastLoginAt = this._lastLoginAt;
   }
 
   /** Update password hash */
   updatePasswordHash(newHash: string): void {
     this._passwordHash = newHash;
+    this._changes.passwordHash = newHash;
   }
 }
-

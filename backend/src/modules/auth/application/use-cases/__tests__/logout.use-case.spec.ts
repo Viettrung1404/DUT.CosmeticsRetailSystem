@@ -14,15 +14,16 @@ describe('LogoutUseCase', () => {
       create: jest.fn(),
       findByRefreshToken: jest.fn(),
       revokeById: jest.fn(),
+      consume: jest.fn().mockResolvedValue(true),
       revokeAllByUserId: jest.fn(),
       revokeAllByUserIdExcept: jest.fn(),
+      rotateActive: jest
+        .fn()
+        .mockResolvedValue({ id: 'session-1', userId: 'user-1' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LogoutUseCase,
-        { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo },
-      ],
+      providers: [LogoutUseCase, { provide: USER_SESSION_REPOSITORY, useValue: sessionRepo }],
     }).compile();
 
     useCase = module.get<LogoutUseCase>(LogoutUseCase);

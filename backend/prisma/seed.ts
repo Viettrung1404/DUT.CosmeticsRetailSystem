@@ -1,5 +1,6 @@
-// Nguồn dữ liệu: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (53 quyền) và mục 5.1 (6 vai trò)
-import { PrismaClient } from '@prisma/client';
+// Nguồn dữ liệu: docs/2-design/04_thiet_ke_csdl.md, mục 3.1 (53 quyền) và mục 5.1 (6 vai trò, 4 hạng thành viên)
+import { PrismaClient, Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -80,6 +81,7 @@ const ROLES = [
     description: 'Quản lý vận hành, kho, đơn hàng và nhân sự của chi nhánh được giao',
     permissions: mask([
       0, 6, 7, 8, 9, 10, 48, 49, 11, 12, 13, 14, 15, 50, 51, 25, 26, 27, 28, 29, 35, 17, 37, 20,
+      16, 19,
     ]),
     dataScope: 'STORE',
   },
@@ -88,15 +90,15 @@ const ROLES = [
     name: 'sales_staff',
     displayName: 'Nhân viên bán hàng',
     description: 'Bán hàng tại quầy POS, thu tiền, tra cứu khách hàng',
-    permissions: mask([0, 11, 13, 16, 20, 21]),
+    permissions: mask([0, 6, 11, 13, 16, 20, 21]),
     dataScope: 'STORE',
   },
   {
     id: 4,
     name: 'warehouse_staff',
     displayName: 'Nhân viên kho',
-    description: 'Nhập kho, chuyển kho, kiểm kê, quản lý lô hạn dùng, đóng gói giao vận',
-    permissions: mask([0, 6, 7, 8, 9, 10, 34, 48, 49, 50, 12]),
+    description: 'Làm tại kho tổng: lập đơn đặt hàng NCC, nhập kho, chuyển kho, kiểm kê, quản lý lô hạn dùng',
+    permissions: mask([0, 6, 7, 8, 9, 10, 32, 34, 48, 49, 12]),
     dataScope: 'STORE',
   },
   {
@@ -104,7 +106,7 @@ const ROLES = [
     name: 'accountant',
     displayName: 'Kế toán',
     description: 'Đối soát thanh toán, hóa đơn điện tử, thanh toán nhà cung cấp, báo cáo tài chính',
-    permissions: mask([0, 19, 30, 33, 35, 36, 39, 52]),
+    permissions: mask([0, 17, 19, 27, 30, 33, 35, 36, 39, 52]),
     dataScope: 'ALL',
   },
   {
@@ -116,6 +118,81 @@ const ROLES = [
     dataScope: 'SELF',
   },
 ];
+
+// Hệ số nhân điểm theo hạng; % giảm giá theo hạng giữ mặc định của bảng (0)
+const LOYALTY_TIERS = [
+  { name: 'Bronze', minPoints: 0, pointMultiplier: 1 },
+  { name: 'Silver', minPoints: 1000, pointMultiplier: 1.2 },
+  { name: 'Gold', minPoints: 5000, pointMultiplier: 1.5 },
+  { name: 'Diamond', minPoints: 15000, pointMultiplier: 2 },
+];
+
+// BR-02: tích 1% giá trị thanh toán (nhân hệ số hạng); 1 điểm = 1đ khi dùng
+const SETTINGS: { key: string; value: Prisma.InputJsonValue; group: string; description: string }[] = [
+  {
+    key: 'loyalty_config',
+    value: { point_rate: 0.01, point_value_vnd: 1 },
+    group: 'loyalty',
+    description: 'Tỷ lệ tích điểm theo giá trị thanh toán',
+  },
+  {
+    // Danh sách rỗng = chưa có quà đổi điểm; quản trị thêm sau
+    key: 'loyalty_rewards',
+    value: { rewards: [] },
+    group: 'loyalty',
+    description: 'Danh sách quà đổi điểm',
+  },
+  {
+    key: 'return_policy',
+    value: {
+      version: 'v1',
+      allocation: 'PROPORTIONAL',
+      refundPointsAs: 'POINTS',
+      exchangeShippingFee: 0,
+      quoteMinutes: 30,
+      allowDifferenceCod: true,
+    },
+    group: 'returns',
+    description: 'Chính sách đổi trả',
+  },
+  {
+    key: 'return_accounting',
+    value: {
+      earnedPointsReversal: 'PROPORTIONAL',
+      allowPointDebt: true,
+      stats: 'NET_CASH_VALUE',
+      totalOrdersMode: 'REMOVE_FULLY_RETURNED_ORDERS',
+    },
+    group: 'returns',
+    description: 'Cách hạch toán điểm và thống kê khi hoàn trả',
+  },
+];
+
+// Admin đầu tiên lấy từ biến môi trường; thiếu biến thì bỏ qua, đã có thì không đổi mật khẩu
+async function seedAdmin() {
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.log('Bỏ qua tạo Admin: chưa đặt SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD.');
+    return;
+  }
+  if (password.length < 8) throw new Error('SEED_ADMIN_PASSWORD phải có ít nhất 8 ký tự');
+  if (await prisma.user.findUnique({ where: { email } })) {
+    console.log('Admin đã tồn tại, giữ nguyên.');
+    return;
+  }
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await bcrypt.hash(password, 10),
+      fullName: process.env.SEED_ADMIN_NAME?.trim() || 'Quản trị viên',
+      roleId: 1,
+      emailVerified: true,
+      status: 'ACTIVE',
+    },
+  });
+  console.log('Đã tạo tài khoản Admin từ biến môi trường.');
+}
 
 async function main() {
   for (const [bitPosition, permissionCode, permissionName, module] of PERMISSIONS) {
@@ -140,7 +217,25 @@ async function main() {
     `SELECT setval(pg_get_serial_sequence('roles', 'id'), (SELECT MAX(id) FROM roles))`,
   );
 
+  // Cột name không có UNIQUE nên không dùng upsert được; tìm theo tên rồi tạo hoặc sửa
+  for (const tier of LOYALTY_TIERS) {
+    const existing = await prisma.loyaltyTier.findFirst({ where: { name: tier.name } });
+    if (existing) {
+      await prisma.loyaltyTier.update({ where: { id: existing.id }, data: tier });
+    } else {
+      await prisma.loyaltyTier.create({ data: tier });
+    }
+  }
+
+  // Chỉ tạo khi chưa có: giá trị quản trị viên đã chỉnh thì chạy lại seed không ghi đè
+  for (const s of SETTINGS) {
+    await prisma.setting.upsert({ where: { key: s.key }, update: {}, create: s });
+  }
+
+  await seedAdmin();
+
   console.log(`Đã seed ${PERMISSIONS.length} quyền và ${ROLES.length} vai trò (id ${ROLES.map((r) => r.id).join(', ')}).`);
+  console.log(`Đã seed ${LOYALTY_TIERS.length} hạng thành viên: ${LOYALTY_TIERS.map((t) => t.name).join(', ')}.`);
 }
 
 main()

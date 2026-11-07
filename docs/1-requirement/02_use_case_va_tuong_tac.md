@@ -635,41 +635,47 @@ sequenceDiagram
     participant Client as Frontend (Next.js)
     participant Gateway as API Gateway
     participant OrderSvc as Order Service
-    participant Inventory as Inventory Service
+    participant PaymentSvc as Payments Module
+    participant DB as PostgreSQL
+    participant Worker as Payment Worker
     participant VNPay as Cổng thanh toán VNPay
 
     Customer->>Client: Nhấn "Đặt hàng" (chọn VNPay)
     Client->>Gateway: POST /api/v1/orders
     Gateway->>OrderSvc: Forward request
     
-    OrderSvc->>Inventory: Chặn tồn kho tạm thời (Lock inventory)
-    Inventory-->>OrderSvc: Xác nhận đã khóa tồn kho
-    
-    OrderSvc->>OrderSvc: Tạo Order (Status: Pending)
-    OrderSvc->>OrderSvc: Tạo Payment Transaction
-    OrderSvc->>VNPay: Gọi API tạo URL thanh toán
-    VNPay-->>OrderSvc: Trả về Payment URL
-    
-    OrderSvc-->>Gateway: Trả về dữ liệu Order & Payment URL
-    Gateway-->>Client: Trả về Payment URL
+    OrderSvc->>DB: Transaction tạo PENDING, giữ hàng/điểm, notification/outbox
+    OrderSvc-->>Gateway: Trả dữ liệu Order
+    Gateway-->>Client: orderId
+    Client->>Gateway: POST /api/v1/payments/vnpay/create (orderId, platform)
+    Gateway->>PaymentSvc: Kiểm tra sở hữu, số tiền, deadline
+    PaymentSvc->>DB: Lưu reference/state/snapshot trước khi tạo URL
+    PaymentSvc->>PaymentSvc: Ký URL VNPay, vnp_ExpireDate cố định
+    PaymentSvc-->>Client: paymentId, paymentUrl, returnUrl, expiresAt
     Client-->>Customer: Chuyển hướng sang VNPay
     
     Customer->>VNPay: Thực hiện thanh toán (Nhập thẻ/OTP)
     VNPay-->>Customer: Hiển thị kết quả thanh toán
     
-    Note over VNPay, OrderSvc: Asynchronous Webhook
-    VNPay->>Gateway: POST /api/v1/payments/vnpay-ipn (Webhook)
-    Gateway->>OrderSvc: Xử lý IPN
-    
-    alt Thanh toán thành công
-        OrderSvc->>Inventory: Trừ tồn kho vĩnh viễn (Commit)
-        OrderSvc->>OrderSvc: Cập nhật Order (Status: Confirmed)
-        OrderSvc-->>VNPay: HTTP 200 OK
-    else Thanh toán thất bại
-        OrderSvc->>Inventory: Nhả tồn kho (Rollback)
-        OrderSvc->>OrderSvc: Cập nhật Order (Status: Payment Failed)
-        OrderSvc-->>VNPay: HTTP 200 OK
+    VNPay->>Gateway: GET /api/v1/payments/vnpay/callback (browser return)
+    Gateway->>PaymentSvc: Kiểm tra state và TTL
+    PaymentSvc-->>Client: 303 về Web hoặc HTTPS bridge Mobile
+    Note over Client,PaymentSvc: Browser return chỉ điều hướng, không xác nhận tiền
+
+    VNPay->>Gateway: GET /api/v1/payments/vnpay/ipn
+    Gateway->>PaymentSvc: Xác thực chữ ký, merchant, amount, transaction
+    PaymentSvc->>DB: Khóa order → payment, commit inbox/paid evidence
+    PaymentSvc-->>VNPay: Native RspCode sau durable commit
+    Worker->>VNPay: Query giao dịch ngoài transaction DB
+    VNPay-->>Worker: Kết quả đã xác thực
+    Worker->>DB: Khóa order → payment, kiểm tra DB clock và paid evidence
+    alt Paid đúng hạn, PENDING, còn trong cửa sổ 60 giây
+        Worker->>DB: Transaction COMPLETED + CONFIRMED + history + notification/outbox
+    else Đơn đã hủy hoặc tiền muộn/thừa
+        Worker->>DB: Transaction COMPLETED + một Refund PENDING, giữ đơn đã hủy
     end
+    Client->>Gateway: GET /api/v1/payments/:id/status
+    Gateway-->>Client: Trạng thái xác minh và refund an toàn
 ```
 
 ### 5.2 Tạo đơn hàng POS
@@ -714,7 +720,6 @@ sequenceDiagram
     participant API as Auth Controller
     participant Service as Auth Service
     participant DB as PostgreSQL
-    participant Redis as Redis Cache (Blacklist)
 
     User->>Client: Nhập Email & Password, nhấn Đăng nhập
     Client->>API: POST /api/v1/auth/login
@@ -729,15 +734,18 @@ sequenceDiagram
         API-->>Client: 401 Unauthorized (Sai email hoặc mật khẩu)
         Client-->>User: Hiển thị thông báo lỗi
     else Hợp lệ
-        Service->>Service: Generate Access Token (JWT)
         Service->>Service: Generate Refresh Token
-        Service->>DB: Lưu Refresh Token (Hoặc lưu Redis)
+        Service->>DB: Khóa user, tạo UserSession (TTL 7 ngày)
+        DB-->>Service: UserSession.id = sid
+        Service->>Service: Ký Access Token (JWT, sid, TTL 15 phút)
         Service-->>API: Trả về Token Pair & User Info
-        API-->>Client: 200 OK + Set-Cookie (Refresh Token) + Access Token
+        API-->>Client: 200 OK JSON {accessToken, refreshToken, user}
         Client->>Client: Lưu Access Token (Memory/LocalStorage)
         Client-->>User: Chuyển hướng về Trang chủ / Dashboard
     end
 ```
+
+Sprint 3 giữ hợp đồng JSON login/refresh hiện tại. Refresh xoay token bằng CAS trong cùng session row, giữ `sid`; khóa theo thứ tự user → session. `PUT /auth/change-password` nhận `{oldPassword,newPassword}`, lấy `sid` từ JWT và kiểm tra phiên active phía server; giữ phiên này, thu hồi các refresh session khác. API không yêu cầu client đọc refresh token từ httpOnly cookie hoặc gửi `currentRefreshToken` trong body. JWT cũ thiếu `sid` phải refresh/đăng nhập lại trước đổi mật khẩu. [Chi tiết](../../backend/docs/sprint-3.md).
 
 ### 5.4 Tìm kiếm sản phẩm (with Elasticsearch)
 

@@ -124,6 +124,18 @@ export class ElasticsearchProductService implements OnModuleInit {
     return this.isConnected && !!this.client;
   }
 
+  /** Durable worker path: propagate errors and reject writes older than the indexed version. */
+  async syncVersioned(id: string, doc: ElasticsearchProductDocument | null, version: number): Promise<void> {
+    if (!this.isAvailable) throw new Error('ELASTICSEARCH_UNAVAILABLE');
+    try {
+      if (doc) await this.client!.index({ index: this.indexName, id, document: doc, version, version_type: 'external_gte' });
+      else await this.client!.delete({ index: this.indexName, id, version, version_type: 'external_gte' });
+    } catch (error) {
+      const code = (error as { meta?: { statusCode?: number } }).meta?.statusCode;
+      if (code !== 409 && !(doc === null && code === 404)) throw error;
+    }
+  }
+
   // Ghi đè hàng loạt; trả về số tài liệu ghi thành công
   async bulkIndex(docs: ElasticsearchProductDocument[]): Promise<number> {
     if (!this.isAvailable || docs.length === 0) return 0;

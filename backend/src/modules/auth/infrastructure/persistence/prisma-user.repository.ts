@@ -17,8 +17,8 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    const raw = await this.prisma.user.findUnique({
-      where: { email },
+    const raw = await this.prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
       include: { role: true },
     });
     return raw ? UserMapper.toDomain(raw) : null;
@@ -48,6 +48,17 @@ export class PrismaUserRepository implements IUserRepository {
         extraPermissions: data.extraPermissions,
         revokedPermissions: data.revokedPermissions,
         lastLoginAt: data.lastLoginAt,
+        ...(data.roleId === 6
+          ? {
+              customer: {
+                create: {
+                  fullName: data.fullName,
+                  // A typed phone number alone is not evidence of ownership of a POS profile.
+                  phone: data.phoneVerified ? data.phone : null,
+                },
+              },
+            }
+          : {}),
       },
       include: { role: true },
     });
@@ -55,26 +66,17 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async update(user: UserEntity): Promise<UserEntity> {
-    const data = UserMapper.toPersistence(user);
-    const raw = await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        roleId: data.roleId,
-        email: data.email,
-        passwordHash: data.passwordHash,
-        phone: data.phone,
-        fullName: data.fullName,
-        avatarUrl: data.avatarUrl,
-        status: data.status,
-        emailVerified: data.emailVerified,
-        phoneVerified: data.phoneVerified,
-        extraPermissions: data.extraPermissions,
-        revokedPermissions: data.revokedPermissions,
-        lastLoginAt: data.lastLoginAt,
-      },
-      include: { role: true },
+    return this.prisma.transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id=${user.id}::uuid FOR UPDATE`;
+      const raw = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          ...user.changes,
+        },
+        include: { role: true },
+      });
+      return UserMapper.toDomain(raw);
     });
-    return UserMapper.toDomain(raw);
   }
 
   async updateLastLogin(userId: string): Promise<void> {
@@ -85,11 +87,10 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async createCustomerForUser(userId: string, phone?: string | null): Promise<void> {
-    await this.prisma.customer.create({
-      data: {
-        userId,
-        phone: phone || null,
-      },
+    await this.prisma.customer.upsert({
+      where: { userId },
+      create: { userId, phone: null },
+      update: {},
     });
   }
 

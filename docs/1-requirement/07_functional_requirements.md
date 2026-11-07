@@ -510,7 +510,7 @@ Khách hàng hoàn tất đơn hàng: chọn/thêm địa chỉ giao hàng, ch�
 3. Điểm thưởng sử dụng không được vượt quá `customers.total_points`
 4. Quy đổi điểm: 1 điểm = 1.000 VNĐ (cấu hình trong `settings`)
 5. `total_amount = subtotal - discount_amount - points_discount + shipping_fee + tax_amount`
-6. Đơn PENDING hơn 30 phút không thanh toán → auto cancel, hoàn reserved inventory
+6. Đơn online PENDING hết hạn sau 15 phút từ tạo đơn; COD sau 30 phút. Paid evidence được DB lưu trước hạn cho phép tối đa 60 giây xác minh, không gia hạn thời gian thanh toán. Hết hạn/hủy đơn → release reservation, hoàn điểm/coupon; tiền nhận muộn/thừa tạo yêu cầu hoàn tiền thủ công. [Thiết kế và nghiệm thu Sprint 3](../../backend/docs/sprint-3.md).
 
 **Phân công chi tiết:**
 
@@ -518,7 +518,7 @@ Khách hàng hoàn tất đơn hàng: chọn/thêm địa chỉ giao hàng, ch�
 |----------|-----------|----------|
 | `[BE]` | API `POST /api/v1/orders` | Transaction: validate stock → create order → create order_items → reserve inventory → apply coupon → apply points → clear cart → trigger notification |
 | `[BE]` | API `POST /api/v1/orders/preview` | Preview order: tính toán giá, áp coupon/points mà chưa tạo đơn (hiển thị cho user confirm) |
-| `[BE]` | Cron Job: Cancel expired orders | Mỗi 5 phút, scan đơn `PENDING` > 30 phút → cancel, release reserved |
+| `[BE]` | Worker: Cancel expired orders | Online poll 1 giây: hạn 15 phút, cửa sổ xác minh paid đúng hạn 60 giây; COD giữ cron hạn 30 phút. Cancel/release/points/coupon/history/notification/outbox cùng transaction. |
 | `[FE-Web]` | Trang `/checkout` | Step 1: Địa chỉ → Step 2: Thanh toán → Step 3: Xác nhận. Input coupon code, slider điểm thưởng, order summary |
 | `[FE-Web]` | Trang `/order-success/:orderNumber` | Cảm ơn + chi tiết đơn hàng |
 | `[Mobile]` | Flow checkout | Multi-step form, saved addresses dropdown, payment method selector |
@@ -1306,7 +1306,7 @@ Thanh toán đơn hàng Online qua các cổng: VNPay (thẻ ATM/Visa/Master), M
 |----------|-----------|----------|
 | `[BE]` | API `POST /api/v1/payments/vnpay/create` | Tạo payment URL VNPay |
 | `[BE]` | API `GET /api/v1/payments/vnpay/callback` | Verify VNPay signature, update payment status |
-| `[BE]` | API `POST /api/v1/payments/vnpay/ipn` | IPN (Instant Payment Notification) từ VNPay |
+| `[BE]` | API `GET /api/v1/payments/vnpay/ipn` | IPN từ VNPay: xác thực, commit inbox rồi native ACK; worker query xác minh trước confirm. Browser callback chỉ điều hướng. |
 | `[BE]` | Tương tự cho MoMo, ZaloPay | Mỗi gateway 1 adapter |
 | `[FE-Web]` | Trang chọn phương thức TT | Radio buttons, redirect handler, return page |
 | `[Mobile]` | In-app payment flow | WebView hoặc deeplink sang app MoMo/ZaloPay |
