@@ -17,6 +17,7 @@ export interface AdminCustomerListQuery {
   search?: string;
   loyaltyTierId?: string;
   storeId?: string;
+  tag?: string;
 }
 
 export interface AdminCustomerListItem {
@@ -29,9 +30,14 @@ export interface AdminCustomerListItem {
   totalPoints: number;
   totalSpent: number;
   totalOrders: number;
+  tags: string[];
   createdAt: Date;
 }
 
 export interface IAdminCustomerRepository {
   findMany(query: AdminCustomerListQuery): Promise<{ items: AdminCustomerListItem[]; total: number }>;
+  exists(id: string): Promise<boolean>;
+  isVisible(id: string, scope: AdminCustomerScopeFilter): Promise<boolean>;
+  listTags(): Promise<{ tag: string; customers: number }[]>;
+  replaceTags(customerId: string, tags: string[]): Promise<void>;
 }

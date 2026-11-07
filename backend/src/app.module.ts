@@ -26,6 +26,7 @@ import { HrModule } from '@modules/hr/hr.module';
 import { SuppliersModule } from '@modules/suppliers/suppliers.module';
 import { FinanceModule } from '@modules/finance/finance.module';
 import { ReportsModule } from '@modules/reports/reports.module';
+import { MarketingModule } from '@modules/marketing/marketing.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { SeoModule } from '@modules/seo/seo.module';
@@ -73,6 +74,7 @@ import { HealthModule } from '@core/health/health.module';
     SuppliersModule,
     FinanceModule,
     ReportsModule,
+    MarketingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

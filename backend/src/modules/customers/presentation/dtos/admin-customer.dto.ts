@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { AdminCustomerListItem } from '../../domain/repositories/admin-customer.repository.interface';
 
@@ -22,6 +22,12 @@ export class AdminCustomerQueryDto extends PageOptionsDto {
   @IsUUID('4', { message: 'storeId không hợp lệ' })
   readonly storeId?: string;
 
+  @ApiPropertyOptional({ description: 'Lọc theo nhãn gắn tay', example: 'VIP' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50, { message: 'Nhãn tối đa 50 ký tự' })
+  readonly tag?: string;
+
   @ApiPropertyOptional({ enum: SORT_FIELDS, default: 'createdAt' })
   @IsOptional()
   @IsIn(SORT_FIELDS, { message: 'sortBy chỉ nhận createdAt, totalSpent hoặc totalPoints' })
@@ -43,9 +49,19 @@ export class AdminCustomerListItemDto {
   @ApiProperty() totalPoints: number;
   @ApiProperty() totalSpent: number;
   @ApiProperty() totalOrders: number;
+  @ApiProperty({ type: [String], description: 'Nhãn gắn tay' }) tags: string[];
   @ApiProperty() createdAt: Date;
 
   static fromDomain(item: AdminCustomerListItem): AdminCustomerListItemDto {
     return Object.assign(new AdminCustomerListItemDto(), item);
   }
+}
+
+export class ReplaceCustomerTagsDto {
+  @ApiProperty({ type: [String], example: ['VIP', 'Hay đổi trả'], description: 'Danh sách nhãn mới, thay toàn bộ nhãn cũ' })
+  @IsArray({ message: 'tags phải là mảng' })
+  @ArrayMaxSize(20, { message: 'Mỗi khách tối đa 20 nhãn' })
+  @IsString({ each: true, message: 'Nhãn phải là chuỗi' })
+  @MaxLength(50, { each: true, message: 'Nhãn tối đa 50 ký tự' })
+  readonly tags: string[];
 }
