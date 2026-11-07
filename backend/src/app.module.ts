@@ -22,6 +22,9 @@ import { CartModule } from '@modules/cart/cart.module';
 import { CustomersModule } from '@modules/customers/customers.module';
 import { OrdersModule } from '@modules/orders/orders.module';
 import { PaymentsModule } from '@modules/payments/payments.module';
+import { HrModule } from '@modules/hr/hr.module';
+import { SuppliersModule } from '@modules/suppliers/suppliers.module';
+import { FinanceModule } from '@modules/finance/finance.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { SeoModule } from '@modules/seo/seo.module';
@@ -62,6 +65,9 @@ import { HealthModule } from '@core/health/health.module';
     CustomersModule,
     OrdersModule,
     PaymentsModule,
+    HrModule,
+    SuppliersModule,
+    FinanceModule,
     CustomerCommerceModule,
     SeoModule,
     HealthModule,
