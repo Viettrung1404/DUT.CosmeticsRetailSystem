@@ -28,6 +28,8 @@ export function StoreMap({ stores, activeStoreId, onSelectStore }: StoreMapProps
   const markersRef = useRef<Map<string, LeafletMarker>>(new Map());
   const [mapReady, setMapReady] = useState(false);
   const [locatingUser, setLocatingUser] = useState(false);
+  const [mapError, setMapError] = useState("");
+  const retryTilesRef = useRef<(() => void) | null>(null);
 
   const activeStore = stores.find((s) => s.id === activeStoreId) || stores[0];
 
@@ -41,6 +43,9 @@ export function StoreMap({ stores, activeStoreId, onSelectStore }: StoreMapProps
     let isMounted = true;
     const markers = markersRef.current;
     let resizeObserver: ResizeObserver | null = null;
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    let tileLayer: TileLayer | undefined;
 
     void import("leaflet").then((L) => {
       if (!isMounted || !mapContainerRef.current) return;
@@ -55,13 +60,12 @@ export function StoreMap({ stores, activeStoreId, onSelectStore }: StoreMapProps
 
       mapInstanceRef.current = map;
 
-      // Google Maps standard tile layer (reliable, fast, zero blockage in VN, no API key required)
       const configuredTileUrl = process.env.NEXT_PUBLIC_MAP_TILE_URL;
-      const defaultTileUrl = "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+      const defaultTileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
       const tileUrl = configuredTileUrl || defaultTileUrl;
       const isGoogle = tileUrl.includes("google.com");
 
-      const tileLayer: TileLayer = L.tileLayer(tileUrl, {
+      tileLayer = L.tileLayer(tileUrl, {
         maxZoom: 20,
         // Tile providers require a Referer; send only the origin, without address data.
         referrerPolicy: "strict-origin-when-cross-origin",
@@ -73,23 +77,41 @@ export function StoreMap({ stores, activeStoreId, onSelectStore }: StoreMapProps
             : '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'),
       });
 
-      // Fallback to ESRI World Street Map if primary fails
-      tileLayer.on("tileerror", () => {
-        if (!configuredTileUrl && isGoogle) {
-          L.tileLayer(
+      // A configured provider can also be unreachable. Replace it once, after
+      // Leaflet finishes processing the failed tile, instead of stacking layers.
+      tileLayer.once("tileerror", () => {
+        fallbackTimer = setTimeout(() => {
+          if (!isMounted) return;
+          tileLayer?.remove();
+          tileLayer?.off();
+          tileLayer = L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
             {
               maxZoom: 19,
-              attribution: "&copy; Esri",
+              referrerPolicy: "strict-origin-when-cross-origin",
+              attribution:
+                '&copy; <a href="https://www.esri.com/" target="_blank" rel="noreferrer">Esri</a>',
             },
-          ).addTo(map);
-        }
+          );
+          tileLayer.on("tileerror", () => {
+            if (isMounted)
+              setMapError("Chưa tải được bản đồ. Bạn vẫn có thể xem cửa hàng và mở chỉ đường.");
+          });
+          tileLayer.on("tileload", () => {
+            if (isMounted) setMapError("");
+          });
+          tileLayer.addTo(map);
+        }, 0);
       });
 
       tileLayer.addTo(map);
+      retryTilesRef.current = () => {
+        setMapError("");
+        tileLayer?.redraw();
+      };
 
       // Trigger size recalculation shortly after render
-      const timer = setTimeout(() => {
+      resizeTimer = setTimeout(() => {
         if (isMounted && mapInstanceRef.current) {
           mapInstanceRef.current.invalidateSize();
         }
@@ -106,18 +128,18 @@ export function StoreMap({ stores, activeStoreId, onSelectStore }: StoreMapProps
       }
 
       setMapReady(true);
-
-      return () => {
-        clearTimeout(timer);
-      };
     });
 
     return () => {
       isMounted = false;
+      clearTimeout(resizeTimer);
+      clearTimeout(fallbackTimer);
+      retryTilesRef.current = null;
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
       mapInstanceRef.current?.remove();
+      tileLayer?.off();
       mapInstanceRef.current = null;
       markers.clear();
     };
@@ -252,6 +274,22 @@ export function StoreMap({ stores, activeStoreId, onSelectStore }: StoreMapProps
     <div className="relative w-full h-full min-h-[460px] overflow-hidden rounded-2xl bg-[#f8f9fa]">
       {/* Map Host Div */}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full z-10" />
+
+      {mapError && (
+        <div
+          role="status"
+          className="absolute top-16 left-4 right-4 z-20 rounded-xl border border-[#efe5e7] bg-white/95 p-3 text-sm text-[#412e27] shadow-sm"
+        >
+          <p>{mapError}</p>
+          <button
+            type="button"
+            onClick={() => retryTilesRef.current?.()}
+            className="mt-2 font-semibold text-[#9d394f] underline"
+          >
+            Thử tải lại bản đồ
+          </button>
+        </div>
+      )}
 
       {/* Floating Map Controls Top Bar */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-none">
