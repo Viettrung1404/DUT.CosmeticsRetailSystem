@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,13 @@ import {
   Alert,
   Share,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useWishlistStore, WishlistItem } from '../../store/useWishlistStore';
 import { useCartStore } from '../../store/useCartStore';
+import { productApi } from '../../api/productApi';
 
 const { width } = Dimensions.get('window');
 
@@ -27,9 +29,14 @@ const CATEGORY_CHIPS = [
 ];
 
 export default function WishlistScreen({ navigation }: any) {
-  const { items, removeItem, clearWishlist, toggleWishlist } = useWishlistStore();
+  const { items, loading, fetchWishlist, removeItem, clearWishlist, toggleWishlist } = useWishlistStore();
   const addItemToCart = useCartStore((s) => s.addItem);
   const [activeFilter, setActiveFilter] = useState('all');
+
+  // Tải danh sách yêu thích từ server khi mở màn hình
+  useEffect(() => {
+    fetchWishlist();
+  }, []);
 
   const filteredItems = items.filter((item) => {
     if (activeFilter === 'all') return true;
@@ -47,46 +54,68 @@ export default function WishlistScreen({ navigation }: any) {
     }
   };
 
-  const handleAddToCart = (item: WishlistItem) => {
-    addItemToCart({
-      id: item.productId,
-      variantId: `var-${item.productId}`,
+  const addWishlistItemToCart = async (item: WishlistItem) => {
+    if (!item.slug) {
+      throw new Error(`Không tìm thấy mã định danh sản phẩm "${item.name}".`);
+    }
+
+    const result = await productApi.getProductDetail(item.slug);
+    const product = result?.data ?? result;
+    const variant = product?.variants?.find(
+      (candidate: any) =>
+        candidate.id &&
+        (candidate.stockQuantity == null || candidate.stockQuantity > 0),
+    );
+    if (!variant?.id) {
+      throw new Error(`"${item.name}" hiện không có biến thể hợp lệ để đặt hàng.`);
+    }
+
+    await addItemToCart({
+      id: variant.id,
+      variantId: variant.id,
       productId: item.productId,
       productName: item.name,
-      variantName: 'Tiêu chuẩn',
-      price: item.price,
-      originalPrice: item.originalPrice,
-      imageUrl: item.imageUrl,
-      stock: 50,
+      variantName:
+        [variant.option1Value, variant.option2Value, variant.option3Value].filter(Boolean).join(' / ')
+        || variant.sku,
+      price: variant.effectivePrice ?? variant.price ?? item.price,
+      originalPrice: product.basePrice ?? item.originalPrice,
+      imageUrl: product.primaryImage ?? item.imageUrl,
+      stock: variant.stockQuantity ?? 99,
     });
-    Alert.alert('Thành công ✨', `Đã thêm "${item.name}" vào giỏ hàng của bạn!`, [
-      { text: 'Tiếp tục xem' },
-      { text: 'Xem giỏ hàng', onPress: () => navigation.navigate('Giỏ hàng') },
-    ]);
   };
 
-  const handleAddAllToCart = () => {
+  const handleAddToCart = async (item: WishlistItem) => {
+    try {
+      await addWishlistItemToCart(item);
+      Alert.alert('Thành công ✨', `Đã thêm "${item.name}" vào giỏ hàng của bạn!`, [
+        { text: 'Tiếp tục xem' },
+        { text: 'Xem giỏ hàng', onPress: () => navigation.navigate('Giỏ hàng') },
+      ]);
+    } catch (error: any) {
+      Alert.alert(
+        'Không thể thêm vào giỏ',
+        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
+      );
+    }
+  };
+
+  const handleAddAllToCart = async () => {
     if (items.length === 0) return;
 
-    items.forEach((item) => {
-      addItemToCart({
-        id: item.productId,
-        variantId: `var-${item.productId}`,
-        productId: item.productId,
-        productName: item.name,
-        variantName: 'Tiêu chuẩn',
-        price: item.price,
-        originalPrice: item.originalPrice,
-        imageUrl: item.imageUrl,
-        stock: 50,
-      });
-    });
-
-    Alert.alert(
-      'Tuyệt vời! 🛍️',
-      `Đã chuyển toàn bộ ${items.length} sản phẩm yêu thích vào giỏ hàng của bạn!`,
-      [{ text: 'Đến giỏ hàng ngay', onPress: () => navigation.navigate('Giỏ hàng') }]
-    );
+    try {
+      await Promise.all(items.map(addWishlistItemToCart));
+      Alert.alert(
+        'Tuyệt vời! 🛍️',
+        `Đã chuyển toàn bộ ${items.length} sản phẩm yêu thích vào giỏ hàng của bạn!`,
+        [{ text: 'Đến giỏ hàng ngay', onPress: () => navigation.navigate('Giỏ hàng') }]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Không thể thêm toàn bộ sản phẩm',
+        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
+      );
+    }
   };
 
   const renderWishlistItem = ({ item }: { item: WishlistItem }) => {
@@ -98,7 +127,7 @@ export default function WishlistScreen({ navigation }: any) {
         <TouchableOpacity
           style={styles.cardImageContainer}
           activeOpacity={0.88}
-          onPress={() => navigation.navigate('ProductDetail', { productId: item.productId })}
+          onPress={() => navigation.navigate('ProductDetail', { slug: item.slug })}
         >
           <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
 
@@ -119,7 +148,11 @@ export default function WishlistScreen({ navigation }: any) {
           <TouchableOpacity
             style={styles.heartBtn}
             activeOpacity={0.8}
-            onPress={() => removeItem(item.productId)}
+            onPress={() => {
+              removeItem(item.productId).catch(() => {
+                Alert.alert('Lỗi', 'Không thể bỏ yêu thích. Vui lòng thử lại.');
+              });
+            }}
           >
             <Ionicons name="heart" size={18} color={theme.colors.primary} />
           </TouchableOpacity>
@@ -134,7 +167,7 @@ export default function WishlistScreen({ navigation }: any) {
 
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('ProductDetail', { productId: item.productId })}
+              onPress={() => navigation.navigate('ProductDetail', { slug: item.slug })}
             >
               <Text style={styles.productName} numberOfLines={2}>
                 {item.name}
@@ -263,12 +296,20 @@ export default function WishlistScreen({ navigation }: any) {
       )}
 
       {/* Main List */}
+      {loading ? (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.emptyDesc, { marginTop: 12 }]}>Đang tải danh sách yêu thích...</Text>
+        </View>
+      ) : (
       <FlatList
         data={filteredItems}
         keyExtractor={(item) => item.id}
         renderItem={renderWishlistItem}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        onRefresh={fetchWishlist}
+        refreshing={loading}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconCircle}>
@@ -287,6 +328,7 @@ export default function WishlistScreen({ navigation }: any) {
           </View>
         }
       />
+      )}
 
       {/* Sticky Bottom Actions Bar */}
       {items.length > 0 && (
@@ -680,4 +722,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
-

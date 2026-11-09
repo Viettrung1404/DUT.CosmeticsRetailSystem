@@ -45,7 +45,7 @@ export default function RmaTrackingScreen({ route, navigation }: any) {
       step: 3,
       title: 'Kiểm định kho & Hoàn tiền',
       time: 'Dự kiến trong ngày mai',
-      desc: '345.000 GlowPoints + Voucher 20K sẽ được chuyển thẳng vào ví của bạn.',
+      desc: 'Hoàn tiền sẽ được xử lý theo chính sách hiện hành (minh họa).',
       done: false,
     },
   ];
@@ -92,7 +92,8 @@ export default function RmaTrackingScreen({ route, navigation }: any) {
 
           <Text style={styles.heroTitle}>Shipper đang đến thu hồi hàng</Text>
           <Text style={styles.heroDesc}>
-            Vui lòng đóng gói sản phẩm kèm hộp hoặc túi giấy ban đầu. Bạn không cần thanh toán bất kỳ chi phí nào.
+            Vui lòng đóng gói sản phẩm kèm hộp hoặc túi giấy ban đầu. Bạn không cần thanh toán bất kỳ chi phí nào.{'\n'}
+            <Text style={styles.heroDisclaimer}>(Thông tin shipper bên dưới là minh họa)</Text>
           </Text>
 
           {/* Shipper Contact Box */}
@@ -189,7 +190,7 @@ export default function RmaTrackingScreen({ route, navigation }: any) {
               <View style={styles.priceRow}>
                 <Text style={styles.productPrice}>345.000₫</Text>
                 <View style={styles.refundTag}>
-                  <Text style={styles.refundTagText}>Hoàn điểm + Voucher 20K</Text>
+                  <Text style={styles.refundTagText}>Hoàn tiền (minh họa)</Text>
                 </View>
               </View>
             </View>
@@ -546,6 +547,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#FFF',
+  },
+  heroDisclaimer: {
+    fontSize: 10,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
 });
 

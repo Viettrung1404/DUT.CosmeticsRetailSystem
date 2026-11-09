@@ -16,7 +16,7 @@ export interface OrderItemInput {
 
 export interface CreateOrderPayload {
   shippingAddress: ShippingAddressInput;
-  paymentMethod?: 'COD' | 'SEPAY' | string;
+  paymentMethod?: 'COD' | 'SEPAY';
   items?: OrderItemInput[];
   note?: string;
   couponCode?: string;

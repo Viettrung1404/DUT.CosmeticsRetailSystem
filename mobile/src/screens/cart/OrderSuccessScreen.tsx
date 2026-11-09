@@ -4,11 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 
 export default function OrderSuccessScreen({ route, navigation }: any) {
-  const { orderCode, totalAmount, paymentMethod } = route.params || {
-    orderCode: 'GLOW-89241',
-    totalAmount: 770000,
-    paymentMethod: 'Thanh toán khi nhận hàng (COD)',
-  };
+  const { orderCode = '', totalAmount = 0, paymentMethod = '' } = route.params || {};
 
   return (
     <SafeAreaView style={styles.safeContainer}>

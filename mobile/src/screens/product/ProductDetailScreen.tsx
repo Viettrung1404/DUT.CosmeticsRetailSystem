@@ -2,28 +2,38 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../../constants/theme';
-import apiClient from '../../api/apiClient';
+import { productApi } from '../../api/productApi';
 
 import { useCartStore } from '../../store/useCartStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
-    const { slug } = route.params || {};
+    const { slug, productId } = route.params || {};
+    const productIdentifier = slug || productId;
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [selectedVariant, setSelectedVariant] = useState('30ml');
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
     const { addItem } = useCartStore();
     const { toggleWishlist, isInWishlist } = useWishlistStore();
 
     useEffect(() => {
         fetchDetail();
-    }, [slug]);
+    }, [productIdentifier]);
 
     const fetchDetail = async () => {
         try {
             setLoading(true);
-            const res = await apiClient.get(`/products/${slug}`);
-            setProduct(res.data);
+            const result = await productApi.getProductDetail(productIdentifier);
+            const productData = result?.data ?? result;
+            setProduct(productData);
+            setSelectedVariantId(
+                productData?.variants?.find(
+                    (variant: any) =>
+                        variant.id &&
+                        (variant.stockQuantity == null || variant.stockQuantity > 0),
+                )?.id
+                    || null,
+            );
         } catch {
             // Mock Fallback
             setProduct({
@@ -35,7 +45,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 price: 350000,
                 original_price: 450000,
                 description: 'Serum dưỡng sáng da GlowUp với 10% Vitamin C nguyên chất kết hợp Niacinamide và Hyaluronic Acid giúp làm mờ vết thâm, cấp ẩm và mang lại làn da căng bóng ngậm nước.',
-                variants: ['30ml', '50ml'],
+                variants: [],
                 image_url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
                 ingredients: ['Vitamin C 10%', 'Niacinamide 5%', 'Hyaluronic Acid', 'Chiết xuất hoa hồng Rose Berry'],
             });
@@ -45,53 +55,80 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     };
 
     const isFav = product ? isInWishlist(product.id || slug || 'prod-vc') : false;
+    const productImage =
+        product?.primaryImage ||
+        product?.image_url ||
+        product?.images?.[0]?.imageUrl ||
+        'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400';
+    const selectedVariant = product?.variants?.find(
+        (variant: any) => variant.id === selectedVariantId,
+    );
 
-    const handleToggleHeart = () => {
+    const getVariantLabel = (variant: any) =>
+        [variant.option1Value, variant.option2Value, variant.option3Value].filter(Boolean).join(' / ')
+        || variant.sku;
+
+    const handleToggleHeart = async () => {
         if (!product) return;
         const productId = product.id || slug || 'prod-vc';
-        const added = toggleWishlist({
-            productId,
-            name: product.name,
-            brand: product.brand || 'GLOWUP LAB',
-            price: product.price || 350000,
-            originalPrice: product.original_price,
-            imageUrl: product.image_url || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
-            category: 'Serum',
-            rating: product.rating || 4.9,
-            reviewsCount: product.reviews_count || 128,
-            stockStatus: 'in_stock',
-        });
+        try {
+            const added = await toggleWishlist({
+                productId,
+                slug: product.slug,
+                name: product.name,
+                brand: product.brandName || product.brand || 'GLOWUP LAB',
+                price: product.basePrice || product.price || 350000,
+                originalPrice: product.salePrice || product.original_price,
+                imageUrl: productImage,
+                category: 'Serum',
+                rating: product.avgRating || product.rating || 4.9,
+                reviewsCount: product.totalReviews || product.reviews_count || 128,
+                stockStatus: 'in_stock',
+            });
 
-        Alert.alert(
-            added ? 'Đã lưu yêu thích ❤️' : 'Đã bỏ yêu thích 💔',
-            added
-                ? `"${product.name}" đã được thêm vào bộ sưu tập Wishlist của bạn.`
-                : `"${product.name}" đã được xóa khỏi Wishlist.`
-        );
+            Alert.alert(
+                added ? 'Đã lưu yêu thích ❤️' : 'Đã bỏ yêu thích 💔',
+                added
+                    ? `"${product.name}" đã được thêm vào bộ sưu tập Wishlist của bạn.`
+                    : `"${product.name}" đã được xóa khỏi Wishlist.`
+            );
+        } catch (error: any) {
+            Alert.alert('Không thể cập nhật yêu thích', error?.message || 'Vui lòng thử lại.');
+        }
     };
 
     const handleAddToCart = () => {
         if (!product) return;
-        addItem({
-            id: `item-${Date.now()}`,
-            variantId: `var-${selectedVariant}`,
-            productId: product.id || 'prod-custom',
-            productName: product.name,
-            variantName: `Dung tích ${selectedVariant}`,
-            price: product.price,
-            originalPrice: product.original_price,
-            imageUrl: product.image_url || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
-            stock: 20,
-        }, 1);
+        if (!selectedVariant?.id) {
+            Alert.alert('Không thể thêm vào giỏ', 'Sản phẩm hiện chưa có biến thể hợp lệ để đặt hàng.');
+            return;
+        }
 
-        Alert.alert(
-            'Thêm thành công',
-            `Đã thêm "${product.name} (${selectedVariant})" vào giỏ hàng!`,
-            [
-                { text: 'Tiếp tục xem', style: 'cancel' },
-                { text: 'Xem giỏ hàng', onPress: () => navigation.navigate('MainTabs', { screen: 'Giỏ hàng' }) }
-            ]
-        );
+        addItem({
+            id: selectedVariant.id,
+            variantId: selectedVariant.id,
+            productId: product.id,
+            productName: product.name,
+            variantName: getVariantLabel(selectedVariant),
+            price: selectedVariant.effectivePrice ?? selectedVariant.price,
+            originalPrice: product.basePrice,
+            imageUrl: productImage,
+            stock: selectedVariant.stockQuantity ?? 0,
+        }, 1).then(() => {
+            Alert.alert(
+                'Thêm thành công',
+                `Đã thêm "${product.name} (${getVariantLabel(selectedVariant)})" vào giỏ hàng!`,
+                [
+                    { text: 'Tiếp tục xem', style: 'cancel' },
+                    { text: 'Xem giỏ hàng', onPress: () => navigation.navigate('MainTabs', { screen: 'Giỏ hàng' }) }
+                ]
+            );
+        }).catch((error: any) => {
+            Alert.alert(
+                'Không thể thêm vào giỏ',
+                error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
+            );
+        });
     };
 
     if (loading) {
@@ -121,7 +158,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 
                 {/* Product Image */}
                 <Image
-                    source={{ uri: product?.image_url || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400' }}
+                    source={{ uri: productImage }}
                     style={styles.image}
                 />
 
@@ -136,22 +173,28 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                     </View>
 
                     <View style={styles.priceRow}>
-                        <Text style={styles.price}>{product?.price?.toLocaleString('vi-VN')}đ</Text>
-                        {product?.original_price && (
-                            <Text style={styles.originalPrice}>{product?.original_price?.toLocaleString('vi-VN')}đ</Text>
+                        <Text style={styles.price}>
+                            {(selectedVariant?.effectivePrice ?? selectedVariant?.price ?? product?.basePrice ?? product?.price)?.toLocaleString('vi-VN')}đ
+                        </Text>
+                        {(product?.salePrice || product?.original_price) && (
+                            <Text style={styles.originalPrice}>
+                                {(product?.basePrice ?? product?.original_price)?.toLocaleString('vi-VN')}đ
+                            </Text>
                         )}
                     </View>
 
                     {/* Variant Picker */}
                     <Text style={styles.sectionTitle}>Dung tích / Biến thể:</Text>
                     <View style={styles.variantRow}>
-                        {product?.variants?.map((v: string) => (
+                        {product?.variants?.map((variant: any) => (
                             <TouchableOpacity
-                                key={v}
-                                style={[styles.variantChip, selectedVariant === v && styles.selectedVariantChip]}
-                                onPress={() => setSelectedVariant(v)}
+                                key={variant.id || variant.sku}
+                                style={[styles.variantChip, selectedVariantId === variant.id && styles.selectedVariantChip]}
+                                onPress={() => setSelectedVariantId(variant.id)}
                             >
-                                <Text style={[styles.variantText, selectedVariant === v && styles.selectedVariantText]}>{v}</Text>
+                                <Text style={[styles.variantText, selectedVariantId === variant.id && styles.selectedVariantText]}>
+                                    {getVariantLabel(variant)}
+                                </Text>
                             </TouchableOpacity>
                         ))}
                     </View>

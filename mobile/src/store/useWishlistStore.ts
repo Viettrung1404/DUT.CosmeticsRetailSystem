@@ -1,14 +1,16 @@
 import { create } from 'zustand';
+import apiClient from '../api/apiClient';
 
 export interface WishlistItem {
   id: string;
   productId: string;
+  slug?: string;
   name: string;
   brand: string;
   price: number;
   originalPrice?: number;
   imageUrl: string;
-  category: 'Skincare' | 'Serum' | 'Sunscreens' | 'Lipstick' | 'Makeup';
+  category: 'Skincare' | 'Serum' | 'Sunscreens' | 'Lipstick' | 'Makeup' | string;
   rating: number;
   reviewsCount: number;
   badge?: string;
@@ -18,103 +20,116 @@ export interface WishlistItem {
 
 interface WishlistState {
   items: WishlistItem[];
-  toggleWishlist: (item: Omit<WishlistItem, 'id'>) => boolean;
+  loading: boolean;
+  fetchWishlist: () => Promise<void>;
+  toggleWishlist: (item: Omit<WishlistItem, 'id'>) => Promise<boolean>;
   isInWishlist: (productId: string) => boolean;
-  removeItem: (productId: string) => void;
+  removeItem: (productId: string) => Promise<void>;
   clearWishlist: () => void;
   getWishlistCount: () => number;
 }
 
-const INITIAL_WISHLIST: WishlistItem[] = [
-  {
-    id: 'wish-1',
-    productId: 'prod-s-1',
-    name: 'GlowUp Radiance C-Serum Tươi 30ml',
-    brand: 'GLOWUP LAB',
-    price: 485000,
-    originalPrice: 650000,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-    category: 'Serum',
-    rating: 4.9,
-    reviewsCount: 1250,
-    badge: 'Bán chạy nhất',
-    stockStatus: 'in_stock',
-    addedDate: 'Hôm nay',
-  },
-  {
-    id: 'wish-2',
-    productId: 'prod-s-2',
-    name: 'Glass Skin Barrier Cream 50g Phục Hồi',
-    brand: 'GLOWUP LAB',
-    price: 390000,
-    originalPrice: 450000,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-    category: 'Skincare',
-    rating: 4.8,
-    reviewsCount: 860,
-    badge: 'Clean 100%',
-    stockStatus: 'in_stock',
-    addedDate: '2 ngày trước',
-  },
-  {
-    id: 'wish-3',
-    productId: 'prod-s-4',
-    name: 'Velvet Cloud Matte Lipstick #04 Rosewood',
-    brand: '3CE STYLENANDA',
-    price: 340000,
-    originalPrice: 390000,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDhU0n1c3dv6DGZ8a2VJP9OMa-8E38wU9vwljidCxKn0i2C1ij5YAY7p1VavTZwGl9Hz0QLnWwilETSfTDzoZ3eEd8f9amVfrQF3e46Voq6vpX-jXddrp8iK_nvUU9FGaCUsZJMTIJKU8g8OCGO7YHQVyWjQmg6NseeG6Vu5mEee-7HKAmNCsOeBny-3U_aD7BXLL2QzoxKqsC9deTGM23ZfQPNXUMegiM041dJ1_SW6YRt3v2kKv_UyQ',
-    category: 'Lipstick',
-    rating: 4.9,
-    reviewsCount: 2100,
-    badge: 'Chỉ còn 3 thỏi',
-    stockStatus: 'low_stock',
-    addedDate: 'Tuần này',
-  },
-  {
-    id: 'wish-4',
-    productId: 'prod-s-5',
-    name: 'Anthelios UV Mune 400 Kiềm Dầu 50ml',
-    brand: 'LA ROCHE-POSAY',
-    price: 495000,
-    originalPrice: 535000,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-    category: 'Sunscreens',
-    rating: 4.9,
-    reviewsCount: 3500,
-    badge: 'Chuyên gia khuyên dùng',
-    stockStatus: 'in_stock',
-    addedDate: '1 tuần trước',
-  },
-];
+/** Map 1 item từ Public ProductResponseDto (backend) sang WishlistItem local */
+function mapApiItem(raw: any): WishlistItem {
+  return {
+    id: raw.id ?? raw.productId ?? String(Date.now()),
+    productId: raw.productId ?? raw.id ?? '',
+    slug: raw.slug ?? undefined,
+    name: raw.name ?? raw.productName ?? '',
+    brand: raw.brand ?? raw.brandName ?? '',
+    price: raw.currentPrice ?? raw.price ?? 0,
+    originalPrice: raw.basePrice ?? raw.originalPrice ?? undefined,
+    imageUrl: raw.thumbnailUrl ?? raw.imageUrl ?? '',
+    category: raw.categoryName ?? raw.category ?? 'Skincare',
+    rating: raw.averageRating ?? raw.rating ?? 0,
+    reviewsCount: raw.reviewCount ?? raw.reviewsCount ?? 0,
+    badge: raw.badge ?? undefined,
+    stockStatus:
+      raw.isAvailable === false
+        ? 'out_of_stock'
+        : raw.stockStatus === 'low_stock'
+        ? 'low_stock'
+        : 'in_stock',
+    addedDate: raw.addedAt ? new Date(raw.addedAt).toLocaleDateString('vi-VN') : undefined,
+  };
+}
+
+function genKey(prefix: string) {
+  return prefix + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+}
 
 export const useWishlistStore = create<WishlistState>((set, get) => ({
-  items: INITIAL_WISHLIST,
+  items: [],
+  loading: false,
 
-  toggleWishlist: (item) => {
+  /** Tải danh sách wishlist từ GET /customer/wishlists */
+  fetchWishlist: async () => {
+    set({ loading: true });
+    try {
+      const res = await apiClient.get('/customer/wishlists', { params: { page: 1, limit: 50 } });
+      const rawItems: any[] = res.data?.data?.items ?? res.data?.items ?? [];
+      set({ items: rawItems.map(mapApiItem) });
+    } catch {
+      // Giữ nguyên state nếu lỗi mạng
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  /**
+   * Toggle yêu thích qua POST /customer/wishlists/toggle
+   * - Optimistic update ngay lập tức
+   * - Rollback nếu API thất bại
+   * Returns true nếu đã thêm, false nếu đã bỏ
+   */
+  toggleWishlist: async (item) => {
     const { items } = get();
     const exists = items.some((i) => i.productId === item.productId);
 
+    // Optimistic update
     if (exists) {
       set({ items: items.filter((i) => i.productId !== item.productId) });
-      return false; // đã bỏ yêu thích
     } else {
-      const newItem: WishlistItem = {
-        ...item,
-        id: `wish-${Date.now()}`,
-        addedDate: 'Vừa thêm',
-      };
+      const newItem: WishlistItem = { ...item, id: `wish-${Date.now()}`, addedDate: 'Vừa thêm' };
       set({ items: [newItem, ...items] });
-      return true; // đã thêm yêu thích
     }
+
+    try {
+      await apiClient.post(
+        '/customer/wishlists/toggle',
+        { productId: item.productId },
+        { headers: { 'Idempotency-Key': genKey('wl') } },
+      );
+    } catch {
+      // Rollback optimistic update
+      set({ items });
+      throw new Error('Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.');
+    }
+
+    return !exists;
   },
 
   isInWishlist: (productId: string) => {
     return get().items.some((i) => i.productId === productId);
   },
 
-  removeItem: (productId: string) => {
-    set({ items: get().items.filter((i) => i.productId !== productId) });
+  /** Bỏ yêu thích qua toggle API */
+  removeItem: async (productId: string) => {
+    const { items } = get();
+    const target = items.find((i) => i.productId === productId);
+    if (!target) return;
+
+    // Optimistic
+    set({ items: items.filter((i) => i.productId !== productId) });
+    try {
+      await apiClient.post(
+        '/customer/wishlists/toggle',
+        { productId },
+        { headers: { 'Idempotency-Key': genKey('wl') } },
+      );
+    } catch {
+      set({ items }); // rollback
+    }
   },
 
   clearWishlist: () => {
@@ -125,4 +140,3 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
     return get().items.length;
   },
 }));
-

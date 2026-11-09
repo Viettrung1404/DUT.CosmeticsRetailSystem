@@ -12,6 +12,7 @@ import {
   SafeAreaView,
   Dimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
@@ -20,8 +21,26 @@ import { useCartStore } from '../../store/useCartStore';
 
 const { width } = Dimensions.get('window');
 
+interface SearchProduct {
+  id: string;
+  slug?: string;
+  variantId?: string;
+  variantName?: string;
+  stock?: number;
+  name: string;
+  brand: string;
+  price: number;
+  originalPrice?: number;
+  rating: number;
+  reviewsCount: number;
+  badge: string;
+  tag: string;
+  category: string;
+  image: string;
+}
+
 // Mock data cho fallback khi offline hoặc search chưa có kết quả backend
-const MOCK_SEARCH_PRODUCTS = [
+const MOCK_SEARCH_PRODUCTS: SearchProduct[] = [
   {
     id: 'prod-s-1',
     name: 'GlowUp Radiance C-Serum 30ml',
@@ -122,7 +141,7 @@ export default function SearchScreen({ navigation }: any) {
   ]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState(MOCK_SEARCH_PRODUCTS);
+  const [results, setResults] = useState<SearchProduct[]>(MOCK_SEARCH_PRODUCTS);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
   // Filter States
@@ -150,22 +169,40 @@ export default function SearchScreen({ navigation }: any) {
 
     try {
       const res = await productApi.searchProducts(q);
-      const apiItems = res?.data || res || [];
+      const apiItems = res?.data?.data || res?.data || res || [];
       if (Array.isArray(apiItems) && apiItems.length > 0) {
         setResults(
-          apiItems.map((item: any) => ({
-            id: item.id || `prod-${item.slug}`,
-            name: item.name,
-            brand: item.brand?.name || 'GlowUp',
-            price: Number(item.price) || 350000,
-            originalPrice: Number(item.original_price) || Number(item.price) * 1.2,
-            rating: 4.8,
-            reviewsCount: 120,
-            badge: item.badge || 'Mới',
-            tag: item.category?.name || 'Skincare',
-            category: item.category?.name || 'Mỹ phẩm',
-            image: item.thumbnail || item.images?.[0]?.url || MOCK_SEARCH_PRODUCTS[0].image,
-          }))
+          apiItems.map((item: any) => {
+            const variant = item.variants?.find(
+              (candidate: any) =>
+                candidate.id &&
+                (candidate.stockQuantity == null || candidate.stockQuantity > 0),
+            );
+            return {
+              id: item.id || `prod-${item.slug}`,
+              slug: item.slug || item.id,
+              variantId: variant?.id,
+              variantName: [variant?.option1Value, variant?.option2Value, variant?.option3Value]
+                .filter(Boolean)
+                .join(' / ') || variant?.sku || 'Tiêu chuẩn',
+              stock: variant?.stockQuantity ?? 99,
+              name: item.name,
+              brand: item.brandName || item.brand?.name || 'GlowUp',
+              price: Number(variant?.effectivePrice ?? variant?.price ?? item.basePrice ?? item.price) || 0,
+              originalPrice: Number(item.basePrice ?? item.originalPrice ?? item.original_price) || undefined,
+              rating: Number(item.avgRating ?? item.rating) || 0,
+              reviewsCount: Number(item.totalReviews ?? item.reviewsCount) || 0,
+              badge: item.badge || 'Mới',
+              tag: item.categoryName || item.category?.name || 'Skincare',
+              category: item.categoryName || item.category?.name || 'Mỹ phẩm',
+              image:
+                item.primaryImage ||
+                item.thumbnail ||
+                item.images?.[0]?.imageUrl ||
+                item.images?.[0]?.url ||
+                MOCK_SEARCH_PRODUCTS[0].image,
+            };
+          })
         );
       } else {
         // Fallback filter trên mock data
@@ -245,25 +282,38 @@ export default function SearchScreen({ navigation }: any) {
     setMinRating(0);
   };
 
-  const handleAddToCart = (product: any) => {
-    addItem({
-      id: product.id,
-      variantId: `var-${product.id}`,
-      productId: product.id,
-      productName: product.name,
-      variantName: 'Tiêu chuẩn',
-      price: product.price,
-      originalPrice: product.originalPrice,
-      imageUrl: product.image,
-      stock: 50,
-    });
+  const handleAddToCart = async (product: SearchProduct) => {
+    if (!product.variantId) {
+      Alert.alert('Chưa thể thêm sản phẩm', 'Mở chi tiết sản phẩm để chọn một biến thể còn hàng.');
+      return;
+    }
+
+    try {
+      await addItem({
+        id: product.variantId,
+        variantId: product.variantId,
+        productId: product.id,
+        productName: product.name,
+        variantName: product.variantName || 'Tiêu chuẩn',
+        price: product.price,
+        originalPrice: product.originalPrice,
+        imageUrl: product.image,
+        stock: product.stock ?? 99,
+      });
+      Alert.alert('Thành công', `Đã thêm "${product.name}" vào giỏ hàng.`);
+    } catch (error: any) {
+      Alert.alert(
+        'Không thể thêm vào giỏ',
+        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
+      );
+    }
   };
 
   const renderProductItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.productCard}
       activeOpacity={0.88}
-      onPress={() => navigation.navigate('ProductDetail', { productId: item.id, slug: item.id })}
+      onPress={() => navigation.navigate('ProductDetail', { productId: item.id, slug: item.slug || item.id })}
     >
       <View style={styles.imageWrapper}>
         <Image source={{ uri: item.image }} style={styles.productImage} />

@@ -32,22 +32,20 @@ export default function CheckoutScreen({ navigation }: any) {
 
   // Phương thức thanh toán (Backend hỗ trợ COD và SEPAY)
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'SEPAY'>('COD');
-  const [voucherCode, setVoucherCode] = useState('GLOWVIP');
-  const [voucherDiscount, setVoucherDiscount] = useState(50000);
+  const [voucherCode, setVoucherCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Tính toán chi phí
   const subtotal = getTotalPrice();
   const shippingFee = shippingOption === 'EXPRESS' ? 0 : 0; // Khuyến mãi Freeship Silk-drop 0đ
-  const grandTotal = Math.max(subtotal - voucherDiscount + shippingFee, 0);
+  const grandTotal = Math.max(subtotal + shippingFee, 0);
 
   const handleApplyVoucher = () => {
-    if (voucherCode.trim().toUpperCase() === 'GLOWVIP') {
-      setVoucherDiscount(50000);
-      Alert.alert('Thành công', 'Đã áp dụng mã GLOWVIP: Giảm 50.000đ.');
-    } else {
-      Alert.alert('Không hợp lệ', 'Mã ưu đãi không tồn tại hoặc đã hết lượt dùng.');
+    if (!voucherCode.trim()) {
+      Alert.alert('Thiếu mã ưu đãi', 'Vui lòng nhập mã ưu đãi trước khi áp dụng.');
+      return;
     }
+    Alert.alert('Chưa thể áp dụng', 'Mã ưu đãi cần được xác thực với máy chủ trước khi sử dụng.');
   };
 
   const handlePlaceOrder = async () => {
@@ -64,16 +62,7 @@ export default function CheckoutScreen({ navigation }: any) {
     setIsSubmitting(true);
 
     try {
-      // 1. Chuẩn bị items có variantId thật nếu là UUID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const orderItems = selectedItems
-        .filter((item) => item.variantId && uuidRegex.test(item.variantId))
-        .map((item) => ({
-          variantId: item.variantId,
-          quantity: item.quantity,
-        }));
-
-      // 2. Gọi API Backend
+      // Đơn hàng lấy các mặt hàng đã chọn từ giỏ hàng phía máy chủ.
       const response = await orderApi.createOrder({
         shippingAddress: {
           recipientName: fullName.trim(),
@@ -82,15 +71,11 @@ export default function CheckoutScreen({ navigation }: any) {
           city: city.trim(),
         },
         paymentMethod: paymentMethod === 'COD' ? 'COD' : 'SEPAY',
-        items: orderItems.length > 0 ? orderItems : undefined,
         note: deliveryPreference === 'OFFICE' ? 'Giao giờ hành chính' : 'Gọi trước 15p',
-        couponCode: voucherDiscount > 0 ? voucherCode : undefined,
       });
 
-      const serverOrderCode =
-        response?.data?.orderNumber ||
-        response?.data?.order_code ||
-        response?.orderNumber;
+      const createdOrder = response?.data;
+      const serverOrderCode = createdOrder?.orderNumber;
 
       if (!serverOrderCode) {
         throw new Error('Máy chủ không trả về mã đơn hàng hợp lệ.');
@@ -100,7 +85,9 @@ export default function CheckoutScreen({ navigation }: any) {
 
       navigation.replace('OrderSuccess', {
         orderCode: serverOrderCode,
-        totalAmount: grandTotal,
+        totalAmount: Number.isFinite(Number(createdOrder.totalAmount))
+          ? Number(createdOrder.totalAmount)
+          : grandTotal,
         paymentMethod:
           paymentMethod === 'COD'
             ? 'Thanh toán khi nhận hàng (COD)'
@@ -417,15 +404,6 @@ export default function CheckoutScreen({ navigation }: any) {
             <Text style={styles.summaryLabel}>Phí vận chuyển (Freeship):</Text>
             <Text style={[styles.summaryVal, { color: theme.colors.success }]}>Miễn phí</Text>
           </View>
-
-          {voucherDiscount > 0 && (
-            <View style={styles.summaryLine}>
-              <Text style={styles.summaryLabel}>Mã giảm giá (GLOWVIP):</Text>
-              <Text style={[styles.summaryVal, { color: theme.colors.primary }]}>
-                -{voucherDiscount.toLocaleString('vi-VN')} đ
-              </Text>
-            </View>
-          )}
 
           <View style={[styles.summaryLine, styles.totalLine]}>
             <Text style={styles.totalLabel}>Tổng thanh toán:</Text>

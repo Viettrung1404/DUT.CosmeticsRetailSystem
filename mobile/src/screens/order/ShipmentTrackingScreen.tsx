@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,54 +11,98 @@ import {
   Linking,
   Clipboard,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, Feather, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import { orderApi } from '../../api/orderApi';
+
+/** Trạng thái tracking nhận về từ GET /orders/:id/tracking */
+interface TrackingEvent {
+  timestamp?: string;
+  description?: string;
+  location?: string;
+}
+interface Shipment {
+  id: string;
+  carrierCode?: string;
+  trackingCode?: string | null;
+  trackingUrl?: string | null;
+  status?: string;
+  events?: TrackingEvent[];
+}
+interface TrackingData {
+  id: string;
+  status?: string;
+  shipments?: Shipment[];
+  statusHistories?: Array<{ status: string; changedAt: string; note?: string }>;
+}
 
 export default function ShipmentTrackingScreen({ route, navigation }: any) {
-  const { orderId = 'GU-89241', trackingCode = 'GHN-8842109VN' } = route.params || {};
+  const { orderId = '' } = route.params || {};
 
   const [copied, setCopied] = useState(false);
+  const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const shipmentSteps = [
-    {
-      title: 'Đang trên tuyến giao đến bạn',
-      time: '15:20 • Hôm nay',
-      desc: 'Tài xế Nguyễn Văn Tuấn đang di chuyển trên đường Nguyễn Hữu Cảnh, cách bạn khoảng 1.2km.',
-      done: true,
-      current: true,
-    },
-    {
-      title: 'Kiện hàng đã xuất kho trung chuyển HCM',
-      time: '13:45 • Hôm nay',
-      desc: 'Bưu kiện hoàn tất thủ tục bàn giao cho đơn vị vận chuyển GHN Express.',
-      done: true,
-    },
-    {
-      title: 'Đã đóng gói kiểm định 3 lớp chống sốc',
-      time: '10:15 • Hôm nay',
-      desc: 'Sản phẩm được niêm phong tem chống hàng giả GlowUp Authentic và màng bọc chống sốc.',
-      done: true,
-    },
-    {
-      title: 'Đơn hàng được xác nhận thành công',
-      time: '09:00 • Hôm nay',
-      desc: 'Hệ thống tiếp nhận thanh toán và chuyển thông tin sang trung tâm hoàn tất đơn hàng.',
-      done: true,
-    },
-  ];
+  useEffect(() => {
+    if (!orderId) {
+      setError('Không tìm thấy mã đơn hàng.');
+      setLoading(false);
+      return;
+    }
+    orderApi
+      .getOrderTracking(orderId)
+      .then((res) => {
+        const data: TrackingData = res?.data ?? res;
+        setTrackingData(data);
+      })
+      .catch(() => {
+        setError('Không thể tải thông tin vận chuyển. Vui lòng thử lại sau.');
+      })
+      .finally(() => setLoading(false));
+  }, [orderId]);
+
+  // Lấy shipment đầu tiên (nếu có)
+  const shipment: Shipment | null = trackingData?.shipments?.[0] ?? null;
+  const trackingCode = shipment?.trackingCode ?? '';
+  const carrierCode = shipment?.carrierCode ?? '';
+
+  // Xây timeline từ events của shipment + statusHistories
+  const timelineItems = (() => {
+    const events: Array<{ title: string; time: string; desc: string; current?: boolean }> = [];
+    // Events của shipment
+    if (shipment?.events?.length) {
+      shipment.events.forEach((ev, i) => {
+        events.push({
+          title: ev.description ?? 'Cập nhật trạng thái',
+          time: ev.timestamp ? new Date(ev.timestamp).toLocaleString('vi-VN') : '',
+          desc: ev.location ?? '',
+          current: i === 0,
+        });
+      });
+    }
+    // Fallback: status histories của đơn
+    if (!events.length && trackingData?.statusHistories?.length) {
+      trackingData.statusHistories.forEach((h, i) => {
+        events.push({
+          title: h.status,
+          time: new Date(h.changedAt).toLocaleString('vi-VN'),
+          desc: h.note ?? '',
+          current: i === 0,
+        });
+      });
+    }
+    return events;
+  })();
 
   const handleCopyTrackingCode = () => {
+    if (!trackingCode) return;
     Clipboard.setString(trackingCode);
     setCopied(true);
     Alert.alert('Thành công', `Đã sao chép mã vận đơn: ${trackingCode}`);
     setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleCallShipper = () => {
-    Linking.openURL('tel:0909123456').catch(() => {
-      Alert.alert('Gọi tài xế', 'Đang liên hệ tài xế Nguyễn Văn Tuấn: 0909 123 456');
-    });
   };
 
   const handleChangeSchedule = () => {
@@ -92,26 +136,44 @@ export default function ShipmentTrackingScreen({ route, navigation }: any) {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Đang tải thông tin vận chuyển...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.loadingContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={theme.colors.textMuted} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.retryBtnText}>Quay lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Realtime Delivery Card */}
+        {/* Status Card Hero */}
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
-            <View style={styles.silkDropBadge}>
-              <Ionicons name="flash" size={13} color="#FFF" />
-              <Text style={styles.silkDropText}>HỎA TỐC 2H SILK-DROP</Text>
+            <View style={styles.statusBadge}>
+              <Ionicons name="cube-outline" size={13} color={theme.colors.primary} />
+              <Text style={styles.statusBadgeText}>{shipment?.status ?? trackingData?.status ?? 'ĐANG XỬ LÝ'}</Text>
             </View>
-            <Text style={styles.estimatedArrival}>Đến trong ~25 phút</Text>
+            {/* Disclaimer: Hỏa Tốc 2H là minh họa, không phải dịch vụ thực */}
+            <View style={styles.disclaimerBadge}>
+              <Text style={styles.disclaimerBadgeText}>⚡ Nhanh (minh họa)</Text>
+            </View>
           </View>
 
-          <Text style={styles.heroStatus}>Kiện hàng đang trên đường giao</Text>
+          <Text style={styles.heroStatus}>Theo dõi kiện hàng</Text>
           <Text style={styles.heroSub}>
-            Tài xế đang di chuyển trên tuyến đường giao nhanh nhất để đảm bảo nhiệt độ mỹ phẩm tối ưu.
+            Thông tin vận chuyển được cập nhật theo dữ liệu thực từ đơn vị vận chuyển.
           </Text>
 
           {/* Tracking Code Box */}
+          {trackingCode ? (
           <View style={styles.trackingCodeBox}>
             <View>
-              <Text style={styles.trackingLabel}>MÃ VẬN ĐƠN GHN</Text>
+              <Text style={styles.trackingLabel}>{carrierCode ? `MÃ VẬN ĐƠN ${carrierCode.toUpperCase()}` : 'MÃ VẬN ĐƠN'}</Text>
               <Text style={styles.trackingCode}>{trackingCode}</Text>
             </View>
             <TouchableOpacity style={styles.copyBtn} onPress={handleCopyTrackingCode}>
@@ -119,34 +181,21 @@ export default function ShipmentTrackingScreen({ route, navigation }: any) {
               <Text style={styles.copyBtnText}>{copied ? 'Đã chép' : 'Sao chép'}</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Shipper Contact Card */}
-          <View style={styles.shipperRow}>
-            <Image
-              source={{
-                uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-              }}
-              style={styles.shipperAvatar}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shipperCarrier}>Đối tác vận chuyển GHN</Text>
-              <Text style={styles.shipperName}>Nguyễn Văn Tuấn</Text>
-              <Text style={styles.shipperRating}>⭐ 4.95 • 1.280 chuyến giao an toàn</Text>
-            </View>
-            <TouchableOpacity style={styles.callShipperBtn} onPress={handleCallShipper}>
-              <Ionicons name="call" size={16} color="#FFF" />
-              <Text style={styles.callShipperText}>Gọi</Text>
-            </TouchableOpacity>
+          ) : (
+          <View style={styles.noTrackingBox}>
+            <Text style={styles.noTrackingText}>Mã vận đơn chưa được cấp. Vui lòng kiểm tra lại sau.</Text>
           </View>
+          )}
         </View>
 
-        {/* Realtime Stepper Timeline */}
+        {/* Timeline */}
+        {timelineItems.length > 0 ? (
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Lịch sử hành trình chi tiết</Text>
 
           <View style={styles.timelineList}>
-            {shipmentSteps.map((step, idx) => {
-              const isLast = idx === shipmentSteps.length - 1;
+            {timelineItems.map((step, idx) => {
+              const isLast = idx === timelineItems.length - 1;
               return (
                 <View key={idx} style={styles.timelineItem}>
                   <View style={styles.timelineIndicatorCol}>
@@ -175,27 +224,19 @@ export default function ShipmentTrackingScreen({ route, navigation }: any) {
                       {step.title}
                     </Text>
                     <Text style={styles.stepTime}>{step.time}</Text>
-                    <Text style={styles.stepDesc}>{step.desc}</Text>
+                    {step.desc ? <Text style={styles.stepDesc}>{step.desc}</Text> : null}
                   </View>
                 </View>
               );
             })}
           </View>
         </View>
-
-        {/* Destination & Package Items */}
+        ) : (
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Địa chỉ nhận hàng</Text>
-          <View style={styles.addressBox}>
-            <Ionicons name="pin-outline" size={20} color={theme.colors.primary} style={{ marginTop: 2 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.receiverInfo}>Thảo Linh Nguyễn • 0938 ••• 921</Text>
-              <Text style={styles.receiverAddress}>
-                Landmark 4, Vinhomes Central Park, 208 Nguyễn Hữu Cảnh, P.22, Q. Bình Thạnh, TP. Hồ Chí Minh
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.sectionTitle}>Lịch sử hành trình</Text>
+          <Text style={styles.noTrackingText}>Chưa có thông tin cập nhật từ đơn vị vận chuyển.</Text>
         </View>
+        )}
 
         {/* Action Buttons */}
         <View style={styles.actionGroup}>
@@ -213,6 +254,7 @@ export default function ShipmentTrackingScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -548,6 +590,76 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  retryBtn: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+  },
+  retryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FAF0F2',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    letterSpacing: 0.5,
+  },
+  disclaimerBadge: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  disclaimerBadgeText: {
+    fontSize: 9,
+    color: '#888',
+    fontWeight: '600',
+  },
+  noTrackingBox: {
+    backgroundColor: '#F5F5F5',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  noTrackingText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 17,
   },
 });
 

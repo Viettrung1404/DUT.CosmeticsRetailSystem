@@ -34,6 +34,8 @@ interface CartState {
   getSelectedCount: () => number;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   isLoading: false,
@@ -42,11 +44,11 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       set({ isLoading: true });
       const res = await cartApi.getCart();
-      const cartData = res?.data || res;
+      const cartData = res?.data?.data || res?.data || res;
       if (Array.isArray(cartData?.items)) {
         const mappedItems: CartItem[] = cartData.items.map((ci: any) => ({
           id: ci.id || ci.productVariantId,
-          variantId: ci.productVariantId || ci.variantId || ci.id,
+          variantId: ci.productVariantId || ci.variantId || '',
           productId: ci.productId || '',
           productName: ci.productName || 'Sản phẩm mỹ phẩm',
           variantName: ci.variantName || 'Mặc định',
@@ -60,39 +62,21 @@ export const useCartStore = create<CartState>((set, get) => ({
           selected: ci.isSelected ?? true,
         }));
         set({ items: mappedItems });
+      } else {
+        throw new Error('Dữ liệu giỏ hàng từ máy chủ không hợp lệ.');
       }
-    } catch {
-      // Khi chưa đăng nhập hoặc offline, giữ state items hiện thời
     } finally {
       set({ isLoading: false });
     }
   },
 
   addItem: async (newItem, quantity = 1) => {
-    // 1. Cập nhật lạc quan (Optimistic update)
-    const existingIndex = get().items.findIndex((i) => i.variantId === newItem.variantId);
-    if (existingIndex > -1) {
-      const updated = [...get().items];
-      updated[existingIndex].quantity += quantity;
-      set({ items: updated });
-    } else {
-      set({
-        items: [
-          ...get().items,
-          { ...newItem, quantity, selected: true },
-        ],
-      });
+    if (!UUID_REGEX.test(newItem.variantId)) {
+      throw new Error('Biến thể sản phẩm không hợp lệ. Vui lòng chọn sản phẩm từ danh mục.');
     }
 
-    // 2. Đồng bộ lên server nếu variantId là UUID
-    try {
-      if (newItem.variantId) {
-        await cartApi.addToCart(newItem.variantId, quantity);
-        await get().fetchCart();
-      }
-    } catch {
-      // Bỏ qua lỗi mạng, dữ liệu vẫn được lưu lạc quan ở máy
-    }
+    await cartApi.addToCart(newItem.variantId, quantity);
+    await get().fetchCart();
   },
 
   updateQuantity: async (id, delta) => {
@@ -106,31 +90,13 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
     if (newQty > targetItem.stock) return;
 
-    // Optimistic update
-    set({
-      items: get().items.map((item) =>
-        item.id === id ? { ...item, quantity: newQty } : item
-      ),
-    });
-
-    try {
-      await cartApi.updateItem(id, { quantity: newQty });
-    } catch {
-      // Giữ cập nhật cục bộ
-    }
+    await cartApi.updateItem(id, { quantity: newQty });
+    await get().fetchCart();
   },
 
   removeItem: async (id) => {
-    // Optimistic remove
-    set({
-      items: get().items.filter((item) => item.id !== id),
-    });
-
-    try {
-      await cartApi.removeItem(id);
-    } catch {
-      // Giữ trạng thái xóa cục bộ
-    }
+    await cartApi.removeItem(id);
+    await get().fetchCart();
   },
 
   toggleSelect: async (id) => {
@@ -138,31 +104,18 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (!target) return;
     const nextSelected = !target.selected;
 
-    set({
-      items: get().items.map((item) =>
-        item.id === id ? { ...item, selected: nextSelected } : item
-      ),
-    });
-
-    try {
-      await cartApi.updateItem(id, { isSelected: nextSelected });
-    } catch {
-      // ignore
-    }
+    await cartApi.updateItem(id, { isSelected: nextSelected });
+    await get().fetchCart();
   },
 
   toggleSelectAll: async () => {
     const allSelected = get().items.every((i) => i.selected);
     const nextVal = !allSelected;
 
-    set({
-      items: get().items.map((i) => ({ ...i, selected: nextVal })),
-    });
-
-    // Cập nhật từng item lên backend nếu cần
-    for (const item of get().items) {
-      cartApi.updateItem(item.id, { isSelected: nextVal }).catch(() => {});
-    }
+    await Promise.all(
+      get().items.map((item) => cartApi.updateItem(item.id, { isSelected: nextVal })),
+    );
+    await get().fetchCart();
   },
 
   clearCart: () => set({ items: [] }),

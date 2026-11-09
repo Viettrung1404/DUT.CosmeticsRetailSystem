@@ -26,8 +26,24 @@ export default function CartScreen({ navigation }: any) {
   } = useCartStore();
 
   useEffect(() => {
-    fetchCart();
+    fetchCart().catch((error) => {
+      Alert.alert(
+        'Không thể tải giỏ hàng',
+        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
+      );
+    });
   }, []);
+
+  const runCartAction = async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error: any) {
+      Alert.alert(
+        'Không thể cập nhật giỏ hàng',
+        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
+      );
+    }
+  };
 
   const isAllSelected = items.length > 0 && items.every((i) => i.selected);
   const totalPrice = getTotalPrice();
@@ -44,7 +60,7 @@ export default function CartScreen({ navigation }: any) {
       `Bạn có chắc muốn xóa "${name}" khỏi giỏ hàng?`,
       [
         { text: 'Hủy', style: 'cancel' },
-        { text: 'Xóa', style: 'destructive', onPress: () => removeItem(id) },
+        { text: 'Xóa', style: 'destructive', onPress: () => runCartAction(() => removeItem(id)) },
       ]
     );
   };
@@ -62,9 +78,10 @@ export default function CartScreen({ navigation }: any) {
         {
           text: 'Xóa',
           style: 'destructive',
-          onPress: () => {
-            items.filter((i) => i.selected).forEach((i) => removeItem(i.id));
-          },
+          onPress: () =>
+            runCartAction(async () => {
+              await Promise.all(items.filter((i) => i.selected).map((i) => removeItem(i.id)));
+            }),
         },
       ]
     );
@@ -86,7 +103,7 @@ export default function CartScreen({ navigation }: any) {
     <View style={styles.cartCard}>
       {/* Checkbox chọn sản phẩm */}
       <TouchableOpacity
-        onPress={() => toggleSelect(item.id)}
+        onPress={() => runCartAction(() => toggleSelect(item.id))}
         style={styles.checkboxContainer}
       >
         <Ionicons
@@ -150,7 +167,7 @@ export default function CartScreen({ navigation }: any) {
 
           <View style={styles.stepperContainer}>
             <TouchableOpacity
-              onPress={() => updateQuantity(item.id, -1)}
+              onPress={() => runCartAction(() => updateQuantity(item.id, -1))}
               style={styles.stepperBtn}
             >
               <Ionicons name="remove" size={14} color={theme.colors.textDark} />
@@ -159,7 +176,7 @@ export default function CartScreen({ navigation }: any) {
             <Text style={styles.quantityText}>{item.quantity}</Text>
 
             <TouchableOpacity
-              onPress={() => updateQuantity(item.id, 1)}
+              onPress={() => runCartAction(() => updateQuantity(item.id, 1))}
               style={styles.stepperBtn}
             >
               <Ionicons name="add" size={14} color={theme.colors.textDark} />
@@ -195,7 +212,7 @@ export default function CartScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.editModeBtn}
-          onPress={toggleSelectAll}
+          onPress={() => runCartAction(toggleSelectAll)}
         >
           <Text style={styles.editModeBtnText}>
             {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
