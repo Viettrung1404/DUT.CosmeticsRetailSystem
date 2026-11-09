@@ -1,5 +1,12 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiConflictResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import {
@@ -12,6 +19,8 @@ import {
   PurchaseOrderQueryDto,
   UpdatePurchaseOrderDto,
 } from '../dtos/supplier-request.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { PurchaseOrderResponseDto } from '../dtos/supplier-response.dto';
 
 @ApiTags('Admin - Suppliers (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -23,6 +32,7 @@ export class PurchaseOrderAdminController {
   @Get()
   @RequireAnyPermission('PO_CREATE', 'PO_APPROVE', 'PO_RECEIVE', 'SUPPLIER_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách đơn đặt hàng NCC (lọc NCC, trạng thái; theo phạm vi kho)' })
+  @ApiPagedOkResponse(PurchaseOrderResponseDto)
   async list(@CurrentUser('userId') userId: string, @Query() query: PurchaseOrderQueryDto) {
     const { items, total } = await this.orders.list(userId, {
       page: query.page ?? 1,
@@ -37,6 +47,7 @@ export class PurchaseOrderAdminController {
   @Get(':id')
   @RequireAnyPermission('PO_CREATE', 'PO_APPROVE', 'PO_RECEIVE', 'SUPPLIER_VIEW')
   @ApiOperation({ summary: 'Admin - Chi tiết đơn đặt hàng kèm các phiếu nhập (GRN)' })
+  @ApiOkResponse({ type: PurchaseOrderResponseDto })
   detail(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.orders.detail(userId, id);
   }
@@ -44,6 +55,7 @@ export class PurchaseOrderAdminController {
   @Post()
   @RequirePermissions('PO_CREATE')
   @ApiOperation({ summary: 'NV kho - Lập đơn đặt hàng NCC (nháp), chỉ giao về kho tổng' })
+  @ApiCreatedResponse({ type: PurchaseOrderResponseDto })
   async create(@CurrentUser('userId') userId: string, @Body() dto: CreatePurchaseOrderDto) {
     const data = await this.orders.create(userId, dto);
     return { message: `Đã lưu nháp đơn ${data.poNumber}`, data };
@@ -52,6 +64,7 @@ export class PurchaseOrderAdminController {
   @Put(':id')
   @RequirePermissions('PO_CREATE')
   @ApiOperation({ summary: 'NV kho - Sửa đơn nháp' })
+  @ApiOkResponse({ type: PurchaseOrderResponseDto })
   update(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -63,6 +76,7 @@ export class PurchaseOrderAdminController {
   @Put(':id/approve-send')
   @RequirePermissions('PO_APPROVE')
   @ApiOperation({ summary: 'Kế toán / Admin - Duyệt và gửi đơn cho NCC (người duyệt khác người lập)' })
+  @ApiOkResponse({ type: PurchaseOrderResponseDto })
   async approveSend(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.orders.approveAndSend(userId, id);
     return { message: `Đã duyệt đơn ${data.poNumber}, gửi cho nhà cung cấp`, data };
@@ -71,6 +85,7 @@ export class PurchaseOrderAdminController {
   @Put(':id/confirm')
   @RequirePermissions('PO_CREATE')
   @ApiOperation({ summary: 'NV kho - Ghi nhận NCC đã xác nhận đơn' })
+  @ApiOkResponse({ type: PurchaseOrderResponseDto })
   async confirm(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.orders.confirm(userId, id);
     return { message: `Nhà cung cấp đã xác nhận đơn ${data.poNumber}`, data };
@@ -79,6 +94,7 @@ export class PurchaseOrderAdminController {
   @Put(':id/cancel')
   @RequireAnyPermission('PO_CREATE', 'PO_APPROVE')
   @ApiOperation({ summary: 'Hủy đơn chưa nhận hàng' })
+  @ApiOkResponse({ type: PurchaseOrderResponseDto })
   async cancel(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.orders.cancel(userId, id);
     return { message: `Đã hủy đơn ${data.poNumber}`, data };
