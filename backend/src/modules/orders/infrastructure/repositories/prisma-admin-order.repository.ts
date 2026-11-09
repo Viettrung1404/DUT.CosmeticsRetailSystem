@@ -383,6 +383,13 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           OrderStatus.CANCELLED,
           'ADMIN',
         );
+        const activeShipments = await tx.shipment.count({
+          where: { orderId: order.id, status: { not: 'CANCELLED' } },
+        });
+        if (activeShipments)
+          throw new ConflictException(
+            'Đơn đang có vận đơn chưa hủy, hãy hủy vận đơn trước khi hủy đơn',
+          );
 
         const result: OrderCancelResult = {
           reservationReleased: false,
