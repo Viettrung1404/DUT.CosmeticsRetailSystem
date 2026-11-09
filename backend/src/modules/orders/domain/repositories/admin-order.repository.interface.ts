@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 export const ADMIN_ORDER_REPOSITORY = Symbol('IAdminOrderRepository');
 
 export interface AdminOrderScopeFilter {
@@ -168,6 +169,7 @@ export interface OrderCancelResult {
 export interface IAdminOrderRepository {
   cancelByAdmin(input: CancelOrderByAdminInput): Promise<OrderCancelResult>;
   updateStatus(input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult>;
+  applyStatusChange(tx: Prisma.TransactionClient, input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult>;
   findMany(query: AdminOrderListQuery): Promise<{ items: AdminOrderListItem[]; total: number }>;
   findAccessInfo(orderId: string): Promise<OrderAccessInfo | null>;
   findDetail(orderId: string): Promise<AdminOrderDetail | null>;

@@ -285,85 +285,90 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     input: UpdateOrderStatusInput,
   ): Promise<OrderStatusChangeResult> {
     // Xuất kho nhiều dòng tốn nhiều câu lệnh, mặc định 5 giây của Prisma dễ hết giờ với Neon
-    return this.prisma.transaction(
-      async (tx) => {
-        const order = await this.lockOrder(tx, input.orderId);
-        const target = input.target as OrderStatus;
-        OrderStateMachine.assertValidTransition(
-          order.status as OrderStatus,
-          target,
-          'ADMIN',
-        );
-        const exchange = await tx.exchangeSettlement.findUnique({
-          where: { replacementOrderId: order.id },
-        });
-        if (exchange) {
-          const paid = await tx.payment.aggregate({
-            where: { orderId: order.id, status: 'COMPLETED' },
-            _sum: { amount: true },
-          });
-          const cod = await tx.payment.aggregate({
-            where: {
-              orderId: order.id,
-              status: 'PENDING',
-              paymentMethod: 'COD',
-            },
-            _sum: { amount: true },
-          });
-          // COD is collected by the DELIVERED transition below. Completion
-          // must be covered by collected payments and exchange credit only.
-          const allowsPendingCod = [
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPING,
-            OrderStatus.DELIVERED,
-          ].includes(target);
-          const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
-            .add(exchange.creditApplied)
-            .add(allowsPendingCod ? (cod._sum.amount ?? 0) : 0);
-          if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
-            throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
-        }
+    return this.prisma.transaction((tx) => this.applyStatusChange(tx, input), {
+      timeout: 15000,
+    });
+  }
 
-        const result: OrderStatusChangeResult = {
-          stockDeducted: false,
-          codPaymentsCompleted: 0,
-          loyalty: null,
-          commissionAmount: null,
-        };
-
-        if (target === OrderStatus.SHIPPING) {
-          await this.deductStockForShipping(tx, order, input.changedBy);
-          result.stockDeducted = true;
-        }
-
-        if (target === OrderStatus.DELIVERED) {
-          const paid = await tx.payment.updateMany({
-            where: {
-              orderId: order.id,
-              paymentMethod: 'COD',
-              status: 'PENDING',
-            },
-            data: { status: 'COMPLETED', paidAt: new Date() },
-          });
-          result.codPaymentsCompleted = paid.count;
-        }
-
-        if (target === OrderStatus.COMPLETED) {
-          result.loyalty = await this.rewardCustomer(tx, order);
-          result.commissionAmount = await this.createCommission(tx, order);
-        }
-
-        await this.changeStatus(
-          tx,
-          order.id,
-          target,
-          input.changedBy,
-          input.note || `Chuyển trạng thái sang ${target}`,
-        );
-        return result;
-      },
-      { timeout: 15000 },
+  // Tách khỏi updateStatus để luồng vận đơn đổi trạng thái đơn trong cùng transaction với sự kiện của hãng
+  async applyStatusChange(
+    tx: Prisma.TransactionClient,
+    input: UpdateOrderStatusInput,
+  ): Promise<OrderStatusChangeResult> {
+    const order = await this.lockOrder(tx, input.orderId);
+    const target = input.target as OrderStatus;
+    OrderStateMachine.assertValidTransition(
+      order.status as OrderStatus,
+      target,
+      'ADMIN',
     );
+    const exchange = await tx.exchangeSettlement.findUnique({
+      where: { replacementOrderId: order.id },
+    });
+    if (exchange) {
+      const paid = await tx.payment.aggregate({
+        where: { orderId: order.id, status: 'COMPLETED' },
+        _sum: { amount: true },
+      });
+      const cod = await tx.payment.aggregate({
+        where: {
+          orderId: order.id,
+          status: 'PENDING',
+          paymentMethod: 'COD',
+        },
+        _sum: { amount: true },
+      });
+      // COD is collected by the DELIVERED transition below. Completion
+      // must be covered by collected payments and exchange credit only.
+      const allowsPendingCod = [
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPING,
+        OrderStatus.DELIVERED,
+      ].includes(target);
+      const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
+        .add(exchange.creditApplied)
+        .add(allowsPendingCod ? (cod._sum.amount ?? 0) : 0);
+      if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
+        throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
+    }
+
+    const result: OrderStatusChangeResult = {
+      stockDeducted: false,
+      codPaymentsCompleted: 0,
+      loyalty: null,
+      commissionAmount: null,
+    };
+
+    if (target === OrderStatus.SHIPPING) {
+      await this.deductStockForShipping(tx, order, input.changedBy);
+      result.stockDeducted = true;
+    }
+
+    if (target === OrderStatus.DELIVERED) {
+      const paid = await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          paymentMethod: 'COD',
+          status: 'PENDING',
+        },
+        data: { status: 'COMPLETED', paidAt: new Date() },
+      });
+      result.codPaymentsCompleted = paid.count;
+    }
+
+    if (target === OrderStatus.COMPLETED) {
+      result.loyalty = await this.rewardCustomer(tx, order);
+      result.commissionAmount = await this.createCommission(tx, order);
+    }
+
+    await this.changeStatus(
+      tx,
+      order.id,
+      target,
+      input.changedBy,
+      input.note || `Chuyển trạng thái sang ${target}`,
+    );
+    return result;
   }
 
   // FR-04.05: hoàn giữ hàng, hoàn coupon, hoàn điểm; đã thu tiền thì tạo phiếu hoàn tiền chờ xử lý
