@@ -1,5 +1,11 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RawResponse } from '@core/decorators/raw-response.decorator';
@@ -25,6 +31,15 @@ import {
   StoreQueryDto,
   TrendsQueryDto,
 } from '../dtos/report-request.dto';
+import { DashboardResponseDto } from '../dtos/report-response.dto';
+import { RevenueReportResponseDto } from '../dtos/report-response.dto';
+import { ProductReportResponseDto } from '../dtos/report-response.dto';
+import { StaffKpiResponseDto } from '../dtos/report-response.dto';
+import { RfmReportResponseDto } from '../dtos/report-response.dto';
+import { CustomerSegmentsResponseDto } from '../dtos/report-response.dto';
+import { TrendsResponseDto } from '../dtos/report-response.dto';
+import { ForecastResponseDto } from '../dtos/report-response.dto';
+import { HrReportResponseDto } from '../dtos/report-response.dto';
 
 @ApiTags('Admin - Reports (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -46,6 +61,7 @@ export class ReportAdminController {
   @Get('dashboard')
   @RequirePermissions('REPORT_VIEW_BASIC')
   @ApiOperation({ summary: 'Admin - Dashboard: doanh thu hôm nay, 7 ngày, top 5 sản phẩm, tỷ lệ kênh, đơn chờ, tồn thấp' })
+  @ApiOkResponse({ type: DashboardResponseDto })
   getDashboard(@CurrentUser('userId') userId: string) {
     return this.dashboard.execute(userId);
   }
@@ -53,6 +69,7 @@ export class ReportAdminController {
   @Get('reports/revenue')
   @RequirePermissions('REPORT_REVENUE')
   @ApiOperation({ summary: 'Admin - Báo cáo doanh thu theo ngày/tuần/tháng: giảm giá, phí ship, giá vốn, lợi nhuận gộp' })
+  @ApiOkResponse({ type: RevenueReportResponseDto })
   getRevenue(@CurrentUser('userId') userId: string, @Query() query: RevenueReportQueryDto) {
     return this.revenue.execute(userId, query);
   }
@@ -60,6 +77,7 @@ export class ReportAdminController {
   @Get('reports/products')
   @RequirePermissions('REPORT_VIEW_BASIC')
   @ApiOperation({ summary: 'Admin - Sản phẩm bán chạy và bán chậm (còn tồn, không bán 30 ngày)' })
+  @ApiOkResponse({ type: ProductReportResponseDto })
   getProducts(@CurrentUser('userId') userId: string, @Query() query: ProductReportQueryDto) {
     return this.products.execute(userId, query);
   }
@@ -67,6 +85,7 @@ export class ReportAdminController {
   @Get('reports/staff-kpi')
   @RequirePermissions('REPORT_STAFF_PERF')
   @ApiOperation({ summary: 'Admin - KPI bán hàng theo nhân viên: số đơn, doanh thu, hoa hồng' })
+  @ApiOkResponse({ type: StaffKpiResponseDto })
   getStaffKpi(@CurrentUser('userId') userId: string, @Query() query: ReportRangeQueryDto) {
     return this.staffKpi.execute(userId, query);
   }
@@ -97,6 +116,7 @@ export class ReportAdminController {
   @Get('reports/rfm')
   @RequirePermissions('REPORT_FORECAST')
   @ApiOperation({ summary: 'Admin - Phân tích RFM khung 12 tháng (ngũ phân vị), kèm nhóm khách' })
+  @ApiOkResponse({ type: RfmReportResponseDto })
   getRfm(@CurrentUser('userId') userId: string, @Query() query: RfmQueryDto) {
     return this.rfm.execute(userId, query);
   }
@@ -104,6 +124,7 @@ export class ReportAdminController {
   @Get('customers/segments')
   @RequirePermissions('REPORT_FORECAST')
   @ApiOperation({ summary: 'Admin - Số khách và chi tiêu theo từng nhóm RFM' })
+  @ApiOkResponse({ type: CustomerSegmentsResponseDto })
   getSegments(@CurrentUser('userId') userId: string, @Query() query: StoreQueryDto) {
     return this.segments.execute(userId, query);
   }
@@ -111,6 +132,7 @@ export class ReportAdminController {
   @Get('reports/trends')
   @RequirePermissions('REPORT_FORECAST')
   @ApiOperation({ summary: 'Admin - Xu hướng doanh thu theo thời gian, danh mục và giờ trong tuần (heatmap)' })
+  @ApiOkResponse({ type: TrendsResponseDto })
   getTrends(@CurrentUser('userId') userId: string, @Query() query: TrendsQueryDto) {
     return this.trends.execute(userId, query);
   }
@@ -118,6 +140,7 @@ export class ReportAdminController {
   @Get('reports/forecast')
   @RequirePermissions('REPORT_FORECAST')
   @ApiOperation({ summary: 'Admin - Dự báo doanh thu kèm khoảng tin cậy 95% (trung bình trượt hoặc hồi quy tuyến tính)' })
+  @ApiOkResponse({ type: ForecastResponseDto })
   getForecast(@CurrentUser('userId') userId: string, @Query() query: ForecastQueryDto) {
     return this.forecast.execute(userId, query);
   }
@@ -125,6 +148,7 @@ export class ReportAdminController {
   @Get('reports/hr')
   @RequirePermissions('EMPLOYEE_VIEW')
   @ApiOperation({ summary: 'Admin - Báo cáo nhân sự: theo phòng ban, cửa hàng, nghỉ việc, đi muộn, KPI' })
+  @ApiOkResponse({ type: HrReportResponseDto })
   getHr(@CurrentUser('userId') userId: string, @Query() query: HrReportQueryDto) {
     return this.hr.execute(userId, query);
   }
