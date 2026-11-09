@@ -18,6 +18,7 @@ import {
   ApiProduces,
   ApiQuery,
   ApiTags,
+  ApiCreatedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { RawResponse } from '@core/decorators/raw-response.decorator';
@@ -29,6 +30,7 @@ import {
 } from '../../application/use-cases/import-products.use-case';
 import { parseDryRun } from '../../application/product-import.rules';
 import { CsvUploadErrorInterceptor } from '../interceptors/csv-upload-error.interceptor';
+import { ImportProductsResponseDto } from '../dtos/product-import-response.dto';
 
 // Đăng ký trước ProductAdminController để "import-template" không bị hiểu là :id
 @ApiTags('Admin - Products (Thành Lập)')
@@ -82,6 +84,7 @@ export class ProductImportAdminController {
     summary:
       'Admin - Nhập sản phẩm hàng loạt từ Excel hoặc CSV: SKU sản phẩm đã có thì cập nhật, chưa có thì tạo cùng biến thể. Có dòng lỗi thì không ghi gì',
   })
+  @ApiCreatedResponse({ type: ImportProductsResponseDto })
   async import(@UploadedFile() file: ImportFileInput | undefined, @Query('dryRun') dryRun?: string) {
     const data = await this.importProducts.execute(file, parseDryRun(dryRun));
     const message = !data.valid

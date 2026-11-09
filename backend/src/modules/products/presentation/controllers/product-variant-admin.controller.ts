@@ -88,6 +88,7 @@ export class ProductVariantAdminController {
   @RequirePermissions('PRODUCT_DELETE')
   @ApiOperation({ summary: 'Admin - Xóa mềm biến thể (chuyển sang ngừng bán)' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy biến thể' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async deleteVariant(@Param('id', ParseUUIDPipe) id: string) {
     await this.deleteProductVariantUseCase.execute(id);
     return { message: 'Đã ngừng bán biến thể', data: null };
