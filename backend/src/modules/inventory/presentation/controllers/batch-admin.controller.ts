@@ -1,10 +1,18 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
 import { ManageBatchesUseCase } from '../../application/use-cases/manage-batches.use-case';
 import { BatchQueryDto, LockBatchDto } from '../dtos/inventory-workflow-request.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { BatchListItemResponseDto } from '../dtos/inventory-workflow-response.dto';
+import { BatchResponseDto } from '../dtos/inventory-workflow-response.dto';
 
 @ApiTags('Admin - Inventory (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -15,6 +23,7 @@ export class BatchAdminController {
   @Get()
   @RequirePermissions('INVENTORY_BATCH_MANAGE')
   @ApiOperation({ summary: 'Admin - Danh sách lô theo hạn dùng (lọc sắp hết hạn 30/60/90 ngày, đã hết hạn, đang khóa)' })
+  @ApiPagedOkResponse(BatchListItemResponseDto)
   async list(@CurrentUser('userId') userId: string, @Query() query: BatchQueryDto) {
     const { items, total } = await this.batches.list(userId, {
       page: query.page ?? 1,
@@ -33,6 +42,7 @@ export class BatchAdminController {
   @Put(':id/lock')
   @RequirePermissions('INVENTORY_BATCH_MANAGE')
   @ApiOperation({ summary: 'Admin - Khóa lô (lỗi chất lượng): mọi luồng xuất FEFO bỏ qua lô này' })
+  @ApiOkResponse({ type: BatchResponseDto })
   async lock(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -45,6 +55,7 @@ export class BatchAdminController {
   @Put(':id/unlock')
   @RequirePermissions('INVENTORY_BATCH_MANAGE')
   @ApiOperation({ summary: 'Admin - Mở khóa lô' })
+  @ApiOkResponse({ type: BatchResponseDto })
   async unlock(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
