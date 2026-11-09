@@ -82,7 +82,7 @@ export class AdjustmentResponseDto {
   @ApiProperty({ example: 'CH01 - Quận Hải Châu' })
   storeName: string;
 
-  @ApiProperty({ example: 'PENDING', description: 'PENDING | APPROVED | REJECTED | CANCELLED' })
+  @ApiProperty({ example: 'PENDING', description: 'Trạng thái phiếu điều chỉnh (ví dụ PENDING khi chờ duyệt)' })
   status: string;
 
   @ApiProperty({ example: 'Hàng vỡ khi kiểm kê' })
@@ -173,7 +173,7 @@ export class TransferResponseDto {
   @ApiProperty({ example: 'CH01 - Quận Hải Châu' })
   toStoreName: string;
 
-  @ApiProperty({ example: 'REQUESTED', description: 'DRAFT | REQUESTED | APPROVED | SHIPPED | RECEIVED | CANCELLED' })
+  @ApiProperty({ example: 'REQUESTED', description: 'Trạng thái phiếu chuyển kho (ví dụ REQUESTED)' })
   status: string;
 
   @ApiProperty({ example: null, nullable: true, type: String })
@@ -258,7 +258,7 @@ export class StocktakeResponseDto {
   @ApiProperty({ example: 'CH01 - Quận Hải Châu' })
   storeName: string;
 
-  @ApiProperty({ example: 'COUNTING', description: 'DRAFT | COUNTING | COMPLETED | CANCELLED' })
+  @ApiProperty({ example: 'COUNTING', description: 'Trạng thái phiếu kiểm kê' })
   status: string;
 
   @ApiProperty({ example: -370000, description: 'Tổng giá trị chênh lệch (VND)' })
