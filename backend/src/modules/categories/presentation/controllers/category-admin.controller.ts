@@ -31,6 +31,7 @@ import { CreateCategoryRequestDto } from '../dtos/create-category-request.dto';
 import { UpdateCategoryRequestDto } from '../dtos/update-category-request.dto';
 import { GetCategoriesQueryDto } from '../dtos/get-categories-query.dto';
 import { CategoryResponseDto } from '../dtos/category-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - Categories (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -48,6 +49,7 @@ export class CategoryAdminController {
   @Get()
   @RequirePermissions('PRODUCT_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách danh mục dạng phẳng (phân trang, tìm, lọc)' })
+  @ApiPagedOkResponse(CategoryResponseDto)
   async getCategories(@Query() query: GetCategoriesQueryDto) {
     const { items, total } = await this.getCategoriesUseCase.execute({
       page: query.page ?? 1,
@@ -112,6 +114,7 @@ export class CategoryAdminController {
   @ApiOperation({ summary: 'Admin - Xóa mềm danh mục (chuyển sang ngừng hoạt động)' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy danh mục' })
   @ApiConflictResponse({ description: 'Còn danh mục con đang hoạt động' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async deleteCategory(@Param('id', ParseUUIDPipe) id: string) {
     await this.deleteCategoryUseCase.execute(id);
     return { message: 'Đã xóa danh mục', data: null };
