@@ -9,6 +9,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiCreatedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import {
@@ -57,6 +58,7 @@ export class PosOrderController {
   @ApiBadRequestResponse({ description: 'Tiền thu sai, voucher / điểm không hợp lệ' })
   @ApiConflictResponse({ description: 'Chưa mở ca tại cửa hàng này, hoặc không đủ hàng' })
   @ApiForbiddenResponse({ description: 'Không được gán cửa hàng này' })
+  @ApiCreatedResponse({ type: PosOrderCreatedResponseDto })
   async create(
     @CurrentUser('userId') userId: string,
     @CurrentUser('permissionCodes') permissionCodes: string[],
