@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import {
   RequireAnyPermission,
@@ -15,6 +21,10 @@ import {
   UpdateCouponDto,
   UpdatePromotionDto,
 } from '../dtos/marketing-request.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { PromotionResponseDto } from '../dtos/marketing-response.dto';
+import { PromotionStatsResponseDto } from '../dtos/marketing-response.dto';
+import { CouponResponseDto } from '../dtos/marketing-response.dto';
 
 @ApiTags('Admin - Marketing (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -25,6 +35,7 @@ export class PromotionAdminController {
   @Get('promotions')
   @RequireAnyPermission('MARKETING_PROMO_VIEW', 'MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Danh sách chương trình khuyến mãi / flash sale' })
+  @ApiPagedOkResponse(PromotionResponseDto)
   async list(@Query() query: PromotionQueryDto) {
     const { items, total } = await this.promotions.listPromotions({
       page: query.page ?? 1,
@@ -40,6 +51,7 @@ export class PromotionAdminController {
   @Get('promotions/:id')
   @RequireAnyPermission('MARKETING_PROMO_VIEW', 'MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Chi tiết khuyến mãi' })
+  @ApiOkResponse({ type: PromotionResponseDto })
   detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.promotion(id);
   }
@@ -54,6 +66,7 @@ export class PromotionAdminController {
       'Số liệu lấy từ các dòng hàng gắn khuyến mãi: discountTotal = tổng tiền giảm; grossRevenue = tổng giá bán x số lượng trước giảm (dùng làm "doanh thu" trong ROI); ' +
       'netRevenue = tổng thực thu sau giảm. roi = null khi chưa có tiền giảm.',
   })
+  @ApiOkResponse({ type: PromotionStatsResponseDto })
   stats(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.promotionStats(id);
   }
@@ -61,6 +74,7 @@ export class PromotionAdminController {
   @Post('promotions')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Tạo khuyến mãi' })
+  @ApiCreatedResponse({ type: PromotionResponseDto })
   async create(@Body() dto: CreatePromotionDto) {
     const data = await this.promotions.createPromotion({
       name: dto.name,
@@ -82,6 +96,7 @@ export class PromotionAdminController {
   @Put('promotions/:id')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa khuyến mãi (đã có đơn dùng thì không đổi loại / mức giảm)' })
+  @ApiOkResponse({ type: PromotionResponseDto })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePromotionDto) {
     return this.promotions.updatePromotion(id, dto);
   }
@@ -89,6 +104,7 @@ export class PromotionAdminController {
   @Put('promotions/:id/deactivate')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Tắt khuyến mãi (không xóa, D0.4)' })
+  @ApiOkResponse({ type: PromotionResponseDto })
   deactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.setPromotionActive(id, false);
   }
@@ -96,6 +112,7 @@ export class PromotionAdminController {
   @Put('promotions/:id/activate')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Bật lại khuyến mãi' })
+  @ApiOkResponse({ type: PromotionResponseDto })
   activate(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.setPromotionActive(id, true);
   }
@@ -103,6 +120,7 @@ export class PromotionAdminController {
   @Get('coupons')
   @RequireAnyPermission('MARKETING_PROMO_VIEW', 'MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Danh sách mã giảm giá' })
+  @ApiPagedOkResponse(CouponResponseDto)
   async listCoupons(@Query() query: CouponQueryDto) {
     const { items, total } = await this.promotions.listCoupons({
       page: query.page ?? 1,
@@ -117,6 +135,7 @@ export class PromotionAdminController {
   @Post('coupons')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Tạo một mã giảm giá (tự đặt mã hoặc để hệ thống sinh)' })
+  @ApiCreatedResponse({ type: CouponResponseDto })
   async createCoupon(@Body() dto: CreateCouponDto) {
     const data = await this.promotions.createCoupon(this.couponInput(dto));
     return { message: `Đã tạo mã ${data.code}`, data };
@@ -125,6 +144,7 @@ export class PromotionAdminController {
   @Post('coupons/bulk')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Tạo hàng loạt mã giảm giá (M7: 8 ký tự, bỏ 0/O/1/I)' })
+  @ApiCreatedResponse({ type: [CouponResponseDto] })
   async bulk(@Body() dto: BulkCouponDto) {
     const data = await this.promotions.createBulk({
       ...this.couponInput(dto),
@@ -137,6 +157,7 @@ export class PromotionAdminController {
   @Get('coupons/:id')
   @RequireAnyPermission('MARKETING_PROMO_VIEW', 'MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Chi tiết mã giảm giá' })
+  @ApiOkResponse({ type: CouponResponseDto })
   getCoupon(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.getCoupon(id);
   }
@@ -144,6 +165,7 @@ export class PromotionAdminController {
   @Put('coupons/:id')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa mã giảm giá (mã đã dùng thì không đổi loại / mức giảm)' })
+  @ApiOkResponse({ type: CouponResponseDto })
   updateCoupon(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateCouponDto) {
     return this.promotions.updateCoupon(id, dto);
   }
@@ -151,6 +173,7 @@ export class PromotionAdminController {
   @Put('coupons/:id/activate')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Bật lại mã giảm giá' })
+  @ApiOkResponse({ type: CouponResponseDto })
   activateCoupon(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.setCouponActive(id, true);
   }
@@ -158,6 +181,7 @@ export class PromotionAdminController {
   @Put('coupons/:id/deactivate')
   @RequirePermissions('MARKETING_PROMO_MANAGE')
   @ApiOperation({ summary: 'Admin - Khóa mã giảm giá (không xóa)' })
+  @ApiOkResponse({ type: CouponResponseDto })
   deactivateCoupon(@Param('id', ParseUUIDPipe) id: string) {
     return this.promotions.setCouponActive(id, false);
   }
