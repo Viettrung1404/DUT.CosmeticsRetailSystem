@@ -99,6 +99,13 @@ export class ReportAdminController {
     'text/csv',
   )
   @ApiOperation({ summary: 'Admin - Xuất báo cáo ra Excel (mặc định), PDF hoặc CSV; cần quyền xem đúng loại báo cáo' })
+  @ApiOkResponse({
+    description: 'File báo cáo xuất ra (xlsx hoặc pdf tùy tham số)',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { schema: { type: 'string', format: 'binary' } },
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
   async export(
     @CurrentUser('userId') userId: string,
     @Query() query: ExportReportQueryDto,
