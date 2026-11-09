@@ -28,6 +28,7 @@ export const ERROR_MESSAGES_VI: Record<string, string> = {
   EXCHANGE_ITEMS_REQUIRED: 'Vui lòng chọn sản phẩm muốn đổi',
   EXCHANGE_NOT_ACCEPTED: 'Yêu cầu đổi hàng chưa được chấp nhận',
   EXCHANGE_NOT_AVAILABLE: 'Không thể đổi hàng cho đơn này',
+  EXCHANGE_SETTLEMENT_UNPAID: 'Đơn đổi hàng chưa thanh toán đủ phần chênh lệch',
   FACEBOOK_GRAPH_VERSION_REQUIRED: 'Cấu hình đăng nhập Facebook chưa hoàn tất',
   FACEBOOK_OAUTH_NOT_CONFIGURED: 'Đăng nhập Facebook hiện không khả dụng',
   FCM_REGISTRATION_TOKEN_REQUIRED: 'Thiếu mã đăng ký thông báo của thiết bị',
