@@ -62,4 +62,9 @@ export class PrismaProductVariantRepository implements IProductVariantRepository
     });
     return ProductVariantMapper.toDomain(updated);
   }
+
+  async updateTryOnColor(id: string, colorHex: string): Promise<boolean> {
+    const count = await this.prisma.$executeRaw`UPDATE product_variants SET try_on_color_hex=${colorHex} WHERE id=${id}::uuid`;
+    return count > 0;
+  }
 }
