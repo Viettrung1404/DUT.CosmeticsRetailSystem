@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useCartStore, CartItem } from '../../store/useCartStore';
 export default function CartScreen({ navigation }: any) {
   const {
     items,
+    fetchCart,
     updateQuantity,
     removeItem,
     toggleSelect,
@@ -23,6 +24,10 @@ export default function CartScreen({ navigation }: any) {
     getTotalPrice,
     getSelectedCount,
   } = useCartStore();
+
+  useEffect(() => {
+    fetchCart();
+  }, []);
 
   const isAllSelected = items.length > 0 && items.every((i) => i.selected);
   const totalPrice = getTotalPrice();

@@ -10,13 +10,19 @@ export const cartApi = {
   // Thêm sản phẩm/biến thể vào giỏ (FR-02.04)
   addToCart: async (productVariantId: string, quantity: number = 1) => {
     const response = await apiClient.post('/cart/items', {
-      product_variant_id: productVariantId,
+      productVariantId,
       quantity,
     });
     return response.data;
   },
 
-  // Cập nhật số lượng món trong giỏ (FR-02.05)
+  // Cập nhật số lượng / trạng thái chọn (FR-02.05)
+  updateItem: async (itemId: string, payload: { quantity?: number; isSelected?: boolean }) => {
+    const response = await apiClient.put(`/cart/items/${itemId}`, payload);
+    return response.data;
+  },
+
+  // Cập nhật số lượng món trong giỏ (backward compatibility)
   updateQuantity: async (itemId: string, quantity: number) => {
     const response = await apiClient.put(`/cart/items/${itemId}`, { quantity });
     return response.data;

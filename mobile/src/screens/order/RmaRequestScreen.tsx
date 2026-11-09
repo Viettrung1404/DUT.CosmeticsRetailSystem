@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,11 @@ const RESOLUTION_METHODS = [
 
 export default function RmaRequestScreen({ route, navigation }: any) {
   const { orderId = 'GU-89241', items: routeItems } = route.params || {};
+
+  // Giữ nguyên Idempotency-Key trong suốt vòng đời của form RMA
+  const idempotencyKeyRef = useRef<string>(
+    'rma-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10)
+  );
 
   const [selectedItems, setSelectedItems] = useState<{ [key: string]: boolean }>({
     'item-1': true,
@@ -134,12 +139,15 @@ export default function RmaRequestScreen({ route, navigation }: any) {
           quantity: p.quantity || 1,
         }));
 
-      await orderApi.createReturnRequest({
-        orderId,
-        type: selectedType,
-        reason: selectedReason,
-        items: itemsToReturn,
-      });
+      await orderApi.createReturnRequest(
+        {
+          orderId,
+          type: selectedType,
+          reason: selectedReason,
+          items: itemsToReturn,
+        },
+        idempotencyKeyRef.current
+      );
 
       Alert.alert(
         'Tạo yêu cầu thành công! ✨',

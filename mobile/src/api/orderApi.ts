@@ -1,15 +1,28 @@
 import apiClient from './apiClient';
 
+export interface ShippingAddressInput {
+  recipientName: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  ward?: string;
+  district?: string;
+}
+
+export interface OrderItemInput {
+  variantId: string;
+  quantity: number;
+}
+
 export interface CreateOrderPayload {
-  shippingAddress: {
-    fullName: string;
-    phone: string;
-    address: string;
-    city: string;
-  };
-  paymentMethod: 'COD' | 'VNPAY';
+  shippingAddress: ShippingAddressInput;
+  paymentMethod?: 'COD' | 'SEPAY' | string;
+  items?: OrderItemInput[];
   note?: string;
   couponCode?: string;
+  usePoints?: number;
+  quoteVersion?: string;
+  storeId?: string;
 }
 
 export type ReturnReasonType =
@@ -41,9 +54,16 @@ export const orderApi = {
     return response.data;
   },
 
-  // Đặt hàng mới (FR-02.06 - Tạo đơn COD)
-  createOrder: async (payload: CreateOrderPayload) => {
-    const response = await apiClient.post('/orders', payload);
+  // Đặt hàng mới (FR-02.06 - Tạo đơn COD / SEPAY)
+  createOrder: async (payload: CreateOrderPayload, idempotencyKey?: string) => {
+    const key =
+      idempotencyKey ||
+      'ord-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+    const response = await apiClient.post('/orders', payload, {
+      headers: {
+        'Idempotency-Key': key,
+      },
+    });
     return response.data;
   },
 
@@ -78,12 +98,13 @@ export const orderApi = {
   },
 
   // Gửi yêu cầu đổi trả / hoàn tiền RMA (POST /returns)
-  createReturnRequest: async (payload: CreateRmaPayload) => {
-    const idempotencyKey =
+  createReturnRequest: async (payload: CreateRmaPayload, idempotencyKey?: string) => {
+    const key =
+      idempotencyKey ||
       'rma-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
     const response = await apiClient.post('/returns', payload, {
       headers: {
-        'Idempotency-Key': idempotencyKey,
+        'Idempotency-Key': key,
       },
     });
     return response.data;

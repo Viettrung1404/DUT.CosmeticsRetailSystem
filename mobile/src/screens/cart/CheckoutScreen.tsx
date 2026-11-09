@@ -30,8 +30,8 @@ export default function CheckoutScreen({ navigation }: any) {
   // Phương thức vận chuyển
   const [shippingOption, setShippingOption] = useState<'EXPRESS' | 'STANDARD'>('EXPRESS');
 
-  // Phương thức thanh toán
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO' | 'VNPAY'>('COD');
+  // Phương thức thanh toán (Backend hỗ trợ COD và SEPAY)
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'SEPAY'>('COD');
   const [voucherCode, setVoucherCode] = useState('GLOWVIP');
   const [voucherDiscount, setVoucherDiscount] = useState(50000);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,26 +56,45 @@ export default function CheckoutScreen({ navigation }: any) {
       return;
     }
 
+    if (selectedItems.length === 0) {
+      Alert.alert('Giỏ hàng trống', 'Vui lòng chọn ít nhất 1 sản phẩm để đặt hàng.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // 1. Gọi API Backend thật
+      // 1. Chuẩn bị items có variantId thật nếu là UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const orderItems = selectedItems
+        .filter((item) => item.variantId && uuidRegex.test(item.variantId))
+        .map((item) => ({
+          variantId: item.variantId,
+          quantity: item.quantity,
+        }));
+
+      // 2. Gọi API Backend
       const response = await orderApi.createOrder({
         shippingAddress: {
-          fullName,
-          phone: phoneNumber,
-          address,
-          city,
+          recipientName: fullName.trim(),
+          phone: phoneNumber.trim(),
+          addressLine: address.trim(),
+          city: city.trim(),
         },
-        paymentMethod: paymentMethod === 'COD' ? 'COD' : 'VNPAY',
+        paymentMethod: paymentMethod === 'COD' ? 'COD' : 'SEPAY',
+        items: orderItems.length > 0 ? orderItems : undefined,
         note: deliveryPreference === 'OFFICE' ? 'Giao giờ hành chính' : 'Gọi trước 15p',
         couponCode: voucherDiscount > 0 ? voucherCode : undefined,
       });
 
       const serverOrderCode =
+        response?.data?.orderNumber ||
         response?.data?.order_code ||
-        response?.orderCode ||
-        `GLOW-${Math.floor(100000 + Math.random() * 900000)}`;
+        response?.orderNumber;
+
+      if (!serverOrderCode) {
+        throw new Error('Máy chủ không trả về mã đơn hàng hợp lệ.');
+      }
 
       clearCart();
 
@@ -85,9 +104,7 @@ export default function CheckoutScreen({ navigation }: any) {
         paymentMethod:
           paymentMethod === 'COD'
             ? 'Thanh toán khi nhận hàng (COD)'
-            : paymentMethod === 'MOMO'
-            ? 'Ví MoMo'
-            : 'VnPay / Thẻ ngân hàng',
+            : 'Chuyển khoản SePay (QR Tự Động)',
       });
     } catch (error: any) {
       const errorMsg =
@@ -347,37 +364,25 @@ export default function CheckoutScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
 
-          {/* MoMo */}
+          {/* SePay / Chuyển khoản QR */}
           <TouchableOpacity
-            style={[styles.paymentBox, paymentMethod === 'MOMO' && styles.paymentBoxSelected]}
-            onPress={() => setPaymentMethod('MOMO')}
+            style={[styles.paymentBox, paymentMethod === 'SEPAY' && styles.paymentBoxSelected]}
+            onPress={() => setPaymentMethod('SEPAY')}
           >
             <Ionicons
-              name={paymentMethod === 'MOMO' ? 'radio-button-on' : 'radio-button-off'}
+              name={paymentMethod === 'SEPAY' ? 'radio-button-on' : 'radio-button-off'}
               size={18}
-              color={paymentMethod === 'MOMO' ? theme.colors.primary : theme.colors.textMuted}
-            />
-            <Ionicons name="wallet-outline" size={22} color="#D82D8B" style={{ marginLeft: 10 }} />
-            <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={styles.paymentName}>Ví điện tử MoMo</Text>
-              <Text style={styles.paymentSub}>Thanh toán tức thì nhận thêm hoàn xu</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* VNPay */}
-          <TouchableOpacity
-            style={[styles.paymentBox, paymentMethod === 'VNPAY' && styles.paymentBoxSelected]}
-            onPress={() => setPaymentMethod('VNPAY')}
-          >
-            <Ionicons
-              name={paymentMethod === 'VNPAY' ? 'radio-button-on' : 'radio-button-off'}
-              size={18}
-              color={paymentMethod === 'VNPAY' ? theme.colors.primary : theme.colors.textMuted}
+              color={paymentMethod === 'SEPAY' ? theme.colors.primary : theme.colors.textMuted}
             />
             <Ionicons name="qr-code-outline" size={22} color="#1565C0" style={{ marginLeft: 10 }} />
             <View style={{ marginLeft: 10, flex: 1 }}>
-              <Text style={styles.paymentName}>VNPay / Thẻ ATM & Quốc Tế</Text>
-              <Text style={styles.paymentSub}>Hỗ trợ quét mã VNPAY-QR tất cả ngân hàng</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.paymentName}>Chuyển khoản SePay</Text>
+                <View style={styles.hotBadge}>
+                  <Text style={styles.hotBadgeText}>Tự động 24/7</Text>
+                </View>
+              </View>
+              <Text style={styles.paymentSub}>Quét mã QR qua ứng dụng Ngân hàng</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -785,6 +790,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: theme.colors.textMuted,
     marginTop: 1,
+  },
+  hotBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  hotBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#1565C0',
   },
 
   /* Voucher */
