@@ -19,7 +19,10 @@ export async function getPosMyStores(): Promise<PosStore[]> {
 
 export async function searchPosProducts(storeId: string, q: string, page = 1, limit = 20): Promise<PosSearchResult> {
   const response = await axiosClient.get('/pos/products/search', { params: { storeId, q, page, limit } })
-  return unwrap<PosSearchResult>(response.data)
+  const body = response.data as PosSearchResult | { data: PosSearchResult }
+  // PageDto hợp lệ có { data: [...], meta }; không bỏ mất meta khi unwrap.
+  if ('meta' in body && Array.isArray(body.data)) return body as PosSearchResult
+  return unwrap<PosSearchResult>(body)
 }
 
 export async function scanPosProduct(storeId: string, barcode: string): Promise<PosProduct> {
