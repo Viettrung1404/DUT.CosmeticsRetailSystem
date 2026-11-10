@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { CustomerEventIntegration } from '@modules/customer-commerce/application/admin-integration.service';
@@ -13,6 +13,8 @@ import {
   CreateShipmentRecord,
   IShipmentRepository,
   OrderForShipment,
+  ReceiveReturnedShipmentInput,
+  ReceiveReturnedShipmentResult,
   ShipmentAccessInfo,
   ShipmentDetail,
   ShipmentListItem,
@@ -25,6 +27,7 @@ import {
 } from '../../domain/shipment-status';
 
 const TX_OPTIONS = { timeout: 30000, maxWait: 10000 };
+const RETURN_RECEIVED = 'SHIPMENT_RETURN_RECEIVED';
 
 const LIST_INCLUDE = {
   order: { select: { orderNumber: true, storeId: true, store: { select: { name: true } } } },
@@ -310,6 +313,133 @@ export class PrismaShipmentRepository implements IShipmentRepository {
         },
       });
       return { shipmentId: shipment.id, orderId: order.id, status: input.status, duplicate: false, orderStatus };
+    }, TX_OPTIONS);
+  }
+
+  // Hàng giao thất bại về lại cửa hàng: nhập lại đúng lô đã xuất, bỏ phần hỏng; đơn đã trả trước thì tạo phiếu hoàn chờ Kế toán
+  async receiveReturned(input: ReceiveReturnedShipmentInput): Promise<ReceiveReturnedShipmentResult> {
+    return this.prisma.transaction(async (tx) => {
+      const found = await tx.shipment.findUniqueOrThrow({
+        where: { id: input.shipmentId },
+        select: { orderId: true },
+      });
+      const order = await this.lockOrder(tx, found.orderId);
+      await tx.$queryRaw`SELECT id FROM shipments WHERE id=${input.shipmentId}::uuid FOR UPDATE`;
+      const shipment = await tx.shipment.findUniqueOrThrow({
+        where: { id: input.shipmentId },
+        include: { order: { select: { storeId: true } } },
+      });
+      if (shipment.status !== 'RETURNED') throw new ConflictException('SHIPMENT_NOT_RETURNED');
+      const received = await tx.auditLog.count({
+        where: { entityType: 'shipment', entityId: shipment.id, action: RETURN_RECEIVED },
+      });
+      if (received) throw new ConflictException('SHIPMENT_RETURN_ALREADY_RECEIVED');
+
+      const storeId = shipment.order.storeId;
+      const outs = await tx.inventoryTransaction.findMany({
+        where: { referenceType: 'ORDER', referenceId: order.id, transactionType: 'OUT' },
+        orderBy: { createdAt: 'asc' },
+        select: { productVariantId: true, batchId: true, quantity: true },
+      });
+
+      const shipped = new Map<string, number>();
+      for (const o of outs) shipped.set(o.productVariantId, (shipped.get(o.productVariantId) ?? 0) - o.quantity);
+      const damagedLeft = new Map<string, number>();
+      for (const d of input.damaged) {
+        const total = (damagedLeft.get(d.productVariantId) ?? 0) + d.quantity;
+        if (total > (shipped.get(d.productVariantId) ?? 0)) {
+          throw new BadRequestException('Số lượng hàng hỏng vượt số lượng đã xuất kho cho đơn');
+        }
+        damagedLeft.set(d.productVariantId, total);
+      }
+
+      const now = new Date();
+      const result: ReceiveReturnedShipmentResult = { restocked: [], notRestocked: [], refundAmount: 0 };
+      for (const o of outs) {
+        const out = -o.quantity;
+        const damaged = Math.min(out, damagedLeft.get(o.productVariantId) ?? 0);
+        if (damaged) {
+          damagedLeft.set(o.productVariantId, (damagedLeft.get(o.productVariantId) ?? 0) - damaged);
+          result.notRestocked.push({
+            productVariantId: o.productVariantId,
+            batchId: o.batchId,
+            quantity: damaged,
+            reason: 'Hỏng khi vận chuyển',
+          });
+        }
+        const qty = out - damaged;
+        if (!qty) continue;
+        if (o.batchId) {
+          const rows = await tx.$queryRaw<{ is_active: boolean; expiry_date: Date }[]>`
+            SELECT is_active, expiry_date FROM batches WHERE id=${o.batchId}::uuid FOR UPDATE`;
+          if (!rows[0]?.is_active || new Date(rows[0].expiry_date) <= now) {
+            result.notRestocked.push({
+              productVariantId: o.productVariantId,
+              batchId: o.batchId,
+              quantity: qty,
+              reason: 'Lô đã hết hạn hoặc ngừng sử dụng',
+            });
+            continue;
+          }
+          await tx.batch.update({ where: { id: o.batchId }, data: { quantity: { increment: qty } } });
+        }
+        await tx.inventory.upsert({
+          where: { storeId_productVariantId: { storeId, productVariantId: o.productVariantId } },
+          update: { quantity: { increment: qty }, lastRestockAt: now },
+          create: { storeId, productVariantId: o.productVariantId, quantity: qty, lastRestockAt: now },
+        });
+        await tx.inventoryTransaction.create({
+          data: {
+            storeId,
+            productVariantId: o.productVariantId,
+            batchId: o.batchId,
+            transactionType: 'RETURN',
+            quantity: qty,
+            referenceType: 'SHIPMENT',
+            referenceId: shipment.id,
+            note: `Nhập lại hàng hoàn từ vận đơn ${shipment.shipmentCode}`,
+            createdBy: input.actorId,
+          },
+        });
+        result.restocked.push({ productVariantId: o.productVariantId, batchId: o.batchId, quantity: qty });
+      }
+
+      const paid = await tx.payment.findMany({
+        where: { orderId: order.id, status: 'COMPLETED', paymentMethod: { not: 'COD' } },
+        select: { id: true, amount: true },
+      });
+      for (const p of paid) {
+        const compensationKey = `SHIPMENT_RETURN:${shipment.id}:${p.id}`;
+        await tx.refund.upsert({
+          where: { compensationKey },
+          update: {},
+          create: {
+            compensationKey,
+            orderId: order.id,
+            paymentId: p.id,
+            amount: p.amount,
+            reason: `Giao hàng thất bại, hàng đã hoàn về cửa hàng (vận đơn ${shipment.shipmentCode})`,
+            status: 'PENDING',
+          },
+        });
+        result.refundAmount += Number(p.amount);
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: input.actorId,
+          action: RETURN_RECEIVED,
+          entityType: 'shipment',
+          entityId: shipment.id,
+          newData: {
+            restocked: result.restocked,
+            notRestocked: result.notRestocked,
+            refundAmount: result.refundAmount,
+            note: input.note ?? null,
+          },
+        },
+      });
+      return result;
     }, TX_OPTIONS);
   }
 

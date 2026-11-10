@@ -107,6 +107,20 @@ export interface ApplyCarrierEventResult {
   orderStatus: string;
 }
 
+export interface ReceiveReturnedShipmentInput {
+  shipmentId: string;
+  actorId: string;
+  damaged: { productVariantId: string; quantity: number }[];
+  note?: string;
+}
+
+export interface ReceiveReturnedShipmentResult {
+  restocked: { productVariantId: string; batchId: string | null; quantity: number }[];
+  // Hỏng khi vận chuyển, hoặc lô đã hết hạn / ngừng dùng thì không nhập lại được
+  notRestocked: { productVariantId: string; batchId: string | null; quantity: number; reason: string }[];
+  refundAmount: number;
+}
+
 export interface IShipmentRepository {
   findAccessInfo(shipmentId: string): Promise<ShipmentAccessInfo | null>;
   findOrderForShipment(orderId: string): Promise<OrderForShipment | null>;
@@ -115,4 +129,5 @@ export interface IShipmentRepository {
   create(record: CreateShipmentRecord): Promise<string>;
   cancel(shipmentId: string, actorId: string): Promise<void>;
   applyCarrierEvent(input: ApplyCarrierEventInput): Promise<ApplyCarrierEventResult>;
+  receiveReturned(input: ReceiveReturnedShipmentInput): Promise<ReceiveReturnedShipmentResult>;
 }

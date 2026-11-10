@@ -16,10 +16,13 @@ import { CancelAdminShipmentUseCase } from '../../application/use-cases/cancel-a
 import { CreateAdminShipmentUseCase } from '../../application/use-cases/create-admin-shipment.use-case';
 import { GetAdminShipmentDetailUseCase } from '../../application/use-cases/get-admin-shipment-detail.use-case';
 import { ListAdminShipmentsUseCase } from '../../application/use-cases/list-admin-shipments.use-case';
+import { ReceiveReturnedShipmentUseCase } from '../../application/use-cases/receive-returned-shipment.use-case';
 import { SimulateAdminShipmentUseCase } from '../../application/use-cases/simulate-admin-shipment.use-case';
 import {
   AdminShipmentQueryDto,
   CreateShipmentDto,
+  ReceiveReturnedShipmentDto,
+  ReceiveReturnedShipmentResultDto,
   ShipmentDetailDto,
   ShipmentListItemDto,
   SimulateShipmentDto,
@@ -40,7 +43,28 @@ export class ShipmentAdminController {
     private readonly getDetail: GetAdminShipmentDetailUseCase,
     private readonly cancelShipment: CancelAdminShipmentUseCase,
     private readonly simulate: SimulateAdminShipmentUseCase,
+    private readonly receiveReturned: ReceiveReturnedShipmentUseCase,
   ) {}
+
+  @Post('shipments/:id/receive-return')
+  @RequirePermissions('ORDER_SHIPMENT_MANAGE', 'ORDER_RETURN_MANAGE')
+  @ApiOperation({
+    summary:
+      'Admin - Nhận hàng hoàn khi giao thất bại (vận đơn RETURNED): nhập lại đúng lô đã xuất, bỏ phần hỏng; ' +
+      'đơn đã trả trước thì tạo phiếu hoàn chờ Kế toán. Mỗi vận đơn nhận một lần',
+  })
+  @ApiOkResponse({ type: ReceiveReturnedShipmentResultDto })
+  @ApiConflictResponse({ description: 'Vận đơn chưa hoàn về, hoặc đã nhận hàng hoàn trước đó' })
+  @ApiNotFoundResponse({ description: NOT_FOUND })
+  @ApiForbiddenResponse({ description: 'Thiếu quyền ORDER_SHIPMENT_MANAGE + ORDER_RETURN_MANAGE hoặc vận đơn thuộc cửa hàng khác' })
+  async receiveReturn(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReceiveReturnedShipmentDto,
+  ) {
+    const result = await this.receiveReturned.execute(userId, id, dto);
+    return { message: 'Đã nhận hàng hoàn về cửa hàng', data: result };
+  }
 
   @Post('orders/:id/shipments')
   @RequirePermissions('ORDER_SHIPMENT_MANAGE')

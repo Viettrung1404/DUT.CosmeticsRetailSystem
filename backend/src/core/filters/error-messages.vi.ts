@@ -108,6 +108,8 @@ export const ERROR_MESSAGES_VI: Record<string, string> = {
   SHIPMENT_ADDRESS_MISSING: 'Đơn hàng thiếu thông tin người nhận hoặc địa chỉ giao hàng',
   SHIPMENT_ALREADY_EXISTS: 'Đơn hàng đã có vận đơn còn hiệu lực',
   SHIPMENT_CANCEL_NOT_ALLOWED: 'Chỉ hủy được vận đơn khi hãng chưa lấy hàng',
+  SHIPMENT_NOT_RETURNED: 'Vận đơn chưa ở trạng thái hàng đã hoàn về cửa hàng',
+  SHIPMENT_RETURN_ALREADY_RECEIVED: 'Hàng hoàn của vận đơn này đã được nhận trước đó',
   SHIPMENT_CREATOR_MISSING: 'Vận đơn thiếu thông tin người tạo, không thể cập nhật tự động',
   SHIPMENT_EVENT_STALE: 'Sự kiện vận chuyển cũ hơn sự kiện đã ghi nhận',
   SHIPMENT_INVALID_TRANSITION: 'Trạng thái vận chuyển mới không hợp lệ với trạng thái hiện tại',

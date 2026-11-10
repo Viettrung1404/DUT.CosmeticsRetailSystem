@@ -15,6 +15,7 @@ import { GetAdminShipmentDetailUseCase } from './application/use-cases/get-admin
 import { CancelAdminShipmentUseCase } from './application/use-cases/cancel-admin-shipment.use-case';
 import { ProcessCarrierEventUseCase } from './application/use-cases/process-carrier-event.use-case';
 import { SimulateAdminShipmentUseCase } from './application/use-cases/simulate-admin-shipment.use-case';
+import { ReceiveReturnedShipmentUseCase } from './application/use-cases/receive-returned-shipment.use-case';
 import { ShipmentAdminController } from './presentation/controllers/shipment-admin.controller';
 import { ShipmentWebhookController } from './presentation/controllers/shipment-webhook.controller';
 
@@ -38,6 +39,7 @@ import { ShipmentWebhookController } from './presentation/controllers/shipment-w
     CancelAdminShipmentUseCase,
     ProcessCarrierEventUseCase,
     SimulateAdminShipmentUseCase,
+    ReceiveReturnedShipmentUseCase,
   ],
 })
 export class ShipmentsModule {}

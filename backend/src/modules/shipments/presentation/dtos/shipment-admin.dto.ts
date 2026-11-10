@@ -1,5 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { SHIPMENT_STATUSES } from '../../domain/shipment-status';
 
@@ -61,6 +74,55 @@ export class SimulateShipmentDto {
   })
   @IsIn([...SHIPMENT_STATUSES], { message: 'Trạng thái vận đơn không hợp lệ' })
   readonly status: string;
+}
+
+export class DamagedReturnItemDto {
+  @ApiProperty({ description: 'Biến thể sản phẩm bị hỏng khi vận chuyển' })
+  @IsUUID('4', { message: 'productVariantId không hợp lệ' })
+  readonly productVariantId: string;
+
+  @ApiProperty({ example: 1 })
+  @IsInt({ message: 'Số lượng hỏng phải là số nguyên' })
+  @Min(1, { message: 'Số lượng hỏng tối thiểu là 1' })
+  readonly quantity: number;
+}
+
+export class ReceiveReturnedShipmentDto {
+  @ApiPropertyOptional({
+    type: [DamagedReturnItemDto],
+    description: 'Hàng hỏng khi vận chuyển, không nhập lại kho. Bỏ trống nếu toàn bộ còn bán được',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => DamagedReturnItemDto)
+  readonly damaged?: DamagedReturnItemDto[];
+
+  @ApiPropertyOptional({ example: 'Hộp son bị móp, 1 chai toner vỡ' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: 'Ghi chú tối đa 500 ký tự' })
+  readonly note?: string;
+}
+
+export class ReturnedStockLineDto {
+  @ApiProperty() productVariantId: string;
+  @ApiPropertyOptional({ nullable: true }) batchId: string | null;
+  @ApiProperty() quantity: number;
+}
+
+export class NotRestockedLineDto extends ReturnedStockLineDto {
+  @ApiProperty({ example: 'Hỏng khi vận chuyển' }) reason: string;
+}
+
+export class ReceiveReturnedShipmentResultDto {
+  @ApiProperty({ type: [ReturnedStockLineDto], description: 'Đã nhập lại kho, đúng lô đã xuất' })
+  restocked: ReturnedStockLineDto[];
+  @ApiProperty({ type: [NotRestockedLineDto], description: 'Không nhập lại: hỏng, hoặc lô đã hết hạn / ngừng dùng' })
+  notRestocked: NotRestockedLineDto[];
+  @ApiProperty({ description: 'Tổng tiền khách đã trả trước, đã tạo phiếu hoàn chờ Kế toán chuyển khoản (0 nếu đơn COD)' })
+  refundAmount: number;
 }
 
 export class ShipmentEventDto {
