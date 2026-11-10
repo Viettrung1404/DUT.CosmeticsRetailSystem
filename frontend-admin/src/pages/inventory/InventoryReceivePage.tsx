@@ -1,9 +1,11 @@
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Card, DatePicker, Form, Input, InputNumber, Radio, Space, Typography, message } from 'antd'
+import { Alert, Button, Card, DatePicker, Form, Input, InputNumber, Radio, Select, Space, Typography, message } from 'antd'
 import dayjs from 'dayjs'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { adjustInventory, receivePurchaseOrder } from '../../api/operationsApi'
 import type { AdjustInventoryInput, ReceivePurchaseOrderInput } from '../../types/operations'
+import { getPurchaseOrderDetail, getReceivablePurchaseOrders } from '../../api/purchaseOrdersApi'
+import type { PurchaseOrder } from '../../api/purchaseOrdersApi'
 
 const { Title, Text } = Typography
 
@@ -36,6 +38,36 @@ export default function InventoryReceivePage() {
   const [submitting, setSubmitting] = useState(false)
   const [receiveForm] = Form.useForm<ReceiveFormValue>()
   const [adjustForm] = Form.useForm<AdjustFormValue>()
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
+  const [poLoading, setPoLoading] = useState(false)
+  const [selectedPo, setSelectedPo] = useState<PurchaseOrder | null>(null)
+  const [poSearch, setPoSearch] = useState('')
+
+  const loadPurchaseOrders = async (search = '') => {
+    setPoLoading(true)
+    try { setPurchaseOrders(await getReceivablePurchaseOrders(search)) }
+    catch { messageApi.error('Không thể tải PO đã xác nhận. Kiểm tra quyền PO_RECEIVE.') }
+    finally { setPoLoading(false) }
+  }
+
+  useEffect(() => {
+    void loadPurchaseOrders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const selectPurchaseOrder = async (id: string) => {
+    setPoLoading(true)
+    try {
+      const po = await getPurchaseOrderDetail(id)
+      setSelectedPo(po)
+      receiveForm.setFieldsValue({
+        purchaseOrderId: po.id,
+        items: po.items.filter(item => item.quantityOrdered > item.quantityReceived)
+          .map(item => ({ purchaseOrderItemId: item.id, quantity: item.quantityOrdered - item.quantityReceived, batchNumber: '', expiryDate: undefined as unknown as dayjs.Dayjs })),
+      })
+    } catch { messageApi.error('Không thể tải chi tiết PO.') }
+    finally { setPoLoading(false) }
+  }
 
   const submitReceive = async (value: ReceiveFormValue) => {
     const payload: ReceivePurchaseOrderInput = {
@@ -54,7 +86,8 @@ export default function InventoryReceivePage() {
       await receivePurchaseOrder(payload)
       messageApi.success('Nhận hàng thành công')
       receiveForm.resetFields()
-      receiveForm.setFieldsValue({ items: [{} as ReceiveFormValue['items'][number]] })
+      setSelectedPo(null)
+      await loadPurchaseOrders(poSearch)
     } catch {
       messageApi.error('Không thể nhận hàng. Kiểm tra PO, số lượng và thông tin lô.')
     } finally {
@@ -107,9 +140,19 @@ export default function InventoryReceivePage() {
       {mode === 'receive' ? (
         <Card title="Nhận hàng theo đơn đặt hàng">
           <Form form={receiveForm} layout="vertical" onFinish={submitReceive} initialValues={{ items: [{}] }}>
-            <Form.Item name="purchaseOrderId" label="Purchase Order ID" rules={[{ required: true, message: 'Nhập purchaseOrderId' }]}>
-              <Input placeholder="UUID của PO" />
+            <Space wrap style={{ marginBottom: 12 }}>
+              <Input placeholder="Tìm theo mã PO hoặc tên NCC" value={poSearch} onChange={e => setPoSearch(e.target.value)}
+                onPressEnter={() => void loadPurchaseOrders(poSearch)} style={{ width: 260 }} />
+              <Button loading={poLoading} onClick={() => void loadPurchaseOrders(poSearch)}>Tìm PO</Button>
+            </Space>
+            <Form.Item name="purchaseOrderId" label="Chọn đơn đặt hàng NCC" rules={[{ required: true, message: 'Hãy chọn PO đã xác nhận' }]}>
+              <Select showSearch optionFilterProp="label" placeholder="Chọn đơn có hàng cần nhận"
+                loading={poLoading} onChange={value => { void selectPurchaseOrder(value) }}
+                options={purchaseOrders.map(po => ({ value: po.id, label: po.poNumber + ' · ' + po.supplierName + ' · ' + po.status }))} />
             </Form.Item>
+            {selectedPo && <Alert type="info" showIcon style={{ marginBottom: 14 }}
+              message={'PO ' + selectedPo.poNumber + ' · ' + selectedPo.supplierName}
+              description={'Kho: ' + selectedPo.storeName + '. Các dòng dưới đây được điền sẵn theo số lượng chưa nhận.'} />}
 
             <Form.List name="items">
               {(fields, { add, remove }) => (
@@ -117,7 +160,9 @@ export default function InventoryReceivePage() {
                   {fields.map(({ key, name }) => (
                     <Card key={key} size="small" title={`Dòng nhận hàng #${name + 1}`} extra={fields.length > 1 ? <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} /> : null}>
                       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.3fr 1.3fr 1.3fr', gap: 12 }}>
-                        <Form.Item name={[name, 'purchaseOrderItemId']} label="PO Item ID" rules={[{ required: true }]}><Input placeholder="UUID dòng PO" /></Form.Item>
+                        <Form.Item name={[name, 'purchaseOrderItemId']} label="PO Item ID" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" placeholder="Chọn dòng trong PO" options={selectedPo?.items.map(item => ({
+                          value: item.id, label: item.productName + ' (' + item.sku + '), còn ' + (item.quantityOrdered - item.quantityReceived),
+                        })) ?? []} /></Form.Item>
                         <Form.Item name={[name, 'quantity']} label="SL nhận" rules={[{ required: true }]}><InputNumber min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
                         <Form.Item name={[name, 'batchNumber']} label="Số lô" rules={[{ required: true }]}><Input placeholder="LOT2610A" /></Form.Item>
                         <Form.Item name={[name, 'expiryDate']} label="Hạn dùng" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item>
@@ -125,7 +170,7 @@ export default function InventoryReceivePage() {
                       </div>
                     </Card>
                   ))}
-                  <Button icon={<PlusOutlined />} onClick={() => add()} block>Thêm dòng nhận hàng</Button>
+                  <Button icon={<PlusOutlined />} onClick={() => add()} block>Thêm dòng cùng PO (nếu chia nhiều lô)</Button>
                 </Space>
               )}
             </Form.List>
