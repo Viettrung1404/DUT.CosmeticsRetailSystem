@@ -47,9 +47,9 @@ export class AdminRefundQueryDto extends PageOptionsDto {
 export class ProcessRefundDto {
   @ApiProperty({
     enum: REFUND_METHODS,
-    description: 'CASH: tiền mặt; BANK_TRANSFER: chuyển khoản; GATEWAY_MANUAL: hoàn thủ công trên trang cổng thanh toán',
+    description: 'CASH: tiền mặt tại quầy, cần đang mở ca POS ở cửa hàng của đơn; BANK_TRANSFER: Kế toán chuyển khoản',
   })
-  @IsIn([...REFUND_METHODS], { message: 'Phương thức hoàn chỉ nhận CASH, BANK_TRANSFER hoặc GATEWAY_MANUAL' })
+  @IsIn([...REFUND_METHODS], { message: 'Phương thức hoàn chỉ nhận CASH hoặc BANK_TRANSFER' })
   readonly method: RefundMethod;
 
   @ApiPropertyOptional({ description: 'Mã tham chiếu giao dịch hoàn. Bắt buộc khi không phải tiền mặt', example: 'FT26110912345' })
@@ -88,6 +88,10 @@ export class RefundListItemDto {
   paymentMethod: string | null;
   @ApiProperty() createdAt: Date;
   @ApiPropertyOptional({ nullable: true }) processedAt: Date | null;
+  @ApiPropertyOptional({ nullable: true, enum: REFUND_METHODS, description: 'Cách đã hoàn: có ca POS là CASH, không có là BANK_TRANSFER' })
+  refundMethod: RefundMethod | null;
+  @ApiPropertyOptional({ nullable: true, description: 'Ca POS đã chi tiền mặt hoàn' }) posSessionId: string | null;
+  @ApiPropertyOptional({ nullable: true, description: 'Người xử lý (hoàn hoặc từ chối) gần nhất' }) processedBy: string | null;
   @ApiProperty({ enum: REFUND_METHODS, isArray: true, description: 'Phương thức hoàn người đang đăng nhập được chọn' })
   allowedMethods: RefundMethod[];
   @ApiProperty({ description: 'Người đăng nhập xử lý được phiếu này' }) canProcess: boolean;

@@ -50,6 +50,9 @@ const toListItem = (r: ListRow): RefundListItem => ({
   paymentMethod: r.payment?.paymentMethod ?? null,
   createdAt: r.createdAt,
   processedAt: r.processedAt,
+  refundMethod: r.status === 'COMPLETED' ? (r.posSessionId ? 'CASH' : 'BANK_TRANSFER') : null,
+  posSessionId: r.posSessionId,
+  processedBy: r.processedBy,
 });
 
 @Injectable()
@@ -69,6 +72,22 @@ export class PrismaRefundAdminRepository implements IRefundAdminRepository {
       amount: Number(r.amount),
       paymentMethod: r.payment?.paymentMethod ?? null,
     };
+  }
+
+  async findOpenSessionId(cashierId: string, storeId: string): Promise<string | null> {
+    const s = await this.prisma.posSession.findFirst({
+      where: { cashierId, storeId, status: 'OPEN' },
+      select: { id: true },
+    });
+    return s?.id ?? null;
+  }
+
+  async findOpenSessionStoreIds(cashierId: string): Promise<string[]> {
+    const rows = await this.prisma.posSession.findMany({
+      where: { cashierId, status: 'OPEN' },
+      select: { storeId: true },
+    });
+    return rows.map((r) => r.storeId);
   }
 
   async list(query: RefundListQuery): Promise<{ items: RefundListItem[]; total: number }> {
@@ -129,19 +148,7 @@ export class PrismaRefundAdminRepository implements IRefundAdminRepository {
       };
     });
     return {
-      id: r.id,
-      orderId: r.orderId,
-      orderNumber: r.order.orderNumber,
-      storeId: r.order.storeId,
-      storeName: r.order.store.name,
-      customerName: r.order.customer?.fullName ?? null,
-      returnOrderId: r.returnOrderId,
-      returnCode: r.returnOrder?.returnCode ?? null,
-      amount: Number(r.amount),
-      status: r.status,
-      paymentMethod: r.payment?.paymentMethod ?? null,
-      createdAt: r.createdAt,
-      processedAt: r.processedAt,
+      ...toListItem({ ...r, payment: r.payment, returnOrder: r.returnOrder }),
       reason: r.reason,
       refundTransactionId: r.refundTransactionId,
       payment: r.payment
@@ -162,6 +169,7 @@ export class PrismaRefundAdminRepository implements IRefundAdminRepository {
     id: string;
     actorId: string;
     method: RefundMethod;
+    posSessionId: string | null;
     reference?: string;
     note?: string;
   }): Promise<void> {
@@ -169,6 +177,14 @@ export class PrismaRefundAdminRepository implements IRefundAdminRepository {
       const refund = await this.lock(tx, input.id);
       assertRefundProcessable(refund.status);
       await this.assertCaps(tx, refund);
+      if (input.posSessionId) {
+        // Khóa dòng ca: đóng ca chạy song song sẽ chờ, rồi tính cả khoản hoàn này vào tiền mặt hệ thống
+        const rows = await tx.$queryRaw<{ status: string }[]>`
+          SELECT status FROM pos_sessions WHERE id = ${input.posSessionId}::uuid FOR UPDATE`;
+        if (rows[0]?.status !== 'OPEN') {
+          throw new ConflictException('Ca POS vừa được đóng, vui lòng mở ca mới để hoàn tiền mặt');
+        }
+      }
 
       await tx.refund.update({
         where: { id: refund.id },
@@ -176,6 +192,8 @@ export class PrismaRefundAdminRepository implements IRefundAdminRepository {
           status: 'COMPLETED',
           processedAt: new Date(),
           refundTransactionId: input.reference?.trim() || null,
+          posSessionId: input.posSessionId,
+          processedBy: input.actorId,
         },
       });
       await tx.auditLog.create({
@@ -201,7 +219,10 @@ export class PrismaRefundAdminRepository implements IRefundAdminRepository {
     await this.prisma.$transaction(async (tx) => {
       const refund = await this.lock(tx, input.id);
       assertRefundRejectable(refund.status);
-      await tx.refund.update({ where: { id: refund.id }, data: { status: 'FAILED' } });
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: { status: 'FAILED', processedBy: input.actorId, posSessionId: null },
+      });
       await tx.auditLog.create({
         data: {
           userId: input.actorId,

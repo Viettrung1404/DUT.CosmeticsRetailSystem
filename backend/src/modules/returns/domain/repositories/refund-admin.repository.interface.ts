@@ -36,6 +36,10 @@ export interface RefundListItem {
   paymentMethod: string | null;
   createdAt: Date;
   processedAt: Date | null;
+  // Suy từ pos_session_id: có ca POS là tiền mặt tại quầy, không có là chuyển khoản
+  refundMethod: RefundMethod | null;
+  posSessionId: string | null;
+  processedBy: string | null;
 }
 
 export interface RefundProcessingRecord {
@@ -65,10 +69,13 @@ export interface IRefundAdminRepository {
   findAccessInfo(id: string): Promise<RefundAccessInfo | null>;
   list(query: RefundListQuery): Promise<{ items: RefundListItem[]; total: number }>;
   findDetail(id: string): Promise<RefundDetail | null>;
+  findOpenSessionId(cashierId: string, storeId: string): Promise<string | null>;
+  findOpenSessionStoreIds(cashierId: string): Promise<string[]>;
   process(input: {
     id: string;
     actorId: string;
     method: RefundMethod;
+    posSessionId: string | null;
     reference?: string;
     note?: string;
   }): Promise<void>;

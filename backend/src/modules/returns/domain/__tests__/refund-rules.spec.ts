@@ -4,71 +4,67 @@ import {
   assertRefundMethodAllowed,
   assertRefundProcessable,
   assertRefundRejectable,
+  canHandleRefund,
 } from '../refund-rules';
 
 describe('refund-rules', () => {
   describe('allowedRefundMethods', () => {
-    it('Quản lý cửa hàng (STORE): chỉ tiền mặt, chỉ khi khách đã trả COD/CASH', () => {
-      expect(allowedRefundMethods('STORE', 'COD')).toEqual(['CASH']);
-      expect(allowedRefundMethods('STORE', 'CASH')).toEqual(['CASH']);
-      expect(allowedRefundMethods('STORE', 'SEPAY')).toEqual([]);
-      expect(allowedRefundMethods('STORE', null)).toEqual([]);
+    it('Quản lý: chỉ tiền mặt, khoản gốc COD/CASH và đang mở ca tại cửa hàng của đơn', () => {
+      expect(allowedRefundMethods('STORE', 'COD', true)).toEqual(['CASH']);
+      expect(allowedRefundMethods('STORE', 'CASH', true)).toEqual(['CASH']);
+      expect(allowedRefundMethods('STORE', 'COD', false)).toEqual([]);
+      expect(allowedRefundMethods('STORE', 'SEPAY', true)).toEqual([]);
+      expect(allowedRefundMethods('STORE', null, true)).toEqual([]);
     });
-    it('Kế toán/Admin (ALL): theo khoản gốc', () => {
-      expect(allowedRefundMethods('ALL', 'COD')).toEqual(['CASH', 'BANK_TRANSFER']);
-      expect(allowedRefundMethods('ALL', 'SEPAY')).toEqual(['BANK_TRANSFER', 'GATEWAY_MANUAL']);
+    it('Kế toán/Admin: luôn chuyển khoản; tiền mặt chỉ khi khoản gốc tiền mặt và đang mở ca', () => {
+      expect(allowedRefundMethods('ALL', 'COD', true)).toEqual(['CASH', 'BANK_TRANSFER']);
+      expect(allowedRefundMethods('ALL', 'COD', false)).toEqual(['BANK_TRANSFER']);
+      expect(allowedRefundMethods('ALL', 'SEPAY', true)).toEqual(['BANK_TRANSFER']);
     });
-    it('SELF: không được hoàn', () => {
-      expect(allowedRefundMethods('SELF', 'COD')).toEqual([]);
+    it('phạm vi SELF không xử lý được', () => {
+      expect(allowedRefundMethods('SELF', 'COD', true)).toEqual([]);
     });
   });
 
+  it('canHandleRefund: Quản lý chỉ thấy nút với khoản gốc tiền mặt', () => {
+    expect(canHandleRefund('STORE', 'COD')).toBe(true);
+    expect(canHandleRefund('STORE', 'SEPAY')).toBe(false);
+    expect(canHandleRefund('ALL', 'SEPAY')).toBe(true);
+    expect(canHandleRefund('SELF', 'COD')).toBe(false);
+  });
+
   describe('assertRefundMethodAllowed', () => {
-    it('Quản lý hoàn chuyển khoản -> 403', () => {
+    const base = { originalPaymentMethod: 'COD', hasOpenSessionAtStore: true } as const;
+    it('Quản lý không chuyển khoản được', () => {
       expect(() =>
-        assertRefundMethodAllowed({
-          scopeType: 'STORE',
-          originalPaymentMethod: 'COD',
-          method: 'BANK_TRANSFER',
-          reference: 'FT123',
-        }),
+        assertRefundMethodAllowed({ ...base, scopeType: 'STORE', method: 'BANK_TRANSFER', reference: 'FT123' }),
       ).toThrow(ForbiddenException);
     });
-    it('Quản lý hoàn khoản trả qua cổng -> 403', () => {
+    it('Quản lý không hoàn khoản gốc SePay', () => {
       expect(() =>
-        assertRefundMethodAllowed({ scopeType: 'STORE', originalPaymentMethod: 'VNPAY', method: 'CASH' }),
+        assertRefundMethodAllowed({ ...base, scopeType: 'STORE', originalPaymentMethod: 'SEPAY', method: 'CASH' }),
       ).toThrow(ForbiddenException);
     });
-    it('hoàn tiền mặt cho khoản gốc qua cổng -> 403 ngay cả với Admin', () => {
+    it('khoản gốc SePay không hoàn tiền mặt, kể cả Admin', () => {
       expect(() =>
-        assertRefundMethodAllowed({ scopeType: 'ALL', originalPaymentMethod: 'SEPAY', method: 'CASH' }),
-      ).toThrow(ForbiddenException);
+        assertRefundMethodAllowed({ ...base, scopeType: 'ALL', originalPaymentMethod: 'SEPAY', method: 'CASH' }),
+      ).toThrow(/chuyển khoản/);
     });
-    it('chuyển khoản/cổng bắt buộc có mã tham chiếu', () => {
+    it('tiền mặt cần đang mở ca POS tại cửa hàng của đơn', () => {
       expect(() =>
-        assertRefundMethodAllowed({ scopeType: 'ALL', originalPaymentMethod: 'SEPAY', method: 'BANK_TRANSFER' }),
+        assertRefundMethodAllowed({ ...base, scopeType: 'STORE', method: 'CASH', hasOpenSessionAtStore: false }),
+      ).toThrow(BadRequestException);
+    });
+    it('chuyển khoản bắt buộc mã tham chiếu', () => {
+      expect(() =>
+        assertRefundMethodAllowed({ ...base, scopeType: 'ALL', method: 'BANK_TRANSFER' }),
       ).toThrow(BadRequestException);
       expect(() =>
-        assertRefundMethodAllowed({
-          scopeType: 'ALL',
-          originalPaymentMethod: 'SEPAY',
-          method: 'BANK_TRANSFER',
-          reference: ' 1 ',
-        }),
-      ).toThrow(BadRequestException);
-      expect(() =>
-        assertRefundMethodAllowed({
-          scopeType: 'ALL',
-          originalPaymentMethod: 'SEPAY',
-          method: 'BANK_TRANSFER',
-          reference: 'FT26110912345',
-        }),
+        assertRefundMethodAllowed({ ...base, scopeType: 'ALL', method: 'BANK_TRANSFER', reference: 'FT26110912345' }),
       ).not.toThrow();
     });
-    it('tiền mặt không cần mã tham chiếu', () => {
-      expect(() =>
-        assertRefundMethodAllowed({ scopeType: 'STORE', originalPaymentMethod: 'COD', method: 'CASH' }),
-      ).not.toThrow();
+    it('tiền mặt tại quầy không cần mã tham chiếu', () => {
+      expect(() => assertRefundMethodAllowed({ ...base, scopeType: 'STORE', method: 'CASH' })).not.toThrow();
     });
   });
 

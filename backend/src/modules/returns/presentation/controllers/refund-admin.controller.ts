@@ -73,8 +73,9 @@ export class RefundAdminController {
   @RequirePermissions('PAYMENT_REFUND')
   @ApiOperation({
     summary:
-      'Admin - Đánh dấu đã hoàn tiền (ghi nhận thủ công, chưa gọi API cổng). Quản lý cửa hàng: chỉ CASH cho khoản trả tiền mặt/COD ' +
-      'tại cửa hàng mình; Kế toán/Admin: mọi cửa hàng, CASH/BANK_TRANSFER/GATEWAY_MANUAL theo khoản gốc, kèm mã tham chiếu',
+      'Admin - Đánh dấu đã hoàn tiền (ghi nhận thủ công). Tiền vào kênh nào hoàn về kênh đó: CASH chỉ cho khoản gốc tiền mặt/COD, ' +
+      'khách tại quầy, người hoàn đang mở ca POS ở cửa hàng của đơn (khoản hoàn trừ vào tiền mặt của ca). ' +
+      'BANK_TRANSFER do Kế toán/Admin, kèm mã tham chiếu',
   })
   @ApiOkResponse({ type: RefundDetailDto })
   @ApiConflictResponse({ description: 'Phiếu đã hoàn, hoặc số tiền vượt giá trị đã thanh toán / hàng trả' })

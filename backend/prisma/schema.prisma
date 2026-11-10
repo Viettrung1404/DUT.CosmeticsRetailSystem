@@ -75,6 +75,7 @@ model User {
   orderStatusHistories       OrderStatusHistory[]
   posSessionsAsCashier       PosSession[]          @relation("CashierSessions")
   posSessionsApproved        PosSession[]          @relation("ApprovedSessions")
+  refundsProcessed           Refund[]              @relation("RefundProcessor")
   inventoryTransactions      InventoryTransaction[]
   transfersRequested         InventoryTransfer[]   @relation("RequestedTransfers")
   transfersApproved          InventoryTransfer[]   @relation("ApprovedTransfers")
@@ -853,6 +854,7 @@ model PosSession {
   approver User?     @relation("ApprovedSessions", fields: [approvedBy], references: [id])
   orders   Order[]
   payments Payment[]
+  refunds  Refund[]
 
   @@index([storeId, status])
   @@map("pos_sessions")
@@ -945,15 +947,20 @@ model Refund {
   refundTransactionId String?   @map("refund_transaction_id") @db.VarChar(100)
   compensationKey     String? @unique @map("compensation_key") @db.VarChar(160)
   processedAt         DateTime? @map("processed_at") @db.Timestamptz
+  posSessionId        String?   @map("pos_session_id") @db.Uuid
+  processedBy         String?   @map("processed_by") @db.Uuid
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   order       Order        @relation(fields: [orderId], references: [id])
   payment     Payment?     @relation(fields: [paymentId], references: [id])
   returnOrder ReturnOrder? @relation(fields: [returnOrderId], references: [id])
+  posSession  PosSession?  @relation(fields: [posSessionId], references: [id])
+  processor   User?        @relation("RefundProcessor", fields: [processedBy], references: [id])
   eventKey    String?      @unique @map("event_key") @db.VarChar(160)
 
   @@index([returnOrderId, status])
+  @@index([posSessionId, status])
   @@map("refunds")
 }
 

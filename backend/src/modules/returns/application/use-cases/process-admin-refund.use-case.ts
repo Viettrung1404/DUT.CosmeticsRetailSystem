@@ -26,13 +26,16 @@ export class ProcessAdminRefundUseCase {
   ): Promise<AdminRefundDetail> {
     const { info, scope } = await this.access.getAccessibleRefund(userId, refundId);
     assertRefundProcessable(info.status);
+    const posSessionId =
+      input.method === 'CASH' ? await this.repository.findOpenSessionId(userId, info.storeId) : null;
     assertRefundMethodAllowed({
       scopeType: scope.type,
       originalPaymentMethod: info.paymentMethod,
       method: input.method,
+      hasOpenSessionAtStore: !!posSessionId,
       reference: input.reference,
     });
-    await this.repository.process({ id: refundId, actorId: userId, ...input });
+    await this.repository.process({ id: refundId, actorId: userId, posSessionId, ...input });
     return this.getDetail.execute(userId, refundId);
   }
 }

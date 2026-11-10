@@ -9,7 +9,11 @@ import { RejectAdminRefundUseCase } from '../reject-admin-refund.use-case';
 const ALL: DataScope = { type: 'ALL', storeIds: [], employeeId: null };
 const store = (...ids: string[]): DataScope => ({ type: 'STORE', storeIds: ids, employeeId: 'e1' });
 
-function setup(scope: DataScope, info: { status?: string; paymentMethod?: string | null; storeId?: string } = {}) {
+function setup(
+  scope: DataScope,
+  info: { status?: string; paymentMethod?: string | null; storeId?: string } = {},
+  openSessionStores: string[] = ['S1'],
+) {
   const access_info = {
     id: 'rf1',
     status: info.status ?? 'PENDING',
@@ -22,14 +26,18 @@ function setup(scope: DataScope, info: { status?: string; paymentMethod?: string
     findDetail: jest.fn().mockResolvedValue({ ...access_info, processing: [] }),
     list: jest.fn().mockResolvedValue({
       items: [
-        { id: 'a', status: 'PENDING', paymentMethod: 'COD' },
-        { id: 'b', status: 'PENDING', paymentMethod: 'SEPAY' },
-        { id: 'c', status: 'COMPLETED', paymentMethod: 'COD' },
+        { id: 'a', status: 'PENDING', paymentMethod: 'COD', storeId: 'S1' },
+        { id: 'b', status: 'PENDING', paymentMethod: 'SEPAY', storeId: 'S1' },
+        { id: 'c', status: 'COMPLETED', paymentMethod: 'COD', storeId: 'S1' },
       ],
       total: 3,
     }),
     process: jest.fn(),
     reject: jest.fn(),
+    findOpenSessionId: jest.fn(async (_u: string, storeId: string) =>
+      openSessionStores.includes(storeId) ? `ses-${storeId}` : null,
+    ),
+    findOpenSessionStoreIds: jest.fn().mockResolvedValue(openSessionStores),
   };
   const scopeUc = { execute: jest.fn().mockResolvedValue(scope) };
   const access = new RefundAccessService(repository as never, scopeUc as never);
@@ -38,10 +46,23 @@ function setup(scope: DataScope, info: { status?: string; paymentMethod?: string
 }
 
 describe('ProcessAdminRefundUseCase', () => {
-  it('Quản lý hoàn tiền mặt khoản COD tại cửa hàng mình -> được', async () => {
+  it('Quản lý hoàn tiền mặt khoản COD tại cửa hàng mình, đang mở ca -> ghi vào ca', async () => {
     const { repository, access, getDetail } = setup(store('S1'));
     await new ProcessAdminRefundUseCase(repository as never, access, getDetail).execute('u', 'rf1', { method: 'CASH' });
-    expect(repository.process).toHaveBeenCalledWith({ id: 'rf1', actorId: 'u', method: 'CASH' });
+    expect(repository.process).toHaveBeenCalledWith({
+      id: 'rf1',
+      actorId: 'u',
+      method: 'CASH',
+      posSessionId: 'ses-S1',
+    });
+  });
+
+  it('Quản lý chưa mở ca tại cửa hàng của đơn -> 400, không ghi', async () => {
+    const { repository, access, getDetail } = setup(store('S1'), {}, []);
+    await expect(
+      new ProcessAdminRefundUseCase(repository as never, access, getDetail).execute('u', 'rf1', { method: 'CASH' }),
+    ).rejects.toThrow(/mở ca POS/);
+    expect(repository.process).not.toHaveBeenCalled();
   });
 
   it('Quản lý hoàn khoản khách đã trả qua cổng -> 403, không ghi', async () => {
@@ -64,10 +85,12 @@ describe('ProcessAdminRefundUseCase', () => {
     const uc = new ProcessAdminRefundUseCase(repository as never, access, getDetail);
     await expect(uc.execute('u', 'rf1', { method: 'BANK_TRANSFER' })).rejects.toThrow(BadRequestException);
     await uc.execute('u', 'rf1', { method: 'BANK_TRANSFER', reference: 'FT999', note: 'đã chuyển' });
+    expect(repository.findOpenSessionId).not.toHaveBeenCalled();
     expect(repository.process).toHaveBeenCalledWith({
       id: 'rf1',
       actorId: 'u',
       method: 'BANK_TRANSFER',
+      posSessionId: null,
       reference: 'FT999',
       note: 'đã chuyển',
     });
@@ -114,7 +137,13 @@ describe('danh sách / chi tiết báo khả năng xử lý theo người đăng
     const { repository, scopeUc } = setup(ALL);
     const res = await new ListAdminRefundsUseCase(repository as never, scopeUc as never).execute('u', { page: 1, limit: 20 });
     expect(res.items.map((i) => i.canProcess)).toEqual([true, true, false]);
-    expect(res.items[1].allowedMethods).toEqual(['BANK_TRANSFER', 'GATEWAY_MANUAL']);
+    expect(res.items[0].allowedMethods).toEqual(['CASH', 'BANK_TRANSFER']);
+    expect(res.items[1].allowedMethods).toEqual(['BANK_TRANSFER']);
+  });
+  it('Quản lý chưa mở ca: phiếu tiền mặt chưa xử lý được', async () => {
+    const { repository, scopeUc } = setup(store('S1'), {}, []);
+    const res = await new ListAdminRefundsUseCase(repository as never, scopeUc as never).execute('u', { page: 1, limit: 20 });
+    expect(res.items.map((i) => i.canProcess)).toEqual([false, false, false]);
   });
   it('chi tiết phiếu cửa hàng khác -> 403', async () => {
     const { getDetail } = setup(store('S2'));

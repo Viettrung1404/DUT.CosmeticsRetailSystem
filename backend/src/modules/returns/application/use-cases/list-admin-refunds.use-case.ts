@@ -27,9 +27,10 @@ export type AdminRefundListItem = RefundListItem & {
 
 export function refundPermissionsFor(
   scopeType: 'ALL' | 'STORE' | 'SELF',
-  item: { status: string; paymentMethod: string | null },
+  item: { status: string; paymentMethod: string | null; storeId: string },
+  openSessionStoreIds: string[],
 ) {
-  const allowedMethods = allowedRefundMethods(scopeType, item.paymentMethod);
+  const allowedMethods = allowedRefundMethods(scopeType, item.paymentMethod, openSessionStoreIds.includes(item.storeId));
   let processable = true;
   try {
     assertRefundProcessable(item.status);
@@ -53,20 +54,26 @@ export class ListAdminRefundsUseCase {
     const scope = await this.getUserDataScope.execute(userId);
     const storeIds = storeIdsForList(scope, input.storeId);
     if (storeIds && storeIds.length === 0) return { items: [], total: 0 };
-    const { items, total } = await this.repository.list({
-      storeIds,
-      page: input.page,
-      limit: input.limit,
-      status: input.status,
-      orderId: input.orderId,
-      returnOrderId: input.returnOrderId,
-      search: input.search,
-      from: input.from,
-      to: input.to,
-    });
+    const [{ items, total }, openStores] = await Promise.all([
+      this.repository.list({
+        storeIds,
+        page: input.page,
+        limit: input.limit,
+        status: input.status,
+        orderId: input.orderId,
+        returnOrderId: input.returnOrderId,
+        search: input.search,
+        from: input.from,
+        to: input.to,
+      }),
+      this.repository.findOpenSessionStoreIds(userId),
+    ]);
     return {
       total,
-      items: items.map((i) => ({ ...i, ...refundPermissionsFor(scope.type, i) })),
+      items: items.map((i) => ({
+        ...i,
+        ...refundPermissionsFor(scope.type, i, openStores),
+      })),
     };
   }
 }

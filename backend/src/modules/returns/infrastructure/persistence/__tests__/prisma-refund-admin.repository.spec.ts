@@ -12,6 +12,7 @@ function setup(opts: {
   returnType?: string;
   itemsCredit?: number;
   otherOnReturn?: number;
+  sessionStatus?: string;
 }) {
   const refund = {
     id: 'rf-1',
@@ -23,7 +24,9 @@ function setup(opts: {
     ...opts.refund,
   };
   const tx = {
-    $queryRaw: jest.fn(),
+    $queryRaw: jest.fn((sql: TemplateStringsArray) =>
+      Promise.resolve(sql.join('').includes('pos_sessions') ? [{ status: opts.sessionStatus ?? 'OPEN' }] : []),
+    ),
     refund: {
       findUniqueOrThrow: jest.fn().mockResolvedValue(refund),
       update: jest.fn(),
@@ -60,11 +63,24 @@ function setup(opts: {
 describe('PrismaRefundAdminRepository.process', () => {
   it('hoàn xong: COMPLETED + mã tham chiếu + nhật ký + báo khách qua integration của Trung', async () => {
     const { repo, tx, integration } = setup({});
-    await repo.process({ id: 'rf-1', actorId: 'u1', method: 'BANK_TRANSFER', reference: ' FT123 ', note: 'ok' });
+    await repo.process({
+      id: 'rf-1',
+      actorId: 'u1',
+      method: 'BANK_TRANSFER',
+      posSessionId: null,
+      reference: ' FT123 ',
+      note: 'ok',
+    });
 
     expect(tx.refund.update).toHaveBeenCalledWith({
       where: { id: 'rf-1' },
-      data: { status: 'COMPLETED', processedAt: expect.any(Date), refundTransactionId: 'FT123' },
+      data: {
+        status: 'COMPLETED',
+        processedAt: expect.any(Date),
+        refundTransactionId: 'FT123',
+        posSessionId: null,
+        processedBy: 'u1',
+      },
     });
     expect(tx.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -80,19 +96,36 @@ describe('PrismaRefundAdminRepository.process', () => {
 
   it('phiếu đã COMPLETED -> 409, không ghi gì', async () => {
     const { repo, tx } = setup({ refund: { status: 'COMPLETED' } });
-    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' })).rejects.toThrow(/đã được hoàn/);
+    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' })).rejects.toThrow(/đã được hoàn/);
     expect(tx.refund.update).not.toHaveBeenCalled();
   });
 
   it('thử lại phiếu FAILED được, nhưng phải qua kiểm hạn mức', async () => {
     const { repo, tx } = setup({ refund: { status: 'FAILED' } });
-    await repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' });
+    await repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' });
     expect(tx.refund.update).toHaveBeenCalled();
+  });
+
+  it('tiền mặt tại quầy: ghi ca POS + người hoàn', async () => {
+    const { repo, tx } = setup({});
+    await repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' });
+    expect(tx.refund.update).toHaveBeenCalledWith({
+      where: { id: 'rf-1' },
+      data: expect.objectContaining({ posSessionId: 'ses-1', processedBy: 'u1' }),
+    });
+  });
+
+  it('ca POS vừa bị đóng giữa chừng -> 409, không ghi', async () => {
+    const { repo, tx } = setup({ sessionStatus: 'CLOSED' });
+    await expect(
+      repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' }),
+    ).rejects.toThrow(/Ca POS vừa được đóng/);
+    expect(tx.refund.update).not.toHaveBeenCalled();
   });
 
   it('tổng hoàn vượt số tiền khách đã thanh toán -> 409', async () => {
     const { repo, tx } = setup({ paymentAmount: 500000, otherOnPayment: 100000 });
-    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' })).rejects.toThrow(
+    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' })).rejects.toThrow(
       /vượt quá số tiền khách đã thanh toán/,
     );
     expect(tx.refund.update).not.toHaveBeenCalled();
@@ -100,7 +133,7 @@ describe('PrismaRefundAdminRepository.process', () => {
 
   it('tổng hoàn vượt giá trị hàng trả trong đơn gốc -> 409', async () => {
     const { repo, tx } = setup({ itemsCredit: 400000 });
-    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' })).rejects.toThrow(
+    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' })).rejects.toThrow(
       /vượt quá giá trị hàng đổi trả/,
     );
     expect(tx.refund.update).not.toHaveBeenCalled();
@@ -108,17 +141,17 @@ describe('PrismaRefundAdminRepository.process', () => {
 
   it('đổi hàng chưa chấp nhận báo giá: hạn mức 0 nên không hoàn được', async () => {
     const { repo } = setup({ returnType: 'EXCHANGE' });
-    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' })).rejects.toThrow(ConflictException);
+    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' })).rejects.toThrow(ConflictException);
   });
 
   it('khoản thanh toán gốc chưa hoàn tất -> 409', async () => {
     const { repo } = setup({ paymentStatus: 'PENDING' });
-    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' })).rejects.toThrow(/chưa hoàn tất/);
+    await expect(repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' })).rejects.toThrow(/chưa hoàn tất/);
   });
 
   it('phiếu hoàn của đơn bị hủy (không có yêu cầu trả) chỉ bị chặn bởi khoản thanh toán', async () => {
     const { repo, tx } = setup({ refund: { returnOrderId: null } });
-    await repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH' });
+    await repo.process({ id: 'rf-1', actorId: 'u1', method: 'CASH', posSessionId: 'ses-1' });
     expect(tx.returnOrder.findUniqueOrThrow).not.toHaveBeenCalled();
     expect(tx.refund.update).toHaveBeenCalled();
   });
@@ -128,7 +161,10 @@ describe('PrismaRefundAdminRepository.reject', () => {
   it('PENDING -> FAILED kèm nhật ký lý do', async () => {
     const { repo, tx } = setup({});
     await repo.reject({ id: 'rf-1', actorId: 'u1', reason: 'Chưa có tài khoản nhận' });
-    expect(tx.refund.update).toHaveBeenCalledWith({ where: { id: 'rf-1' }, data: { status: 'FAILED' } });
+    expect(tx.refund.update).toHaveBeenCalledWith({
+      where: { id: 'rf-1' },
+      data: { status: 'FAILED', processedBy: 'u1', posSessionId: null },
+    });
     expect(tx.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: 'REFUND_REJECT',

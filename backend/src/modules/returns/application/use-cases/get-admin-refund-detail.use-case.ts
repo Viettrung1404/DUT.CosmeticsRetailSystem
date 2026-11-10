@@ -21,6 +21,7 @@ export class GetAdminRefundDetailUseCase {
     const { scope } = await this.access.getAccessibleRefund(userId, refundId);
     const detail = await this.repository.findDetail(refundId);
     if (!detail) throw new NotFoundException('Không tìm thấy phiếu hoàn tiền');
-    return { ...detail, ...refundPermissionsFor(scope.type, detail) };
+    const openStores = await this.repository.findOpenSessionStoreIds(userId);
+    return { ...detail, ...refundPermissionsFor(scope.type, detail, openStores) };
   }
 }

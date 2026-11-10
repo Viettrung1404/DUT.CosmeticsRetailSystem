@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 
-export const REFUND_METHODS = ['CASH', 'BANK_TRANSFER', 'GATEWAY_MANUAL'] as const;
+export const REFUND_METHODS = ['CASH', 'BANK_TRANSFER'] as const;
 export type RefundMethod = (typeof REFUND_METHODS)[number];
 
 const CASH_PAYMENT_METHODS = ['COD', 'CASH'];
@@ -23,32 +23,49 @@ export function assertRefundRejectable(status: string): void {
   }
 }
 
-// Phương thức hoàn mà người dùng với phạm vi dữ liệu này được chọn cho khoản thanh toán gốc
+// Tiền vào kênh nào hoàn về kênh đó: tiền mặt chỉ hoàn cho khoản gốc tiền mặt/COD, tại quầy khi người hoàn đang mở ca ở cửa hàng của đơn
+export function canHandleRefund(scopeType: 'ALL' | 'STORE' | 'SELF', originalPaymentMethod: string | null): boolean {
+  if (scopeType === 'ALL') return true;
+  return scopeType === 'STORE' && isCashPayment(originalPaymentMethod);
+}
+
 export function allowedRefundMethods(
   scopeType: 'ALL' | 'STORE' | 'SELF',
   originalPaymentMethod: string | null,
+  hasOpenSessionAtStore: boolean,
 ): RefundMethod[] {
-  if (scopeType === 'SELF') return [];
-  const cashOriginal = isCashPayment(originalPaymentMethod);
-  if (scopeType === 'STORE') return cashOriginal ? ['CASH'] : [];
-  return cashOriginal ? ['CASH', 'BANK_TRANSFER'] : ['BANK_TRANSFER', 'GATEWAY_MANUAL'];
+  if (!canHandleRefund(scopeType, originalPaymentMethod)) return [];
+  const cash: RefundMethod[] = isCashPayment(originalPaymentMethod) && hasOpenSessionAtStore ? ['CASH'] : [];
+  return scopeType === 'ALL' ? [...cash, 'BANK_TRANSFER'] : cash;
 }
 
 export function assertRefundMethodAllowed(params: {
   scopeType: 'ALL' | 'STORE' | 'SELF';
   originalPaymentMethod: string | null;
   method: RefundMethod;
+  hasOpenSessionAtStore: boolean;
   reference?: string | null;
 }): void {
-  const allowed = allowedRefundMethods(params.scopeType, params.originalPaymentMethod);
-  if (!allowed.includes(params.method)) {
+  if (!canHandleRefund(params.scopeType, params.originalPaymentMethod)) {
     throw new ForbiddenException(
       params.scopeType === 'STORE'
-        ? 'Quản lý cửa hàng chỉ hoàn tiền mặt cho khoản khách đã trả tiền mặt/COD; các khoản khác do Kế toán xử lý'
-        : 'Phương thức hoàn tiền không phù hợp với khoản thanh toán gốc',
+        ? 'Quản lý cửa hàng chỉ hoàn tiền mặt cho khoản khách đã trả tiền mặt/COD; các khoản khác do Kế toán chuyển khoản'
+        : 'Bạn không có quyền xử lý phiếu hoàn tiền này',
     );
   }
-  if (params.method !== 'CASH' && (params.reference ?? '').trim().length < 3) {
-    throw new BadRequestException('Hoàn qua chuyển khoản/cổng thanh toán cần nhập mã tham chiếu giao dịch');
+  if (params.method === 'CASH') {
+    if (!isCashPayment(params.originalPaymentMethod)) {
+      throw new ForbiddenException('Khoản gốc thanh toán qua ngân hàng nên phải hoàn bằng chuyển khoản');
+    }
+    if (!params.hasOpenSessionAtStore) {
+      throw new BadRequestException('Cần mở ca POS tại cửa hàng của đơn để hoàn tiền mặt cho khách tại quầy');
+    }
+    return;
+  }
+  if (params.scopeType !== 'ALL') {
+    throw new ForbiddenException('Quản lý cửa hàng chỉ hoàn tiền mặt tại quầy; chuyển khoản do Kế toán xử lý');
+  }
+  if ((params.reference ?? '').trim().length < 3) {
+    throw new BadRequestException('Hoàn qua chuyển khoản cần nhập mã tham chiếu giao dịch');
   }
 }
