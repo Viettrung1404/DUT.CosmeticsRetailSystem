@@ -64,7 +64,7 @@ export type PosPreview = {
   }>
   customer: { id: string; fullName: string | null; phone: string | null; totalPoints: number } | null
 }
-export type PosOrderCreated = PosPreview & {
+export type PosOrderCreated = Omit<PosPreview, 'canCheckout' | 'shortages'> & {
   orderId: string
   orderNumber: string
   createdAt: string
