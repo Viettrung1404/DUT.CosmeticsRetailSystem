@@ -13,7 +13,11 @@ import type {
 } from '../types/operations'
 
 function unwrap<T>(payload: unknown): T {
-  const body = payload as { data?: T }
+  const body = payload as { data?: T; meta?: unknown }
+  // NestJS PageDto = { data: T[], meta: ... }; không được unwrap thành mảng và mất metadata.
+  if (body && typeof body === 'object' && 'meta' in body && Array.isArray(body.data)) {
+    return payload as T
+  }
   return body && typeof body === 'object' && 'data' in body ? (body.data as T) : (payload as T)
 }
 
