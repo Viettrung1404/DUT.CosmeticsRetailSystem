@@ -69,7 +69,7 @@ const menuItems = [
   {
     key: 'advanced-ops-group',
     type: 'group' as const,
-    label: 'SPRINT 4 — VẬN HÀNH NÂNG CAO',
+    label: 'VẬN HÀNH NÂNG CAO',
     children: [
       { key: '/admin/inventory/transfers', icon: <DeploymentUnitOutlined />, label: 'Chuyển kho' },
       { key: '/admin/stocktakes', icon: <AuditOutlined />, label: 'Kiểm kê' },
