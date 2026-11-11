@@ -12,6 +12,17 @@ import PosSessionsPage from './pages/pos/PosSessionsPage'
 import InventoryPage from './pages/inventory/InventoryPage'
 import InventoryReceivePage from './pages/inventory/InventoryReceivePage'
 import UsersPage from './pages/users/UsersPage'
+import TransfersPage from './pages/inventory/TransfersPage'
+import StocktakesPage from './pages/inventory/StocktakesPage'
+import BatchesPage from './pages/inventory/BatchesPage'
+import SuppliersPage from './pages/suppliers/SuppliersPage'
+import PurchaseOrdersPage from './pages/suppliers/PurchaseOrdersPage'
+import SupplierPaymentsPage from './pages/suppliers/SupplierPaymentsPage'
+import FinancePage from './pages/finance/FinancePage'
+import HrSettingsPage from './pages/hr/HrSettingsPage'
+import EmployeesPage from './pages/hr/EmployeesPage'
+import AttendancePage from './pages/hr/AttendancePage'
+import CommissionsPage from './pages/hr/CommissionsPage'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 export default function App() {
@@ -29,6 +40,20 @@ export default function App() {
           <Route path="orders/:id" element={<OrderDetailPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="inventory/transfers" element={<TransfersPage />} />
+          <Route path="stocktakes" element={<StocktakesPage />} />
+          <Route path="batches" element={<BatchesPage />} />
+          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+          <Route path="supplier-payments" element={<SupplierPaymentsPage />} />
+          <Route path="payments" element={<FinancePage mode="payments" />} />
+          <Route path="reconciliation" element={<FinancePage mode="reconciliation" />} />
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="departments" element={<HrSettingsPage mode="departments" />} />
+          <Route path="shifts" element={<HrSettingsPage mode="shifts" />} />
+          <Route path="attendance" element={<AttendancePage />} />
+          <Route path="commissions" element={<CommissionsPage />} />
+
           <Route path="pos" element={<PosPage />} />
           <Route path="pos/sessions" element={<PosSessionsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
