@@ -1,5 +1,5 @@
 import { EditOutlined, LockOutlined, PlusOutlined, ReloadOutlined, SafetyCertificateOutlined, UnlockOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Descriptions, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Checkbox, Descriptions, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd'
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createUser, getPermissions, getRoles, getUser, getUsers, setUserPermissions, setUserStores, updateUser } from '../../api/adminUsersApi'
@@ -279,9 +279,14 @@ export default function UsersPage() {
                   <strong>{p.permissionName}</strong><div><Text type="secondary" style={{ fontSize: 11 }}>{p.permissionCode}</Text></div>
                 </div>
                 <Tag color={effective ? 'green' : 'default'}>{effective ? 'Được phép' : 'Không có quyền'}</Tag>
-                <Select style={{ width: 150 }} value={value}
-                  onChange={(next: PermissionMode) => setModes((old) => ({ ...old, [p.bitPosition]: next }))}
-                  options={[{ value: 'inherit', label: 'Kế thừa' }, { value: 'extra', label: 'Cấp thêm' }, { value: 'revoke', label: 'Thu hồi' }]} />
+                <Space wrap>
+                  <Checkbox checked={value === 'extra'} onChange={(e) => setModes((old) => ({
+                    ...old, [p.bitPosition]: e.target.checked ? 'extra' : 'inherit',
+                  }))}>Cấp thêm</Checkbox>
+                  <Checkbox checked={value === 'revoke'} onChange={(e) => setModes((old) => ({
+                    ...old, [p.bitPosition]: e.target.checked ? 'revoke' : 'inherit',
+                  }))}>Thu hồi</Checkbox>
+                </Space>
               </div>
             })}
           </Card>)}
