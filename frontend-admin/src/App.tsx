@@ -23,6 +23,7 @@ import HrSettingsPage from './pages/hr/HrSettingsPage'
 import EmployeesPage from './pages/hr/EmployeesPage'
 import AttendancePage from './pages/hr/AttendancePage'
 import CommissionsPage from './pages/hr/CommissionsPage'
+import AdminDashboardPage from './pages/dashboard/AdminDashboardPage'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="products" replace />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="brands" element={<BrandsPage />} />
           <Route path="orders" element={<OrdersPage />} />
