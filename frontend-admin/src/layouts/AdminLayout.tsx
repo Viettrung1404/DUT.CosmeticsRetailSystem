@@ -13,6 +13,7 @@ import {
   TagsOutlined,
   TeamOutlined,
   UserOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import {
   Avatar,
@@ -62,6 +63,7 @@ const menuItems = [
     label: 'PHÂN TÍCH & HỆ THỐNG',
     children: [
       { key: 'reports', icon: <BarChartOutlined />, label: 'Báo cáo', disabled: true },
+      { key: '/admin/users', icon: <SafetyCertificateOutlined />, label: 'Người dùng & phân quyền' },
       { key: 'settings', icon: <SettingOutlined />, label: 'Cài đặt', disabled: true },
     ],
   },
@@ -74,6 +76,7 @@ function resolvePageName(pathname: string) {
   if (pathname === '/admin/orders') return 'Quản lý đơn hàng'
   if (pathname.startsWith('/admin/orders/')) return 'Chi tiết đơn hàng'
   if (pathname === '/admin/customers') return 'Quản lý khách hàng'
+  if (pathname === '/admin/users') return 'Người dùng & phân quyền'
   if (pathname === '/admin/pos') return 'POS tại cửa hàng'
   if (pathname === '/admin/pos/sessions') return 'Ca bán hàng POS'
   if (pathname === '/admin/inventory') return 'Quản lý tồn kho'
