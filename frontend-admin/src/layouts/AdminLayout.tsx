@@ -47,6 +47,7 @@ const menuItems = [
     type: 'group' as const,
     label: 'DANH MỤC & SẢN PHẨM',
     children: [
+      { key: '/admin/dashboard', icon: <BarChartOutlined />, label: 'Tổng quan vận hành' },
       { key: '/admin/products', icon: <AppstoreOutlined />, label: 'Sản phẩm' },
       { key: '/admin/categories', icon: <TagsOutlined />, label: 'Danh mục' },
       { key: '/admin/brands', icon: <ShopOutlined />, label: 'Thương hiệu' },
@@ -98,6 +99,7 @@ const menuItems = [
 ]
 
 function resolvePageName(pathname: string) {
+  if (pathname === '/admin/dashboard') return 'Tổng quan vận hành'
   if (pathname === '/admin/products') return 'Quản lý sản phẩm'
   if (pathname === '/admin/categories') return 'Quản lý danh mục'
   if (pathname === '/admin/brands') return 'Quản lý thương hiệu'
