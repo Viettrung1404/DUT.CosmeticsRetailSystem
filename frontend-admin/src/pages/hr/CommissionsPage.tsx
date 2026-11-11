@@ -12,7 +12,7 @@ export default function CommissionsPage(){
  const [rows,setRows]=useState<Commission[]>([]),[summary,setSummary]=useState<Summary[]>([]),[total,setTotal]=useState(0),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false)
  const load=useCallback(async()=>{setLoading(true);try{const p=await apiGet<Result>('/admin/commissions',query);setRows(p.items??[]);setSummary(p.summary??[]);setTotal(p.meta?.itemCount??0)}catch(e){msg.error(errorText(e))}finally{setLoading(false)}},[query,msg])
  useEffect(()=>{void load()},[load])
- const finalize=async()=>{setBusy(true);try{const v=await apiPost<{data?:{finalizedCount:number}}>('/admin/commissions/finalize',{month:query.month,year:query.year});msg.success(`Chốt hoa hồng thành công: ${v.data?.finalizedCount??0} dòng`);await load()}catch(e){msg.error(errorText(e))}finally{setBusy(false)}}
+ const finalize=async()=>{setBusy(true);try{const v=await apiPost<{finalizedCount:number}>('/admin/commissions/finalize',{month:query.month,year:query.year});msg.success(`Chốt hoa hồng thành công: ${v.finalizedCount??0} dòng`);await load()}catch(e){msg.error(errorText(e))}finally{setBusy(false)}}
  return <div>{holder}<div className="glowup-page-header"><div><Title level={2} className="glowup-page-title">Hoa hồng nhân viên</Title><Text className="glowup-page-subtitle">Đối chiếu hoa hồng theo nhân viên và chốt tháng đã kết thúc.</Text></div><Space><Button onClick={()=>void load()}>Làm mới</Button>
  <Popconfirm title="Chốt hoa hồng tháng đã kết thúc?" description="Không thể chốt lại tháng đã chốt." onConfirm={()=>void finalize()}><Button type="primary" loading={busy}>Chốt tháng</Button></Popconfirm></Space></div>
  <Card className="glowup-toolbar-card" style={{marginBottom:16}}><Space wrap>
