@@ -14,6 +14,14 @@ import {
   TeamOutlined,
   UserOutlined,
   SafetyCertificateOutlined,
+  AuditOutlined,
+  BankOutlined,
+  DeploymentUnitOutlined,
+  FileDoneOutlined,
+  ScheduleOutlined,
+  DollarOutlined,
+  SolutionOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
 import {
   Avatar,
@@ -58,6 +66,26 @@ const menuItems = [
     ],
   },
   {
+    key: 'advanced-ops-group',
+    type: 'group' as const,
+    label: 'SPRINT 4 — VẬN HÀNH NÂNG CAO',
+    children: [
+      { key: '/admin/inventory/transfers', icon: <DeploymentUnitOutlined />, label: 'Chuyển kho' },
+      { key: '/admin/stocktakes', icon: <AuditOutlined />, label: 'Kiểm kê' },
+      { key: '/admin/batches', icon: <InboxOutlined />, label: 'Lô hàng & HSD' },
+      { key: '/admin/payments', icon: <DollarOutlined />, label: 'Lịch sử thanh toán' },
+      { key: '/admin/reconciliation', icon: <FileDoneOutlined />, label: 'Đối soát' },
+      { key: '/admin/employees', icon: <SolutionOutlined />, label: 'Nhân viên' },
+      { key: '/admin/departments', icon: <TeamOutlined />, label: 'Phòng ban' },
+      { key: '/admin/shifts', icon: <ScheduleOutlined />, label: 'Ca làm việc' },
+      { key: '/admin/attendance', icon: <AuditOutlined />, label: 'Chấm công' },
+      { key: '/admin/commissions', icon: <DollarOutlined />, label: 'Hoa hồng' },
+      { key: '/admin/suppliers', icon: <BankOutlined />, label: 'Nhà cung cấp' },
+      { key: '/admin/purchase-orders', icon: <ShoppingCartOutlined />, label: 'Đơn mua hàng (PO)' },
+      { key: '/admin/supplier-payments', icon: <DollarOutlined />, label: 'Công nợ & thanh toán NCC' },
+    ],
+  },
+  {
     key: 'analytics-group',
     type: 'group' as const,
     label: 'PHÂN TÍCH & HỆ THỐNG',
@@ -77,6 +105,22 @@ function resolvePageName(pathname: string) {
   if (pathname.startsWith('/admin/orders/')) return 'Chi tiết đơn hàng'
   if (pathname === '/admin/customers') return 'Quản lý khách hàng'
   if (pathname === '/admin/users') return 'Người dùng & phân quyền'
+  const sprint4Names: Record<string, string> = {
+    '/admin/inventory/transfers': 'Chuyển kho',
+    '/admin/stocktakes': 'Kiểm kê tồn kho',
+    '/admin/batches': 'Lô hàng & hạn sử dụng',
+    '/admin/payments': 'Lịch sử thanh toán',
+    '/admin/reconciliation': 'Đối soát thanh toán',
+    '/admin/employees': 'Nhân viên',
+    '/admin/departments': 'Phòng ban',
+    '/admin/shifts': 'Ca làm việc',
+    '/admin/attendance': 'Chấm công',
+    '/admin/commissions': 'Hoa hồng',
+    '/admin/suppliers': 'Nhà cung cấp',
+    '/admin/purchase-orders': 'Đơn mua hàng (PO)',
+    '/admin/supplier-payments': 'Công nợ nhà cung cấp',
+  }
+  if (sprint4Names[pathname]) return sprint4Names[pathname]
   if (pathname === '/admin/pos') return 'POS tại cửa hàng'
   if (pathname === '/admin/pos/sessions') return 'Ca bán hàng POS'
   if (pathname === '/admin/inventory') return 'Quản lý tồn kho'
