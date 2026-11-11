@@ -15,7 +15,7 @@ Cập nhật: 11/11/2026. Nguồn: `docs/3-planning/08_sprint_plan.md`. Nhánh F
 | Suppliers / PO | `/admin/suppliers`, `/admin/purchase-orders`, `/admin/supplier-payments` | CRUD NCC, rating, balance; tạo/duyệt/xác nhận/hủy PO; nhập khoản thanh toán | SupplierAdminController và PurchaseOrderAdminController có API |
 | RMA Admin / refund gateway | Chưa có màn xử lý mutation | **Chưa triển khai** vì chưa tìm thấy Admin REST controller hợp đồng cho approve/inspect/complete/refund trong Backend develop | **Backend blocker** |
 | Tạo vận đơn GHN | Chưa có modal submit tạo vận đơn | **Chưa triển khai** vì chưa thấy endpoint Admin tạo vận đơn trong Backend develop | **Backend blocker** |
-| Dashboard widget tồn thấp | Chưa thêm widget Dashboard | Inventory list có thể hiển thị cảnh báo; cần chốt route dashboard và API alert | Cần rà API |
+| Dashboard widget tồn thấp | `/admin/dashboard`: hai KPI từ lọc tồn LOW_STOCK/OUT_OF_STOCK và bảng 10 dòng | API GET /admin/inventory đã có |
 
 ## Giới hạn cần sửa trước nghiệm thu
 
@@ -23,7 +23,7 @@ Cập nhật: 11/11/2026. Nguồn: `docs/3-planning/08_sprint_plan.md`. Nhánh F
 - Trang chuyển kho hiện chưa hỗ trợ **sửa nháp**. Các nút duyệt/nhận xử lý dòng trên phiếu thật.
 - Trang kiểm kê cho nhập dòng đếm, chưa tự điền từ danh sách sản phẩm và lô; calendar chấm công chỉ tóm tắt **trang dữ liệu đang tải**, không phải tổng hợp toàn tháng.
 - Trang thanh toán export **CSV chỉ trang hiện tại**, không phải export toàn kết quả.
-- Form user quyền hiện dùng select ba trạng thái; checklist spec yêu cầu ma trận checkbox, cần polish.
+- Form user quyền đã dùng checkbox Cấp thêm / Thu hồi (không cho cùng lúc), mặc định kế thừa; cần test thực tế bitmask và role.
 - Cần test lưu dữ liệu thực trên database test. Không tự seed/migrate/reset DB chung.
 - **Chưa chạy `npm run build` hoặc E2E cho commit mới trên máy người dùng.** Trạng thái là đã viết code trên GitHub, không phải đã nghiệm thu.
 
