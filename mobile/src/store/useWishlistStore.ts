@@ -62,12 +62,14 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
   items: [],
   loading: false,
 
-  /** Tải danh sách wishlist từ GET /customer/wishlists */
+  /** Tải danh sách wishlist từ GET /wishlists */
   fetchWishlist: async () => {
     set({ loading: true });
     try {
-      const res = await apiClient.get('/customer/wishlists', { params: { page: 1, limit: 50 } });
-      const rawItems: any[] = res.data?.data?.items ?? res.data?.items ?? [];
+      const res = await apiClient.get('/wishlists', { params: { page: 1, limit: 50 } }).catch(() =>
+        apiClient.get('/customer/wishlists', { params: { page: 1, limit: 50 } })
+      );
+      const rawItems: any[] = res.data?.data?.items ?? res.data?.items ?? (Array.isArray(res.data) ? res.data : []);
       set({ items: rawItems.map(mapApiItem) });
     } catch {
       // Giữ nguyên state nếu lỗi mạng
@@ -77,7 +79,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
   },
 
   /**
-   * Toggle yêu thích qua POST /customer/wishlists/toggle
+   * Toggle yêu thích qua POST /wishlists/toggle
    * - Optimistic update ngay lập tức
    * - Rollback nếu API thất bại
    * Returns true nếu đã thêm, false nếu đã bỏ
@@ -95,11 +97,19 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
     }
 
     try {
-      await apiClient.post(
-        '/customer/wishlists/toggle',
-        { productId: item.productId },
-        { headers: { 'Idempotency-Key': genKey('wl') } },
-      );
+      await apiClient
+        .post(
+          '/wishlists/toggle',
+          { productId: item.productId },
+          { headers: { 'Idempotency-Key': genKey('wl') } }
+        )
+        .catch(() =>
+          apiClient.post(
+            '/customer/wishlists/toggle',
+            { productId: item.productId },
+            { headers: { 'Idempotency-Key': genKey('wl') } }
+          )
+        );
     } catch {
       // Rollback optimistic update
       set({ items });

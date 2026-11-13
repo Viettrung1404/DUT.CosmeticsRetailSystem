@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../../constants/theme';
 import { productApi } from '../../api/productApi';
@@ -8,6 +9,7 @@ import { useCartStore } from '../../store/useCartStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
+    const insets = useSafeAreaInsets();
     const { slug, productId } = route.params || {};
     const productIdentifier = slug || productId;
     const [product, setProduct] = useState<any>(null);
@@ -54,6 +56,11 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         }
     };
 
+    const cleanDescription = (product?.description || product?.shortDescription || '')
+        .replace(/<[^>]*>?/gm, '')
+        .replace(/&nbsp;/g, ' ')
+        .trim();
+
     const isFav = product ? isInWishlist(product.id || slug || 'prod-vc') : false;
     const productImage =
         product?.primaryImage ||
@@ -62,11 +69,18 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400';
     const selectedVariant = product?.variants?.find(
         (variant: any) => variant.id === selectedVariantId,
-    );
+    ) || (product?.id ? {
+        id: product.defaultVariantId || product.id,
+        effectivePrice: product.salePrice || product.price || product.basePrice || 350000,
+        price: product.basePrice || product.price || 350000,
+        stockQuantity: product.stockQuantity ?? 99,
+        sku: 'DEFAULT',
+        option1Value: 'Tiêu chuẩn',
+    } : null);
 
     const getVariantLabel = (variant: any) =>
-        [variant.option1Value, variant.option2Value, variant.option3Value].filter(Boolean).join(' / ')
-        || variant.sku;
+        [variant?.option1Value, variant?.option2Value, variant?.option3Value].filter(Boolean).join(' / ')
+        || variant?.sku || 'Tiêu chuẩn';
 
     const handleToggleHeart = async () => {
         if (!product) return;
@@ -143,7 +157,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         <View style={{ flex: 1, backgroundColor: COLORS.background }}>
             <ScrollView contentContainerStyle={styles.container}>
                 {/* Header Bar */}
-                <View style={styles.headerNav}>
+                <View style={[styles.headerNav, { paddingTop: Math.max(insets.top, SPACING.md) }]}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
                     </TouchableOpacity>
@@ -164,55 +178,69 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 
                 {/* Info Section */}
                 <View style={styles.infoCard}>
-                    <Text style={styles.brand}>{product?.brand}</Text>
+                    <Text style={styles.brand}>{product?.brandName || product?.brand || 'GLOWUP'}</Text>
                     <Text style={styles.title}>{product?.name}</Text>
 
                     <View style={styles.ratingRow}>
                         <Ionicons name="star" size={16} color="#FFD700" />
-                        <Text style={styles.ratingText}>{product?.rating} ({product?.reviews_count} đánh giá)</Text>
+                        <Text style={styles.ratingText}>
+                            {(product?.avgRating ?? product?.rating ?? 5.0).toFixed(1)} ({product?.totalReviews ?? product?.reviews_count ?? 0} đánh giá)
+                        </Text>
                     </View>
 
                     <View style={styles.priceRow}>
                         <Text style={styles.price}>
                             {(selectedVariant?.effectivePrice ?? selectedVariant?.price ?? product?.basePrice ?? product?.price)?.toLocaleString('vi-VN')}đ
                         </Text>
-                        {(product?.salePrice || product?.original_price) && (
+                        {product?.basePrice && selectedVariant?.effectivePrice && product.basePrice > selectedVariant.effectivePrice ? (
                             <Text style={styles.originalPrice}>
-                                {(product?.basePrice ?? product?.original_price)?.toLocaleString('vi-VN')}đ
+                                {product.basePrice.toLocaleString('vi-VN')}đ
                             </Text>
-                        )}
+                        ) : null}
                     </View>
 
                     {/* Variant Picker */}
-                    <Text style={styles.sectionTitle}>Dung tích / Biến thể:</Text>
-                    <View style={styles.variantRow}>
-                        {product?.variants?.map((variant: any) => (
-                            <TouchableOpacity
-                                key={variant.id || variant.sku}
-                                style={[styles.variantChip, selectedVariantId === variant.id && styles.selectedVariantChip]}
-                                onPress={() => setSelectedVariantId(variant.id)}
-                            >
-                                <Text style={[styles.variantText, selectedVariantId === variant.id && styles.selectedVariantText]}>
-                                    {getVariantLabel(variant)}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                    {product?.variants && product.variants.length > 0 ? (
+                        <>
+                            <Text style={styles.sectionTitle}>Dung tích / Biến thể:</Text>
+                            <View style={styles.variantRow}>
+                                {product.variants.map((variant: any) => (
+                                    <TouchableOpacity
+                                        key={variant.id || variant.sku}
+                                        style={[styles.variantChip, selectedVariantId === variant.id && styles.selectedVariantChip]}
+                                        onPress={() => setSelectedVariantId(variant.id)}
+                                    >
+                                        <Text style={[styles.variantText, selectedVariantId === variant.id && styles.selectedVariantText]}>
+                                            {getVariantLabel(variant)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </>
+                    ) : null}
 
                     {/* Description */}
-                    <Text style={styles.sectionTitle}>Mô tả sản phẩm:</Text>
-                    <Text style={styles.description}>{product?.description}</Text>
+                    {cleanDescription ? (
+                        <>
+                            <Text style={styles.sectionTitle}>Mô tả sản phẩm:</Text>
+                            <Text style={styles.description}>{cleanDescription}</Text>
+                        </>
+                    ) : null}
 
                     {/* Ingredients */}
-                    <Text style={styles.sectionTitle}>Thành phần chính:</Text>
-                    {product?.ingredients?.map((ing: string, i: number) => (
-                        <Text key={i} style={styles.ingredientItem}>• {ing}</Text>
-                    ))}
+                    {Array.isArray(product?.ingredients) && product.ingredients.length > 0 ? (
+                        <>
+                            <Text style={styles.sectionTitle}>Thành phần chính:</Text>
+                            {product.ingredients.map((ing: string, i: number) => (
+                                <Text key={i} style={styles.ingredientItem}>• {ing}</Text>
+                            ))}
+                        </>
+                    ) : null}
                 </View>
             </ScrollView>
 
             {/* Sticky Bottom Bar */}
-            <View style={styles.bottomBar}>
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
                 <TouchableOpacity
                     style={styles.addToCartBtn}
                     onPress={handleAddToCart}

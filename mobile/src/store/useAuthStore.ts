@@ -1,19 +1,24 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '../utils/secureStore';
 import apiClient from '../api/apiClient';
 
-interface User {
+export interface User {
   id?: string;
   email: string;
-  full_name: string;
+  full_name?: string;
+  fullName?: string;
+  phone?: string;
+  avatarUrl?: string;
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
-  setAuth: (user: User, token: string) => Promise<void>; // Khai báo thêm setAuth
+  setAuth: (user: User, token: string, refreshToken?: string) => Promise<void>;
   login: (email: string, pass: string) => Promise<void>;
+  register: (payload: { email: string; password: string; fullName: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -21,38 +26,83 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
+  refreshToken: null,
   isLoading: true,
 
-  // Định nghĩa hàm setAuth lưu Token & User
-  setAuth: async (user, token) => {
+  setAuth: async (user, token, refreshToken) => {
     await SecureStore.setItemAsync('userToken', token);
-    set({ user, token });
+    if (refreshToken) {
+      await SecureStore.setItemAsync('userRefreshToken', refreshToken);
+    }
+    set({ user, token, refreshToken: refreshToken || null });
   },
 
   login: async (email, password) => {
     const res = await apiClient.post('/auth/login', { email, password });
-    const { access_token, user } = res.data;
-    await SecureStore.setItemAsync('userToken', access_token);
-    set({ user, token: access_token });
+    // Bóc tách envelope NestJS: res.data.data hoặc res.data
+    const payload = res?.data?.data || res?.data || {};
+    const accessToken = payload.accessToken || payload.access_token || '';
+    const refreshToken = payload.refreshToken || payload.refresh_token || '';
+    const user = payload.user || { email, full_name: email.split('@')[0] };
+
+    if (accessToken) {
+      await SecureStore.setItemAsync('userToken', accessToken);
+    }
+    if (refreshToken) {
+      await SecureStore.setItemAsync('userRefreshToken', refreshToken);
+    }
+
+    set({ user, token: accessToken, refreshToken, isLoading: false });
+  },
+
+  register: async (payload) => {
+    const res = await apiClient.post('/auth/register', payload);
+    const data = res?.data?.data || res?.data || {};
+    const accessToken = data.accessToken || data.access_token;
+    const refreshToken = data.refreshToken || data.refresh_token;
+    const user = data.user || { email: payload.email, full_name: payload.fullName };
+
+    if (accessToken) {
+      await SecureStore.setItemAsync('userToken', accessToken);
+      if (refreshToken) {
+        await SecureStore.setItemAsync('userRefreshToken', refreshToken);
+      }
+      set({ user, token: accessToken, refreshToken, isLoading: false });
+    }
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync('userToken');
-    set({ user: null, token: null });
+    try {
+      const refreshToken = await SecureStore.getItemAsync('userRefreshToken');
+      if (refreshToken && apiClient?.post) {
+        try {
+          await apiClient.post('/auth/logout', { refreshToken });
+        } catch {
+          // Bỏ qua lỗi mạng khi logout
+        }
+      }
+    } finally {
+      await SecureStore.deleteItemAsync('userToken');
+      await SecureStore.deleteItemAsync('userRefreshToken');
+      set({ user: null, token: null, refreshToken: null, isLoading: false });
+    }
   },
 
   checkAuth: async () => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
+      const refreshToken = await SecureStore.getItemAsync('userRefreshToken');
       if (token) {
         const res = await apiClient.get('/users/me');
-        set({ user: res.data, token, isLoading: false });
+        const user = res?.data?.data || res?.data || null;
+        set({ user, token, refreshToken, isLoading: false });
       } else {
-        set({ isLoading: false });
+        set({ user: null, token: null, refreshToken: null, isLoading: false });
       }
     } catch {
       await SecureStore.deleteItemAsync('userToken');
-      set({ user: null, token: null, isLoading: false });
+      await SecureStore.deleteItemAsync('userRefreshToken');
+      set({ user: null, token: null, refreshToken: null, isLoading: false });
     }
   },
 }));

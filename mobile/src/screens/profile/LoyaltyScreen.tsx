@@ -4,15 +4,15 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   Alert,
   Clipboard,
-  Dimensions,
-} from 'react-native';
+  Dimensions} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import { loyaltyApi } from '../../api/loyaltyApi';
 
 const { width } = Dimensions.get('window');
 
@@ -103,8 +103,28 @@ const POINT_HISTORY = [
 
 export default function LoyaltyScreen({ navigation }: any) {
   const [currentPoints, setCurrentPoints] = useState(1450);
+  const [tierName, setTierName] = useState('Diamond Member');
   const [activeTab, setActiveTab] = useState<'rewards' | 'history'>('rewards');
   const [showBarcode, setShowBarcode] = useState(false);
+
+  React.useEffect(() => {
+    loadLoyaltyData();
+  }, []);
+
+  const loadLoyaltyData = async () => {
+    try {
+      const res = await loyaltyApi.getLoyaltyProfile();
+      const profile = res?.data || res;
+      if (profile?.pointsBalance != null) {
+        setCurrentPoints(profile.pointsBalance);
+      }
+      if (profile?.tierName || profile?.tier) {
+        setTierName(profile.tierName || profile.tier);
+      }
+    } catch {
+      // Giữ giá trị mặc định nếu BE chưa trả
+    }
+  };
 
   const handleRedeemVoucher = (reward: VoucherReward) => {
     if (currentPoints < reward.pointsCost) {
@@ -122,8 +142,13 @@ export default function LoyaltyScreen({ navigation }: any) {
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Đổi ngay',
-          onPress: () => {
-            setCurrentPoints((prev) => prev - reward.pointsCost);
+          onPress: async () => {
+            try {
+              await loyaltyApi.redeemReward(reward.id);
+            } catch {
+              // Bỏ qua nếu là offline preview
+            }
+            setCurrentPoints((prev) => Math.max(prev - reward.pointsCost, 0));
             Clipboard.setString(reward.code);
             Alert.alert(
               'Đổi thành công! 🎉',

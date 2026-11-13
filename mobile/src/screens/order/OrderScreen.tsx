@@ -5,15 +5,14 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   Image,
   Alert,
   Modal,
   ScrollView,
   TextInput,
   Linking,
-  Dimensions,
-} from 'react-native';
+  Dimensions} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { orderApi } from '../../api/orderApi';
@@ -196,6 +195,57 @@ export default function OrderScreen({ navigation }: any) {
     { key: 'DELIVERED', label: 'Hoàn tất' },
     { key: 'CANCELLED', label: 'Đã hủy' },
   ];
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      const res = await orderApi.getMyOrders();
+      const list = res?.data?.items || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(list) && list.length > 0) {
+        setOrders(
+          list.map((o: any) => ({
+            id: o.id,
+            orderCode: o.orderNumber || o.orderCode || o.id,
+            date: o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : 'Gần đây',
+            status: (o.status || 'PENDING') as OrderStatus,
+            statusText:
+              o.status === 'PENDING'
+                ? 'Chờ duyệt'
+                : o.status === 'SHIPPING'
+                ? 'Đang giao'
+                : o.status === 'DELIVERED'
+                ? 'Hoàn tất'
+                : o.status === 'CANCELLED'
+                ? 'Đã hủy'
+                : 'Đang xử lý',
+            subtotal: o.subtotalAmount || o.subtotal || o.totalAmount || 0,
+            discount: o.discountAmount || 0,
+            shippingFee: o.shippingFee || 0,
+            totalAmount: o.totalAmount || 0,
+            paymentMethod:
+              o.paymentMethod === 'COD'
+                ? 'Thanh toán khi nhận hàng (COD)'
+                : 'Chuyển khoản SePay',
+            items: (o.items || []).map((it: any) => ({
+              id: it.id || it.productVariantId,
+              name: it.productName || 'Sản phẩm GlowUp',
+              variant: it.variantName || 'Mặc định',
+              price: it.unitPrice || 0,
+              quantity: it.quantity || 1,
+              imageUrl:
+                it.thumbnailUrl ||
+                'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+            })),
+          }))
+        );
+      }
+    } catch {
+      // Giữ danh sách ban đầu nếu offline
+    }
+  };
 
   // Lọc đơn hàng
   const filteredOrders =

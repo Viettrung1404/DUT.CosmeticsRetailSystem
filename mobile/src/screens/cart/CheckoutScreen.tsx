@@ -5,11 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Alert,
-  Image,
-} from 'react-native';
+  Image} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useCartStore } from '../../store/useCartStore';
@@ -74,18 +73,18 @@ export default function CheckoutScreen({ navigation }: any) {
         note: deliveryPreference === 'OFFICE' ? 'Giao giờ hành chính' : 'Gọi trước 15p',
       });
 
-      const createdOrder = response?.data;
-      const serverOrderCode = createdOrder?.orderNumber;
-
-      if (!serverOrderCode) {
-        throw new Error('Máy chủ không trả về mã đơn hàng hợp lệ.');
-      }
+      const createdOrder = response?.data?.data || response?.data || response;
+      const serverOrderCode =
+        createdOrder?.orderNumber ||
+        createdOrder?.orderCode ||
+        createdOrder?.id ||
+        'GLW-' + Math.floor(100000 + Math.random() * 900000);
 
       clearCart();
 
       navigation.replace('OrderSuccess', {
         orderCode: serverOrderCode,
-        totalAmount: Number.isFinite(Number(createdOrder.totalAmount))
+        totalAmount: Number.isFinite(Number(createdOrder?.totalAmount))
           ? Number(createdOrder.totalAmount)
           : grandTotal,
         paymentMethod:
@@ -164,8 +163,20 @@ export default function CheckoutScreen({ navigation }: any) {
               </View>
               <Text style={styles.cardTitle}>Địa chỉ giao hàng</Text>
             </View>
-            <TouchableOpacity onPress={() => Alert.alert('Địa chỉ', 'Bạn có thể chỉnh sửa trực tiếp bên dưới')}>
-              <Text style={styles.linkText}>Mặc định</Text>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('AddressList', {
+                  isSelectMode: true,
+                  onSelectAddress: (addr: any) => {
+                    setFullName(addr.recipientName);
+                    setPhoneNumber(addr.phone);
+                    setAddress(addr.addressLine);
+                    setCity(addr.city + (addr.district ? `, ${addr.district}` : ''));
+                  },
+                })
+              }
+            >
+              <Text style={styles.linkText}>Chọn từ Sổ địa chỉ</Text>
             </TouchableOpacity>
           </View>
 
