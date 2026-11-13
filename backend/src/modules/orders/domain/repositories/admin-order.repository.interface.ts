@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 export const ADMIN_ORDER_REPOSITORY = Symbol('IAdminOrderRepository');
 
 export interface AdminOrderScopeFilter {
@@ -150,6 +151,8 @@ export interface OrderStatusChangeResult {
   codPaymentsCompleted: number;
   loyalty: { configured: boolean; pointsEarned: number; newTierName: string | null } | null;
   commissionAmount: number | null;
+  // Giao thành công thì đơn tự hoàn tất (Q-HT): khách được đổi trả và tích điểm ngay, không chờ admin bấm tay
+  autoCompleted: boolean;
 }
 
 export interface CancelOrderByAdminInput {
@@ -165,9 +168,23 @@ export interface OrderCancelResult {
   refundAmount: number;
 }
 
+export interface OrderBenefitsReleaseInput {
+  orderId: string;
+  orderNumber: string;
+  customerId: string | null;
+  couponId: string | null;
+  loyaltyPointsUsed: number;
+  reason: 'CANCEL' | 'SHIPMENT_RETURN';
+}
+
 export interface IAdminOrderRepository {
   cancelByAdmin(input: CancelOrderByAdminInput): Promise<OrderCancelResult>;
   updateStatus(input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult>;
+  applyStatusChange(tx: Prisma.TransactionClient, input: UpdateOrderStatusInput): Promise<OrderStatusChangeResult>;
+  releaseBenefits(
+    tx: Prisma.TransactionClient,
+    input: OrderBenefitsReleaseInput,
+  ): Promise<{ couponReleased: boolean; pointsRefunded: number }>;
   findMany(query: AdminOrderListQuery): Promise<{ items: AdminOrderListItem[]; total: number }>;
   findAccessInfo(orderId: string): Promise<OrderAccessInfo | null>;
   findDetail(orderId: string): Promise<AdminOrderDetail | null>;

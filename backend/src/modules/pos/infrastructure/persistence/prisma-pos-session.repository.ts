@@ -13,6 +13,21 @@ import { POS_SESSION_INCLUDE, PosSessionMapper } from '../mappers/pos-session.ma
 
 class StaleSystemCashError extends Error {}
 
+// Tiền mặt hệ thống của ca = tiền mặt thu được − tiền mặt đã hoàn cho khách tại quầy trong ca
+async function netCash(client: Prisma.TransactionClient, sessionId: string): Promise<number> {
+  const [paid, refunded] = await Promise.all([
+    client.payment.aggregate({
+      where: { posSessionId: sessionId, paymentMethod: 'CASH', status: 'COMPLETED' },
+      _sum: { amount: true },
+    }),
+    client.refund.aggregate({
+      where: { posSessionId: sessionId, status: 'COMPLETED' },
+      _sum: { amount: true },
+    }),
+  ]);
+  return Number(paid._sum.amount ?? 0) - Number(refunded._sum.amount ?? 0);
+}
+
 @Injectable()
 export class PrismaPosSessionRepository implements IPosSessionRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -69,12 +84,8 @@ export class PrismaPosSessionRepository implements IPosSessionRepository {
     }
   }
 
-  async sumCompletedCash(sessionId: string): Promise<number> {
-    const result = await this.prisma.payment.aggregate({
-      where: { posSessionId: sessionId, paymentMethod: 'CASH', status: 'COMPLETED' },
-      _sum: { amount: true },
-    });
-    return Number(result._sum.amount ?? 0);
+  sumCompletedCash(sessionId: string): Promise<number> {
+    return netCash(this.prisma, sessionId);
   }
 
   // Khóa dòng ca bằng cách đóng trước, rồi đối chiếu lại tiền mặt: đơn vừa ghi xen vào giữa thì hoàn tác để tính lại
@@ -94,11 +105,7 @@ export class PrismaPosSessionRepository implements IPosSessionRepository {
       if (count === 0) {
         return 'already_closed' as const;
       }
-      const cash = await tx.payment.aggregate({
-        where: { posSessionId: session.id, paymentMethod: 'CASH', status: 'COMPLETED' },
-        _sum: { amount: true },
-      });
-      if (Number(cash._sum.amount ?? 0) !== session.systemCash) {
+      if ((await netCash(tx, session.id)) !== session.systemCash) {
         throw new StaleSystemCashError();
       }
       return 'saved' as const;

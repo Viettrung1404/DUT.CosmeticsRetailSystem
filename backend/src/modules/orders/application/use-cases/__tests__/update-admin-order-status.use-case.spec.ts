@@ -6,7 +6,7 @@ import { GetAdminOrderDetailUseCase } from '../get-admin-order-detail.use-case';
 import { UpdateAdminOrderStatusUseCase } from '../update-admin-order-status.use-case';
 import { createAdminOrderRepositoryMock } from './admin-order-mocks';
 
-const NO_EFFECTS = { stockDeducted: false, codPaymentsCompleted: 0, loyalty: null, commissionAmount: null };
+const NO_EFFECTS = { stockDeducted: false, codPaymentsCompleted: 0, loyalty: null, commissionAmount: null, autoCompleted: false };
 
 describe('UpdateAdminOrderStatusUseCase', () => {
   let repository: ReturnType<typeof createAdminOrderRepositoryMock>;
