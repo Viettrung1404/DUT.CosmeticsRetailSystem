@@ -6,6 +6,7 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import { PageDto, PageMetaDto, PageOptionsDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
@@ -14,6 +15,7 @@ import { ScanPosProductUseCase } from '../../application/use-cases/scan-pos-prod
 import { SearchPosProductsUseCase } from '../../application/use-cases/search-pos-products.use-case';
 import { ScanProductQueryDto, SearchProductQueryDto } from '../dtos/pos-lookup-request.dto';
 import { PosVariantResponseDto } from '../dtos/pos-lookup-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('POS - Sales (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -29,6 +31,7 @@ export class PosProductController {
   @ApiOperation({ summary: 'POS - Quét mã vạch ra biến thể, giá và tồn bán được tại cửa hàng' })
   @ApiNotFoundResponse({ description: 'Không có biến thể với mã vạch này' })
   @ApiForbiddenResponse({ description: 'Không được gán cửa hàng này' })
+  @ApiOkResponse({ type: PosVariantResponseDto })
   async scan(@CurrentUser('userId') userId: string, @Query() query: ScanProductQueryDto) {
     const view = await this.scanPosProductUseCase.execute(userId, query.barcode, query.storeId);
     return PosVariantResponseDto.fromDomain(view);
@@ -39,6 +42,7 @@ export class PosProductController {
   @ApiOperation({ summary: 'POS - Tìm biến thể theo tên hoặc SKU (chỉ hàng đang bán)' })
   @ApiBadRequestResponse({ description: 'Kho tổng hoặc cửa hàng ngừng hoạt động' })
   @ApiForbiddenResponse({ description: 'Không được gán cửa hàng này' })
+  @ApiPagedOkResponse(PosVariantResponseDto)
   async search(
     @CurrentUser('userId') userId: string,
     @Query() query: SearchProductQueryDto,

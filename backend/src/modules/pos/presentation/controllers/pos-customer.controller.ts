@@ -5,6 +5,8 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
 import { CreatePosCustomerUseCase } from '../../application/use-cases/create-pos-customer.use-case';
@@ -25,6 +27,7 @@ export class PosCustomerController {
   @RequirePermissions('CUSTOMER_VIEW')
   @ApiOperation({ summary: 'POS - Tìm khách theo số điện thoại (hạng, điểm hiện có)' })
   @ApiNotFoundResponse({ description: 'Chưa có khách với số điện thoại này' })
+  @ApiOkResponse({ type: PosCustomerResponseDto })
   async lookup(@Query() query: LookupCustomerQueryDto) {
     const customer = await this.lookupPosCustomerUseCase.execute(query.phone);
     return PosCustomerResponseDto.fromDomain(customer);
@@ -34,6 +37,7 @@ export class PosCustomerController {
   @RequirePermissions('CUSTOMER_CREATE_UPDATE')
   @ApiOperation({ summary: 'POS - Tạo nhanh khách tại quầy (số điện thoại + họ tên, chưa cần tài khoản)' })
   @ApiConflictResponse({ description: 'Số điện thoại đã có khách' })
+  @ApiCreatedResponse({ type: PosCustomerResponseDto })
   async create(@Body() dto: CreatePosCustomerDto) {
     const customer = await this.createPosCustomerUseCase.execute(dto);
     return { message: 'Tạo khách hàng thành công', data: PosCustomerResponseDto.fromDomain(customer) };

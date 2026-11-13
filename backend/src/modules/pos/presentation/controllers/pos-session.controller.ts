@@ -9,6 +9,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiCreatedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
@@ -39,6 +40,7 @@ export class PosSessionController {
   @RequirePermissions('PAYMENT_COLLECT')
   @ApiOperation({ summary: 'POS - Ca đang mở của cửa hàng (data = null nếu chưa có ca)' })
   @ApiForbiddenResponse({ description: 'Cửa hàng ngoài phạm vi của bạn' })
+  @ApiOkResponse({ type: PosSessionResponseDto })
   async getCurrent(
     @CurrentUser('userId') userId: string,
     @Query() query: CurrentPosSessionQueryDto,
@@ -52,6 +54,7 @@ export class PosSessionController {
   @ApiOperation({ summary: 'POS - Mở ca, khai báo tiền mặt đầu ca (mỗi cửa hàng chỉ một ca mở)' })
   @ApiBadRequestResponse({ description: 'Cửa hàng ngừng hoạt động hoặc là kho tổng' })
   @ApiConflictResponse({ description: 'Cửa hàng hoặc bạn đang có ca chưa đóng' })
+  @ApiCreatedResponse({ type: PosSessionResponseDto })
   async open(@CurrentUser('userId') userId: string, @Body() dto: OpenPosSessionDto) {
     const session = await this.openPosSessionUseCase.execute(userId, dto);
     return { message: 'Mở ca thành công', data: PosSessionResponseDto.fromDomain(session) };

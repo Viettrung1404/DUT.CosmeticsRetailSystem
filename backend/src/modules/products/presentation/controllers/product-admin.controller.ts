@@ -30,6 +30,7 @@ import { CreateProductRequestDto } from '../dtos/create-product-request.dto';
 import { UpdateProductRequestDto } from '../dtos/update-product-request.dto';
 import { GetAdminProductsQueryDto } from '../dtos/get-admin-products-query.dto';
 import { ProductResponseDto } from '../dtos/product-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - Products (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -46,6 +47,7 @@ export class ProductAdminController {
   @Get()
   @RequirePermissions('PRODUCT_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách sản phẩm (gồm cả đã ẩn; tìm theo tên/SKU, lọc danh mục, thương hiệu, trạng thái)' })
+  @ApiPagedOkResponse(ProductResponseDto)
   async getProducts(@Query() query: GetAdminProductsQueryDto) {
     const { items, total } = await this.getAdminProductsUseCase.execute({
       page: query.page ?? 1,
@@ -106,6 +108,7 @@ export class ProductAdminController {
   @RequirePermissions('PRODUCT_DELETE')
   @ApiOperation({ summary: 'Admin - Xóa mềm sản phẩm (chuyển sang ngừng kinh doanh)' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy sản phẩm' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async deleteProduct(@Param('id', ParseUUIDPipe) id: string) {
     await this.deleteProductUseCase.execute(id);
     return { message: 'Đã ngừng kinh doanh sản phẩm', data: null };

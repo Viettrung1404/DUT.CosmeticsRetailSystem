@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { OrderDirection, PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
@@ -27,6 +33,7 @@ import {
   AdminUserResponseDto,
   CreateAdminUserResponseDto,
 } from '../dtos/admin-user-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - Users (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -46,6 +53,7 @@ export class UserAdminController {
 
   @Get('users')
   @ApiOperation({ summary: 'Admin - Danh sách người dùng (lọc vai trò, trạng thái, cửa hàng; tìm tên/email/SĐT)' })
+  @ApiPagedOkResponse(AdminUserResponseDto)
   async list(@Query() query: GetAdminUsersQueryDto) {
     const { items, total } = await this.getUsers.execute({
       page: query.page ?? 1,
@@ -64,12 +72,14 @@ export class UserAdminController {
 
   @Get('users/:id')
   @ApiOperation({ summary: 'Admin - Chi tiết người dùng' })
+  @ApiOkResponse({ type: AdminUserResponseDto })
   async detail(@Param('id', ParseUUIDPipe) id: string) {
     return AdminUserResponseDto.fromDomain(await this.getUserDetail.execute(id));
   }
 
   @Post('users')
   @ApiOperation({ summary: 'Admin - Tạo tài khoản nhân viên, gửi email đặt mật khẩu' })
+  @ApiCreatedResponse({ type: CreateAdminUserResponseDto })
   async create(@Body() dto: CreateAdminUserRequestDto): Promise<CreateAdminUserResponseDto> {
     const { user, activationEmailSent } = await this.createUser.execute(dto);
     return { user: AdminUserResponseDto.fromDomain(user), activationEmailSent };
@@ -77,6 +87,7 @@ export class UserAdminController {
 
   @Put('users/:id')
   @ApiOperation({ summary: 'Admin - Sửa họ tên, SĐT, vai trò, trạng thái (khóa thì thu hồi phiên đăng nhập)' })
+  @ApiOkResponse({ type: AdminUserResponseDto })
   async update(
     @CurrentUser() actor: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -88,6 +99,7 @@ export class UserAdminController {
 
   @Put('users/:id/permissions')
   @ApiOperation({ summary: 'Admin - Đặt quyền cấp thêm / thu hồi theo mặt nạ bit' })
+  @ApiOkResponse({ type: AdminUserResponseDto })
   async permissions(
     @CurrentUser() actor: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -98,6 +110,7 @@ export class UserAdminController {
 
   @Put('users/:id/stores')
   @ApiOperation({ summary: 'Admin - Gán danh sách cửa hàng phụ trách' })
+  @ApiOkResponse({ type: AdminUserResponseDto })
   async stores(
     @CurrentUser() actor: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
@@ -110,12 +123,14 @@ export class UserAdminController {
 
   @Get('roles')
   @ApiOperation({ summary: 'Admin - Danh sách vai trò' })
+  @ApiOkResponse({ type: [AdminRoleResponseDto] })
   async roles() {
     return (await this.getRoles.execute()).map((r) => AdminRoleResponseDto.fromDomain(r));
   }
 
   @Get('permissions')
   @ApiOperation({ summary: 'Admin - Danh sách quyền (bit và mã)' })
+  @ApiOkResponse({ type: [AdminPermissionResponseDto] })
   async permissionList() {
     return (await this.getPermissions.execute()).map((p) => AdminPermissionResponseDto.fromDomain(p));
   }

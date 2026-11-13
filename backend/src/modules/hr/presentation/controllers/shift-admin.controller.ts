@@ -5,6 +5,8 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
@@ -35,6 +37,7 @@ export class ShiftAdminController {
   @Get()
   @RequirePermissions('EMPLOYEE_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách ca làm việc (lọc cửa hàng; theo phạm vi dữ liệu)' })
+  @ApiOkResponse({ type: [ShiftResponseDto] })
   async list(@CurrentUser() user: JwtPayload, @Query() query: GetShiftsQueryDto) {
     const shifts = await this.getShifts.execute(user.userId, query.storeId);
     return shifts.map((s) => ShiftResponseDto.fromDomain(s));
@@ -43,6 +46,7 @@ export class ShiftAdminController {
   @Post()
   @RequirePermissions('EMPLOYEE_MANAGE')
   @ApiOperation({ summary: 'Admin - Tạo ca làm việc cho một cửa hàng (bỏ trống storeId = ca dùng chung)' })
+  @ApiCreatedResponse({ type: ShiftResponseDto })
   async create(@CurrentUser() user: JwtPayload, @Body() dto: CreateShiftRequestDto) {
     return ShiftResponseDto.fromDomain(await this.createShift.execute(user.userId, dto));
   }
@@ -51,6 +55,7 @@ export class ShiftAdminController {
   @RequirePermissions('EMPLOYEE_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa tên / giờ của ca (không đổi cửa hàng)' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy ca làm việc' })
+  @ApiOkResponse({ type: ShiftResponseDto })
   async update(
     @CurrentUser() user: JwtPayload,
     @Param('id', parseUuidVi) id: string,
@@ -63,6 +68,7 @@ export class ShiftAdminController {
   @RequirePermissions('EMPLOYEE_MANAGE')
   @ApiOperation({ summary: 'Admin - Xóa ca (chỉ khi chưa có dòng chấm công nào dùng ca)' })
   @ApiConflictResponse({ description: 'Ca đã có dòng chấm công' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async remove(@CurrentUser() user: JwtPayload, @Param('id', parseUuidVi) id: string) {
     await this.deleteShift.execute(user.userId, id);
     return { message: 'Đã xóa ca làm việc', data: null };

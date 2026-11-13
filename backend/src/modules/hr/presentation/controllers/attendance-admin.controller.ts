@@ -1,5 +1,11 @@
 import { Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiConflictResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+} from '@nestjs/swagger';
 import { OrderDirection, PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
@@ -9,6 +15,7 @@ import { CheckOutUseCase } from '../../application/use-cases/check-out.use-case'
 import { GetAttendanceUseCase } from '../../application/use-cases/get-attendance.use-case';
 import { GetAttendanceQueryDto } from '../dtos/hr-request.dto';
 import { AttendanceResponseDto } from '../dtos/hr-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - HR (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -25,6 +32,7 @@ export class AttendanceAdminController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Nhân viên tự chấm công vào ca (trễ quá 15 phút so với ca đã phân = LATE)' })
   @ApiConflictResponse({ description: 'Đã chấm công vào / đã chấm đủ trong ngày' })
+  @ApiCreatedResponse({ type: AttendanceResponseDto })
   async checkInNow(@CurrentUser() user: JwtPayload) {
     const row = await this.checkIn.execute(user.userId);
     return { message: 'Chấm công vào thành công', data: AttendanceResponseDto.fromDomain(row) };
@@ -34,6 +42,7 @@ export class AttendanceAdminController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Nhân viên tự chấm công ra' })
   @ApiConflictResponse({ description: 'Chưa chấm công vào hoặc đã chấm công ra' })
+  @ApiCreatedResponse({ type: AttendanceResponseDto })
   async checkOutNow(@CurrentUser() user: JwtPayload) {
     const row = await this.checkOut.execute(user.userId);
     return { message: 'Chấm công ra thành công', data: AttendanceResponseDto.fromDomain(row) };
@@ -41,6 +50,7 @@ export class AttendanceAdminController {
 
   @Get('me')
   @ApiOperation({ summary: 'Nhân viên xem lịch sử chấm công của chính mình' })
+  @ApiPagedOkResponse(AttendanceResponseDto)
   async listMine(@CurrentUser() user: JwtPayload, @Query() query: GetAttendanceQueryDto) {
     const { items, total } = await this.getAttendance.executeSelf(user.userId, {
       page: query.page ?? 1,
@@ -59,6 +69,7 @@ export class AttendanceAdminController {
   @Get()
   @RequirePermissions('EMPLOYEE_ATTENDANCE')
   @ApiOperation({ summary: 'Admin - Bảng chấm công (lọc nhân viên, cửa hàng, khoảng ngày, trạng thái; theo phạm vi dữ liệu)' })
+  @ApiPagedOkResponse(AttendanceResponseDto)
   async list(@CurrentUser() user: JwtPayload, @Query() query: GetAttendanceQueryDto) {
     const { items, total } = await this.getAttendance.execute(user.userId, {
       page: query.page ?? 1,
