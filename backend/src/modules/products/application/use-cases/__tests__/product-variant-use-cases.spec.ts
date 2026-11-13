@@ -52,6 +52,7 @@ describe('Product variant use cases', () => {
       findByOptions: jest.fn().mockResolvedValue(null),
       create: jest.fn((v: ProductVariantEntity) => Promise.resolve(v)),
       update: jest.fn((v: ProductVariantEntity) => Promise.resolve(v)),
+      updateTryOnColor: jest.fn(),
     };
   });
 

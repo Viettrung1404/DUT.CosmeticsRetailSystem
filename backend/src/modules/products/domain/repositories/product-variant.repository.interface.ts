@@ -11,4 +11,5 @@ export interface IProductVariantRepository {
   findByOptions(productId: string, options: VariantOptionValues): Promise<ProductVariantEntity | null>;
   create(variant: ProductVariantEntity): Promise<ProductVariantEntity>;
   update(variant: ProductVariantEntity): Promise<ProductVariantEntity>;
+  updateTryOnColor(id: string, colorHex: string): Promise<boolean>;
 }

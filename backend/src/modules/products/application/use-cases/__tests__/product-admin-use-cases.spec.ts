@@ -67,6 +67,7 @@ describe('Product admin use cases', () => {
       findByOptions: jest.fn().mockResolvedValue(null),
       create: jest.fn(),
       update: jest.fn(),
+      updateTryOnColor: jest.fn(),
     };
   });
 
