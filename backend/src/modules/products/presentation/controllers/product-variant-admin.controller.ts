@@ -1,7 +1,4 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
-import { ApiProperty } from '@nestjs/swagger';
-import { Matches } from 'class-validator';
-import { PrismaService } from '@infrastructure/database/prisma.service';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -17,17 +14,14 @@ import { GetProductVariantsUseCase } from '../../application/use-cases/get-produ
 import { CreateProductVariantUseCase } from '../../application/use-cases/create-product-variant.use-case';
 import { UpdateProductVariantUseCase } from '../../application/use-cases/update-product-variant.use-case';
 import { DeleteProductVariantUseCase } from '../../application/use-cases/delete-product-variant.use-case';
+import { UpdateVariantTryOnColorUseCase } from '../../application/use-cases/update-variant-try-on-color.use-case';
+import { UpdateTryOnColorRequestDto } from '../dtos/update-try-on-color-request.dto';
+import { TryOnColorResponseDto } from '../dtos/try-on-color-response.dto';
 import {
   CreateProductVariantRequestDto,
   UpdateProductVariantRequestDto,
 } from '../dtos/product-variant-request.dto';
 import { ProductVariantResponseDto } from '../dtos/product-variant-response.dto';
-
-class TryOnColorDto {
-  @ApiProperty({ example: '#B9465E', description: 'Mã màu được duyệt từ ảnh swatch của biến thể' })
-  @Matches(/^#[0-9A-Fa-f]{6}$/)
-  colorHex: string;
-}
 
 @ApiTags('Admin - Product Variants (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -38,15 +32,16 @@ export class ProductVariantAdminController {
     private readonly createProductVariantUseCase: CreateProductVariantUseCase,
     private readonly updateProductVariantUseCase: UpdateProductVariantUseCase,
     private readonly deleteProductVariantUseCase: DeleteProductVariantUseCase,
-    private readonly db: PrismaService,
+    private readonly updateVariantTryOnColor: UpdateVariantTryOnColorUseCase,
   ) {}
 
   @Patch('variants/:id/try-on-color')
   @RequirePermissions('PRODUCT_UPDATE')
   @ApiOperation({ summary: 'Cập nhật mã màu thử son đã được duyệt cho biến thể' })
-  async updateTryOnColor(@Param('id', ParseUUIDPipe) id: string, @Body() dto: TryOnColorDto) {
-    const count = await this.db.$executeRaw`UPDATE product_variants SET try_on_color_hex=${dto.colorHex} WHERE id=${id}::uuid`;
-    if (!count) throw new NotFoundException('VARIANT_NOT_FOUND');
+  @ApiOkResponse({ type: TryOnColorResponseDto })
+  @ApiNotFoundResponse({ description: 'Không tìm thấy biến thể sản phẩm' })
+  async updateTryOnColor(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTryOnColorRequestDto) {
+    await this.updateVariantTryOnColor.execute(id, dto.colorHex);
     return { id, tryOnColorHex: dto.colorHex };
   }
 
@@ -93,6 +88,7 @@ export class ProductVariantAdminController {
   @RequirePermissions('PRODUCT_DELETE')
   @ApiOperation({ summary: 'Admin - Xóa mềm biến thể (chuyển sang ngừng bán)' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy biến thể' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async deleteVariant(@Param('id', ParseUUIDPipe) id: string) {
     await this.deleteProductVariantUseCase.execute(id);
     return { message: 'Đã ngừng bán biến thể', data: null };
