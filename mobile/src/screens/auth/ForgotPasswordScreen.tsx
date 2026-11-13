@@ -15,8 +15,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
         try {
             setLoading(true);
             await apiClient.post('/auth/forgot-password', { email });
-            Alert.alert('Thành công', 'Hướng dẫn khôi phục mật khẩu đã được gửi đến email của bạn.', [
-                { text: 'OK', onPress: () => navigation.navigate('Login') },
+            Alert.alert('Thành công', 'Mã xác thực OTP đã được gửi đến email của bạn.', [
+                { text: 'Tiếp tục', onPress: () => navigation.navigate('ResetPassword', { email }) },
             ]);
         } catch (err: any) {
             Alert.alert('Thất bại', err.response?.data?.message || 'Email không tồn tại trong hệ thống.');

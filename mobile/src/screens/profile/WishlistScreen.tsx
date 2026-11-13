@@ -4,14 +4,13 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   Image,
   Alert,
   Share,
   Dimensions,
-  ActivityIndicator,
-} from 'react-native';
+  ActivityIndicator} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useWishlistStore, WishlistItem } from '../../store/useWishlistStore';

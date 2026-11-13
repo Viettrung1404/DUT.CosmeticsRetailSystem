@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,14 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useCartStore, CartItem } from '../../store/useCartStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function CartScreen({ navigation }: any) {
   const {
@@ -25,14 +27,16 @@ export default function CartScreen({ navigation }: any) {
     getSelectedCount,
   } = useCartStore();
 
+  const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
-    fetchCart().catch((error) => {
-      Alert.alert(
-        'Không thể tải giỏ hàng',
-        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
-      );
-    });
+    fetchCart().catch(() => {});
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCart().catch(() => {});
+    setRefreshing(false);
+  };
 
   const runCartAction = async (action: () => Promise<void>) => {
     try {
@@ -94,6 +98,21 @@ export default function CartScreen({ navigation }: any) {
   const handleProceedCheckout = () => {
     if (selectedCount === 0) {
       Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một sản phẩm để tiến hành thanh toán.');
+      return;
+    }
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để tiến hành đặt hàng và tích lũy điểm GlowPoint.',
+        [
+          { text: 'Để sau', style: 'cancel' },
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('AuthStack', { screen: 'Login' }),
+          },
+        ]
+      );
       return;
     }
     navigation.navigate('Checkout');
@@ -221,6 +240,7 @@ export default function CartScreen({ navigation }: any) {
       </View>
 
       <FlatList
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={renderCartItem}

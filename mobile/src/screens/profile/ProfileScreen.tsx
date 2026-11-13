@@ -5,12 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Image,
   Switch,
   Alert,
-  Linking,
-} from 'react-native';
+  Linking} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -329,6 +328,23 @@ export default function ProfileScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
           </TouchableOpacity>
 
+          {/* Sổ địa chỉ */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => navigation.navigate('AddressList')}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="location-outline" size={18} color={theme.colors.textDark} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Sổ địa chỉ nhận hàng</Text>
+                <Text style={styles.settingsSub}>Quản lý địa chỉ giao hàng mặc định</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
           {/* Đổi mật khẩu */}
           <TouchableOpacity
             style={styles.settingsRow}
@@ -347,9 +363,43 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* 6. Chăm Sóc Khách Hàng VIP */}
-        <Text style={styles.sectionHeaderLabel}>CHĂM SÓC KHÁCH HÀNG VIP</Text>
+        {/* 6. Chăm Sóc Khách Hàng & Hệ Thống Showroom */}
+        <Text style={styles.sectionHeaderLabel}>TIỆN ÍCH & CHĂM SÓC KHÁCH HÀNG</Text>
         <View style={styles.settingsGroupCard}>
+          {/* Hệ thống Showroom */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => navigation.navigate('StoreLocator')}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="business-outline" size={18} color={theme.colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Hệ thống Showroom GlowUp</Text>
+                <Text style={styles.settingsSub}>Tra cứu chi nhánh gần nhất & giờ mở cửa</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Trung tâm trợ giúp & Chính sách */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => navigation.navigate('HelpCenter')}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="help-circle-outline" size={18} color={theme.colors.textDark} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Trung tâm trợ giúp & Chính sách</Text>
+                <Text style={styles.settingsSub}>FAQ, đổi trả 7 ngày & bảo hành da</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.settingsRow}
             onPress={() => Linking.openURL('tel:19008899')}
@@ -361,22 +411,6 @@ export default function ProfileScreen({ navigation }: any) {
               <View>
                 <Text style={styles.settingsTitle}>Tư vấn sắc đẹp riêng 24/7</Text>
                 <Text style={styles.settingsSub}>Hotline hỗ trợ: 1900 8899</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => Alert.alert('Chính sách', 'GlowUp hỗ trợ đổi trả miễn phí trong 15-30 ngày.')}
-          >
-            <View style={styles.settingsRowLeft}>
-              <View style={styles.settingsIconBox}>
-                <Ionicons name="shield-checkmark-outline" size={18} color={theme.colors.textDark} />
-              </View>
-              <View>
-                <Text style={styles.settingsTitle}>Chính sách đổi trả & Bảo hành da</Text>
-                <Text style={styles.settingsSub}>Đồng kiểm khi nhận, đổi trả 100% miễn phí</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />

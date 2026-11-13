@@ -9,11 +9,10 @@ import {
   Image,
   Modal,
   ScrollView,
-  SafeAreaView,
   Dimensions,
   ActivityIndicator,
-  Alert,
-} from 'react-native';
+  Alert} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { productApi } from '../../api/productApi';
