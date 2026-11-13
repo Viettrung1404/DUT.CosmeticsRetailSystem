@@ -30,6 +30,7 @@ const describeSideEffects = (result: OrderStatusChangeResult): string[] => {
     if (result.loyalty.newTierName) notes.push(`Khách lên hạng ${result.loyalty.newTierName}.`);
   }
   if (result.commissionAmount !== null) notes.push(`Đã ghi hoa hồng ${result.commissionAmount}đ cho nhân viên bán.`);
+  if (result.autoCompleted) notes.push('Đơn tự chuyển sang hoàn tất (COMPLETED).');
   return notes;
 };
 

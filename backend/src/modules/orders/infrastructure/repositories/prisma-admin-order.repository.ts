@@ -20,6 +20,7 @@ import {
   AdminOrderScopeFilter,
   CancelOrderByAdminInput,
   ConfirmOrderInput,
+  OrderBenefitsReleaseInput,
   OrderCancelResult,
   IAdminOrderRepository,
   OrderAccessInfo,
@@ -285,85 +286,145 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     input: UpdateOrderStatusInput,
   ): Promise<OrderStatusChangeResult> {
     // Xuất kho nhiều dòng tốn nhiều câu lệnh, mặc định 5 giây của Prisma dễ hết giờ với Neon
-    return this.prisma.transaction(
-      async (tx) => {
-        const order = await this.lockOrder(tx, input.orderId);
-        const target = input.target as OrderStatus;
-        OrderStateMachine.assertValidTransition(
-          order.status as OrderStatus,
-          target,
-          'ADMIN',
-        );
-        const exchange = await tx.exchangeSettlement.findUnique({
-          where: { replacementOrderId: order.id },
+    return this.prisma.transaction((tx) => this.applyStatusChange(tx, input), {
+      timeout: 15000,
+    });
+  }
+
+  // Tách khỏi updateStatus để luồng vận đơn đổi trạng thái đơn trong cùng transaction với sự kiện của hãng
+  // Trả lại voucher và điểm khách đã dùng khi đơn không thành (hủy, hoặc giao thất bại hàng hoàn về)
+  async releaseBenefits(
+    tx: Prisma.TransactionClient,
+    input: OrderBenefitsReleaseInput,
+  ): Promise<{ couponReleased: boolean; pointsRefunded: number }> {
+    let couponReleased = false;
+    let pointsRefunded = 0;
+    if (input.couponId) {
+      const usage = await tx.couponUsage.deleteMany({ where: { orderId: input.orderId } });
+      if (usage.count > 0) {
+        await tx.coupon.update({
+          where: { id: input.couponId },
+          data: { usedCount: { decrement: 1 } },
         });
-        if (exchange) {
-          const paid = await tx.payment.aggregate({
-            where: { orderId: order.id, status: 'COMPLETED' },
-            _sum: { amount: true },
-          });
-          const cod = await tx.payment.aggregate({
-            where: {
-              orderId: order.id,
-              status: 'PENDING',
-              paymentMethod: 'COD',
-            },
-            _sum: { amount: true },
-          });
-          // COD is collected by the DELIVERED transition below. Completion
-          // must be covered by collected payments and exchange credit only.
-          const allowsPendingCod = [
-            OrderStatus.PROCESSING,
-            OrderStatus.SHIPPING,
-            OrderStatus.DELIVERED,
-          ].includes(target);
-          const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
-            .add(exchange.creditApplied)
-            .add(allowsPendingCod ? (cod._sum.amount ?? 0) : 0);
-          if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
-            throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
-        }
+        couponReleased = true;
+      }
+    }
+    if (input.loyaltyPointsUsed > 0 && input.customerId) {
+      const cancel = input.reason === 'CANCEL';
+      await tx.customer.update({
+        where: { id: input.customerId },
+        data: { totalPoints: { increment: input.loyaltyPointsUsed } },
+      });
+      await tx.loyaltyPointsTransaction.create({
+        data: {
+          customerId: input.customerId,
+          orderId: input.orderId,
+          points: input.loyaltyPointsUsed,
+          type: 'REFUND',
+          eventKey: `ORDER:${input.orderId}:${cancel ? 'CANCEL' : 'SHIPMENT_RETURN'}_POINTS`,
+          description: cancel
+            ? `Hoàn điểm do hủy đơn hàng ${input.orderNumber}`
+            : `Hoàn điểm do giao hàng thất bại, đơn ${input.orderNumber}`,
+        },
+      });
+      pointsRefunded = input.loyaltyPointsUsed;
+      await evaluateTier(tx, input.customerId);
+    }
+    return { couponReleased, pointsRefunded };
+  }
 
-        const result: OrderStatusChangeResult = {
-          stockDeducted: false,
-          codPaymentsCompleted: 0,
-          loyalty: null,
-          commissionAmount: null,
-        };
-
-        if (target === OrderStatus.SHIPPING) {
-          await this.deductStockForShipping(tx, order, input.changedBy);
-          result.stockDeducted = true;
-        }
-
-        if (target === OrderStatus.DELIVERED) {
-          const paid = await tx.payment.updateMany({
-            where: {
-              orderId: order.id,
-              paymentMethod: 'COD',
-              status: 'PENDING',
-            },
-            data: { status: 'COMPLETED', paidAt: new Date() },
-          });
-          result.codPaymentsCompleted = paid.count;
-        }
-
-        if (target === OrderStatus.COMPLETED) {
-          result.loyalty = await this.rewardCustomer(tx, order);
-          result.commissionAmount = await this.createCommission(tx, order);
-        }
-
-        await this.changeStatus(
-          tx,
-          order.id,
-          target,
-          input.changedBy,
-          input.note || `Chuyển trạng thái sang ${target}`,
-        );
-        return result;
-      },
-      { timeout: 15000 },
+  async applyStatusChange(
+    tx: Prisma.TransactionClient,
+    input: UpdateOrderStatusInput,
+  ): Promise<OrderStatusChangeResult> {
+    const order = await this.lockOrder(tx, input.orderId);
+    const target = input.target as OrderStatus;
+    OrderStateMachine.assertValidTransition(
+      order.status as OrderStatus,
+      target,
+      'ADMIN',
     );
+    const exchange = await tx.exchangeSettlement.findUnique({
+      where: { replacementOrderId: order.id },
+    });
+    if (exchange) {
+      const paid = await tx.payment.aggregate({
+        where: { orderId: order.id, status: 'COMPLETED' },
+        _sum: { amount: true },
+      });
+      const cod = await tx.payment.aggregate({
+        where: {
+          orderId: order.id,
+          status: 'PENDING',
+          paymentMethod: 'COD',
+        },
+        _sum: { amount: true },
+      });
+      // COD is collected by the DELIVERED transition below. Completion
+      // must be covered by collected payments and exchange credit only.
+      const allowsPendingCod = [
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPING,
+        OrderStatus.DELIVERED,
+      ].includes(target);
+      const amount = new Prisma.Decimal(paid._sum.amount ?? 0)
+        .add(exchange.creditApplied)
+        .add(allowsPendingCod ? (cod._sum.amount ?? 0) : 0);
+      if (exchange.status !== 'ACTIVE' || amount.lt(order.total_amount))
+        throw new ConflictException('EXCHANGE_SETTLEMENT_UNPAID');
+    }
+
+    const result: OrderStatusChangeResult = {
+      stockDeducted: false,
+      codPaymentsCompleted: 0,
+      loyalty: null,
+      commissionAmount: null,
+      autoCompleted: false,
+    };
+
+    if (target === OrderStatus.SHIPPING) {
+      await this.deductStockForShipping(tx, order, input.changedBy);
+      result.stockDeducted = true;
+    }
+
+    if (target === OrderStatus.DELIVERED) {
+      const paid = await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          paymentMethod: 'COD',
+          status: 'PENDING',
+        },
+        data: { status: 'COMPLETED', paidAt: new Date() },
+      });
+      result.codPaymentsCompleted = paid.count;
+    }
+
+    if (target === OrderStatus.COMPLETED) {
+      result.loyalty = await this.rewardCustomer(tx, order);
+      result.commissionAmount = await this.createCommission(tx, order);
+    }
+
+    await this.changeStatus(
+      tx,
+      order.id,
+      target,
+      input.changedBy,
+      input.note || `Chuyển trạng thái sang ${target}`,
+    );
+
+    if (target === OrderStatus.DELIVERED) {
+      result.loyalty = await this.rewardCustomer(tx, order);
+      result.commissionAmount = await this.createCommission(tx, order);
+      await this.changeStatus(
+        tx,
+        order.id,
+        OrderStatus.COMPLETED,
+        input.changedBy,
+        'Tự hoàn tất khi giao hàng thành công',
+      );
+      result.autoCompleted = true;
+    }
+    return result;
   }
 
   // FR-04.05: hoàn giữ hàng, hoàn coupon, hoàn điểm; đã thu tiền thì tạo phiếu hoàn tiền chờ xử lý
@@ -378,6 +439,13 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           OrderStatus.CANCELLED,
           'ADMIN',
         );
+        const activeShipments = await tx.shipment.count({
+          where: { orderId: order.id, status: { not: 'CANCELLED' } },
+        });
+        if (activeShipments)
+          throw new ConflictException(
+            'Đơn đang có vận đơn chưa hủy, hãy hủy vận đơn trước khi hủy đơn',
+          );
 
         const result: OrderCancelResult = {
           reservationReleased: false,
@@ -417,37 +485,16 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
           result.reservationReleased = items.length > 0;
         }
 
-        if (order.coupon_id) {
-          const usage = await tx.couponUsage.deleteMany({
-            where: { orderId: order.id },
-          });
-          if (usage.count > 0) {
-            await tx.coupon.update({
-              where: { id: order.coupon_id },
-              data: { usedCount: { decrement: 1 } },
-            });
-            result.couponReleased = true;
-          }
-        }
-
-        if (order.loyalty_points_used > 0 && order.customer_id) {
-          await tx.customer.update({
-            where: { id: order.customer_id },
-            data: { totalPoints: { increment: order.loyalty_points_used } },
-          });
-          await tx.loyaltyPointsTransaction.create({
-            data: {
-              customerId: order.customer_id,
-              orderId: order.id,
-              points: order.loyalty_points_used,
-              type: 'REFUND',
-              eventKey: `ORDER:${order.id}:CANCEL_POINTS`,
-              description: `Hoàn điểm do hủy đơn hàng ${order.order_number}`,
-            },
-          });
-          result.pointsRefunded = order.loyalty_points_used;
-          await evaluateTier(tx, order.customer_id);
-        }
+        const released = await this.releaseBenefits(tx, {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          customerId: order.customer_id,
+          couponId: order.coupon_id,
+          loyaltyPointsUsed: order.loyalty_points_used,
+          reason: 'CANCEL',
+        });
+        result.couponReleased = released.couponReleased;
+        result.pointsRefunded = released.pointsRefunded;
 
         const payments = await tx.payment.findMany({
           where: { orderId: order.id },

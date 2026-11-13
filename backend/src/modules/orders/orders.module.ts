@@ -83,6 +83,6 @@ import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-or
     UpdateAdminOrderStatusUseCase,
     CancelAdminOrderUseCase,
   ],
-  exports: [ORDER_REPOSITORY, PreviewOrderUseCase, CreateOrderUseCase],
+  exports: [ORDER_REPOSITORY, ADMIN_ORDER_REPOSITORY, PreviewOrderUseCase, CreateOrderUseCase],
 })
 export class OrdersModule {}

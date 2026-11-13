@@ -39,6 +39,16 @@ describe('Exchange replacement COD funding', () => {
         data: { status: 'COMPLETED', paidAt: expect.any(Date) },
       }));
     }
+    expect(result.autoCompleted).toBe(target === OrderStatus.DELIVERED);
+  });
+
+  it('giao thành công thì đơn tự hoàn tất: tích điểm, hoa hồng, ghi lịch sử COMPLETED', async () => {
+    order.status = OrderStatus.SHIPPING;
+    await repo.updateStatus({ orderId: order.id, target: OrderStatus.DELIVERED, changedBy: 'staff' });
+    const changeStatus = (repo as any).changeStatus as jest.Mock;
+    expect(changeStatus.mock.calls.map((c: unknown[]) => c[2])).toEqual([OrderStatus.DELIVERED, OrderStatus.COMPLETED]);
+    expect((repo as any).rewardCustomer).toHaveBeenCalledTimes(1);
+    expect((repo as any).createCommission).toHaveBeenCalledTimes(1);
   });
 
   it('requires collected funds before completion', async () => {
