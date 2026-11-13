@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOperation,
+  ApiTags,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { OrderDirection, PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
@@ -10,6 +16,9 @@ import {
   AdminCustomerQueryDto,
   ReplaceCustomerTagsDto,
 } from '../dtos/admin-customer.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { CustomerTagSummaryDto } from '../dtos/customer-tag-response.dto';
+import { ReplaceCustomerTagsResponseDto } from '../dtos/customer-tag-response.dto';
 
 @ApiTags('Admin - Customers (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -23,6 +32,7 @@ export class CustomerAdminController {
   @Get('tags')
   @RequirePermissions('CUSTOMER_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách nhãn khách hàng kèm số khách, dùng cho gợi ý và phân nhóm thủ công' })
+  @ApiOkResponse({ type: [CustomerTagSummaryDto] })
   getTags() {
     return this.customerTags.list();
   }
@@ -30,6 +40,7 @@ export class CustomerAdminController {
   @Put(':id/tags')
   @RequirePermissions('CUSTOMER_CREATE_UPDATE')
   @ApiOperation({ summary: 'Admin - Gắn nhãn cho khách (thay toàn bộ nhãn cũ), trong phạm vi dữ liệu' })
+  @ApiOkResponse({ type: ReplaceCustomerTagsResponseDto })
   async replaceTags(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -46,6 +57,7 @@ export class CustomerAdminController {
       'Admin - Danh sách khách hàng: tìm theo tên/SĐT/email, lọc hạng và cửa hàng, tự lọc theo phạm vi dữ liệu',
   })
   @ApiForbiddenResponse({ description: 'Thiếu quyền CUSTOMER_VIEW' })
+  @ApiPagedOkResponse(AdminCustomerListItemDto)
   async getCustomers(@CurrentUser('userId') userId: string, @Query() query: AdminCustomerQueryDto) {
     const { items, total } = await this.getAdminCustomersUseCase.execute(userId, {
       page: query.page ?? 1,

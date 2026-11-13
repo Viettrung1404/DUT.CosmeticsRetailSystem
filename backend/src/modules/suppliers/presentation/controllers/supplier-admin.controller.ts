@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import {
@@ -16,6 +22,10 @@ import {
   SupplierQueryDto,
   UpdateSupplierDto,
 } from '../dtos/supplier-request.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { SupplierResponseDto } from '../dtos/supplier-response.dto';
+import { SupplierBalanceResponseDto } from '../dtos/supplier-response.dto';
+import { SupplierPaymentResponseDto } from '../dtos/supplier-response.dto';
 
 @ApiTags('Admin - Suppliers (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -30,6 +40,7 @@ export class SupplierAdminController {
   @Get('suppliers')
   @RequireAnyPermission('SUPPLIER_VIEW', 'PO_CREATE')
   @ApiOperation({ summary: 'Admin - Danh bạ nhà cung cấp' })
+  @ApiPagedOkResponse(SupplierResponseDto)
   async list(@Query() query: SupplierQueryDto) {
     const { items, total } = await this.suppliers.list({
       page: query.page ?? 1,
@@ -43,6 +54,7 @@ export class SupplierAdminController {
   @Get('suppliers/:id')
   @RequireAnyPermission('SUPPLIER_VIEW', 'PO_CREATE')
   @ApiOperation({ summary: 'Admin - Chi tiết nhà cung cấp' })
+  @ApiOkResponse({ type: SupplierResponseDto })
   detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.suppliers.detail(id);
   }
@@ -50,6 +62,7 @@ export class SupplierAdminController {
   @Post('suppliers')
   @RequirePermissions('SUPPLIER_MANAGE')
   @ApiOperation({ summary: 'Admin - Thêm nhà cung cấp' })
+  @ApiCreatedResponse({ type: SupplierResponseDto })
   async create(@Body() dto: CreateSupplierDto) {
     const data = await this.suppliers.create(dto);
     return { message: `Đã thêm nhà cung cấp ${data.name}`, data };
@@ -58,6 +71,7 @@ export class SupplierAdminController {
   @Put('suppliers/:id')
   @RequirePermissions('SUPPLIER_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa thông tin / ngừng hợp tác nhà cung cấp' })
+  @ApiOkResponse({ type: SupplierResponseDto })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateSupplierDto) {
     return this.suppliers.update(id, dto);
   }
@@ -65,6 +79,7 @@ export class SupplierAdminController {
   @Put('suppliers/:id/rating')
   @RequireAnyPermission('SUPPLIER_MANAGE', 'PO_APPROVE')
   @ApiOperation({ summary: 'Admin / Kế toán - Chấm điểm nhà cung cấp (1–5)' })
+  @ApiOkResponse({ type: SupplierResponseDto })
   rate(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -76,6 +91,7 @@ export class SupplierAdminController {
   @Get('suppliers/:id/balance')
   @RequireAnyPermission('SUPPLIER_VIEW', 'PO_APPROVE')
   @ApiOperation({ summary: 'Admin / Kế toán - Công nợ nhà cung cấp (hóa đơn đã nhận − đã trả)' })
+  @ApiOkResponse({ type: SupplierBalanceResponseDto })
   balance(@Param('id', ParseUUIDPipe) id: string) {
     return this.payments.balance(id);
   }
@@ -83,6 +99,7 @@ export class SupplierAdminController {
   @Get('supplier-payments')
   @RequireAnyPermission('SUPPLIER_VIEW', 'PO_APPROVE')
   @ApiOperation({ summary: 'Admin / Kế toán - Lịch sử trả tiền nhà cung cấp' })
+  @ApiPagedOkResponse(SupplierPaymentResponseDto)
   async listPayments(@Query() query: SupplierPaymentQueryDto) {
     const { items, total } = await this.payments.list({
       page: query.page ?? 1,
@@ -95,6 +112,7 @@ export class SupplierAdminController {
   @Post('supplier-payments')
   @RequirePermissions('PO_APPROVE')
   @ApiOperation({ summary: 'Kế toán - Ghi khoản đã trả nhà cung cấp (không vượt công nợ)' })
+  @ApiCreatedResponse({ type: SupplierPaymentResponseDto })
   async pay(@CurrentUser('userId') userId: string, @Body() dto: CreateSupplierPaymentDto) {
     const data = await this.payments.pay(userId, dto);
     return { message: 'Đã ghi nhận thanh toán cho nhà cung cấp', data };

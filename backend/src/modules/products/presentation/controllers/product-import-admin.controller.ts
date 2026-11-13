@@ -18,6 +18,8 @@ import {
   ApiProduces,
   ApiQuery,
   ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { RawResponse } from '@core/decorators/raw-response.decorator';
@@ -29,6 +31,7 @@ import {
 } from '../../application/use-cases/import-products.use-case';
 import { parseDryRun } from '../../application/product-import.rules';
 import { CsvUploadErrorInterceptor } from '../interceptors/csv-upload-error.interceptor';
+import { ImportProductsResponseDto } from '../dtos/product-import-response.dto';
 
 // Đăng ký trước ProductAdminController để "import-template" không bị hiểu là :id
 @ApiTags('Admin - Products (Thành Lập)')
@@ -45,6 +48,13 @@ export class ProductImportAdminController {
   @ApiOperation({
     summary:
       'Admin - Tải file mẫu nhập sản phẩm (Excel hoặc CSV). Mỗi dòng là một biến thể; các dòng cùng product_sku thuộc một sản phẩm',
+  })
+  @ApiOkResponse({
+    description: 'Mẫu nhập sản phẩm (xlsx hoặc csv tùy tham số format)',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { schema: { type: 'string', format: 'binary' } },
+      'text/csv': { schema: { type: 'string', format: 'binary' } },
+    },
   })
   async template(@Res() res: Response, @Query('format') format: string = 'xlsx') {
     if (format !== 'xlsx' && format !== 'csv') {
@@ -82,6 +92,7 @@ export class ProductImportAdminController {
     summary:
       'Admin - Nhập sản phẩm hàng loạt từ Excel hoặc CSV: SKU sản phẩm đã có thì cập nhật, chưa có thì tạo cùng biến thể. Có dòng lỗi thì không ghi gì',
   })
+  @ApiCreatedResponse({ type: ImportProductsResponseDto })
   async import(@UploadedFile() file: ImportFileInput | undefined, @Query('dryRun') dryRun?: string) {
     const data = await this.importProducts.execute(file, parseDryRun(dryRun));
     const message = !data.valid

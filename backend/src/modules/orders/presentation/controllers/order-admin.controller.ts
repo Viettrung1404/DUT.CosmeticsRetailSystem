@@ -23,6 +23,7 @@ import {
   UpdateOrderStatusDto,
 } from '../dtos/admin-order-action.dto';
 import { AdminOrderDetailDto, AdminOrderListItemDto } from '../dtos/admin-order-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - Orders (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -42,6 +43,7 @@ export class OrderAdminController {
     summary: 'Admin - Danh sách đơn hàng, tự lọc theo phạm vi dữ liệu (ALL / STORE / SELF)',
   })
   @ApiForbiddenResponse({ description: 'Thiếu quyền ORDER_ONLINE_VIEW' })
+  @ApiPagedOkResponse(AdminOrderListItemDto)
   async getOrders(@CurrentUser('userId') userId: string, @Query() query: AdminOrderQueryDto) {
     const { items, total } = await this.getAdminOrdersUseCase.execute(userId, {
       page: query.page ?? 1,

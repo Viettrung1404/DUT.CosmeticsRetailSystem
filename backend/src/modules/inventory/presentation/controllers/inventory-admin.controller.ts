@@ -7,6 +7,8 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
@@ -31,6 +33,11 @@ import {
   UpdateThresholdsDto,
 } from '../dtos/inventory-workflow-request.dto';
 import { InventoryItemResponseDto } from '../dtos/inventory-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { ConsistencyReportResponseDto } from '../dtos/inventory-workflow-response.dto';
+import { ReceivePurchaseOrderResponseDto } from '../dtos/inventory-workflow-response.dto';
+import { AdjustmentResponseDto } from '../dtos/inventory-workflow-response.dto';
+import { InventoryThresholdResponseDto } from '../dtos/inventory-workflow-response.dto';
 
 @ApiTags('Admin - Inventory (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -53,6 +60,7 @@ export class InventoryAdminController {
     summary: 'Admin - Xem tồn kho (thực tế / giữ chỗ / khả dụng), tự lọc theo phạm vi dữ liệu',
   })
   @ApiForbiddenResponse({ description: 'Cửa hàng ngoài phạm vi của bạn' })
+  @ApiPagedOkResponse(InventoryItemResponseDto)
   async getInventory(@CurrentUser('userId') userId: string, @Query() query: InventoryQueryDto) {
     const { items, total } = await this.getInventoryUseCase.execute(userId, {
       page: query.page ?? 1,
@@ -74,6 +82,7 @@ export class InventoryAdminController {
       'Admin - Kiểm tra nhất quán tồn kho: so tồn với tổng lô và thẻ kho, giữ chỗ không vượt tồn. Chỉ đọc, không sửa dữ liệu',
   })
   @ApiForbiddenResponse({ description: 'Cửa hàng ngoài phạm vi của bạn' })
+  @ApiOkResponse({ type: ConsistencyReportResponseDto })
   async consistencyCheck(
     @CurrentUser('userId') userId: string,
     @Query() query: ConsistencyCheckQueryDto,
@@ -94,6 +103,7 @@ export class InventoryAdminController {
   @ApiBadRequestResponse({ description: 'Đơn chưa duyệt / đã nhận đủ, nhận vượt số đặt, lô hết hạn' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy đơn đặt hàng' })
   @ApiConflictResponse({ description: 'Số lô trùng nhưng khác hạn dùng, hoặc đơn vừa được người khác nhận' })
+  @ApiCreatedResponse({ type: ReceivePurchaseOrderResponseDto })
   async receive(@CurrentUser('userId') userId: string, @Body() dto: ReceivePurchaseOrderDto) {
     const result = await this.receivePurchaseOrderUseCase.execute(userId, dto);
     const message =
@@ -111,6 +121,7 @@ export class InventoryAdminController {
   })
   @ApiBadRequestResponse({ description: 'Không đủ hàng, thiếu lý do hoặc thiếu thông tin lô' })
   @ApiConflictResponse({ description: 'Đụng phần đang giữ chỗ cho đơn online' })
+  @ApiCreatedResponse({ type: AdjustmentResponseDto })
   async adjust(@CurrentUser('userId') userId: string, @Body() dto: AdjustInventoryDto) {
     const result = await this.adjustInventoryUseCase.execute(userId, dto);
     const message =
@@ -123,6 +134,7 @@ export class InventoryAdminController {
   @Get('adjustments')
   @RequirePermissions('INVENTORY_CHECK')
   @ApiOperation({ summary: 'Admin - Danh sách phiếu điều chỉnh / xuất hủy theo phạm vi dữ liệu' })
+  @ApiPagedOkResponse(AdjustmentResponseDto)
   async listAdjustments(@CurrentUser('userId') userId: string, @Query() query: AdjustmentQueryDto) {
     const { items, total } = await this.getAdjustments.execute(userId, {
       page: query.page ?? 1,
@@ -136,6 +148,7 @@ export class InventoryAdminController {
   @Get('adjustments/:id')
   @RequirePermissions('INVENTORY_CHECK')
   @ApiOperation({ summary: 'Admin - Chi tiết phiếu điều chỉnh' })
+  @ApiOkResponse({ type: AdjustmentResponseDto })
   adjustmentDetail(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.getAdjustments.detail(userId, id);
   }
@@ -143,6 +156,7 @@ export class InventoryAdminController {
   @Put('adjustments/:id/approve')
   @RequirePermissions('INVENTORY_CHECK')
   @ApiOperation({ summary: 'Admin - Duyệt phiếu xuất hủy (người duyệt khác người lập), trừ tồn theo FEFO' })
+  @ApiOkResponse({ type: AdjustmentResponseDto })
   async approveAdjustment(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -155,6 +169,7 @@ export class InventoryAdminController {
   @Put('adjustments/:id/reject')
   @RequirePermissions('INVENTORY_CHECK')
   @ApiOperation({ summary: 'Admin - Từ chối phiếu xuất hủy' })
+  @ApiOkResponse({ type: AdjustmentResponseDto })
   async rejectAdjustment(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -167,6 +182,7 @@ export class InventoryAdminController {
   @Put('adjustments/:id/cancel')
   @RequirePermissions('INVENTORY_CHECK')
   @ApiOperation({ summary: 'Admin - Người lập hủy phiếu đang chờ duyệt' })
+  @ApiOkResponse({ type: AdjustmentResponseDto })
   async cancelAdjustment(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.cancelAdjustmentUseCase.execute(userId, id);
     return { message: `Đã hủy phiếu ${data.adjustmentCode}`, data };
@@ -175,6 +191,7 @@ export class InventoryAdminController {
   @Put(':id/thresholds')
   @RequirePermissions('INVENTORY_WARN_LOW')
   @ApiOperation({ summary: 'Admin - Cài mức tồn tối thiểu / tối đa để cảnh báo (id = dòng tồn kho)' })
+  @ApiOkResponse({ type: InventoryThresholdResponseDto })
   async updateThresholds(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,

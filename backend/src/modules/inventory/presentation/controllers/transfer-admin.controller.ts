@@ -1,5 +1,12 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiConflictResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import {
@@ -20,6 +27,8 @@ import {
   TransferQueryDto,
   UpdateTransferDraftDto,
 } from '../dtos/inventory-workflow-request.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { TransferResponseDto } from '../dtos/inventory-workflow-response.dto';
 
 // DRAFT → REQUESTED (QL) → APPROVED (kho tổng) → SHIPPED (kho tổng xuất FEFO) → RECEIVED (QL nhận)
 @ApiTags('Admin - Inventory (Thành Lập)')
@@ -40,6 +49,7 @@ export class TransferAdminController {
   @Get()
   @RequireAnyPermission('INVENTORY_TRANSFER_MANAGE', 'INVENTORY_TRANSFER')
   @ApiOperation({ summary: 'Admin - Danh sách phiếu chuyển kho (địa điểm của bạn là nơi xuất hoặc nhận)' })
+  @ApiPagedOkResponse(TransferResponseDto)
   async list(@CurrentUser('userId') userId: string, @Query() query: TransferQueryDto) {
     const { items, total } = await this.getTransfers.execute(userId, {
       page: query.page ?? 1,
@@ -53,6 +63,7 @@ export class TransferAdminController {
   @Get(':id')
   @RequireAnyPermission('INVENTORY_TRANSFER_MANAGE', 'INVENTORY_TRANSFER')
   @ApiOperation({ summary: 'Admin - Chi tiết phiếu chuyển kho' })
+  @ApiOkResponse({ type: TransferResponseDto })
   detail(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.getTransfers.detail(userId, id);
   }
@@ -60,6 +71,7 @@ export class TransferAdminController {
   @Post()
   @RequirePermissions('INVENTORY_TRANSFER_MANAGE')
   @ApiOperation({ summary: 'Admin - QL lập phiếu xin hàng từ kho tổng (lưu nháp)' })
+  @ApiCreatedResponse({ type: TransferResponseDto })
   async create(@CurrentUser('userId') userId: string, @Body() dto: CreateTransferDto) {
     const data = await this.createTransfer.execute(userId, dto);
     return { message: `Đã lưu nháp phiếu ${data.transferCode}`, data };
@@ -68,6 +80,7 @@ export class TransferAdminController {
   @Put(':id')
   @RequirePermissions('INVENTORY_TRANSFER_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa phiếu nháp (ghi chú, danh sách hàng)' })
+  @ApiOkResponse({ type: TransferResponseDto })
   update(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -79,6 +92,7 @@ export class TransferAdminController {
   @Put(':id/request')
   @RequirePermissions('INVENTORY_TRANSFER_MANAGE')
   @ApiOperation({ summary: 'Admin - Gửi yêu cầu cho kho tổng' })
+  @ApiOkResponse({ type: TransferResponseDto })
   async request(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.changeStatus.request(userId, id);
     return { message: `Đã gửi yêu cầu ${data.transferCode} cho kho tổng`, data };
@@ -87,6 +101,7 @@ export class TransferAdminController {
   @Put(':id/approve')
   @RequirePermissions('INVENTORY_TRANSFER_MANAGE')
   @ApiOperation({ summary: 'Admin - Kho tổng duyệt số lượng đáp ứng' })
+  @ApiOkResponse({ type: TransferResponseDto })
   async approve(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -99,6 +114,7 @@ export class TransferAdminController {
   @Put(':id/ship')
   @RequirePermissions('INVENTORY_TRANSFER')
   @ApiOperation({ summary: 'Admin - Kho tổng xuất hàng (tự chọn lô FEFO, bỏ lô khóa / hết hạn)' })
+  @ApiOkResponse({ type: TransferResponseDto })
   async ship(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.shipTransfer.execute(userId, id);
     return { message: `Đã xuất kho phiếu ${data.transferCode}`, data };
@@ -107,6 +123,7 @@ export class TransferAdminController {
   @Put(':id/receive')
   @RequirePermissions('INVENTORY_TRANSFER')
   @ApiOperation({ summary: 'Admin - Cửa hàng nhận hàng, ghi hao hụt nếu thiếu' })
+  @ApiOkResponse({ type: TransferResponseDto })
   async receive(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -119,6 +136,7 @@ export class TransferAdminController {
   @Put(':id/cancel')
   @RequirePermissions('INVENTORY_TRANSFER_MANAGE')
   @ApiOperation({ summary: 'Admin - Hủy phiếu chưa xuất kho' })
+  @ApiOkResponse({ type: TransferResponseDto })
   async cancel(@CurrentUser('userId') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     const data = await this.changeStatus.cancel(userId, id);
     return { message: `Đã hủy phiếu ${data.transferCode}`, data };

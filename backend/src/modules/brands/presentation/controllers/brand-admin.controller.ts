@@ -29,6 +29,7 @@ import { CreateBrandRequestDto } from '../dtos/create-brand-request.dto';
 import { UpdateBrandRequestDto } from '../dtos/update-brand-request.dto';
 import { GetBrandsQueryDto } from '../dtos/get-brands-query.dto';
 import { BrandResponseDto } from '../dtos/brand-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - Brands (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -45,6 +46,7 @@ export class BrandAdminController {
   @Get()
   @RequirePermissions('PRODUCT_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách thương hiệu (phân trang, tìm theo tên, lọc trạng thái)' })
+  @ApiPagedOkResponse(BrandResponseDto)
   async getBrands(@Query() query: GetBrandsQueryDto) {
     const { items, total } = await this.getBrandsUseCase.execute({
       page: query.page ?? 1,
@@ -94,6 +96,7 @@ export class BrandAdminController {
   @ApiOperation({ summary: 'Admin - Xóa thương hiệu (chỉ khi chưa có sản phẩm nào)' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy thương hiệu' })
   @ApiConflictResponse({ description: 'Thương hiệu đang có sản phẩm' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async deleteBrand(@Param('id', ParseUUIDPipe) id: string) {
     await this.deleteBrandUseCase.execute(id);
     return { message: 'Đã xóa thương hiệu', data: null };

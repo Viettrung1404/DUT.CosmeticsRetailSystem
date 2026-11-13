@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { OrderDirection, PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
@@ -13,6 +19,7 @@ import {
   UpdateEmployeeRequestDto,
 } from '../dtos/employee-request.dto';
 import { CreateEmployeeResponseDto, EmployeeResponseDto } from '../dtos/employee-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('Admin - HR (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -27,6 +34,7 @@ export class EmployeeAdminController {
   @Get()
   @RequirePermissions('EMPLOYEE_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách nhân viên (lọc cửa hàng, phòng ban, trạng thái; theo phạm vi dữ liệu)' })
+  @ApiPagedOkResponse(EmployeeResponseDto)
   async list(@CurrentUser() user: JwtPayload, @Query() query: GetEmployeesQueryDto) {
     const { items, total } = await this.getEmployees.execute(user.userId, {
       page: query.page ?? 1,
@@ -46,6 +54,7 @@ export class EmployeeAdminController {
   @Post()
   @RequirePermissions('EMPLOYEE_MANAGE', 'SYSTEM_USER_MANAGE')
   @ApiOperation({ summary: 'Admin - Thêm nhân viên: tạo tài khoản + hồ sơ + gán cửa hàng trong một giao dịch' })
+  @ApiCreatedResponse({ type: CreateEmployeeResponseDto })
   async create(@Body() dto: CreateEmployeeRequestDto): Promise<CreateEmployeeResponseDto> {
     const { employee, activationEmailSent } = await this.createEmployee.execute(dto);
     return { employee: EmployeeResponseDto.fromDomain(employee), activationEmailSent };
@@ -54,6 +63,7 @@ export class EmployeeAdminController {
   @Put(':id')
   @RequirePermissions('EMPLOYEE_MANAGE', 'SYSTEM_USER_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa hồ sơ nhân viên và thông tin tài khoản (họ tên, SĐT)' })
+  @ApiOkResponse({ type: EmployeeResponseDto })
   async update(
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,

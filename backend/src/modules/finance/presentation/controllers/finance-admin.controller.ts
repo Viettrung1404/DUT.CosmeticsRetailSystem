@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiConflictResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiOperation,
+  ApiTags,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { PageDto, PageMetaDto } from '@core/common/pagination.dto';
 import { CurrentUser } from '@core/decorators/current-user.decorator';
 import {
@@ -12,6 +18,10 @@ import {
   PaymentHistoryQueryDto,
   ReconciliationQueryDto,
 } from '../dtos/finance-request.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
+import { PaymentHistoryItemDto } from '../dtos/finance-response.dto';
+import { ReconciliationResponseDto } from '../dtos/finance-response.dto';
+import { MarkReconciledResponseDto } from '../dtos/finance-response.dto';
 
 @ApiTags('Admin - Finance (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -24,6 +34,7 @@ export class FinanceAdminController {
   @ApiOperation({
     summary: 'Admin - Lịch sử giao dịch thanh toán; NV bán hàng chỉ thấy giao dịch trong ca của mình',
   })
+  @ApiPagedOkResponse(PaymentHistoryItemDto)
   async payments(@CurrentUser('userId') userId: string, @Query() query: PaymentHistoryQueryDto) {
     const { items, total } = await this.finance.payments(userId, {
       page: query.page ?? 1,
@@ -40,6 +51,7 @@ export class FinanceAdminController {
   @Get('reconciliation')
   @RequirePermissions('PAYMENT_RECONCILE')
   @ApiOperation({ summary: 'Kế toán - Bảng đối soát một ngày, gom theo cửa hàng + kênh + phương thức' })
+  @ApiOkResponse({ type: ReconciliationResponseDto })
   reconciliation(@CurrentUser('userId') userId: string, @Query() query: ReconciliationQueryDto) {
     return this.finance.reconciliation(userId, query);
   }
@@ -48,6 +60,7 @@ export class FinanceAdminController {
   @RequirePermissions('PAYMENT_RECONCILE')
   @ApiConflictResponse({ description: 'Nhóm POS còn ca chưa chốt đối soát' })
   @ApiOperation({ summary: 'Kế toán - Đánh dấu đã đối soát cả nhóm giao dịch (ghi payments.reconciled_at)' })
+  @ApiOkResponse({ type: MarkReconciledResponseDto })
   async mark(@CurrentUser('userId') userId: string, @Body() dto: MarkReconciledDto) {
     const data = await this.finance.mark(userId, dto);
     return { message: `Đã đánh dấu đối soát ${data.marked} giao dịch`, data };

@@ -5,6 +5,8 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
 } from '@nestjs/swagger';
 import { RequirePermissions } from '@core/decorators/require-permissions.decorator';
 import { CreateDepartmentUseCase } from '../../application/use-cases/create-department.use-case';
@@ -29,6 +31,7 @@ export class DepartmentAdminController {
   @Get()
   @RequirePermissions('EMPLOYEE_VIEW')
   @ApiOperation({ summary: 'Admin - Danh sách phòng ban (kèm số nhân viên)' })
+  @ApiOkResponse({ type: [DepartmentResponseDto] })
   async list() {
     return (await this.getDepartments.execute()).map((d) => DepartmentResponseDto.fromDomain(d));
   }
@@ -37,6 +40,7 @@ export class DepartmentAdminController {
   @RequirePermissions('EMPLOYEE_MANAGE', 'SYSTEM_USER_MANAGE')
   @ApiOperation({ summary: 'Admin - Tạo phòng ban' })
   @ApiConflictResponse({ description: 'Tên phòng ban đã tồn tại' })
+  @ApiCreatedResponse({ type: DepartmentResponseDto })
   async create(@Body() dto: CreateDepartmentRequestDto) {
     return DepartmentResponseDto.fromDomain(await this.createDepartment.execute(dto));
   }
@@ -45,6 +49,7 @@ export class DepartmentAdminController {
   @RequirePermissions('EMPLOYEE_MANAGE', 'SYSTEM_USER_MANAGE')
   @ApiOperation({ summary: 'Admin - Sửa phòng ban' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy phòng ban' })
+  @ApiOkResponse({ type: DepartmentResponseDto })
   async update(@Param('id', parseUuidVi) id: string, @Body() dto: UpdateDepartmentRequestDto) {
     return DepartmentResponseDto.fromDomain(await this.updateDepartment.execute(id, dto));
   }
@@ -53,6 +58,7 @@ export class DepartmentAdminController {
   @RequirePermissions('EMPLOYEE_MANAGE', 'SYSTEM_USER_MANAGE')
   @ApiOperation({ summary: 'Admin - Xóa phòng ban (chỉ khi không còn nhân viên)' })
   @ApiConflictResponse({ description: 'Phòng ban còn nhân viên' })
+  @ApiOkResponse({ description: 'Thành công', schema: { type: 'null' } })
   async remove(@Param('id', parseUuidVi) id: string) {
     await this.deleteDepartment.execute(id);
     return { message: 'Đã xóa phòng ban', data: null };

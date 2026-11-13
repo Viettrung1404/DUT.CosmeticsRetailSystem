@@ -6,6 +6,7 @@ import { RequirePermissions } from '@core/decorators/require-permissions.decorat
 import { GetInventoryUseCase } from '../../application/use-cases/get-inventory.use-case';
 import { PosInventoryQueryDto } from '../dtos/inventory-request.dto';
 import { InventoryItemResponseDto } from '../dtos/inventory-response.dto';
+import { ApiPagedOkResponse } from '@core/decorators/api-paged-response.decorator';
 
 @ApiTags('POS - Inventory (Thành Lập)')
 @ApiBearerAuth('JWT-auth')
@@ -17,6 +18,7 @@ export class InventoryPosController {
   @RequirePermissions('INVENTORY_VIEW')
   @ApiOperation({ summary: 'POS - Xem tồn kho tại cửa hàng đang trực' })
   @ApiForbiddenResponse({ description: 'Cửa hàng ngoài phạm vi của bạn' })
+  @ApiPagedOkResponse(InventoryItemResponseDto)
   async getInventory(@CurrentUser('userId') userId: string, @Query() query: PosInventoryQueryDto) {
     const { items, total } = await this.getInventoryUseCase.execute(userId, {
       page: query.page ?? 1,
