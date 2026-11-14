@@ -225,24 +225,34 @@ export class PromotionsService {
           { id: string; price: number }[]
         >`SELECT id,sprint5_variant_price(id,0::numeric)::float8 AS price FROM product_variants WHERE id=ANY(${ids}::uuid[])`
       : [];
-    return active.map((q) => ({
-      serverTime: now.toISOString(),
-      promotionId: q.promotion.id,
-      promotionName: q.promotion.name,
-      endDate: q.promotion.endDate,
-      conditional: Number(q.promotion.minOrderAmount) > 0,
-      remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
-      variantId: q.productVariantId,
-      productId: q.variant.product.id,
-      name: q.variant.product.name,
-      slug: q.variant.product.slug,
-      brandName: q.variant.product.brand?.name ?? null,
-      imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
-      originalPrice: Number(q.variant.price),
-      effectivePrice:
-        prices.find((p) => p.id === q.productVariantId)?.price ??
-        Number(q.variant.price),
-    }));
+    return active.map((q) => {
+      const endMs = new Date(q.promotion.endDate).getTime();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      const effectiveEndDate =
+        endMs > endOfDay.getTime()
+          ? endOfDay.toISOString()
+          : q.promotion.endDate;
+
+      return {
+        serverTime: now.toISOString(),
+        promotionId: q.promotion.id,
+        promotionName: q.promotion.name,
+        endDate: effectiveEndDate,
+        conditional: Number(q.promotion.minOrderAmount) > 0,
+        remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
+        variantId: q.productVariantId,
+        productId: q.variant.product.id,
+        name: q.variant.product.name,
+        slug: q.variant.product.slug,
+        brandName: q.variant.product.brand?.name ?? null,
+        imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
+        originalPrice: Number(q.variant.price),
+        effectivePrice:
+          prices.find((p) => p.id === q.productVariantId)?.price ??
+          Number(q.variant.price),
+      };
+    });
   }
   async active(query: PublicListDto, flash = false) {
     const now = new Date();
@@ -305,18 +315,29 @@ export class PromotionsService {
         >`SELECT id,sprint5_variant_price(id,0::numeric)::float8 AS price FROM product_variants WHERE id=ANY(${ids}::uuid[])`
       : [];
     return {
-      items: items.map((p) => ({
-        ...p,
-        variants: quotas
-          .filter((q) => q.promotionId === p.id)
-          .map((q) => ({
-            variantId: q.productVariantId,
-            remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
-            effectivePrice: prices.find((v) => v.id === q.productVariantId)
-              ?.price,
-            conditional: Number(p.minOrderAmount) > 0,
-          })),
-      })),
+      items: items.map((p) => {
+        const endMs = new Date(p.endDate).getTime();
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+        const effectiveEndDate =
+          flash && endMs > endOfDay.getTime()
+            ? endOfDay.toISOString()
+            : p.endDate;
+
+        return {
+          ...p,
+          endDate: effectiveEndDate,
+          variants: quotas
+            .filter((q) => q.promotionId === p.id)
+            .map((q) => ({
+              variantId: q.productVariantId,
+              remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
+              effectivePrice: prices.find((v) => v.id === q.productVariantId)
+                ?.price,
+              conditional: Number(p.minOrderAmount) > 0,
+            })),
+        };
+      }),
       total,
       page: query.page,
       limit: query.limit,

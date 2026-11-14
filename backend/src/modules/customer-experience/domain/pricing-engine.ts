@@ -8,9 +8,29 @@ import {
 
 export const STORE_SHIPPING_POLICY = {
   fee: 30000,
-  freeFrom: 500000,
+  freeFrom: 459000,
+  tiers: [
+    { minAmount: 459000, discount: 30000, fee: 0 },
+    { minAmount: 359000, discount: 25000, fee: 5000 },
+    { minAmount: 129000, discount: 15000, fee: 15000 },
+  ],
   basis: "AFTER_DISCOUNTS",
 } as const;
+
+export function calculateTierShippingFee(
+  merchandisePayable: number,
+  hasFreeShippingCampaign: boolean = false,
+): number {
+  if (hasFreeShippingCampaign || merchandisePayable >= STORE_SHIPPING_POLICY.freeFrom) {
+    return 0;
+  }
+  for (const tier of STORE_SHIPPING_POLICY.tiers) {
+    if (merchandisePayable >= tier.minAmount) {
+      return tier.fee;
+    }
+  }
+  return STORE_SHIPPING_POLICY.fee;
+}
 
 export interface PriceLine {
   variantId: string;
@@ -242,10 +262,10 @@ export function calculateCommercePrice(input: {
       !c.isFlashSale &&
       lines.some((l) => campaignApplies(c, l)),
   );
-  const shippingFee =
-    merchandisePayable >= STORE_SHIPPING_POLICY.freeFrom || shippingCampaign
-      ? 0
-      : STORE_SHIPPING_POLICY.fee;
+  const shippingFee = calculateTierShippingFee(
+    merchandisePayable,
+    Boolean(shippingCampaign),
+  );
   const pricedLines = lines.map((line, i) => ({
     ...line,
     couponDiscount: couponShares[i],

@@ -76,117 +76,7 @@ export default function OrderScreen({ navigation }: any) {
   const [rmaReason, setRmaReason] = useState('broken');
 
   // Dữ liệu mẫu đơn hàng đồng bộ theo Stitch Design
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 'ord-1',
-      orderCode: 'GLOW-89241',
-      date: '10:30 • Hôm nay',
-      status: 'SHIPPING',
-      statusText: 'Đang vận chuyển',
-      deliveryEta: 'Hôm nay (16:00 - 17:30)',
-      carrier: 'GHN Express',
-      trackingCode: 'GHN88294719VN',
-      shipperName: 'Nguyễn Văn Bình',
-      shipperPhone: '0909123456',
-      shipperRating: '4.9 ★',
-      subtotal: 835000,
-      discount: 65000,
-      shippingFee: 0,
-      totalAmount: 770000,
-      paymentMethod: 'Đã thanh toán qua MoMo',
-      timeline: [
-        {
-          time: '14:20 • Hôm nay',
-          title: 'Đang giao hàng',
-          description:
-            'Tài xế đang giao kiện hàng đến địa chỉ của bạn (Landmark 81, P. 22, Bình Thạnh, TP.HCM). Xin vui lòng chú ý điện thoại.',
-          active: true,
-        },
-        {
-          time: '09:15 • Hôm nay',
-          title: 'Xuất kho vận chuyển',
-          description:
-            'Đơn hàng đã xuất kho Phân phối Mỹ phẩm Tân Bình & đã được bàn giao cho bưu cục GHN Bình Thạnh.',
-        },
-        {
-          time: '07:30 • Hôm nay',
-          title: 'Đóng gói niêm phong',
-          description:
-            'Đơn hàng đã được kiểm tra & đóng gói cẩn thận có dán tem niêm phong chống hàng giả GlowUp Authenticity.',
-        },
-      ],
-      items: [
-        {
-          id: 'i1',
-          name: 'Serum Tinh Chất Rose Berry B5 50ml',
-          categoryTag: 'Tinh chất phục hồi',
-          variant: 'Chai 50ml tinh chất',
-          price: 345000,
-          quantity: 1,
-          imageUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuBAFp77ol43EApZG_P7J0TAjKTI2ZADhWxoSkzsqH-C1pguV4aydmou8H1Bn_II6M0CsxsFH-oo3hYgWgCxmXtcp1VfWXpvnYL3MesIAQ3FiQ1JzSGMoOBTpUXCzxmT1Obi3i27PMuJV-HTbaOIxpEt-f0ibw9n8l7K8ZddtrbPEpHZ4IXfa_-MhthuFlcQeAFark7E1tRSvnIBWubCCZD09vHeB7plhPnapEIAOnMbOr4qerCOMRHf5A',
-        },
-        {
-          id: 'i2',
-          name: 'Son Kem Lì Velvet Tint #04 Muted Rose',
-          categoryTag: 'Son môi mịn lì',
-          variant: 'Màu #04 Rosewood nhung',
-          price: 245000,
-          quantity: 2,
-          imageUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuBOAgFSap5-Sxi3FFsobfBamaHe82GVE_YnV69zeaGjF77FAytLcx-sSHaj4qu9SZe9nwDhAtlhIIMiFwXFfTyuViGWXkpOrF8nkA1n5SXvGFyHRGfdMer7RvPQu4_CPdGVvF2jz1R-eoK_dZ38F37NYgSQMUmug_Wpcx6hwKcz2stBtcuXFjZFbFsFybV1SoZeMd_uzYMECbXDB-xOGdorYP1YTdNvLx-tugwt2fbJVxHBmoXrb_6ZIw',
-        },
-      ],
-    },
-    {
-      id: 'ord-2',
-      orderCode: 'GLOW-731940',
-      date: '14:30 • Hôm qua',
-      status: 'PENDING',
-      statusText: 'Chờ xác nhận',
-      subtotal: 520000,
-      discount: 0,
-      shippingFee: 25000,
-      totalAmount: 545000,
-      paymentMethod: 'Thanh toán khi nhận hàng (COD)',
-      items: [
-        {
-          id: 'i3',
-          name: 'Kem Chống Nắng Nâng Tone Sunscreen SPF50+',
-          categoryTag: 'Bảo vệ da',
-          variant: 'Tuýp 50ml dưỡng sáng',
-          price: 520000,
-          quantity: 1,
-          imageUrl:
-            'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=400',
-        },
-      ],
-    },
-    {
-      id: 'ord-3',
-      orderCode: 'GLOW-612084',
-      date: '02/10/2026',
-      status: 'DELIVERED',
-      statusText: 'Hoàn tất',
-      subtotal: 380000,
-      discount: 30000,
-      shippingFee: 0,
-      totalAmount: 350000,
-      paymentMethod: 'Đã thanh toán qua VNPay',
-      items: [
-        {
-          id: 'i4',
-          name: 'Nước Tẩy Trang Dịu Nhẹ Micellar Water',
-          categoryTag: 'Làm sạch sâu',
-          variant: 'Chai 400ml nắp hồng',
-          price: 380000,
-          quantity: 1,
-          imageUrl:
-            'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400',
-        },
-      ],
-    },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const tabs: { key: OrderStatus; label: string }[] = [
     { key: 'ALL', label: 'Tất cả' },
@@ -204,7 +94,7 @@ export default function OrderScreen({ navigation }: any) {
     try {
       const res = await orderApi.getMyOrders();
       const list = res?.data?.items || res?.data || (Array.isArray(res) ? res : null);
-      if (Array.isArray(list) && list.length > 0) {
+      if (Array.isArray(list)) {
         setOrders(
           list.map((o: any) => ({
             id: o.id,

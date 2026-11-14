@@ -14,6 +14,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     const productIdentifier = slug || productId;
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
     const { addItem } = useCartStore();
     const { toggleWishlist, isInWishlist } = useWishlistStore();
@@ -36,21 +37,9 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 )?.id
                     || null,
             );
-        } catch {
-            // Mock Fallback
-            setProduct({
-                id: slug || 'prod-vc',
-                name: 'GlowUp Vitamin C Glow Serum',
-                brand: 'GlowUp Beauty',
-                rating: 4.9,
-                reviews_count: 128,
-                price: 350000,
-                original_price: 450000,
-                description: 'Serum dưỡng sáng da GlowUp với 10% Vitamin C nguyên chất kết hợp Niacinamide và Hyaluronic Acid giúp làm mờ vết thâm, cấp ẩm và mang lại làn da căng bóng ngậm nước.',
-                variants: [],
-                image_url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
-                ingredients: ['Vitamin C 10%', 'Niacinamide 5%', 'Hyaluronic Acid', 'Chiết xuất hoa hồng Rose Berry'],
-            });
+        } catch (err: any) {
+            setError(err?.response?.data?.message || err?.message || 'Không thể tải thông tin sản phẩm. Vui lòng kiểm tra lại kết nối mạng.');
+            setProduct(null);
         } finally {
             setLoading(false);
         }
@@ -149,6 +138,29 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         return (
             <View style={styles.center}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
+            </View>
+        );
+    }
+
+    if (!product || error) {
+        return (
+            <View style={[styles.center, { padding: SPACING.xl }]}>
+                <Ionicons name="alert-circle-outline" size={64} color={COLORS.textMuted} />
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary, marginTop: SPACING.md, textAlign: 'center' }}>
+                    {error || 'Không tìm thấy thông tin sản phẩm'}
+                </Text>
+                <TouchableOpacity
+                    style={{ backgroundColor: COLORS.primary, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: 8, marginTop: SPACING.lg }}
+                    onPress={fetchDetail}
+                >
+                    <Text style={{ color: COLORS.surface, fontWeight: '600' }}>Thử lại</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={{ marginTop: SPACING.md }}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Text style={{ color: COLORS.textMuted }}>Quay lại</Text>
+                </TouchableOpacity>
             </View>
         );
     }

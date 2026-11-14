@@ -382,8 +382,8 @@ export function CheckoutPage() {
             <p className="checkout-shipping-note">
               {quote?.shippingPolicy && (
                 <>
-                  Phí tiêu chuẩn {formatPrice(quote.shippingPolicy.fee)}. Miễn phí từ{" "}
-                  {formatPrice(quote.shippingPolicy.freeFrom)} tiền hàng sau ưu đãi và xu.{" "}
+                  Phí tiêu chuẩn {formatPrice(quote.shippingPolicy.fee)}. Đơn từ 129k giảm 15k · từ 359k giảm 25k · từ{" "}
+                  {formatPrice(quote.shippingPolicy.freeFrom)} miễn phí toàn quốc.{" "}
                 </>
               )}
               Cửa hàng sẽ xác nhận lịch giao khi xử lý đơn.

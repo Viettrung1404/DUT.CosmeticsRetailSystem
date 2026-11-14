@@ -18,6 +18,7 @@ export const routes = {
   help: "/help",
   cart: "/cart",
   checkout: "/checkout",
+  orderTracking: "/order-tracking",
   paymentReturn: "/payment/return",
   login: "/login",
   register: "/register",

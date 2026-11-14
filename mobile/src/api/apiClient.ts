@@ -19,7 +19,7 @@ export const getBaseUrl = (): string => {
   }
 
   // Mặc định IP mạng LAN cho thiết bị di động (cùng mạng Wi-Fi với máy tính)
-  return 'http://192.168.110.249:3000/api/v1';
+  return 'http://192.168.1.3:3000/api/v1';
 };
 
 export const BASE_URL = getBaseUrl();

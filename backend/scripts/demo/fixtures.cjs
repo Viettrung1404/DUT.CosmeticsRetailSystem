@@ -3,6 +3,11 @@ const demoId=(kind,key)=>id(`demo-v1:${kind}:${key}`);
 const ANCHOR=new Date('2026-10-27T03:00:00Z');
 const ACTIVE_START=new Date('2026-10-01T00:00:00Z');
 const ACTIVE_END=new Date('2027-10-27T00:00:00Z');
+const FLASH_SALE_END=(()=>{
+  const d=new Date();
+  d.setHours(23,59,59,999);
+  return d;
+})();
 
 const SETTINGS=[
   {key:'loyalty_config',group:'loyalty',value:{point_rate:0.01,point_value_vnd:1}},
@@ -121,4 +126,4 @@ const BLOGS=[
  ]],
 ].map(([slug,title,categorySlug,excerpt,sections],i)=>({id:demoId('blog',slug),slug,title,categorySlug,excerpt,content:sections.map(([heading,text])=>`<h2>${heading}</h2><p>${text}</p>`).join(''),publishedAt:new Date(ANCHOR.getTime()-(i+1)*86400000)}));
 
-module.exports={demoId,ANCHOR,ACTIVE_START,ACTIVE_END,SETTINGS,PAGES,FAQS,BLOG_CATEGORIES,BLOGS};
+module.exports={demoId,ANCHOR,ACTIVE_START,ACTIVE_END,FLASH_SALE_END,SETTINGS,PAGES,FAQS,BLOG_CATEGORIES,BLOGS};

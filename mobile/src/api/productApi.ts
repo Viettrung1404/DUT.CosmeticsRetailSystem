@@ -11,6 +11,7 @@ export interface NormalizedProduct {
   imageUrl: string;
   rating: number;
   reviewsCount: number;
+  totalSold?: number;
   variants?: any[];
   description?: string;
 }
@@ -52,6 +53,7 @@ export const extractProductList = (res: any): NormalizedProduct[] => {
       'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
     rating: item.avgRating ?? item.rating ?? 5.0,
     reviewsCount: item.totalReviews ?? item.reviewsCount ?? item.reviews_count ?? 0,
+    totalSold: item.totalSold ?? 0,
     variants: item.variants || [],
     description: item.description || item.shortDescription || '',
   }));
@@ -112,6 +114,12 @@ export const productApi = {
   // 4. Lấy cây danh mục sản phẩm (Skincare, Son môi, Chống nắng...)
   getCategories: async () => {
     const response = await apiClient.get('/categories/tree');
+    return response.data;
+  },
+
+  // 5. Lấy danh sách Flash Sale cards
+  getFlashSaleCards: async (limit: number = 5) => {
+    const response = await apiClient.get('/promotions/flash-sale/cards', { params: { limit } });
     return response.data;
   },
 };

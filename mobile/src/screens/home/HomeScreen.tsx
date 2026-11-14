@@ -49,6 +49,7 @@ interface Product {
   avgRating?: number;
   totalReviews?: number;
   reviews_count?: number;
+  totalSold?: number;
 }
 
 // ─── Hero Banner data ────────────────────────────────────────────────────────
@@ -392,38 +393,116 @@ const catCardStyles = StyleSheet.create({
 });
 
 // ─── FlashDealBanner ─────────────────────────────────────────────────────────
-function FlashDealBanner({ onPress }: { onPress: () => void }) {
-  const [secs, setSecs] = useState(3600 * 4 + 23 * 60 + 15);
+function FlashDealBanner({
+  onPress,
+  onSelectProduct,
+}: {
+  onPress: () => void;
+  onSelectProduct?: (product: any) => void;
+}) {
+  const [cards, setCards] = useState<any[]>([]);
+  const [secs, setSecs] = useState<number | null>(null);
+
   useEffect(() => {
-    const t = setInterval(() => setSecs((s) => Math.max(s - 1, 0)), 1000);
-    return () => clearInterval(t);
+    let timer: any;
+    productApi.getFlashSaleCards(6).then((res: any) => {
+      const list = res?.data || res || [];
+      if (Array.isArray(list) && list.length > 0) {
+        setCards(list);
+        const first = list[0];
+        if (first.endDate) {
+          const serverMs = first.serverTime ? new Date(first.serverTime).getTime() : Date.now();
+          const offsetMs = Date.now() - serverMs;
+          const targetMs = new Date(first.endDate).getTime();
+
+          const calcSecs = () => Math.max(0, Math.floor((targetMs - (Date.now() - offsetMs)) / 1000));
+          setSecs(calcSecs());
+
+          timer = setInterval(() => {
+            const rem = calcSecs();
+            setSecs(rem);
+            if (rem <= 0) clearInterval(timer);
+          }, 1000);
+        }
+      }
+    }).catch(() => {
+      setSecs(3600 * 2);
+    });
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, []);
-  const h = String(Math.floor(secs / 3600)).padStart(2, '0');
-  const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
-  const s = String(secs % 60).padStart(2, '0');
+
+  const safeSecs = secs ?? (3600 * 2);
+  const h = String(Math.floor(safeSecs / 3600)).padStart(2, '0');
+  const m = String(Math.floor((safeSecs % 3600) / 60)).padStart(2, '0');
+  const s = String(safeSecs % 60).padStart(2, '0');
 
   return (
-    <TouchableOpacity style={flashStyles.card} onPress={onPress} activeOpacity={0.9}>
-      <View style={{ flex: 1, paddingRight: 6 }}>
-        <Text style={flashStyles.kicker}>ƯU ĐÃI DÀNH CHO BẠN</Text>
-        <Text style={flashStyles.heading}>DEAL ĐẸP CÓ HẠN ⚡</Text>
-      </View>
-      <View style={flashStyles.timerRow}>
-        {[h, m, s].map((unit, i) => (
-          <React.Fragment key={i}>
-            <View style={flashStyles.timeBox}>
-              <Text style={flashStyles.timeNum}>{unit}</Text>
-            </View>
-            {i < 2 && <Text style={flashStyles.colon}>:</Text>}
-          </React.Fragment>
-        ))}
-      </View>
-      <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
-    </TouchableOpacity>
+    <View style={flashStyles.wrapper}>
+      <TouchableOpacity style={flashStyles.card} onPress={onPress} activeOpacity={0.9}>
+        <View style={{ flex: 1, paddingRight: 6 }}>
+          <Text style={flashStyles.kicker}>ƯU ĐÃI DÀNH CHO BẠN</Text>
+          <Text style={flashStyles.heading}>DEAL ĐẸP CÓ HẠN ⚡</Text>
+        </View>
+        <View style={flashStyles.timerRow}>
+          {[h, m, s].map((unit, i) => (
+            <React.Fragment key={i}>
+              <View style={flashStyles.timeBox}>
+                <Text style={flashStyles.timeNum}>{unit}</Text>
+              </View>
+              {i < 2 && <Text style={flashStyles.colon}>:</Text>}
+            </React.Fragment>
+          ))}
+        </View>
+        <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
+      </TouchableOpacity>
+
+      {cards.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={flashStyles.cardList}
+        >
+          {cards.map((c) => (
+            <TouchableOpacity
+              key={c.variantId || c.productId}
+              style={flashStyles.dealItem}
+              onPress={() => onSelectProduct?.(c)}
+              activeOpacity={0.85}
+            >
+              <View style={flashStyles.imgBox}>
+                <Image
+                  source={{ uri: c.imageUrl || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400' }}
+                  style={flashStyles.dealImg}
+                />
+                <View style={flashStyles.saleBadge}>
+                  <Text style={flashStyles.saleBadgeText}>-15%</Text>
+                </View>
+              </View>
+              <Text numberOfLines={1} style={flashStyles.dealName}>{c.name}</Text>
+              <Text style={flashStyles.dealPrice}>{(c.effectivePrice || c.originalPrice)?.toLocaleString('vi-VN')}đ</Text>
+              {c.originalPrice && c.effectivePrice && c.originalPrice > c.effectivePrice ? (
+                <Text style={flashStyles.dealOriginalPrice}>{c.originalPrice.toLocaleString('vi-VN')}đ</Text>
+              ) : null}
+              {c.remaining != null && (
+                <View style={flashStyles.quotaBadge}>
+                  <Text style={flashStyles.quotaText}>Còn {c.remaining} suất</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
 const flashStyles = StyleSheet.create({
+  wrapper: {
+    marginBottom: SPACING.xs,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -432,7 +511,7 @@ const flashStyles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     borderRadius: 16,
     padding: SPACING.sm + 4,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   kicker: {
     fontSize: 9,
@@ -453,6 +532,76 @@ const flashStyles = StyleSheet.create({
   },
   timeNum: { color: '#fff', fontWeight: '800', fontSize: 12 },
   colon: { color: '#fff', fontWeight: '900', fontSize: 14, marginHorizontal: 2 },
+  cardList: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xs,
+    gap: SPACING.sm,
+  },
+  dealItem: {
+    width: 130,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  imgBox: {
+    position: 'relative',
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  dealImg: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  saleBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  saleBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  dealName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  dealPrice: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  dealOriginalPrice: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    textDecorationLine: 'line-through',
+    marginBottom: 4,
+  },
+  quotaBadge: {
+    backgroundColor: '#FFF0F0',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  quotaText: {
+    color: COLORS.primary,
+    fontSize: 9,
+    fontWeight: '600',
+  },
 });
 
 // ─── ProductCard ─────────────────────────────────────────────────────────────
@@ -488,6 +637,11 @@ function ProductCard({ item, onPress }: { item: Product; onPress: () => void }) 
         <View style={prodCardStyles.ratingRow}>
           <Ionicons name="star" size={11} color="#FFD700" />
           <Text style={prodCardStyles.ratingTxt}>{rating.toFixed(1)}</Text>
+          {Boolean(item.totalSold && item.totalSold > 0) && (
+            <Text style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>
+              • Đã bán {item.totalSold >= 1000 ? `${(item.totalSold / 1000).toFixed(1)}k` : item.totalSold}
+            </Text>
+          )}
         </View>
         <View style={prodCardStyles.priceRow}>
           <Text style={prodCardStyles.price}>{formatPrice(price)}</Text>
@@ -767,7 +921,10 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* Flash Deal Banner (DEAL ĐẸP CÓ HẠN) */}
         <View style={styles.section}>
-          <FlashDealBanner onPress={goToCatalog} />
+          <FlashDealBanner
+            onPress={goToCatalog}
+            onSelectProduct={(c) => navigation.navigate('ProductDetail', { slug: c.slug || c.productId })}
+          />
         </View>
 
         {/* Bán Chạy Nhất (Bestsellers) */}

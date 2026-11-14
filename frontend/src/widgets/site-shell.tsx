@@ -157,7 +157,7 @@ export function SiteHeader({
               <nav aria-label="Liên kết thêm">
                 <Link href="/products">Tất cả sản phẩm</Link>
                 <Link href="/flash-sale">Flash Sale</Link>
-                <Link href="/account/orders">Tra cứu đơn hàng</Link>
+                <Link href="/order-tracking">Tra cứu đơn hàng</Link>
                 <Link href="/account/notifications">Thông báo</Link>
                 <Link href="/help">Trung tâm hỗ trợ</Link>
               </nav>
@@ -297,7 +297,7 @@ export function SiteHeader({
             { href: "/stores", label: "Hệ thống cửa hàng" },
             { href: "/blog", label: "Góc làm đẹp" },
             { href: "/account", label: "Tài khoản của tôi" },
-            { href: "/account/orders", label: "Tra cứu đơn hàng" },
+            { href: "/order-tracking", label: "Tra cứu đơn hàng" },
             { href: "/wishlist", label: "Sản phẩm yêu thích" },
             { href: "/account/notifications", label: "Thông báo" },
           ].map((item) => (
@@ -371,7 +371,7 @@ const footerGroups = [
     links: [
       ["Hướng dẫn đặt hàng", "/help"],
       ["Câu hỏi thường gặp (FAQ)", "/faq"],
-      ["Tra cứu tình trạng đơn hàng", "/account/orders"],
+      ["Tra cứu tình trạng đơn hàng", "/order-tracking"],
       ["Trung tâm hỗ trợ", "/help"],
       ["Chính sách đổi trả", "/chinh-sach-doi-tra"],
     ],

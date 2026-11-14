@@ -87,4 +87,17 @@ export class GuestCheckoutController {
   ) {
     return this.payments.statusGuest(session, id);
   }
+
+  @Post('orders/track')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Tra cứu thông tin đơn hàng bằng Mã đơn hàng và Số điện thoại',
+  })
+  track(
+    @Body('orderNumber') orderNumber: string,
+    @Body('phone') phone: string,
+  ) {
+    return this.checkout.trackOrder(orderNumber, phone);
+  }
 }

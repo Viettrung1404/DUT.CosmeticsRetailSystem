@@ -57,6 +57,9 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="catalog-rating">
           ★ <span>{product.avgRating.toFixed(1)}</span>
           <small>({product.totalReviews})</small>
+          {Boolean(product.totalSold && product.totalSold > 0) && (
+            <span className="catalog-sold"> · Đã bán {product.totalSold >= 1000 ? `${(product.totalSold / 1000).toFixed(1)}k` : product.totalSold}</span>
+          )}
         </div>
         <div className="catalog-prices">
           <strong>{formatPrice(price)}</strong>
