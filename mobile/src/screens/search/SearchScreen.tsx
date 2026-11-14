@@ -38,74 +38,6 @@ interface SearchProduct {
   image: string;
 }
 
-// Mock data cho fallback khi offline hoặc search chưa có kết quả backend
-const MOCK_SEARCH_PRODUCTS: SearchProduct[] = [
-  {
-    id: 'prod-s-1',
-    name: 'GlowUp Radiance C-Serum 30ml',
-    brand: 'GLOWUP LAB',
-    price: 485000,
-    originalPrice: 650000,
-    rating: 4.9,
-    reviewsCount: 1250,
-    badge: 'Best Seller',
-    tag: 'Sáng da & Mờ thâm',
-    category: 'Serum',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  },
-  {
-    id: 'prod-s-2',
-    name: 'Glass Skin Barrier Cream 50g',
-    brand: 'GLOWUP LAB',
-    price: 390000,
-    originalPrice: 450000,
-    rating: 4.8,
-    reviewsCount: 860,
-    badge: 'Clean 100%',
-    tag: 'Phục hồi & Khóa ẩm',
-    category: 'Kem dưỡng',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-  },
-  {
-    id: 'prod-s-3',
-    name: 'Hydrating Petal Toner Mist 150ml',
-    brand: 'ANUA',
-    price: 295000,
-    originalPrice: 350000,
-    rating: 4.7,
-    reviewsCount: 420,
-    badge: 'Thuần chay',
-    tag: 'Cấp ẩm sâu',
-    category: 'Toner',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  },
-  {
-    id: 'prod-s-4',
-    name: 'Velvet Cloud Matte Lipstick #04 Rosewood',
-    brand: '3CE',
-    price: 340000,
-    originalPrice: 390000,
-    rating: 4.9,
-    reviewsCount: 2100,
-    badge: 'Trending',
-    tag: 'Lâu trôi',
-    category: 'Son môi',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-  },
-  {
-    id: 'prod-s-5',
-    name: 'Anthelios UV Mune 400 Oil Control 50ml',
-    brand: "LA ROCHE-POSAY",
-    price: 495000,
-    originalPrice: 535000,
-    rating: 4.9,
-    reviewsCount: 3500,
-    badge: 'Bác sĩ khuyên dùng',
-    tag: 'Kiềm dầu 12H',
-    category: 'Chống nắng',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  },
-];
 
 const TRENDING_KEYWORDS = [
   'Serum B5 phục hồi',
@@ -140,8 +72,36 @@ export default function SearchScreen({ navigation }: any) {
   ]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState<SearchProduct[]>(MOCK_SEARCH_PRODUCTS);
+  const [results, setResults] = useState<SearchProduct[]>([]);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [suggestedProducts, setSuggestedProducts] = useState<SearchProduct[]>([]);
+
+  useEffect(() => {
+    productApi.getProducts({ limit: 4 }).then((res) => {
+      const items = res?.data?.data || res?.data || res?.items || [];
+      if (Array.isArray(items) && items.length > 0) {
+        setSuggestedProducts(
+          items.map((it: any) => ({
+            id: it.id,
+            slug: it.slug || it.id,
+            name: it.name,
+            brand: it.brandName || 'GlowUp',
+            price: Number(it.salePrice || it.basePrice || it.price) || 0,
+            originalPrice: Number(it.basePrice) || undefined,
+            rating: Number(it.avgRating) || 5.0,
+            reviewsCount: Number(it.totalReviews) || 0,
+            badge: it.isFeatured ? 'Nổi bật' : 'Mới',
+            tag: it.categoryName || 'Mỹ phẩm',
+            category: it.categoryName || 'Mỹ phẩm',
+            image:
+              it.primaryImage ||
+              it.image_url ||
+              'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+          }))
+        );
+      }
+    }).catch(() => {});
+  }, []);
 
   // Filter States
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([]);
@@ -199,29 +159,15 @@ export default function SearchScreen({ navigation }: any) {
                 item.thumbnail ||
                 item.images?.[0]?.imageUrl ||
                 item.images?.[0]?.url ||
-                MOCK_SEARCH_PRODUCTS[0].image,
+                'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
             };
           })
         );
       } else {
-        // Fallback filter trên mock data
-        const filtered = MOCK_SEARCH_PRODUCTS.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q.toLowerCase()) ||
-            p.brand.toLowerCase().includes(q.toLowerCase()) ||
-            p.tag.toLowerCase().includes(q.toLowerCase())
-        );
-        setResults(filtered.length > 0 ? filtered : MOCK_SEARCH_PRODUCTS);
+        setResults([]);
       }
     } catch {
-      // Offline fallback
-      const filtered = MOCK_SEARCH_PRODUCTS.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q.toLowerCase()) ||
-          p.brand.toLowerCase().includes(q.toLowerCase()) ||
-          p.tag.toLowerCase().includes(q.toLowerCase())
-      );
-      setResults(filtered.length > 0 ? filtered : MOCK_SEARCH_PRODUCTS);
+      setResults([]);
     } finally {
       setIsLoading(false);
     }
@@ -251,7 +197,7 @@ export default function SearchScreen({ navigation }: any) {
     setFilterModalVisible(false);
     setIsLoading(true);
     setTimeout(() => {
-      let filtered = [...MOCK_SEARCH_PRODUCTS];
+      let filtered = results.length > 0 ? [...results] : [...suggestedProducts];
 
       if (selectedBrands.length > 0) {
         filtered = filtered.filter((p) =>
@@ -529,7 +475,7 @@ export default function SearchScreen({ navigation }: any) {
           <View style={[styles.section, { marginBottom: 40 }]}>
             <Text style={styles.sectionTitle}>Sản phẩm gợi ý cho bạn</Text>
             <View style={styles.suggestedGrid}>
-              {MOCK_SEARCH_PRODUCTS.slice(0, 4).map((p) => (
+              {(suggestedProducts.length > 0 ? suggestedProducts : []).slice(0, 4).map((p) => (
                 <View key={p.id} style={styles.suggestedCardWrapper}>
                   {renderProductItem({ item: p })}
                 </View>

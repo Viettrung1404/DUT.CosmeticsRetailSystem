@@ -130,7 +130,8 @@ describe('Sprint 5 shared pricing engine', () => {
       couponDiscount: 10000,
       pointsUsed: 100000,
       pointsDiscount: 100000,
-      totalAmount: 160000,
+      shippingFee: 15000,
+      totalAmount: 145000,
     });
     expect(quote.items[0]).toMatchObject({
       cashValue: 130000,
@@ -162,10 +163,12 @@ describe('Sprint 5 shared pricing engine', () => {
     });
   });
   it('checks free shipping threshold after all discounts', () => {
-    expect(price({ lines: [line('v1', 500000)] }).shippingFee).toBe(0);
+    expect(price({ lines: [line('v1', 459000)] }).shippingFee).toBe(0);
     expect(
-      price({ lines: [line('v1', 500000)], tierPercentage: 1 }).shippingFee,
-    ).toBe(30000);
+      price({ lines: [line('v1', 459000)], tierPercentage: 1 }).shippingFee,
+    ).toBe(5000);
+    expect(price({ lines: [line('v1', 200000)] }).shippingFee).toBe(15000);
+    expect(price({ lines: [line('v1', 100000)] }).shippingFee).toBe(30000);
   });
   it('preserves allocated money and whole point units across partial-return snapshots', () => {
     const quote = price({
@@ -183,7 +186,7 @@ describe('Sprint 5 shared pricing engine', () => {
   it('uses the same minimum balance, step and half-order limit as POS', () => {
     const order = { lines: [line('v1', 300000)] };
     expect(price({ ...order, pointsRequested: 150000, availablePoints: 320000 }))
-      .toMatchObject({ pointsDiscount: 150000, totalAmount: 180000 });
+      .toMatchObject({ pointsDiscount: 150000, shippingFee: 15000, totalAmount: 165000 });
     expect(() => price({ ...order, pointsRequested: 300000, availablePoints: 320000 }))
       .toThrow('50%');
     expect(() => price({ ...order, pointsRequested: 10000, availablePoints: 30000 }))

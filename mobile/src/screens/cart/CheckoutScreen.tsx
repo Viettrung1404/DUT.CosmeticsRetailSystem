@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,11 +33,54 @@ export default function CheckoutScreen({ navigation }: any) {
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'SEPAY'>('COD');
   const [voucherCode, setVoucherCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [quoteVersion, setQuoteVersion] = useState<string>('');
+  const [serverShippingFee, setServerShippingFee] = useState<number | null>(null);
+  const [serverDiscount, setServerDiscount] = useState<number>(0);
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+
+  const fetchPreview = useCallback(async () => {
+    if (selectedItems.length === 0) return;
+    try {
+      setPreviewLoading(true);
+      const res = await orderApi.previewOrder({
+        items: selectedItems.map((it) => ({
+          variantId: it.variantId || it.id,
+          quantity: it.quantity,
+        })),
+        couponCode: voucherCode.trim() || undefined,
+      });
+      const data = res?.data || res;
+      if (data?.quoteVersion) {
+        setQuoteVersion(data.quoteVersion);
+      }
+      if (typeof data?.shippingFee === 'number') {
+        setServerShippingFee(data.shippingFee);
+      }
+      if (typeof data?.discountAmount === 'number') {
+        setServerDiscount(data.discountAmount);
+      }
+    } catch (err) {
+      console.warn('Preview order failed', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [selectedItems, voucherCode]);
+
+  useEffect(() => {
+    fetchPreview();
+  }, [fetchPreview]);
 
   // Tính toán chi phí
   const subtotal = getTotalPrice();
-  const shippingFee = shippingOption === 'EXPRESS' ? 0 : 0; // Khuyến mãi Freeship Silk-drop 0đ
-  const grandTotal = Math.max(subtotal + shippingFee, 0);
+  const tierShippingFee = (() => {
+    if (serverShippingFee !== null) return serverShippingFee;
+    if (subtotal >= 459000) return 0;
+    if (subtotal >= 359000) return 5000;
+    if (subtotal >= 129000) return 15000;
+    return 30000;
+  })();
+  const shippingFee = shippingOption === 'EXPRESS' ? tierShippingFee + 15000 : tierShippingFee;
+  const grandTotal = Math.max(subtotal - serverDiscount + shippingFee, 0);
 
   const handleApplyVoucher = () => {
     if (!voucherCode.trim()) {
@@ -62,6 +105,24 @@ export default function CheckoutScreen({ navigation }: any) {
 
     try {
       // Đơn hàng lấy các mặt hàng đã chọn từ giỏ hàng phía máy chủ.
+      // Lấy báo giá hợp lệ (quoteVersion) nếu chưa có sẵn
+      let activeQuoteVersion = quoteVersion;
+      if (!activeQuoteVersion) {
+        try {
+          const previewRes = await orderApi.previewOrder({
+            items: selectedItems.map((it) => ({
+              variantId: it.variantId || it.id,
+              quantity: it.quantity,
+            })),
+            couponCode: voucherCode.trim() || undefined,
+          });
+          const previewData = previewRes?.data || previewRes;
+          activeQuoteVersion = previewData?.quoteVersion;
+        } catch {
+          // fallback
+        }
+      }
+
       const response = await orderApi.createOrder({
         shippingAddress: {
           recipientName: fullName.trim(),
@@ -70,6 +131,7 @@ export default function CheckoutScreen({ navigation }: any) {
           city: city.trim(),
         },
         paymentMethod: paymentMethod === 'COD' ? 'COD' : 'SEPAY',
+        quoteVersion: activeQuoteVersion || undefined,
         note: deliveryPreference === 'OFFICE' ? 'Giao giờ hành chính' : 'Gọi trước 15p',
       });
 
@@ -83,6 +145,8 @@ export default function CheckoutScreen({ navigation }: any) {
       clearCart();
 
       navigation.replace('OrderSuccess', {
+        orderId: createdOrder?.id,
+        rawPaymentMethod: paymentMethod,
         orderCode: serverOrderCode,
         totalAmount: Number.isFinite(Number(createdOrder?.totalAmount))
           ? Number(createdOrder.totalAmount)
@@ -412,8 +476,10 @@ export default function CheckoutScreen({ navigation }: any) {
           </View>
 
           <View style={styles.summaryLine}>
-            <Text style={styles.summaryLabel}>Phí vận chuyển (Freeship):</Text>
-            <Text style={[styles.summaryVal, { color: theme.colors.success }]}>Miễn phí</Text>
+            <Text style={styles.summaryLabel}>Phí vận chuyển:</Text>
+            <Text style={[styles.summaryVal, shippingFee === 0 && { color: theme.colors.success }]}>
+              {shippingFee === 0 ? 'Miễn phí' : `${shippingFee.toLocaleString('vi-VN')} đ`}
+            </Text>
           </View>
 
           <View style={[styles.summaryLine, styles.totalLine]}>

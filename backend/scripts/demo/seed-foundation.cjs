@@ -3,7 +3,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const bcrypt=require('bcrypt');
 const {PrismaClient}=require('@prisma/client');
-const {demoId,ANCHOR,ACTIVE_START,ACTIVE_END,SETTINGS,PAGES,FAQS,BLOG_CATEGORIES,BLOGS}=require('./fixtures.cjs');
+const {demoId,ANCHOR,ACTIVE_START,ACTIVE_END,FLASH_SALE_END,SETTINGS,PAGES,FAQS,BLOG_CATEGORIES,BLOGS}=require('./fixtures.cjs');
 const ROOT=path.resolve(__dirname,'../../.demo-data');
 const db=new PrismaClient();
 const encode=value=>JSON.stringify(value,(_,v)=>typeof v==='bigint'?v.toString():v);
@@ -120,7 +120,7 @@ async function main(){
     const promotions=[
       {id:demoId('promotion','skincare'),name:'GlowUp Demo — Chăm sóc da -10%',type:'PERCENTAGE',value:10,minOrderAmount:0,maxDiscountAmount:100000,startDate:ACTIVE_START,endDate:ACTIVE_END,usageLimit:1000,applicableProducts:selection.slice(0,6).map(p=>p.id)},
       {id:demoId('promotion','shipping'),name:'GlowUp Demo — Miễn phí giao đơn từ 300K',type:'FREE_SHIPPING',value:0,minOrderAmount:300000,startDate:ACTIVE_START,endDate:ACTIVE_END,usageLimit:1000},
-      {id:demoId('promotion','flash'),name:'GlowUp Demo — Flash sale chọn lọc -15%',type:'PERCENTAGE',value:15,minOrderAmount:0,maxDiscountAmount:80000,isFlashSale:true,startDate:ACTIVE_START,endDate:ACTIVE_END,usageLimit:200,applicableProducts:selection.slice(6,9).map(p=>p.id)},
+      {id:demoId('promotion','flash'),name:'GlowUp Demo — Flash sale chọn lọc -15%',type:'PERCENTAGE',value:15,minOrderAmount:0,maxDiscountAmount:80000,isFlashSale:true,startDate:ACTIVE_START,endDate:FLASH_SALE_END,usageLimit:200,applicableProducts:selection.slice(6,9).map(p=>p.id)},
       {id:demoId('promotion','expired'),name:'GlowUp Demo — Chương trình đã kết thúc',type:'PERCENTAGE',value:5,minOrderAmount:0,startDate:new Date('2026-09-01T00:00:00Z'),endDate:new Date('2026-09-30T00:00:00Z')},
     ];
     const priorPromotionCount=await tx.promotion.count({where:{id:{in:promotions.map(p=>p.id)}}});

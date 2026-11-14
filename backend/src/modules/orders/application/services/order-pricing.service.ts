@@ -65,7 +65,7 @@ export class OrderPricingService {
     }
     return value;
   }
-  private readonly FREE_SHIPPING_THRESHOLD = 500000;
+  private readonly FREE_SHIPPING_THRESHOLD = 459000;
   private readonly STANDARD_SHIPPING_FEE = 30000;
 
   calculatePricing(input: CalculatePricingInput): OrderPricingResult {
@@ -84,9 +84,15 @@ export class OrderPricingService {
       )
       .toNumber();
 
-    // 2. Calculate Shipping Fee
-    const shippingFee =
-      subtotal >= this.FREE_SHIPPING_THRESHOLD ? 0 : this.STANDARD_SHIPPING_FEE;
+    // 2. Calculate Tiered Shipping Fee (129k -> -15k, 359k -> -25k, 459k -> Freeship)
+    let shippingFee = this.STANDARD_SHIPPING_FEE;
+    if (subtotal >= 459000) {
+      shippingFee = 0;
+    } else if (subtotal >= 359000) {
+      shippingFee = 5000;
+    } else if (subtotal >= 129000) {
+      shippingFee = 15000;
+    }
 
     // 3. Calculate Coupon Discount
     let discountAmount = 0;

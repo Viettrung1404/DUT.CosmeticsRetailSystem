@@ -271,6 +271,74 @@ export class CommerceCheckoutService {
     };
   }
 
+  async trackOrder(orderNumber: string, phone: string) {
+    if (!orderNumber || !phone) {
+      throw new BadRequestException("Mã đơn hàng và số điện thoại là bắt buộc");
+    }
+    const cleanOrderNumber = orderNumber.trim();
+    const cleanPhone = phone.replace(/\D/g, "");
+
+    const order = await this.db.order.findFirst({
+      where: {
+        orderNumber: { equals: cleanOrderNumber, mode: "insensitive" },
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        createdAt: true,
+        subtotal: true,
+        discountAmount: true,
+        shippingFee: true,
+        taxAmount: true,
+        totalAmount: true,
+        shippingAddress: true,
+        items: {
+          select: {
+            id: true,
+            productVariantId: true,
+            productName: true,
+            variantName: true,
+            quantity: true,
+            unitPrice: true,
+            discountAmount: true,
+            totalPrice: true,
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          select: { id: true, paymentMethod: true, status: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Không tìm thấy đơn hàng");
+    }
+
+    const addr = order.shippingAddress as any;
+    const orderPhone = (addr?.phone || "").replace(/\D/g, "");
+    if (!orderPhone || !cleanPhone || !orderPhone.endsWith(cleanPhone.slice(-7))) {
+      throw new NotFoundException("Thông tin số điện thoại không trùng khớp với đơn hàng");
+    }
+
+    return {
+      ...order,
+      subtotal: Number(order.subtotal),
+      discountAmount: Number(order.discountAmount),
+      shippingFee: Number(order.shippingFee),
+      taxAmount: Number(order.taxAmount),
+      totalAmount: Number(order.totalAmount),
+      items: order.items.map((item) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        discountAmount: Number(item.discountAmount),
+        totalPrice: Number(item.totalPrice),
+      })),
+      payments: order.payments,
+    };
+  }
+
   private async commit(
     tx: Prisma.TransactionClient,
     input: CheckoutCreate,

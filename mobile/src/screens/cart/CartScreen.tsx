@@ -54,9 +54,48 @@ export default function CartScreen({ navigation }: any) {
   const selectedCount = getSelectedCount();
 
   // Ngưỡng Freeship theo Stitch Design (Mục tiêu 1.000.000đ)
-  const FREESHIP_TARGET = 1000000;
+  // Ngưỡng Freeship bậc thang: 129k -> giảm 15k, 359k -> giảm 25k, 459k -> Freeship toàn quốc
+  const getFreeshipProgress = (amount: number) => {
+    if (amount >= 459000) {
+      return {
+        target: 459000,
+        remaining: 0,
+        percent: 100,
+        label: 'Freeship toàn quốc',
+        nextTier: 'Đã đạt Freeship toàn quốc',
+      };
+    }
+    if (amount >= 359000) {
+      return {
+        target: 459000,
+        remaining: 459000 - amount,
+        percent: Math.min(Math.round((amount / 459000) * 100), 100),
+        label: 'Freeship 25k (Đạt)',
+        nextTier: 'Freeship toàn quốc',
+      };
+    }
+    if (amount >= 129000) {
+      return {
+        target: 359000,
+        remaining: 359000 - amount,
+        percent: Math.min(Math.round((amount / 359000) * 100), 100),
+        label: 'Freeship 15k (Đạt)',
+        nextTier: 'Freeship 25k',
+      };
+    }
+    return {
+      target: 129000,
+      remaining: 129000 - amount,
+      percent: Math.min(Math.round((amount / 129000) * 100), 100),
+      label: 'Phí chuẩn 30k',
+      nextTier: 'Freeship 15k',
+    };
+  };
+
+  const freeshipInfo = getFreeshipProgress(totalPrice);
+  const FREESHIP_TARGET = freeshipInfo.target;
   const progressPercent = Math.min(Math.round((totalPrice / FREESHIP_TARGET) * 100), 100);
-  const remainingForFreeship = Math.max(FREESHIP_TARGET - totalPrice, 0);
+  const remainingForFreeship = freeshipInfo.remaining;
 
   const handleConfirmDelete = (id: string, name: string) => {
     Alert.alert(
@@ -263,13 +302,13 @@ export default function CartScreen({ navigation }: any) {
                           </Text>{' '}
                           để nhận{' '}
                           <Text style={{ fontWeight: '700', color: theme.colors.primary }}>
-                            Freeship Silk-Drop
+                            {freeshipInfo.nextTier}
                           </Text>{' '}
                           & Túi quà Minisize
                         </>
                       ) : (
                         <Text style={{ fontWeight: '700', color: theme.colors.success }}>
-                          🎉 Chúc mừng! Bạn đã đạt Freeship & Quà tặng Minisize
+                          🎉 Chúc mừng! Bạn đã đạt Freeship toàn quốc & Quà tặng Minisize
                         </Text>
                       )}
                     </Text>
