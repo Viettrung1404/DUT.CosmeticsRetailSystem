@@ -357,6 +357,7 @@ model Store {
   longitude    Decimal? @db.Decimal(11, 8)
   openingHours Json?    @map("opening_hours") @db.JsonB
   isActive     Boolean  @default(true) @map("is_active")
+  fulfillmentCapacityPerDay Int @default(500) @map("fulfillment_capacity_per_day")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -389,7 +390,10 @@ model Inventory {
   productVariantId  String    @map("product_variant_id") @db.Uuid
   quantity          Int       @default(0)
   reservedQuantity  Int       @default(0) @map("reserved_quantity")
-  // Cột GENERATED (quantity - reserved_quantity), tạo trong migration add_db_constraints. Chỉ đọc, không ghi.
+  safetyStock       Int       @default(0) @map("safety_stock")
+  quarantinedQuantity Int     @default(0) @map("quarantined_quantity")
+  damagedQuantity   Int       @default(0) @map("damaged_quantity")
+  // Cột GENERATED (quantity - reserved_quantity - safety_stock - quarantined_quantity - damaged_quantity), tạo trong migration. Chỉ đọc, không ghi.
   availableQuantity Int?      @default(dbgenerated()) @map("available_quantity")
   minQuantity       Int       @default(5) @map("min_quantity")
   maxQuantity       Int?      @map("max_quantity")
@@ -401,6 +405,7 @@ model Inventory {
   variant ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@unique([storeId, productVariantId])
+  @@index([storeId, productVariantId], map: "idx_inventory_store_variant")
   @@map("inventory")
 }
 
@@ -1933,3 +1938,20 @@ model CustomerTag {
   @@index([tag])
   @@map("customer_tags")
 }
+
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  aggregateType String    @map("aggregate_type") @db.VarChar(50)
+  aggregateId   String    @map("aggregate_id") @db.VarChar(100)
+  eventType     String    @map("event_type") @db.VarChar(100)
+  payload       Json      @db.JsonB
+  status        String    @default("PENDING") @db.VarChar(20) // PENDING, PROCESSING, PUBLISHED, FAILED
+  retryCount    Int       @default(0) @map("retry_count")
+  lastError     String?   @map("last_error") @db.Text
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([status, createdAt], map: "idx_outbox_events_status_created")
+  @@map("outbox_events")
+}
+

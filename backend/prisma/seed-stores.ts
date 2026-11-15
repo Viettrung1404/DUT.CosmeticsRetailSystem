@@ -1,13 +1,92 @@
-// Dữ liệu demo: 5 cửa hàng + 1 kho tổng.
-// Địa chỉ cập nhật theo đơn vị hành chính sau sáp nhập và tọa độ thực tế.
-// Nhà cung cấp chỉ giao về kho tổng, nên luôn phải có ít nhất một địa điểm WAREHOUSE.
+// Dữ liệu chuẩn hóa mạng lưới bán lẻ & kho vận theo thiết kế DES-05 / DES-06 / DES-07:
+// - Central Warehouse: Kho Tổng Tân Bình (WH-TB, 2500 đơn/ngày), Kho Tổng Hà Nội (WH-HN, 2000 đơn/ngày)
+// - Showroom chuẩn hóa HCM: Quận 1 (STORE-03), Quận 10 (STORE-06), Bình Thạnh (STORE-07) (500 đơn/ngày)
+// - Mạng lưới chi nhánh mở rộng: STORE-01 (Hai Bà Trưng), STORE-02 (Cầu Giấy), STORE-04 (Hải Châu), STORE-05 (Thủ Đức)
+// - Khởi tạo Inventory Balances (tồn vật lý, giữ chỗ, an toàn, cách ly, hỏng) cho các kho/showroom mới.
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const OPENING_HOURS = { mon_sun: '08:00-22:00' };
+const OPENING_HOURS_STORE = { mon_sun: '08:00-22:00' };
+const OPENING_HOURS_WH = { mon_sat: '07:30-18:00' };
 
-const STORES = [
+export const STORES = [
+  // --- KHO TỔNG (CENTRAL WAREHOUSE) ---
+  {
+    code: 'WH-TB',
+    name: 'Tổng kho Tân Bình - GlowUp Central DC',
+    type: 'WAREHOUSE',
+    address: 'Lô 5, Đường CN13, KCN Tân Bình, Phường Tây Thạnh',
+    district: 'Tân Phú',
+    city: 'TP. Hồ Chí Minh',
+    phone: '028 3999 0000',
+    email: 'warehouse.tb@glowup.vn',
+    latitude: 10.8142,
+    longitude: 106.6264,
+    openingHours: OPENING_HOURS_WH,
+    fulfillmentCapacityPerDay: 2500,
+  },
+  {
+    code: 'WH-HN',
+    name: 'Kho Tổng Hà Nội - GlowUp Northern DC',
+    type: 'WAREHOUSE',
+    address: 'Lô C2, KCN Quang Minh',
+    district: 'Mê Linh',
+    city: 'Hà Nội',
+    phone: '024 3999 0000',
+    email: 'warehouse.hn@glowup.vn',
+    latitude: 21.1926,
+    longitude: 105.7513,
+    openingHours: OPENING_HOURS_WH,
+    fulfillmentCapacityPerDay: 2000,
+  },
+
+  // --- 3 SHOWROOM CHUẨN HÓA HCM (DES-07) ---
+  {
+    code: 'STORE-03',
+    name: 'GlowUp Showroom Quận 1',
+    type: 'STORE',
+    address: '45 Lê Lợi, Phường Bến Nghé',
+    district: 'Quận 1',
+    city: 'TP. Hồ Chí Minh',
+    phone: '028 3999 0003',
+    email: 'quan1@glowup.vn',
+    latitude: 10.7745,
+    longitude: 106.7009,
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
+  },
+  {
+    code: 'STORE-06',
+    name: 'GlowUp Showroom Quận 10',
+    type: 'STORE',
+    address: '256 Ba Tháng Hai, Phường 12',
+    district: 'Quận 10',
+    city: 'TP. Hồ Chí Minh',
+    phone: '028 3999 0006',
+    email: 'quan10@glowup.vn',
+    latitude: 10.7708,
+    longitude: 106.6698,
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
+  },
+  {
+    code: 'STORE-07',
+    name: 'GlowUp Showroom Bình Thạnh',
+    type: 'STORE',
+    address: '180 Phan Đăng Lưu, Phường 1',
+    district: 'Bình Thạnh',
+    city: 'TP. Hồ Chí Minh',
+    phone: '028 3999 0007',
+    email: 'binhthanh@glowup.vn',
+    latitude: 10.8035,
+    longitude: 106.6914,
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
+  },
+
+  // --- CHI NHÁNH BỔ TRỢ TOÀN QUỐC ---
   {
     code: 'STORE-01',
     name: 'GlowUp Hai Bà Trưng',
@@ -19,7 +98,8 @@ const STORES = [
     email: 'haibatrung@glowup.vn',
     latitude: 21.0136,
     longitude: 105.8501,
-    openingHours: OPENING_HOURS,
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
   },
   {
     code: 'STORE-02',
@@ -32,20 +112,8 @@ const STORES = [
     email: 'caugiay@glowup.vn',
     latitude: 21.0366,
     longitude: 105.7828,
-    openingHours: OPENING_HOURS,
-  },
-  {
-    code: 'STORE-03',
-    name: 'GlowUp Quận 1',
-    type: 'STORE',
-    address: '45 Lê Lợi, Phường Bến Nghé',
-    district: 'Quận 1',
-    city: 'TP. Hồ Chí Minh',
-    phone: '028 3999 0003',
-    email: 'quan1@glowup.vn',
-    latitude: 10.7745,
-    longitude: 106.7009,
-    openingHours: OPENING_HOURS,
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
   },
   {
     code: 'STORE-04',
@@ -58,7 +126,8 @@ const STORES = [
     email: 'haichau@glowup.vn',
     latitude: 16.0607,
     longitude: 108.2144,
-    openingHours: OPENING_HOURS,
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
   },
   {
     code: 'STORE-05',
@@ -71,38 +140,73 @@ const STORES = [
     email: 'thuduc@glowup.vn',
     latitude: 10.8507,
     longitude: 106.7719,
-    openingHours: OPENING_HOURS,
-  },
-  {
-    code: 'WH-HN',
-    name: 'Kho Tổng Hà Nội',
-    type: 'WAREHOUSE',
-    address: 'Lô C2, KCN Quang Minh',
-    district: 'Mê Linh',
-    city: 'Hà Nội',
-    phone: '024 3999 0000',
-    email: 'warehouse.hn@glowup.vn',
-    latitude: 21.1926,
-    longitude: 105.7513,
-    openingHours: { mon_sat: '07:30-17:30' },
+    openingHours: OPENING_HOURS_STORE,
+    fulfillmentCapacityPerDay: 500,
   },
 ];
 
-// Chỉ thêm hoặc cập nhật theo mã, không xóa: chi nhánh đã có đơn hàng, tồn kho tham chiếu tới
-async function main() {
+export async function seedStoresAndInventory() {
+  console.log('📦 Bắt đầu seed Locations (Stores/Warehouses) & Inventory Balances...');
+
+  // 1. Upsert Stores & Warehouses
+  const seededStores: any[] = [];
   for (const { code, ...data } of STORES) {
-    await prisma.store.upsert({
+    const store = await prisma.store.upsert({
       where: { code },
       update: data,
       create: { code, ...data },
     });
+    seededStores.push(store);
   }
-  console.log(`Đã seed ${STORES.length} chi nhánh: ${STORES.map((s) => s.code).join(', ')}.`);
+  console.log(`✅ Đã seed ${seededStores.length} địa điểm: ${seededStores.map((s) => s.code).join(', ')}.`);
+
+  // 2. Kiểm tra và bổ sung Inventory Balances cho các kho/showroom mới
+  // Lấy danh sách sample variants (lấy tối đa 100 variants tiêu biểu để seed số dư mẫu nếu chưa có)
+  const variants = await prisma.productVariant.findMany({
+    take: 100,
+    select: { id: true, sku: true },
+  });
+
+  if (variants.length > 0) {
+    const inventoryData: any[] = [];
+    for (const store of seededStores) {
+      const isWarehouse = store.type === 'WAREHOUSE';
+      const initialQty = isWarehouse ? 200 : 30;
+      const safetyStock = isWarehouse ? 10 : 3;
+
+      for (const variant of variants) {
+        inventoryData.push({
+          storeId: store.id,
+          productVariantId: variant.id,
+          quantity: initialQty,
+          reservedQuantity: 0,
+          safetyStock: safetyStock,
+          quarantinedQuantity: 0,
+          damagedQuantity: 0,
+          minQuantity: 5,
+        });
+      }
+    }
+
+    const result = await prisma.inventory.createMany({
+      data: inventoryData,
+      skipDuplicates: true,
+    });
+    console.log(`✅ Đã đồng bộ ${result.count} bản ghi Inventory Balances ban đầu.`);
+  }
+
+  return seededStores;
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  await seedStoresAndInventory();
+}
+
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error('❌ Lỗi seed stores:', e);
+      process.exit(1);
+    })
+    .finally(() => prisma.$disconnect());
+}

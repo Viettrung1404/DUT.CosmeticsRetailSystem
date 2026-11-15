@@ -37,6 +37,10 @@ import { PrismaStocktakeRepository } from './infrastructure/persistence/prisma-s
 import { PrismaBatchRepository } from './infrastructure/persistence/prisma-batch.repository';
 import { PrismaInventoryAlertRepository } from './infrastructure/persistence/prisma-inventory-alert.repository';
 import { InventoryAlertScheduler } from './infrastructure/schedulers/inventory-alert.scheduler';
+import { AtpCalculatorService } from './application/services/atp-calculator.service';
+import { InventoryBalanceService } from './application/services/inventory-balance.service';
+import { LocationService } from './application/services/location.service';
+import { LocationController } from './presentation/controllers/location.controller';
 
 @Module({
   imports: [PermissionsModule],
@@ -46,6 +50,7 @@ import { InventoryAlertScheduler } from './infrastructure/schedulers/inventory-a
     TransferAdminController,
     StocktakeAdminController,
     BatchAdminController,
+    LocationController,
   ],
   providers: [
     GetInventoryUseCase,
@@ -74,6 +79,15 @@ import { InventoryAlertScheduler } from './infrastructure/schedulers/inventory-a
     { provide: STOCKTAKE_REPOSITORY, useClass: PrismaStocktakeRepository },
     { provide: BATCH_REPOSITORY, useClass: PrismaBatchRepository },
     { provide: INVENTORY_ALERT_REPOSITORY, useClass: PrismaInventoryAlertRepository },
+    AtpCalculatorService,
+    InventoryBalanceService,
+    LocationService,
+  ],
+  exports: [
+    AtpCalculatorService,
+    InventoryBalanceService,
+    LocationService,
+    INVENTORY_REPOSITORY,
   ],
 })
 export class InventoryModule {}
