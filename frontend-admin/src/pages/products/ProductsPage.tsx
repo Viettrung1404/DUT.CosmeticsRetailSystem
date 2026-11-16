@@ -45,6 +45,7 @@ import {
   updateProductVariant,
 } from '../../api/productsApi'
 import { uploadImage } from '../../api/uploadApi'
+import { apiGet } from '../../api/sprint5Api'
 import RichTextEditor from '../../components/common/RichTextEditor'
 import type {
   Brand,
@@ -117,6 +118,7 @@ export default function ProductsPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [images, setImages] = useState<ProductImagePayload[]>([])
+  const [tagOptions, setTagOptions] = useState<string[]>([])
 
   const [variantProduct, setVariantProduct] = useState<Product | null>(null)
   const [variants, setVariants] = useState<ProductVariant[]>([])
@@ -153,6 +155,10 @@ export default function ProductsPage() {
       ])
       setCategories(categoryTree)
       setBrands(brandResult.data)
+      try {
+        const tags = await apiGet<{ name: string }[] | string[]>('/admin/product-tags', { limit: 50 })
+        setTagOptions(tags.map((item) => typeof item === 'string' ? item : item.name))
+      } catch { /* tag suggestions are optional */ }
     } catch (error) {
       message.error(errorText(error))
     }
@@ -194,6 +200,7 @@ export default function ProductsPage() {
     form.setFieldsValue({
       isActive: true,
       isFeatured: false,
+      tags: [],
       variants: [{ sku: '', price: 0, costPrice: 0, isActive: true }],
     })
     setOpen(true)
@@ -217,6 +224,7 @@ export default function ProductsPage() {
         brandId: product.brandId ?? null,
         name: product.name,
         slug: product.slug,
+        tags: product.tags ?? [],
         sku: product.sku,
         description: product.description,
         shortDescription: product.shortDescription,
@@ -555,6 +563,7 @@ export default function ProductsPage() {
           <Card className="glowup-panel" title="1. Thông tin sản phẩm" style={{ marginBottom: 14 }}>
             <Row gutter={14}>
               <Col xs={24} md={12}><Form.Item name="name" label="Tên sản phẩm" rules={[{ required: true, message: 'Nhập tên sản phẩm' }]}><Input maxLength={255} /></Form.Item></Col>
+              <Col xs={24}><Form.Item name="tags" label="Nhãn sản phẩm (tags)"><Select mode="tags" tokenSeparators={[',']} maxCount={20} options={tagOptions.map(t => ({label:t,value:t}))} placeholder="Tìm hoặc thêm tag, Enter để lưu"/></Form.Item></Col>
               <Col xs={24} md={12}><Form.Item name="slug" label="Slug" rules={[{ required: true, message: 'Nhập slug' }, { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: 'Slug không hợp lệ' }]}><Input maxLength={255} /></Form.Item></Col>
               <Col xs={24} md={8}><Form.Item name="sku" label="SKU sản phẩm" rules={[{ required: true, message: 'Nhập SKU' }]}><Input maxLength={50} /></Form.Item></Col>
               <Col xs={24} md={8}><Form.Item name="categoryId" label="Danh mục" rules={[{ required: true, message: 'Chọn danh mục' }]}><Select showSearch optionFilterProp="label" options={categoryOptions} /></Form.Item></Col>
