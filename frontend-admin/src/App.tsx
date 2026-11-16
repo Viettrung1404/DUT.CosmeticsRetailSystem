@@ -24,6 +24,14 @@ import EmployeesPage from './pages/hr/EmployeesPage'
 import AttendancePage from './pages/hr/AttendancePage'
 import CommissionsPage from './pages/hr/CommissionsPage'
 import AdminDashboardPage from './pages/dashboard/AdminDashboardPage'
+import ReportsPage from './pages/reports/ReportsPage'
+import PromotionsPage from './pages/marketing/PromotionsPage'
+import CouponsPage from './pages/marketing/CouponsPage'
+import ReviewsPage from './pages/marketing/ReviewsPage'
+import CmsPage from './pages/marketing/CmsPage'
+import BlogPage from './pages/marketing/BlogPage'
+import PushPage from './pages/marketing/PushPage'
+import ImportProductsPage from './pages/products/ImportProductsPage'
 import ProtectedRoute from './routes/ProtectedRoute'
 
 export default function App() {
@@ -36,6 +44,17 @@ export default function App() {
           <Route index element={<Navigate to="products" replace />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="reports/revenue" element={<ReportsPage mode="revenue" />} />
+          <Route path="reports/products" element={<ReportsPage mode="products" />} />
+          <Route path="promotions" element={<PromotionsPage />} />
+          <Route path="coupons" element={<CouponsPage />} />
+          <Route path="reviews" element={<ReviewsPage />} />
+          <Route path="pages" element={<CmsPage mode="pages" />} />
+          <Route path="blog" element={<BlogPage />} />
+          <Route path="faqs" element={<CmsPage mode="faqs" />} />
+          <Route path="banners" element={<CmsPage mode="banners" />} />
+          <Route path="notifications/push" element={<PushPage />} />
+          <Route path="products/import" element={<ImportProductsPage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="brands" element={<BrandsPage />} />
           <Route path="orders" element={<OrdersPage />} />
