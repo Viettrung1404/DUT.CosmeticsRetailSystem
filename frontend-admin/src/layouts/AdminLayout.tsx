@@ -87,6 +87,24 @@ const menuItems = [
     ],
   },
   {
+    key: 'insights-group',
+    type: 'group' as const,
+    label: 'BÁO CÁO & MARKETING',
+    children: [
+      { key: '/admin/reports/revenue', icon: <BarChartOutlined />, label: 'Báo cáo doanh thu' },
+      { key: '/admin/reports/products', icon: <BarChartOutlined />, label: 'Phân tích sản phẩm' },
+      { key: '/admin/promotions', icon: <TagsOutlined />, label: 'Khuyến mãi' },
+      { key: '/admin/coupons', icon: <TagsOutlined />, label: 'Voucher' },
+      { key: '/admin/reviews', icon: <AuditOutlined />, label: 'Đánh giá sản phẩm' },
+      { key: '/admin/pages', icon: <FileDoneOutlined />, label: 'Trang nội dung' },
+      { key: '/admin/blog', icon: <FileDoneOutlined />, label: 'Blog' },
+      { key: '/admin/faqs', icon: <FileDoneOutlined />, label: 'FAQ' },
+      { key: '/admin/banners', icon: <AppstoreOutlined />, label: 'Banner quảng cáo' },
+      { key: '/admin/notifications/push', icon: <BellOutlined />, label: 'Gửi thông báo' },
+      { key: '/admin/products/import', icon: <DatabaseOutlined />, label: 'Nhập sản phẩm Excel' },
+    ],
+  },
+  {
     key: 'analytics-group',
     type: 'group' as const,
     label: 'PHÂN TÍCH & HỆ THỐNG',
@@ -99,7 +117,21 @@ const menuItems = [
 ]
 
 function resolvePageName(pathname: string) {
-  if (pathname === '/admin/dashboard') return 'Tổng quan vận hành'
+  if (pathname === '/admin/dashboard') return 'Tổng quan kinh doanh'
+  const sprint5Names: Record<string, string> = {
+    '/admin/reports/revenue': 'Báo cáo doanh thu',
+    '/admin/reports/products': 'Phân tích sản phẩm',
+    '/admin/promotions': 'Chương trình khuyến mãi',
+    '/admin/coupons': 'Voucher & mã giảm giá',
+    '/admin/reviews': 'Đánh giá sản phẩm',
+    '/admin/pages': 'Trang nội dung',
+    '/admin/blog': 'Quản lý Blog',
+    '/admin/faqs': 'Câu hỏi thường gặp',
+    '/admin/banners': 'Banner quảng cáo',
+    '/admin/notifications/push': 'Thông báo đẩy',
+    '/admin/products/import': 'Nhập sản phẩm Excel',
+  }
+  if (sprint5Names[pathname]) return sprint5Names[pathname]
   if (pathname === '/admin/products') return 'Quản lý sản phẩm'
   if (pathname === '/admin/categories') return 'Quản lý danh mục'
   if (pathname === '/admin/brands') return 'Quản lý thương hiệu'
