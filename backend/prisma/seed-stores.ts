@@ -193,6 +193,52 @@ export async function seedStoresAndInventory() {
       skipDuplicates: true,
     });
     console.log(`✅ Đã đồng bộ ${result.count} bản ghi Inventory Balances ban đầu.`);
+
+    // 3. Khởi tạo các Lô hàng mẫu (InventoryLot) phục vụ FEFO Engine
+    // Mỗi variant tại mỗi kho sẽ có 2 lô: 1 lô date chuẩn (+12 tháng) và 1 lô date xa (+24 tháng)
+    const now = new Date();
+    const lotsData: any[] = [];
+    const targetVariants = variants.slice(0, 20); // Chọn 20 variants mẫu để seed lô
+
+    for (const store of seededStores) {
+      const isWarehouse = store.type === 'WAREHOUSE';
+      const lot1Qty = isWarehouse ? 80 : 15;
+      const lot2Qty = isWarehouse ? 100 : 12;
+
+      for (const variant of targetVariants) {
+        // Lô 1: Hạn dùng 12 tháng tới (365 ngày)
+        const expiry1 = new Date(now);
+        expiry1.setDate(expiry1.getDate() + 365);
+
+        // Lô 2: Hạn dùng 24 tháng tới (730 ngày)
+        const expiry2 = new Date(now);
+        expiry2.setDate(expiry2.getDate() + 730);
+
+        lotsData.push({
+          locationId: store.id,
+          productVariantId: variant.id,
+          batchCode: `LOT-${variant.sku.substring(0, 10)}-${store.code}-A`,
+          expiryDate: expiry1,
+          quantityOnHand: lot1Qty,
+          quantityReserved: 0,
+        });
+
+        lotsData.push({
+          locationId: store.id,
+          productVariantId: variant.id,
+          batchCode: `LOT-${variant.sku.substring(0, 10)}-${store.code}-B`,
+          expiryDate: expiry2,
+          quantityOnHand: lot2Qty,
+          quantityReserved: 0,
+        });
+      }
+    }
+
+    const lotsResult = await prisma.inventoryLot.createMany({
+      data: lotsData,
+      skipDuplicates: true,
+    });
+    console.log(`✅ Đã khởi tạo ${lotsResult.count} bản ghi InventoryLot mẫu cho FEFO.`);
   }
 
   return seededStores;

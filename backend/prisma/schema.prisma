@@ -274,6 +274,7 @@ model ProductVariant {
   weight          Decimal?                @db.Decimal(8, 2)
   unit            String?                 @db.VarChar(20)
   stockQuantity   Int                     @default(0) @map("stock_quantity")
+  minShelfLifeDays Int                    @default(180) @map("min_shelf_life_days")
   barcode         String?                 @unique @db.VarChar(100)
   isActive        Boolean                 @default(true) @map("is_active")
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz
@@ -282,6 +283,8 @@ model ProductVariant {
   product               Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
   images                ProductImage[]
   inventory             Inventory[]
+  inventoryLots         InventoryLot[]
+  inventoryReservationItems InventoryReservationItem[]
   inventoryTransactions InventoryTransaction[]
   batches               Batch[]
   transferItems         InventoryTransferItem[]
@@ -292,6 +295,8 @@ model ProductVariant {
   returnOrderItems      ReturnOrderItem[]
   purchaseOrderItems    PurchaseOrderItem[]
   exchangeItems         ExchangeItem[]
+  fulfillmentOrderItems FulfillmentOrderItem[]
+  packageItems          PackageItem[]
 
   @@unique([productId, option1Value, option2Value, option3Value])
   @@map("product_variants")
@@ -365,6 +370,8 @@ model Store {
   employees             Employee[]             @relation("EmployeeStore")
   userStores            UserStore[]
   inventory             Inventory[]
+  inventoryLots         InventoryLot[]
+  inventoryReservations InventoryReservation[]
   inventoryTransactions InventoryTransaction[]
   batches               Batch[]
   transfersFrom         InventoryTransfer[]    @relation("TransferFromStore")
@@ -380,6 +387,8 @@ model Store {
   returnOrders          ReturnOrder[]
   restockReturnItems    ReturnOrderItem[]      @relation("RestockStore")
   shifts                Shift[]
+  shippingQuotes        ShippingQuote[]
+  fulfillmentOrders     FulfillmentOrder[]
 
   @@map("stores")
 }
@@ -459,6 +468,60 @@ model Batch {
   @@unique([storeId, productVariantId, batchNumber])
   @@index([productVariantId, storeId, expiryDate])
   @@map("batches")
+}
+
+model InventoryLot {
+  id               String         @id @default(uuid()) @db.Uuid
+  locationId       String         @map("location_id") @db.Uuid
+  productVariantId String         @map("product_variant_id") @db.Uuid
+  batchCode        String         @map("batch_code") @db.VarChar(100)
+  expiryDate       DateTime       @map("expiry_date") @db.Date
+  quantityOnHand   Int            @default(0) @map("quantity_on_hand")
+  quantityReserved Int            @default(0) @map("quantity_reserved")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  location         Store          @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  variant          ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  reservationItems InventoryReservationItem[]
+
+  @@unique([locationId, productVariantId, batchCode], map: "uq_lot_batch")
+  @@index([locationId, productVariantId, expiryDate], map: "idx_lots_fefo_search")
+  @@map("inventory_lots")
+}
+
+model InventoryReservation {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  orderId            String?                    @map("order_id") @db.Uuid
+  fulfillmentOrderId String?                    @unique @map("fulfillment_order_id") @db.Uuid
+  locationId         String                     @map("location_id") @db.Uuid
+  status             String                     @default("ACTIVE") @db.VarChar(30)
+  expiresAt          DateTime                   @map("expires_at") @db.Timestamptz
+  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order              Order?                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  location           Store                      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  fulfillmentOrder   FulfillmentOrder?          @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
+  items              InventoryReservationItem[]
+
+  @@index([status, expiresAt], map: "idx_res_cleanup")
+  @@map("inventory_reservations")
+}
+
+model InventoryReservationItem {
+  id               String               @id @default(uuid()) @db.Uuid
+  reservationId    String               @map("reservation_id") @db.Uuid
+  productVariantId String               @map("product_variant_id") @db.Uuid
+  lotId            String               @map("lot_id") @db.Uuid
+  quantity         Int
+
+  reservation      InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  variant          ProductVariant       @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  lot              InventoryLot         @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId], map: "idx_reservation_items_res_id")
+  @@map("inventory_reservation_items")
 }
 
 model InventoryTransfer {
@@ -665,6 +728,8 @@ model Order {
   coupon                  Coupon?                    @relation(fields: [couponId], references: [id])
   salesStaff              Employee?                  @relation(fields: [salesStaffId], references: [id])
   items                   OrderItem[]
+  inventoryReservations   InventoryReservation[]
+  fulfillmentOrders       FulfillmentOrder[]
   shipments               Shipment[]
   statusHistories         OrderStatusHistory[]
   returnOrders            ReturnOrder[]
@@ -710,6 +775,7 @@ model OrderItem {
   orderItemBatches OrderItemBatch[]
   returnItems      ReturnOrderItem[]
   invoiceItems     InvoiceItem[]
+  fulfillmentOrderItems FulfillmentOrderItem[]
   pricingSnapshot  Json?             @map("pricing_snapshot") @db.JsonB
 
   @@index([promotionId])
@@ -751,10 +817,14 @@ model Shipment {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  events ShipmentEvent[]
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fulfillmentOrderId String?            @map("fulfillment_order_id") @db.Uuid
+  fulfillmentOrder   FulfillmentOrder?  @relation(fields: [fulfillmentOrderId], references: [id], onDelete: SetNull)
+  events             ShipmentEvent[]
+  packages           ShipmentPackage[]
 
   @@index([orderId, status])
+  @@index([fulfillmentOrderId])
   @@index([carrierMetadata], type: Gin, map: "idx_shipments_carrier_metadata")
   @@map("shipments")
 }
@@ -1953,5 +2023,119 @@ model OutboxEvent {
 
   @@index([status, createdAt], map: "idx_outbox_events_status_created")
   @@map("outbox_events")
+}
+
+model ShippingQuote {
+  id                    String   @id @default(uuid()) @db.Uuid
+  quoteGroupId          String   @map("quote_group_id") @db.Uuid
+  carrierCode           String   @map("carrier_code") @db.VarChar(50)
+  serviceCode           String   @map("service_code") @db.VarChar(50)
+  sourceLocationId      String   @map("source_location_id") @db.Uuid
+  estimatedFee          Decimal  @map("estimated_fee") @db.Decimal(12, 2)
+  estimatedDeliveryTime DateTime @map("estimated_delivery_time") @db.Timestamptz
+  distanceKm            Decimal? @map("distance_km") @db.Decimal(10, 2)
+  isAvailable           Boolean  @default(true) @map("is_available")
+  unavailableReason     String?  @map("unavailable_reason") @db.VarChar(255)
+  expiresAt             DateTime @map("expires_at") @db.Timestamptz
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  sourceLocation        Store    @relation(fields: [sourceLocationId], references: [id], onDelete: Restrict)
+
+  @@index([quoteGroupId, expiresAt], map: "idx_quotes_group")
+  @@map("shipping_quotes")
+}
+
+model FulfillmentOrder {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  orderId                String                 @map("order_id") @db.Uuid
+  fulfillmentOrderNumber String                 @unique @map("fulfillment_order_number") @db.VarChar(60)
+  sourceLocationId       String                 @map("source_location_id") @db.Uuid
+  status                 String                 @default("PENDING_ALLOCATION") @db.VarChar(35)
+  shippingServiceCode    String                 @map("shipping_service_code") @db.VarChar(50)
+  totalItemsCount        Int                    @map("total_items_count")
+  assignedPickerId       String?                @map("assigned_picker_id") @db.Uuid
+  allocatedAt            DateTime?              @map("allocated_at") @db.Timestamptz
+  pickedAt               DateTime?              @map("picked_at") @db.Timestamptz
+  packedAt               DateTime?              @map("packed_at") @db.Timestamptz
+  handedOverAt           DateTime?              @map("handed_over_at") @db.Timestamptz
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order                  Order                  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  sourceLocation         Store                  @relation(fields: [sourceLocationId], references: [id], onDelete: Restrict)
+  items                  FulfillmentOrderItem[]
+  reservation            InventoryReservation?
+  packages               Package[]
+  shipments              Shipment[]
+
+  @@index([sourceLocationId, status], map: "idx_fo_location_status")
+  @@index([orderId], map: "idx_fo_order_id")
+  @@map("fulfillment_orders")
+}
+
+model FulfillmentOrderItem {
+  id                 String           @id @default(uuid()) @db.Uuid
+  fulfillmentOrderId String           @map("fulfillment_order_id") @db.Uuid
+  orderItemId        String           @map("order_item_id") @db.Uuid
+  productVariantId   String           @map("product_variant_id") @db.Uuid
+  quantityRequested  Int              @map("quantity_requested")
+  quantityFulfilled  Int              @default(0) @map("quantity_fulfilled")
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  fulfillmentOrder   FulfillmentOrder @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
+  orderItem          OrderItem        @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  variant            ProductVariant   @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([fulfillmentOrderId], map: "idx_fo_items_fo_id")
+  @@index([orderItemId], map: "idx_fo_items_order_item_id")
+  @@map("fulfillment_order_items")
+}
+
+model Package {
+  id                   String            @id @default(uuid()) @db.Uuid
+  fulfillmentOrderId   String            @map("fulfillment_order_id") @db.Uuid
+  packageCode          String            @unique @map("package_code") @db.VarChar(60)
+  actualWeightGrams    Int               @map("actual_weight_grams")
+  lengthCm             Int               @map("length_cm")
+  widthCm              Int               @map("width_cm")
+  heightCm             Int               @map("height_cm")
+  packedBy             String?           @map("packed_by") @db.Uuid
+  sealedAt             DateTime?         @default(now()) @map("sealed_at") @db.Timestamptz
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  fulfillmentOrder     FulfillmentOrder  @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Restrict)
+  items                PackageItem[]
+  shipmentPackages     ShipmentPackage[]
+
+  @@index([fulfillmentOrderId], map: "idx_packages_fo_id")
+  @@map("packages")
+}
+
+model PackageItem {
+  id                 String           @id @default(uuid()) @db.Uuid
+  packageId          String           @map("package_id") @db.Uuid
+  productVariantId   String           @map("product_variant_id") @db.Uuid
+  quantity           Int
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  package            Package          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  variant            ProductVariant   @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([packageId], map: "idx_package_items_package_id")
+  @@map("package_items")
+}
+
+model ShipmentPackage {
+  id                 String           @id @default(uuid()) @db.Uuid
+  shipmentId         String           @map("shipment_id") @db.Uuid
+  packageId          String           @map("package_id") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  shipment           Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  package            Package          @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@unique([shipmentId, packageId], map: "uq_shipment_package")
+  @@map("shipment_packages")
 }
 

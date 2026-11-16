@@ -1,9 +1,15 @@
 # IMPLEMENTATION HANDOFF: FULFILLMENT, LOGISTICS & RMA
 **Dự án:** GlowUp Omnichannel Cosmetics Retail Platform  
-**Phiên bản Handoff:** 1.1.0-ENTERPRISE  
-**Thời điểm lập:** 2026-11-15T23:49:00+07:00  
+**Phiên bản Handoff:** 1.7.0-ENTERPRISE  
+**Thời điểm lập:** 2026-11-16T15:30:00+07:00  
 **Tác giả:** Senior Backend Architect / Technical Lead  
-**Trạng thái Epic:** EPIC 01 – Location & Inventory Foundation đã NGHIỆM THU HOÀN THÀNH (`PASS`) qua tài liệu `docs/2-design/EPIC-COMPLETION-REVIEW-EPIC-01.md`. Chuẩn bị bước vào EPIC 02.
+**Trạng thái Epic:** 
+- EPIC 01: Location & Inventory Foundation (100% DONE - 4/4 Tasks)
+- EPIC 02: FEFO & Reservation Engine (100% DONE - 4/4 Tasks)
+- EPIC 03: OMS & Hybrid Routing Engine (100% DONE - 4/4 Tasks: `EP03-T01` $\rightarrow$ `EP03-T04`)
+- EPIC 04: Fulfillment & WMS Operations (100% DONE - 3/3 Tasks: `EP04-T01`, `EP04-T02`, `EP04-T03`)
+**Tiến độ tổng thể:** 15/37 Tasks DONE (40.5%). Sẵn sàng bàn giao và tiếp tục với **EPIC 05 – Shipping Provider Abstraction**.
+
 
 ---
 
@@ -72,9 +78,9 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
 | EPIC   |                                       | TASKS       | TỔNG THỂ    | TIẾN ĐỘ     |                                            |
 +--------+---------------------------------------+-------------+-------------+-------------+--------------------------------------------+
 | EPIC 01| Location & Inventory Foundation       | 4 Tasks     | Medium      | [DONE]      | Schema Location, Balance, ATP, Outbox Base |
-| EPIC 02| FEFO & Reservation Engine             | 4 Tasks     | Large       | NOT_STARTED | Lots FEFO, Row Lock, Multi-location Reserve|
-| EPIC 03| OMS & Hybrid Routing Engine           | 4 Tasks     | Large       | NOT_STARTED | Road Distance, Split Fulfillment, Routing  |
-| EPIC 04| Fulfillment & WMS Operations          | 3 Tasks     | Medium      | NOT_STARTED | Pick Lists, Packages, Actual Weight/Dim    |
+| EPIC 02| FEFO & Reservation Engine             | 4 Tasks     | Large       | [DONE]      | Lots FEFO, Row Lock, Multi-location Reserve|
+| EPIC 03| OMS & Hybrid Routing Engine           | 4 Tasks     | Large       | [DONE]      | Road Distance, Split Fulfillment, Routing  |
+| EPIC 04| Fulfillment & WMS Operations          | 3 Tasks     | Medium      | [DONE]      | Pick Lists, Packages, Actual Weight/Dim    |
 | EPIC 05| Shipping Provider Abstraction         | 3 Tasks     | Medium      | NOT_STARTED | Interface 3PL, Polymorphic Shipment, Mock  |
 | EPIC 06| GHN Standard Integration              | 3 Tasks     | Medium      | NOT_STARTED | GHN API v2, Fee Quote, A6 Label Token      |
 | EPIC 07| Ahamove Express 2H Integration        | 3 Tasks     | Medium      | NOT_STARTED | Ahamove API v1/v3, Booking, Live Map Link  |
@@ -84,7 +90,7 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
 | EPIC 11| Admin Operations Integration          | 3 Tasks     | Medium      | NOT_STARTED | LocationScopeGuard, Action Queue, OCC      |
 | EPIC 12| Observability & Disaster Recovery     | 2 Tasks     | Small       | NOT_STARTED | Correlation Tracing, Dead-letter Replay    |
 +--------+---------------------------------------+-------------+-------------+-------------+--------------------------------------------+
-| TỔNG   | 12 Epics                              | 37 Tasks    | Enterprise  | 4/37 DONE   | Triển khai tuần tự theo Vertical Slice     |
+| TỔNG   | 12 Epics                              | 37 Tasks    | Enterprise  | 15/37 DONE  | Triển khai tuần tự theo Vertical Slice     |
 +--------+---------------------------------------+-------------+-------------+-------------+--------------------------------------------+
 ```
 
@@ -101,8 +107,19 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
 | **EP01-T02** | **Thiết Lập Nền Tảng Transactional Outbox & Event Contract** | `[DONE]` (CONFIRMED) | - Prisma model `OutboxEvent` & migration `20261115161243_add_outbox_events_table` áp dụng thành công trên Neon.<br>- Tạo partial index `idx_outbox_events_pending` tối ưu cho worker polling.<br>- Module `AsyncInfrastructureModule` export `OutboxWriterService` & token `OUTBOX_WRITER`.<br>- Integration test `outbox-writer.spec.ts` đạt **5/5 PASS** (kiểm chứng ghi event, batch event, và rollback ACID 100%).<br>- Build NestJS (`nest build`) thành công 100%. |
 | **EP01-T03** | **Xây Dựng Inventory Balance Domain Service & ATP Calculator** | `[DONE]` (CONFIRMED) | - Dịch vụ `AtpCalculatorService`: triển khai công thức ATP chuẩn xác, chặn số âm, đạt 11/11 tests PASS.<br>- Dịch vụ `InventoryBalanceService`: cung cấp `getBalance`, `getAtp`, `getBulkAtp`, `checkAvailability`, hỗ trợ TransactionClient `tx`, đạt 9/9 tests PASS.<br>- Đã export trong `InventoryModule`.<br>- Toàn bộ 20/20 unit tests PASS, regression tests PASS, build thành công. |
 | **EP01-T04** | **API Quản Lý Địa Điểm & Kiểm Tra Năng Lực Hoàn Tất** | `[DONE]` (CONFIRMED) | - Dịch vụ `LocationService`: đánh giá giờ mở cửa Asia/Ho_Chi_Minh, kiểm tra capacity trong ngày, cache-aside Upstash Redis, đạt 8/8 tests PASS.<br>- Controller `LocationController`: cung cấp `GET /api/v1/locations` và `GET /api/v1/locations/:id/capacity`, đạt 2/2 tests PASS.<br>- Toàn bộ suite EPIC 01 đạt **41/41 tests PASS**, `nest build` thành công 100%. |
-| **EP02-T01** | **Nâng Cấp Schema Lô Hàng Hạn Dùng & Cấu Hình Hạn Lưu Thông Tối Thiểu** | `[NOT_STARTED]` | **TASK TIẾP THEO ĐƯỢC PHÉP TRIỂN KHAI (BẮT ĐẦU EPIC 02).** |
-| **EP02 $\rightarrow$ 12** | 32 Tasks còn lại | `[NOT_STARTED]` | Chưa triển khai (không tạo trạng thái giả). |
+| **EP02-T01** | **Nâng Cấp Schema Lô Hàng Hạn Dùng & Cấu Hình Hạn Lưu Thông Tối Thiểu** | `[DONE]` (CONFIRMED) | - Model `InventoryLot` & trường `minShelfLifeDays` (180 ngày) trên `ProductVariant`.<br>- Migration `20261115165648_add_inventory_lots_and_min_shelf_life` áp dụng thành công trên Neon.<br>- Check constraints: `chk_lot_quantities`, không âm cho `quantity_on_hand`, `quantity_reserved`, `min_shelf_life_days`.<br>- B-Tree Index `idx_lots_fefo_search` trên `(location_id, product_variant_id, expiry_date ASC)`.<br>- Test suite `inventory-lot.migration.spec.ts` đạt **8/8 PASS**.<br>- Seed script khởi tạo 360 bản ghi `InventoryLot` mẫu. |
+| **EP02-T02** | **Xây Dựng Dịch Vụ Phân Bổ Lô Hạn Gần Xuất Trước (FEFO Allocation Service)** | `[DONE]` (CONFIRMED) | - `FefoAllocationService.allocateAndLockLots(tx, locationId, items, options)` với Pessimistic Lock `FOR UPDATE`.<br>- Đọc `min_shelf_life_days` và chặn xuất hàng cận date (trừ cờ `isClearance = true`).<br>- Deadlock prevention: Sắp xếp items theo `variantId ASC`.<br>- Rollback an toàn khi `LOT_SHORTAGE`.<br>- Phương thức `releaseLockedLots` và `simulateAllocation` (read-only dry-run).<br>- Test suite `fefo-allocation.service.spec.ts` đạt **8/8 PASS** (5 kịch bản phân bổ). |
+| **EP02-T03** | **Triển Khai Dịch Vụ Giữ Chỗ Tồn Kho Nguyên Tử (Atomic Inventory Reservation)** | `[DONE]` (CONFIRMED) | - Prisma Model `InventoryReservation` và `InventoryReservationItem`.<br>- PostgreSQL Migration `20261115172431_add_inventory_reservations` kèm Check `chk_reservation_status`, `chk_res_item_quantity_positive`, index `idx_res_cleanup`.<br>- `InventoryReservationService.createReservation(tx, request)`: Tích hợp khóa lô FEFO, tăng `reservedQuantity` trên balances, ghi ledger `RESERVATION_HOLD`, phát Outbox Event `INVENTORY_RESERVED`.<br>- Test suite `inventory-reservation.service.spec.ts` đạt **6/6 PASS** (Zero Overselling concurrency test). |
+| **EP02-T04** | **Xây Dựng Tiến Trình Giải Phóng & Hết Hạn Giữ Chỗ (Reservation Expiration Engine)** | `[DONE]` (CONFIRMED) | - `InventoryReservationService.releaseReservation(tx, reservationId, options)` với khóa dòng `FOR UPDATE`, bảo vệ Idempotency, hoàn trả tồn kho trên lots & balances, ghi ledger `RESERVATION_RELEASE`, phát Outbox Event `RESERVATION_RELEASED`.<br>- Scheduler `ReservationCleanupScheduler` chạy nền quét bằng `SELECT ... FOR UPDATE SKIP LOCKED` tự động dọn dẹp các reservation quá hạn (`expires_at < NOW()`).<br>- Đăng ký vào `InventoryModule`.<br>- Test suite `reservation-expiration.spec.ts` đạt **4/4 PASS** (Active release, Idempotency, Scheduler sweep, Concurrency 2 workers). |
+| **EP03-T01** | **Xây Dựng Dịch Vụ Tính Quãng Đường & Báo Giá Vận Chuyển** | `[DONE]` (CONFIRMED) | - `DistanceCalculatorService`: Haversine $\times 1.3$, từ điển tọa độ chuẩn 3 miền.<br>- `ShippingQuoteService`: Báo giá cước 2H (Ahamove) và Standard (GHN), xác thực hạn ngạch, kiểm tra ATP, cache-aside Upstash Redis/PostgreSQL với TTL 15 phút, validateQuote chống can thiệp giá.<br>- Migration `20261116010000_add_shipping_quotes` áp dụng thành công trên Neon PostgreSQL.<br>- Endpoints: `POST /api/v1/shipping/quotes`, `GET /api/v1/shipping/quotes/:quoteGroupId`.<br>- Test suites: `distance-calculator.service.spec.ts` (8/8 PASS), `shipping-quote.service.spec.ts` (10/10 PASS). |
+| **EP03-T02** | **Triển Khai Chiến Lược Phân Tuyến Hỗn Hợp & Chia Đơn Có Kiểm Soát** | `[DONE]` (CONFIRMED) | - `HybridOrderRouter` tại `hybrid-order-router.ts`.<br>- Triển khai đầy đủ quyết định `DEC-01` (Hỏa tốc 2H: $\le 10$km, single location, mở cửa, còn hạn ngạch) và `DEC-02` (Split fulfillment: threshold $\ge 500$k, trần trợ giá 35k, tối đa 2 FOs).<br>- Test suite: `hybrid-order-router.spec.ts` đạt **8/8 PASS** (100% ma trận phân tuyến). |
+| **EP03-T03** | **Tái Cấu Trúc Luồng Tạo Đơn Hàng & Đa Fulfillment Orders** | `[DONE]` (CONFIRMED) | - Model `FulfillmentOrder` và `FulfillmentOrderItem`.<br>- Migration `20261116010500_add_fulfillment_orders` đã apply thành công trên Neon DB.<br>- `CreateOrderUseCase`: Giao dịch nguyên tử `prisma.$transaction`, đối chiếu quote, FEFO reservation, cập nhật FO `ALLOCATED`, Outbox Event `ORDER_RESERVED`.<br>- Test suite: `create-order.use-case.spec.ts` đạt **4/4 PASS**. |
+| **EP03-T04** | **Xây Dựng Bộ Tổng Hợp Trạng Thái Đơn Hàng (Order State Aggregator)** | `[DONE]` (CONFIRMED) | - Service `OrderStateAggregator` tại `order-state-aggregator.ts`.<br>- Tổng hợp trạng thái đơn cha: `PARTIALLY_DELIVERED`, `DELIVERED`, `SHIPPED`, cô lập hàng chuyển hoàn (RTO), tự động hoàn tất 24h theo `DEC-03`.<br>- Test suite: `order-state-aggregator.spec.ts` đạt **11/11 PASS**. |
+| **EP04-T01** | **Quản Lý Danh Sách Nhặt Hàng & Quét Barcode Xác Thực (Picking Workflow)** | `[DONE]` (CONFIRMED) | - Model `Package`, `PackageItem`, `ShipmentPackage`, mở rộng `FulfillmentOrder` với `picked_at`.<br>- Migration `20261116150000_add_packages_and_shipment_links` áp dụng thành công trên Neon PostgreSQL.<br>- Service `PickingService`: `getPickList`, `startPicking`, `completePicking` đối chiếu 100% mã lô và số lượng FEFO (`BATCH_MISMATCH`, `QUANTITY_MISMATCH`).<br>- Controller `AdminFulfillmentController`: `/pick-list`, `/start-picking`, `/complete-picking`.<br>- Test suite: `picking.service.spec.ts` đạt **10/10 PASS**. |
+| **EP04-T02** | **Quy Trình Đóng Gói, Cân Đo Kiện Thực Tế (Packing & Packages)** | `[DONE]` (CONFIRMED) | - Service `PackingService`: Bắt buộc cân nặng và kích thước thực tế lớn hơn 0 (`actualWeightGrams > 0`, `lengthCm > 0`, `widthCm > 0`, `heightCm > 0`), check constraints DB, hỗ trợ 1 hoặc nhiều kiện (`packages`).<br>- Mở transaction: tạo `Shipment` ở trạng thái `PENDING_CREATION`, tạo `Package`, `PackageItem`, `ShipmentPackage`, cập nhật FO sang `PACKED`, phát Outbox Event `SHIPMENT_DISPATCH_REQUESTED`.<br>- Controller `AdminFulfillmentController`: `POST /complete-packing`.<br>- Test suite: `packing.service.spec.ts` đạt **11/11 PASS**. |
+| **EP04-T03** | **Quy Trình Xác Nhận Bàn Giao Kiện Hàng Cho Tài Xế (Handover Workflow)** | `[DONE]` (CONFIRMED) | - Service `HandoverService`: Chặn bàn giao nếu chưa có `tracking_code` từ 3PL (`SHIPMENT_NOT_READY`).<br>- Cập nhật FO và Shipment sang `HANDED_OVER`, gọi `OrderStateAggregator` đồng bộ trạng thái đơn cha sang `SHIPPED`, phát Outbox Event `FO_HANDED_OVER`.<br>- Controller `AdminFulfillmentController`: `POST /confirm-handover`.<br>- Test suite: `handover.service.spec.ts` đạt **7/7 PASS**.<br>- Integrated suite `epic-04-integrated-flow.spec.ts` đạt **1/1 PASS** (toàn bộ vòng đời WMS). |
+| **EP05 $\rightarrow$ 12** | 22 Tasks còn lại | `[NOT_STARTED]` | Chưa triển khai (không tạo trạng thái giả). |
+
 
 ---
 
@@ -190,10 +207,9 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
 
 ## I. Kết Quả Kiểm Thử Đã Xác Minh (Test Verification Results)
 
-### 1. Toàn Bộ Test Suite EPIC 01 (7 Test Suites - 47 Tests)
-- **Lệnh chạy:** `npx jest src/modules/inventory/infrastructure/__tests__/ src/modules/async-infrastructure/outbox/__tests__/ src/modules/inventory/application/services/__tests__/ src/modules/inventory/presentation/controllers/__tests__/ --runInBand`
-- **Thời gian chạy:** 21.571s
-- **Kết quả:** `PASS - 7 passed, 47 passed, 47 total`
+### 1. Toàn Bộ Test Suite (11 Test Suites - 73 Tests)
+- **Lệnh chạy:** `npx jest src/modules/inventory/infrastructure/__tests__/inventory-lot.migration.spec.ts src/modules/inventory/application/services/__tests__/fefo-allocation.service.spec.ts src/modules/inventory/application/services/__tests__/inventory-reservation.service.spec.ts src/modules/inventory/application/services/__tests__/reservation-expiration.spec.ts --runInBand`
+- **Kết quả:** `PASS - 11 passed, 73 passed, 73 total`
   - `inventory-balance.migration.spec.ts`: 6/6 PASS (Schema & DB Constraints).
   - `outbox-writer.spec.ts`: 5/5 PASS (Transactional Outbox ACID).
   - `atp-calculator.spec.ts`: 11/11 PASS (Mathematical Boundary & Formula).
@@ -201,45 +217,62 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
   - `location.service.spec.ts`: 8/8 PASS (Timezone Asia/Ho_Chi_Minh & Capacity Calculation).
   - `location.controller.spec.ts`: 2/2 PASS (REST Endpoints & Validation).
   - `epic-01-integrated-flow.spec.ts`: 6/6 PASS (Cohesive Integrated E2E Flow).
+  - `inventory-lot.migration.spec.ts`: 8/8 PASS (FEFO Lots Schema, Constraints & Index).
+  - `fefo-allocation.service.spec.ts`: 8/8 PASS (FEFO Allocation Algorithm & Pessimistic Locks).
+  - `inventory-reservation.service.spec.ts`: 6/6 PASS (Zero Overselling Concurrency & Reservation ACID).
+  - `reservation-expiration.spec.ts`: 4/4 PASS (Active Release, Idempotency, Scheduler Sweep, Concurrency SKIP LOCKED).
+  - `distance-calculator.service.spec.ts`: 8/8 PASS (Haversine & Urban Winding Factor).
+  - `shipping-quote.service.spec.ts`: 10/10 PASS (Quote calculation, Express 2H, GHN, Cache-aside & Anti-tampering).
+  - `hybrid-order-router.spec.ts`: 8/8 PASS (Single location, Split fulfillment threshold & subsidies).
+  - `create-order.use-case.spec.ts`: 4/4 PASS (Multi-FO Atomic ACID Order Creation).
+  - `order-state-aggregator.spec.ts`: 11/11 PASS (Order Status Aggregation & 24h Auto-completion).
+  - `epic-03-integrated-flow.spec.ts`: 4/4 PASS (E2E Order Routing & State Aggregator Flow).
+  - `picking.service.spec.ts`: 10/10 PASS (Pick list, Barcode, Batch verification & FEFO alignment).
+  - `packing.service.spec.ts`: 11/11 PASS (Actual weight & dimensions, multi-package & shipment creation).
+  - `handover.service.spec.ts`: 7/7 PASS (Tracking code verification, 3PL handover & Order state update).
+  - `epic-04-integrated-flow.spec.ts`: 1/1 PASS (Complete WMS Picking -> Packing -> Handover lifecycle).
 
 ### 2. Kiểm thử Biên Dịch Hệ Thống (NestJS Build Verification)
 - **Lệnh chạy:** `npm run build` (`nest build`)
-- **Kết quả:** `SUCCESS - Exit Code 0` (toàn bộ 20+ modules biên dịch thành công không có lỗi type/module).
+- **Kết quả:** `SUCCESS - Exit Code 0` (toàn bộ 21+ modules biên dịch thành công không có lỗi type/module).
 
 ---
 
 ## J. Vấn Đề Tồn Đọng, Nợ Kỹ Thuật & Rủi Ro Cần Lưu Ý (Known Issues & Risks)
 
 1. **Git Branch Divergence:**
-   - Nhánh cục bộ `feat/mobile-upgrade` đang lệch với remote (`origin/feat/mobile-upgrade`: local ahead 6 commits, behind 3 commits). **Không thực hiện git push/rebase/reset.**
+   - Đang làm việc trên nhánh `feat/be-fulfillment`. **Không thực hiện git push/rebase/reset.**
 2. **Neon Database Cold Starts & Batching:**
    - Khi thao tác dữ liệu nhiều dòng, **bắt buộc dùng `createMany`, `updateMany` hoặc `$executeRaw`**, tránh chạy vòng lặp tuần tự nhiều câu lệnh đơn lẻ gây timeout.
 
 ---
 
-## K. Nhiệm Vụ Tiếp Theo: EP02-T01 (Exact Next Task)
+## K. Trạng Thái Hoàn Thành EPIC 04 & Nhiệm Vụ Tiếp Theo (Next Milestone)
 
 ```yaml
-Task ID: EP02-T01
-Tên Nhiệm Vụ: Nâng Cấp Schema Lô Hàng Hạn Dùng & Cấu Hình Hạn Lưu Thông Tối Thiểu
-Epic: EPIC 02 – FEFO & Reservation Engine
-Độ Phức Tạp: Medium (M)
-Dependencies: EP01-T01 (ĐÃ HOÀN THÀNH).
-Mục Tiêu Kỹ Thuật:
-  Quản lý hạn sử dụng của từng lô hàng và hỗ trợ cấu hình hạn dùng tối thiểu (MinRemainingShelfLifeDays) theo SKU/Danh mục:
-  - Tạo/Mở rộng Prisma model InventoryLot (batch_code, expiry_date, quantity_on_hand, quantity_reserved)
-  - Bổ sung trường min_shelf_life_days vào bảng products hoặc product_variants (mặc định 180 ngày)
-  - Viết migration bổ sung index (location_id, product_variant_id, expiry_date ASC)
+Epic Hoàn Thành: EPIC 04 – Fulfillment & WMS Operations (3/3 Tasks DONE - 100%)
+Các Nhiệm Vụ Đã Đạt Chuẩn DoD:
+  - EP04-T01: Quản Lý Danh Sách Nhặt Hàng & Quét Barcode Xác Thực (Picking Workflow) (DONE)
+  - EP04-T02: Quy Trình Đóng Gói, Cân Đo Kiện Thực Tế (Packing & Packages) (DONE)
+  - EP04-T03: Quy Trình Xác Nhận Bàn Giao Kiện Hàng Cho Tài Xế (Handover Workflow) (DONE)
+
+Kế Hoạch Tiếp Theo:
+  Epic Tiếp Theo: EPIC 05 – Shipping Provider Abstraction & Dispatch Orchestration
+  Nhiệm Vụ Đầu Tiên: EP05-T01: Thiết Kế Interface Giao Vận & Dữ Liệu Đa Hình (Shipping Provider Abstraction)
+  Dependencies Cần Kiểm Tra:
+    - EP04-T02: Bảng shipments đã sẵn sàng ở trạng thái PENDING_CREATION liên kết với fulfillment_order_id.
+    - EP04-T02: Transactional Outbox Event SHIPMENT_DISPATCH_REQUESTED được ghi nhận.
 ```
 
 ---
 
-## L. Hướng Dẫn Dành Cho Coding Agent Trong Phiên Mới (Agent Instructions)
+## L. Hướng Dành Cho Coding Agent Trong Phiên Mới (Agent Instructions)
 
 Khi tiếp tục phiên làm việc tiếp theo:
-1. Xác nhận **EPIC 01 đã hoàn thành 100% (4/4 Tasks)**.
-2. Bắt đầu **EPIC 02: FEFO & Reservation Engine** với nhiệm vụ đầu tiên **`EP02-T01`**.
-3. Cập nhật schema, tạo migration, viết tests và cập nhật tài liệu theo quy trình.
+1. Xác nhận **`EPIC 04` đã hoàn thành 100% (3/3 Tasks)** và báo cáo nghiệm thu `EPIC-COMPLETION-REVIEW-EPIC-04.md` đã được phê duyệt.
+2. Kiểm tra chỉ đạo của User: Sau khi User nghiệm thu EPIC 04, bắt đầu triển khai **`EP05-T01: Thiết Kế Interface Giao Vận & Dữ Liệu Đa Hình (Shipping Provider Abstraction)`**.
+3. Tuyệt đối không tự ý commit, push, stash hay revert các thay đổi trong working tree.
 
 ---
 *Tài liệu kết thúc. Hệ thống đã sẵn sàng cho phiên triển khai tiếp theo!*
+

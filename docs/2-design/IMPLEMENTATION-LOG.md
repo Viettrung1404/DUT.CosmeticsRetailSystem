@@ -120,3 +120,96 @@
 - **Kết luận:** **PASS**. Toàn bộ Epic 01 đã sẵn sàng làm bệ phóng cho **EPIC 02: FEFO & Reservation Engine**.
 - **Kế hoạch tiếp theo:** Chuẩn bị triển khai task `EP02-T01: Nâng Cấp Schema Lô Hàng Hạn Dùng & Cấu Hình Hạn Lưu Thông Tối Thiểu`.
 
+---
+
+### [2026-11-16] EP04-T01: Quản Lý Danh Sách Nhặt Hàng & Quét Barcode Xác Thực (Picking Workflow)
+- **Epic:** EPIC 04 – Fulfillment & WMS Operations
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP03-T03 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Prisma Schema & Migrations:
+    - Bổ sung `picked_at` vào bảng `fulfillment_orders`.
+    - Tạo các bảng `packages`, `package_items`, `shipment_packages` với check constraints trọng lượng và kích thước dương.
+    - Bổ sung liên kết `fulfillment_order_id` trên `shipments`.
+    - Migration `20261116150000_add_packages_and_shipment_links` áp dụng thành công trên Neon PostgreSQL.
+  - DTOs (`backend/src/modules/fulfillment/presentation/dtos/picking.dto.ts`):
+    - `StartPickingDto`, `PickedItemDto`, `CompletePickingDto`, `PickListItemDto`, `PickListResponseDto`.
+  - Service `PickingService` (`backend/src/modules/fulfillment/application/services/picking.service.ts`):
+    - `getPickList(fulfillmentOrderId)`: Truy vấn danh sách cần nhặt kèm mã lô FEFO chỉ định từ `inventory_reservation_items`.
+    - `startPicking(fulfillmentOrderId, pickerId)`: Chuyển trạng thái `ALLOCATED` -> `PICKING`, gán `assignedPickerId`, hỗ trợ idempotent.
+    - `completePicking(fulfillmentOrderId, dto, pickerId)`:
+      - Đối chiếu 100% mã lô và số lượng thực tế với FEFO reservation.
+      - AC1: Quét sai mã lô (Batch Code) ném `BadRequestException('BATCH_MISMATCH: ...')`.
+      - AC2: Quét đủ số lượng và đúng lô -> cập nhật FO sang `PICKED`, lưu `pickedAt`, cập nhật `quantityFulfilled` trên `fulfillment_order_items`.
+  - Controller `AdminFulfillmentController` (`backend/src/modules/fulfillment/presentation/controllers/admin-fulfillment.controller.ts`):
+    - `GET /api/v1/admin/fulfillment-orders/:id/pick-list`
+    - `POST /api/v1/admin/fulfillment-orders/:id/start-picking`
+    - `POST /api/v1/admin/fulfillment-orders/:id/complete-picking`
+  - Đóng gói `FulfillmentModule` và đăng ký vào `AppModule`.
+- **Kiểm thử:** `picking.service.spec.ts` (10/10 tests PASS bao phủ pick list, start picking, batch mismatch, quantity mismatch, complete picking, và idempotency).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100% sạch sẽ.
+
+---
+
+### [2026-11-16] EP04-T02: Quy Trình Đóng Gói, Cân Đo Kiện Thực Tế (Packing & Packages)
+- **Epic:** EPIC 04 – Fulfillment & WMS Operations
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP04-T01 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - DTOs (`backend/src/modules/fulfillment/presentation/dtos/packing.dto.ts`):
+    - `CreatePackageItemDto`, `CreatePackageDto`, `CompletePackingDto`, `PackageResponseDto`, `CompletePackingResponseDto`.
+  - Service `PackingService` (`backend/src/modules/fulfillment/application/services/packing.service.ts`):
+    - Kiểm tra trạng thái FO phải là `PICKED`.
+    - Idempotency guard: Nếu đơn đã `PACKED`, trả về danh sách packages và shipment hiện tại.
+    - AC1: Hỗ trợ đóng thành 1 hoặc nhiều packages (`dto.packages`).
+    - AC2: Bắt buộc cân nặng và kích thước thực tế lớn hơn 0 (`actualWeightGrams > 0`, `lengthCm > 0`, `widthCm > 0`, `heightCm > 0`), từ chối số ước tính.
+    - Kiểm tra độ bao phủ 100% sản phẩm đối chiếu với danh sách FO items (`ITEM_NOT_FOUND_IN_ORDER`, `QUANTITY_MISMATCH`).
+    - Mở Transaction:
+      - Tạo thực thể `Shipment` ở trạng thái `PENDING_CREATION`, mapping `carrierCode` chuẩn (`EXPRESS_2H` $\rightarrow$ `AHAMOVE`, `STANDARD` $\rightarrow$ `GHN`).
+      - Tạo các thực thể `Package` và `PackageItem`.
+      - Tạo liên kết `ShipmentPackage`.
+      - Cập nhật `fulfillment_orders.status = 'PACKED'`, `packedAt = now()`.
+      - Ghi nhận Transactional Outbox Event `SHIPMENT_DISPATCH_REQUESTED`.
+  - Controller `AdminFulfillmentController`:
+    - `POST /api/v1/admin/fulfillment-orders/:id/complete-packing`.
+  - Cập nhật `FulfillmentModule` đăng ký `PackingService`.
+- **Kiểm thử:** `packing.service.spec.ts` (11/11 tests PASS bao phủ validation, đơn kiện, đa kiện, Express 2H / Ahamove, GHN và idempotent).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100% sạch sẽ.
+
+---
+
+### [2026-11-16] EP04-T03: Quy Trình Xác Nhận Bàn Giao Kiện Hàng Cho Tài Xế (Handover Workflow)
+- **Epic:** EPIC 04 – Fulfillment & WMS Operations
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP04-T02 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - DTOs (`backend/src/modules/fulfillment/presentation/dtos/handover.dto.ts`):
+    - `ConfirmHandoverDto`, `ConfirmHandoverResponseDto`.
+  - Service `HandoverService` (`backend/src/modules/fulfillment/application/services/handover.service.ts`):
+    - Kiểm tra trạng thái FO phải là `PACKED`.
+    - Idempotency guard: Nếu đơn đã `HANDED_OVER`, trả về chi tiết bàn giao hiện tại.
+    - AC1: Kiểm tra vận đơn `Shipment` liên kết; nếu chưa có `tracking_code` từ 3PL ném `BadRequestException('SHIPMENT_NOT_READY: Kiện hàng chưa có mã vận đơn từ đối tác vận chuyển!')`.
+    - AC2: Bàn giao thành công:
+      - Cập nhật `fulfillment_orders.status = 'HANDED_OVER'`, `handedOverAt = now()`.
+      - Cập nhật `shipments.status = 'HANDED_OVER'`, `handedOverAt = now()`.
+      - Tích hợp gọi `OrderStateAggregator.computeOrderStatus(fo.orderId, tx)` để cập nhật trạng thái đơn cha (ví dụ `SHIPPED` hoặc `PARTIALLY_SHIPPED`).
+      - Ghi nhận Transactional Outbox Event `FO_HANDED_OVER`.
+  - Controller `AdminFulfillmentController`:
+    - `POST /api/v1/admin/fulfillment-orders/:id/confirm-handover`.
+  - Cập nhật `FulfillmentModule` đăng ký `HandoverService`.
+- **Kiểm thử:** `handover.service.spec.ts` (7/7 tests PASS bao phủ validation trạng thái, tracking code check, bàn giao thành công, gọi aggregator và idempotent).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100% sạch sẽ.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 04
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP04-T01** | Quản Lý Danh Sách Nhặt Hàng & Quét Barcode Xác Thực (Picking Workflow) | `DONE` | 10/10 PASS (`picking.service.spec.ts`) |
+| **EP04-T02** | Quy Trình Đóng Gói, Cân Đo Kiện Thực Tế (Packing & Packages) | `DONE` | 11/11 PASS (`packing.service.spec.ts`) |
+| **EP04-T03** | Quy Trình Xác Nhận Bàn Giao Kiện Hàng Cho Tài Xế (Handover Workflow) | `DONE` | 7/7 PASS (`handover.service.spec.ts`) |
+
+
+
+

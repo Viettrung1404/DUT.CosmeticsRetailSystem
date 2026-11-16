@@ -34,6 +34,8 @@ import { ReturnsModule } from '@modules/returns/returns.module';
 import { ShipmentsModule } from '@modules/shipments/shipments.module';
 import { HealthModule } from '@core/health/health.module';
 import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-infrastructure.module';
+import { OmsModule } from '@modules/oms/oms.module';
+import { FulfillmentModule } from '@modules/fulfillment/fulfillment.module';
 
 @Module({
   imports: [
@@ -81,6 +83,8 @@ import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-i
     ReportsModule,
     MarketingModule,
     AsyncInfrastructureModule,
+    OmsModule,
+    FulfillmentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

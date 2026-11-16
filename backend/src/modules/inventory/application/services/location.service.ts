@@ -244,7 +244,7 @@ export class LocationService {
     if ((this.prisma as any).fulfillmentOrder) {
       allocatedOrdersToday = await (this.prisma as any).fulfillmentOrder.count({
         where: {
-          locationId: store.id,
+          sourceLocationId: store.id,
           createdAt: { gte: startUtc, lte: endUtc },
           status: { notIn: ['CANCELLED'] },
         },

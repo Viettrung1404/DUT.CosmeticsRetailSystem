@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PermissionsModule } from '@modules/permissions/permissions.module';
+import { AsyncInfrastructureModule } from '@modules/async-infrastructure';
 import { InventoryAdminController } from './presentation/controllers/inventory-admin.controller';
 import { InventoryPosController } from './presentation/controllers/inventory-pos.controller';
 import { TransferAdminController } from './presentation/controllers/transfer-admin.controller';
@@ -37,13 +38,16 @@ import { PrismaStocktakeRepository } from './infrastructure/persistence/prisma-s
 import { PrismaBatchRepository } from './infrastructure/persistence/prisma-batch.repository';
 import { PrismaInventoryAlertRepository } from './infrastructure/persistence/prisma-inventory-alert.repository';
 import { InventoryAlertScheduler } from './infrastructure/schedulers/inventory-alert.scheduler';
+import { ReservationCleanupScheduler } from './infrastructure/schedulers/reservation-cleanup.scheduler';
 import { AtpCalculatorService } from './application/services/atp-calculator.service';
 import { InventoryBalanceService } from './application/services/inventory-balance.service';
 import { LocationService } from './application/services/location.service';
+import { FefoAllocationService } from './application/services/fefo-allocation.service';
+import { InventoryReservationService } from './application/services/inventory-reservation.service';
 import { LocationController } from './presentation/controllers/location.controller';
 
 @Module({
-  imports: [PermissionsModule],
+  imports: [PermissionsModule, AsyncInfrastructureModule],
   controllers: [
     InventoryAdminController,
     InventoryPosController,
@@ -73,6 +77,7 @@ import { LocationController } from './presentation/controllers/location.controll
     ManageBatchesUseCase,
     SendInventoryAlertsUseCase,
     InventoryAlertScheduler,
+    ReservationCleanupScheduler,
     { provide: INVENTORY_REPOSITORY, useClass: PrismaInventoryRepository },
     { provide: ADJUSTMENT_REPOSITORY, useClass: PrismaAdjustmentRepository },
     { provide: TRANSFER_REPOSITORY, useClass: PrismaTransferRepository },
@@ -82,11 +87,16 @@ import { LocationController } from './presentation/controllers/location.controll
     AtpCalculatorService,
     InventoryBalanceService,
     LocationService,
+    FefoAllocationService,
+    InventoryReservationService,
   ],
   exports: [
     AtpCalculatorService,
     InventoryBalanceService,
     LocationService,
+    FefoAllocationService,
+    InventoryReservationService,
+    ReservationCleanupScheduler,
     INVENTORY_REPOSITORY,
   ],
 })
