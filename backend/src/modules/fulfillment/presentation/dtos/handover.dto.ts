@@ -1,7 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString } from 'class-validator';
 
 export class ConfirmHandoverDto {
+  @ApiPropertyOptional({
+    description: 'Phiên bản kỳ vọng để kiểm soát đồng thời (OCC)',
+    example: 3,
+  })
+  @IsInt()
+  @IsOptional()
+  expectedVersion?: number;
+
   @ApiPropertyOptional({
     description: 'Tên tài xế/bưu tá nhận hàng',
     example: 'Nguyễn Văn Tài',

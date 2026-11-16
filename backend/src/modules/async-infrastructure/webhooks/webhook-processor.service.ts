@@ -238,6 +238,25 @@ export class WebhookProcessorService {
             occurredAt,
           },
         });
+
+        // Nếu giao thành công và có số tiền COD phát sinh -> Ghi nhận sự kiện COD_COLLECTED_CONFIRMED
+        if (targetStatus === 'DELIVERED' && Number(shipment.codAmount || 0) > 0) {
+          await this.outboxWriter.record(tx, {
+            aggregateType: 'SHIPMENT',
+            aggregateId: shipment.id,
+            eventType: 'COD_COLLECTED_CONFIRMED',
+            occurredAt,
+            payload: {
+              shipmentId: shipment.id,
+              orderId: shipment.orderId,
+              fulfillmentOrderId: shipment.fulfillmentOrderId,
+              trackingCode: shipment.trackingCode,
+              carrierCode,
+              codAmount: Number(shipment.codAmount),
+              collectedAt: occurredAt,
+            },
+          });
+        }
       }
 
       // 7. Gọi OrderStateAggregator để cập nhật trạng thái đơn hàng cha

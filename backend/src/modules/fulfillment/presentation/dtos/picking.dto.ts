@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -13,6 +14,10 @@ export class StartPickingDto {
   @IsString()
   @IsOptional()
   pickerId?: string;
+
+  @IsInt()
+  @IsOptional()
+  expectedVersion?: number;
 }
 
 export class PickedItemDto {
@@ -38,6 +43,10 @@ export class CompletePickingDto {
   @ValidateNested({ each: true })
   @Type(() => PickedItemDto)
   items!: PickedItemDto[];
+
+  @IsInt()
+  @IsOptional()
+  expectedVersion?: number;
 }
 
 export interface PickListItemDto {

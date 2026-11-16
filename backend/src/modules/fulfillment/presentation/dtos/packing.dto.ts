@@ -75,6 +75,11 @@ export class CompletePackingDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePackageDto)
   packages: CreatePackageDto[];
+
+  @ApiPropertyOptional({ description: 'Phiên bản kỳ vọng để kiểm soát đồng thời (OCC)', example: 2 })
+  @IsInt()
+  @IsOptional()
+  expectedVersion?: number;
 }
 
 export class PackageItemResponseDto {

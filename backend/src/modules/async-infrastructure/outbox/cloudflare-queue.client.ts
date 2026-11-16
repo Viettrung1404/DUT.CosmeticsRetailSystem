@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getCorrelationId } from '@core/logger/correlation-context';
 
 export const CLOUDFLARE_QUEUE_CLIENT = Symbol('CLOUDFLARE_QUEUE_CLIENT');
 
@@ -54,12 +55,17 @@ export class CloudflareQueueClient implements ICloudflareQueueClient {
     }
 
     try {
+      const correlationId =
+        getCorrelationId() ||
+        message.payload?.metadata?.correlationId;
+
       const response = await fetch(this.producerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiToken}`,
           'X-Event-Type': message.eventType,
+          ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
         },
         body: JSON.stringify(message),
         signal: AbortSignal.timeout(5000),
@@ -102,11 +108,13 @@ export class CloudflareQueueClient implements ICloudflareQueueClient {
     }
 
     try {
+      const correlationId = getCorrelationId();
       const response = await fetch(`${this.producerUrl}/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiToken}`,
+          ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
         },
         body: JSON.stringify({ messages }),
         signal: AbortSignal.timeout(10000),

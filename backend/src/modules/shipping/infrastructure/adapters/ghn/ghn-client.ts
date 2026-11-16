@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UpstashRedisService } from '@core/cache/upstash-redis.service';
+import { getCorrelationId } from '@core/logger/correlation-context';
 import {
   QuoteRequestDto,
   QuoteResponseDto,
@@ -92,10 +93,12 @@ export class GHNClient {
   }
 
   private getHeaders(): Record<string, string> {
+    const correlationId = getCorrelationId();
     return {
       'Content-Type': 'application/json',
       Token: this.token,
       ShopId: this.shopId,
+      ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
     };
   }
 

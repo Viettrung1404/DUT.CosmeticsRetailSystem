@@ -3,10 +3,38 @@ import { Prisma, OutboxEvent } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { BaseDomainEvent } from './base-domain-event';
 import { IOutboxWriter } from './outbox-writer.interface';
+import { getCorrelationId } from '@core/logger/correlation-context';
 
 @Injectable()
 export class OutboxWriterService implements IOutboxWriter {
   private readonly logger = new Logger(OutboxWriterService.name);
+
+  /**
+   * Làm giàu payload sự kiện miền với metadata chứa correlationId phục vụ truy vết phân tán (EP12-T01)
+   */
+  private enrichPayloadWithMetadata(payload: any): any {
+    const correlationId =
+      getCorrelationId() ||
+      (typeof payload === 'object' && payload !== null ? payload.metadata?.correlationId : undefined) ||
+      randomUUID();
+
+    if (typeof payload === 'object' && payload !== null) {
+      return {
+        ...payload,
+        metadata: {
+          ...(payload.metadata || {}),
+          correlationId,
+        },
+      };
+    }
+
+    return {
+      data: payload,
+      metadata: {
+        correlationId,
+      },
+    };
+  }
 
   /**
    * Ghi nhận một sự kiện miền vào bảng outbox_events bên trong một Transaction Client.
@@ -20,6 +48,7 @@ export class OutboxWriterService implements IOutboxWriter {
     const createdAt = event.occurredAt
       ? new Date(event.occurredAt)
       : new Date();
+    const payload = this.enrichPayloadWithMetadata(event.payload);
 
     return tx.outboxEvent.create({
       data: {
@@ -27,7 +56,7 @@ export class OutboxWriterService implements IOutboxWriter {
         aggregateType: event.aggregateType,
         aggregateId: String(event.aggregateId),
         eventType: event.eventType,
-        payload: event.payload as any,
+        payload: payload as any,
         status: 'PENDING',
         retryCount: 0,
         createdAt,
@@ -52,13 +81,14 @@ export class OutboxWriterService implements IOutboxWriter {
       const createdAt = event.occurredAt
         ? new Date(event.occurredAt)
         : new Date();
+      const payload = this.enrichPayloadWithMetadata(event.payload);
 
       return {
         id,
         aggregateType: event.aggregateType,
         aggregateId: String(event.aggregateId),
         eventType: event.eventType,
-        payload: event.payload as any,
+        payload: payload as any,
         status: 'PENDING',
         retryCount: 0,
         createdAt,
@@ -70,3 +100,4 @@ export class OutboxWriterService implements IOutboxWriter {
     });
   }
 }
+

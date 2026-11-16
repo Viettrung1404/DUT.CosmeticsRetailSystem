@@ -661,5 +661,217 @@
 | **EP09-T02** | Triển Khai Cloudflare Worker Webhook Ingress Tại Edge | `DONE` | 5/5 PASS (`cloudflare-worker-ingress-consumer.spec.ts`) |
 | **EP09-T03** | Triển Khai Cloudflare Queue Consumer & Internal Command Dispatcher | `DONE` | 10/10 PASS (`internal-webhook.controller.spec.ts`, `cloudflare-worker-ingress-consumer.spec.ts`, `epic-09-integrated-flow.spec.ts`) |
 
+---
+
+### [2026-11-16] EP10-T01: Xây Dựng Vòng Đời Thu Hộ COD & Phân Bổ Khi Tách Đơn (4-Stage COD Lifecycle)
+- **Epic:** EPIC 10 – COD Reconciliation Engine
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP08-T03 (`DONE`), EP04-T02 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Định nghĩa trạng thái COD 4 giai đoạn (`backend/src/modules/finance/domain/cod-status.ts`):
+    - `COD_PENDING_COLLECTION`: Chờ thu tiền khi shipper đang giao.
+    - `COD_COLLECTED_BY_CARRIER`: Shipper đã thu tiền thành công.
+    - `COD_REMITTED_TO_BANK`: Tiền đã về tài khoản ngân hàng GlowUp.
+    - `COD_SETTLED_DISCREPANCY`: Lệch tiền thu hộ so với đối soát.
+  - Service `CodManagementService` (`backend/src/modules/finance/application/services/cod-management.service.ts`):
+    - `calculateFulfillmentOrderCod(foId)`: Phân bổ COD theo tỷ lệ Net Merchandise Value giữa các kiện tách kho (AC1).
+    - `processCarrierCollection(trackingCode, amount, tx)`: Cập nhật trạng thái COD khi nhận Webhook giao thành công.
+  - Tích hợp vào `PackingService` và `WebhookProcessorService`.
+- **Kiểm thử:** `cod-management.service.spec.ts`: 20/20 tests PASS.
+
+---
+
+### [2026-11-16] EP10-T02: Nhập Bảng Kê Đối Soát Đối Tác & Cảnh Báo Sai Lệch (Reconciliation & Discrepancies)
+- **Epic:** EPIC 10 – COD Reconciliation Engine
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP10-T01 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Cơ sở dữ liệu: Model `CodReconciliation`, `CodReconciliationItem` trong `schema.prisma`.
+  - Migration: `20261116200000_add_cod_reconciliations` đã apply thành công trên Neon PostgreSQL.
+  - Service `CodReconciliationService` (`backend/src/modules/finance/application/services/cod-management.service.ts`):
+    - `reconcileBatch`: Đối chiếu từng dòng vận đơn, tự động gắn cờ `DISCREPANCY` nếu lệch tiền (AC1) và `MATCHED` / `SETTLED` nếu khớp 100% (AC2).
+  - Controller `AdminCodController` (`backend/src/modules/finance/presentation/controllers/admin-cod.controller.ts`).
+- **Kiểm thử:**
+  - `cod-reconciliation.service.spec.ts`: 8/8 tests PASS.
+  - `admin-cod.controller.spec.ts`: 3/3 tests PASS.
+  - `cod-reconciliation.migration.spec.ts`: 1/1 test PASS.
+  - `epic-10-integrated-flow.spec.ts`: 1/1 test PASS.
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100%.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 10
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP10-T01** | Xây Dựng Vòng Đời Thu Hộ COD & Phân Bổ Khi Tách Đơn | `DONE` | 20/20 PASS (`cod-management.service.spec.ts`), 23/23 PASS (regression) |
+| **EP10-T02** | Nhập Bảng Kê Đối Soát Đối Tác & Cảnh Báo Sai Lệch | `DONE` | 13/13 PASS (`cod-reconciliation.service.spec.ts`, `admin-cod.controller.spec.ts`, `cod-reconciliation.migration.spec.ts`, `epic-10-integrated-flow.spec.ts`) |
+
+---
+
+### [2026-11-16] EP11-T01: Xây Dựng Location Scope & RBAC Guards Cho Nghiệp Vụ Kho
+- **Epic:** EPIC 11 – Admin Operations Integration
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP04-T01 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Decorator `@LocationScoped()` (`backend/src/core/decorators/location-scoped.decorator.ts`):
+    - Khai báo metadata phạm vi chi nhánh cho các route/controller: `resourceType` (`FULFILLMENT_ORDER`, `STORE`, `SHIPMENT`), `paramName`, `allowAdminOverride`.
+  - Guard `LocationScopeGuard` (`backend/src/core/guards/location-scope.guard.ts`):
+    - Tận dụng `GetUserDataScopeUseCase` và `isStoreInScope` sẵn có của hệ thống để phân giải phạm vi chi nhánh của người dùng từ bảng `user_stores`.
+    - Phân giải ID tài nguyên từ params/body/query và truy vấn `sourceLocationId` từ database đối với `FulfillmentOrder` hoặc `Shipment`.
+    - **AC1:** Nhân viên Showroom Q10 thao tác trên đơn hàng Showroom Q1 $\implies$ Ném HTTP 403 Forbidden với mã `LOCATION_SCOPE_UNAUTHORIZED`.
+    - **AC2:** Quản lý vùng phụ trách nhiều chi nhánh (ví dụ [Q1, Q10]) thao tác thành công trên đơn hàng thuộc phạm vi.
+    - Admin bypass: Người dùng có vai trò `ADMIN`, `OPERATIONS_MGR` hoặc `dataScope === 'ALL' | 'GLOBAL'` được bypass toàn quyền.
+    - Xác thực định dạng UUID an toàn tránh lỗi runtime DB driver; trả 404 `NotFoundException` nếu tài nguyên không tồn tại.
+  - Tích hợp Global Guard:
+    - Đăng ký `LocationScopeGuard` làm `APP_GUARD` trong `AppModule` (`backend/src/app.module.ts`), đặt sau `JwtAuthGuard` và `PermissionGuard`.
+  - Áp dụng trên `AdminFulfillmentController` (`backend/src/modules/fulfillment/presentation/controllers/admin-fulfillment.controller.ts`):
+    - Bảo vệ các endpoint WMS: `GET /:id/pick-list`, `POST /:id/start-picking`, `POST /:id/complete-picking`, `POST /:id/complete-packing`, `POST /:id/confirm-handover`.
+    - Kết hợp `@RequireAnyPermission(...)` kiểm tra quyền theo module.
+- **Kiểm thử:**
+  - `location-scope.guard.spec.ts`: 7/7 tests PASS (Bỏ qua route không đánh dấu; Unauthorized khi thiếu user; Admin bypass; 404 khi không tìm thấy đơn; AC1: Q10 chặn đơn Q1 ném 403; AC2: Quản lý đa chi nhánh thành công; Hỗ trợ kiểm tra SHIPMENT).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100%.
+
+---
+
+### [2026-11-16] EP11-T02: Xây Dựng Admin Work Queues & API Danh Mục Hành Động (Work Queues & Actions API)
+- **Epic:** EPIC 11 – Admin Operations Integration
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP11-T01 (`DONE`), EP04-T02 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Service `AdminActionMatrixService` (`backend/src/modules/fulfillment/application/services/admin-action-matrix.service.ts`):
+    - Tính toán danh mục hành động hợp lệ (`availableActions`) và chi tiết metadata (nhãn nút, HTTP method, endpoint REST) theo máy trạng thái WMS:
+      - `ALLOCATED` $\rightarrow$ `['START_PICKING', 'CANCEL']` (chặn tuyệt đối việc đóng gói hoặc giao hàng khi chưa nhặt hàng).
+      - `PICKING` $\rightarrow$ `['COMPLETE_PICKING']`
+      - `PICKED` $\rightarrow$ `['COMPLETE_PACKING']`
+      - `PACKED` $\rightarrow$ `['CONFIRM_HANDOVER']`
+      - `HANDED_OVER` $\rightarrow$ `['TRACK_SHIPMENT']`
+      - `COMPLETED` / `CANCELLED` $\rightarrow$ `[]`
+  - DTOs (`backend/src/modules/fulfillment/presentation/dtos/queue.dto.ts`):
+    - `TaskQueueQueryDto`: Phân trang (`page`, `limit`), lọc `storeId`.
+    - `TaskQueueItemDto`, `TaskQueueResponseDto`: Cung cấp dữ liệu tóm tắt cho màn hình điều hành kho.
+  - Service `FulfillmentQueueService` (`backend/src/modules/fulfillment/application/services/fulfillment-queue.service.ts`):
+    - `getUserAccessibleStoreIds`: Tự động phân giải chi nhánh phụ trách của nhân viên từ `userDataScope`.
+    - `getPickingTasks`: **AC1** - Truy vấn hàng đợi nhặt hàng (`status = 'ALLOCATED'`) chỉ bao gồm các đơn thuộc phạm vi chi nhánh của nhân viên.
+    - `getPackingTasks`: Hàng đợi đóng gói (`status = 'PICKED'`) theo phạm vi chi nhánh.
+    - `getHandoverTasks`: Hàng đợi bàn giao (`status = 'PACKED'`) theo phạm vi chi nhánh.
+    - `getFulfillmentOrderDetail`: Trả về chi tiết đơn đầy đủ (items, variant, packages, shipments, order) kèm `availableActions` và `actionDetails` (AC2).
+  - Controller `AdminFulfillmentQueueController` (`backend/src/modules/fulfillment/presentation/controllers/admin-fulfillment-queue.controller.ts`):
+    - `GET /api/v1/admin/fulfillment/tasks/picking`
+    - `GET /api/v1/admin/fulfillment/tasks/packing`
+    - `GET /api/v1/admin/fulfillment/tasks/handover`
+    - Phân quyền RBAC qua `@RequireAnyPermission(...)`.
+  - Cập nhật `AdminFulfillmentController`:
+    - Thêm endpoint `GET /api/v1/admin/fulfillment-orders/:id` có `@LocationScoped()` và `@RequireAnyPermission(...)`.
+- **Kiểm thử:**
+  - `admin-action-matrix.service.spec.ts`: 7/7 tests PASS (AC2: Chặn sai bước, ma trận hành động từng trạng thái, metadata endpoint).
+  - `fulfillment-queue.service.spec.ts`: 7/7 tests PASS (AC1: Lọc đúng chi nhánh, admin xem toàn hệ thống, 403 khi lọc ngoài quyền, hàng đợi đóng gói, hàng đợi bàn giao, chi tiết đơn kèm availableActions, 404).
+  - `admin-fulfillment-queue.controller.spec.ts`: 3/3 tests PASS.
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100%.
+
+---
+
+### [2026-11-16] EP11-T03: Tích Hợp Kiểm Soát Đồng Thời Lạc Quan & Universal Audit Log (OCC & Audit History)
+- **Epic:** EPIC 11 – Admin Operations Integration
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP11-T02 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Cơ sở dữ liệu & Migration:
+    - Bổ sung `version Int @default(1)` vào model `FulfillmentOrder` (`fulfillment_orders`).
+    - Bổ sung model `DomainStatusHistory` (`domain_status_histories`) vào `backend/prisma/schema.prisma`.
+    - Migration PostgreSQL: `20261116210000_add_occ_and_domain_status_histories` đã apply thành công trên Neon PostgreSQL.
+    - Index tối ưu: `idx_domain_status_audit` trên `(entity_type, entity_id, occurred_at DESC)`.
+  - Service `AuditLogService` (`backend/src/core/services/audit-log.service.ts`):
+    - `recordTransition(tx, params)`: Ghi nhận sự kiện chuyển trạng thái trong cùng ACID transaction với thao tác nghiệp vụ.
+    - `getEntityHistory(entityType, entityId)`: Truy vấn toàn bộ lịch sử chuyển trạng thái theo thứ tự thời gian giảm dần (AC2).
+  - Kiểm soát đồng thời lạc quan (OCC - Optimistic Concurrency Control):
+    - Bổ sung `expectedVersion?: number` vào các Command DTOs: `StartPickingDto`, `CompletePickingDto`, `CompletePackingDto`, `ConfirmHandoverDto`.
+    - **AC1:** Nếu 2 nhân viên cùng mở màn hình và cùng bấm "Bắt đầu nhặt hàng" với cùng version ban đầu $\implies$ Thao tác đến sau bị chặn với mã lỗi HTTP 409 Conflict (`CONCURRENT_MODIFICATION_DETECTED`).
+    - Tự động tăng `version: { increment: 1 }` trên mỗi bước chuyển trạng thái (`ALLOCATED` $\rightarrow$ `PICKING` $\rightarrow$ `PICKED` $\rightarrow$ `PACKED` $\rightarrow$ `HANDED_OVER`).
+    - Ghi nhận Universal Audit Log tại tất cả các bước với đầy đủ `actorId`, `actorType`, `fromStatus`, `toStatus`, `actionPerformed`.
+- **Kiểm thử:**
+  - `audit-log.service.spec.ts`: 3/3 tests PASS (AC2: Ghi nhận đúng entityType, entityId, fromStatus, toStatus, actionPerformed, actorId; tự động fallback SYSTEM_WORKER; truy vấn getEntityHistory desc).
+  - `concurrency-occ.spec.ts`: 5/5 tests PASS (AC1: Nhân viên 1 thành công version 1 -> 2; Nhân viên 2 gửi version 1 bị ném 409 Conflict CONCURRENT_MODIFICATION_DETECTED; chặn sai version ở completePicking, completePacking, confirmHandover).
+  - `epic-11-integrated-flow.spec.ts`: 1/1 test PASS (Kiểm thử chu trình khép kín: Location Scope Guard chặn Showroom Q1 gọi đơn Q10 -> Queue lọc đúng chi nhánh -> OCC Concurrency Collision chặn người bấm sau với 409 Conflict -> Chu trình khép kín 4 bước tăng version tuần tự -> Universal Audit Log ghi nhận 4 bản ghi audit đầy đủ).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100%.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 11
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP11-T01** | Xây Dựng Location Scope & RBAC Guards Cho Nghiệp Vụ Kho | `DONE` | 7/7 PASS (`location-scope.guard.spec.ts`) |
+| **EP11-T02** | Xây Dựng Admin Work Queues & API Danh Mục Hành Động | `DONE` | 17/17 PASS (`admin-action-matrix.service.spec.ts`, `fulfillment-queue.service.spec.ts`, `admin-fulfillment-queue.controller.spec.ts`) |
+| **EP11-T03** | Tích Hợp Kiểm Soát Đồng Thời Lạc Quan & Universal Audit Log | `DONE` | 9/9 PASS (`audit-log.service.spec.ts`, `concurrency-occ.spec.ts`, `epic-11-integrated-flow.spec.ts`) |
+
+---
+
+### [2026-11-16] EP12-T01: Tích Hợp Correlation ID & Truy Vết Phân Tán (Distributed Tracing & Correlation ID)
+- **Epic:** EPIC 12 – Observability & Disaster Recovery
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP09-T03 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - `CorrelationContext` (`backend/src/core/logger/correlation-context.ts`):
+    - Sử dụng Node.js `AsyncLocalStorage` để lưu trữ ngữ cảnh Correlation ID xuyên suốt vòng đời bất đồng bộ mà không cần truyền biến thủ công qua tham số hàm.
+    - Cung cấp `getCorrelationId()`, `getOrCreateCorrelationId()`, `runWithCorrelationContext(...)`.
+  - `CorrelationIdMiddleware` (`backend/src/core/middlewares/correlation-id.middleware.ts`):
+    - Tự động trích xuất `x-correlation-id` (hoặc `x-request-id`) từ header yêu cầu; nếu chưa có thì tự động sinh UUID v4 mới.
+    - Gắn `x-correlation-id` vào request header, request object và HTTP response header (`res.setHeader('x-correlation-id', correlationId)`).
+    - Đăng ký toàn cục trong `AppModule.configure(consumer.apply(CorrelationIdMiddleware).forRoutes('*'))`.
+  - `StructuredLoggerService` (`backend/src/core/logger/structured-logger.service.ts`):
+    - Định dạng log dạng chuẩn JSON: `timestamp`, `level`, `context`, `message`, `correlationId`, `data`, `stack`.
+    - Tự động trích xuất `correlationId` từ ngữ cảnh `AsyncLocalStorage`.
+  - Tích hợp Truy vết phân tán (Distributed Tracing):
+    - `OutboxWriterService` (`backend/src/modules/async-infrastructure/outbox/outbox-writer.service.ts`): Tự động đính kèm `metadata.correlationId` vào payload của mọi domain event ghi vào bảng `outbox_events` (cả `record` và `recordMany`).
+    - `CloudflareQueueClient` (`backend/src/modules/async-infrastructure/outbox/cloudflare-queue.client.ts`): Truyền header `x-correlation-id` trong các cuộc gọi HTTP bắn message sang Cloudflare Queue.
+    - `GHNClient` & `AhamoveClient`: Tự động đính kèm `x-correlation-id` trong toàn bộ cuộc gọi HTTP sang 3PL carriers.
+- **Kiểm thử:**
+  - `correlation-id.middleware.spec.ts`: 4/4 tests PASS (Trích xuất header có sẵn, fallback x-request-id, tự sinh UUID v4, cô lập ngữ cảnh giữa các luồng đồng thời).
+  - `structured-logger.service.spec.ts`: 4/4 tests PASS (Định dạng JSON chuẩn, gắn correlationId từ context, format lỗi có stack trace, logging warn có payload data).
+  - `outbox-tracing.spec.ts`: 3/3 tests PASS (Tự động gắn correlationId vào metadata outbox event, hỗ trợ batch recordMany, tự động fallback UUID khi ghi ngoài HTTP context).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100%.
+
+---
+
+### [2026-11-16] EP12-T02: Xây Dựng Công Cụ Bắn Lại Sự Kiện Lỗi & Xử Lý Dead Letter Queue (DLQ Replay Tooling)
+- **Epic:** EPIC 12 – Observability & Disaster Recovery
+- **Trạng thái:** `DONE`
+- **Dependencies:** EP12-T01 (`DONE`), EP09-T03 (`DONE`).
+- **Thay đổi kỹ thuật:**
+  - Cảnh báo Dead Letter Queue (`backend/src/modules/async-infrastructure/operations/dlq-alert.service.ts`):
+    - Tích hợp phát cảnh báo thời gian thực tới Discord Webhook và Slack Webhook khi có message rơi vào DLQ (**AC2**).
+    - Hỗ trợ cấu hình qua biến môi trường `DISCORD_DLQ_WEBHOOK_URL` và `SLACK_DLQ_WEBHOOK_URL`.
+    - Rich embed/block format: Carrier, Queue, Tracking Code, Event ID, Error Message, Timestamp.
+  - Quản trị & Điều hành DLQ (`backend/src/modules/async-infrastructure/operations/dlq-operations.service.ts`):
+    - `listDlqMessages`: Truy vấn danh sách message lỗi hoặc chuyển vào DLQ từ bảng `shipping_webhook_inbox` (`processedStatus IN ('FAILED', 'DEAD_LETTER')`), có phân trang và lọc theo carrier/tracking code.
+    - `replayMessages`: Bắn lại (Replay) message lỗi một cách an toàn và Idempotent (**AC1**): Đặt lại `processedStatus = 'PENDING'` và kích hoạt `WebhookProcessorService.processEvent(inboxId)`. Ràng buộc unique `[carrier_code, event_id]` và State Transition Guard ngăn chặn tuyệt đối việc nhân đôi dữ liệu hoặc lùi trạng thái đơn hàng.
+    - `retryStuckOutboxEvents`: Quét các outbox events bị kẹt (`status = 'FAILED'` hoặc `retry_count >= threshold`), reset về `status = 'PENDING'`, `retry_count = 0`, `last_error = null`.
+    - `recordDlqMessage`: Điểm tiếp nhận hoặc mô phỏng message rơi vào DLQ từ Cloudflare Queue và kích hoạt cảnh báo tức thời.
+  - Controller Quản trị DLQ (`backend/src/modules/async-infrastructure/operations/dlq-operations.controller.ts`):
+    - `GET /api/v1/admin/operations/dlq/messages`
+    - `POST /api/v1/admin/operations/dlq/replay`
+    - `POST /api/v1/admin/operations/outbox/retry-stuck`
+    - Phân quyền bảo mật: `@UseGuards(JwtAuthGuard, PermissionGuard)` và `@RequireAnyPermission('SYSTEM_SETTING_UPDATE', 'ADMIN')`.
+  - Tích hợp Module (`backend/src/modules/async-infrastructure/async-infrastructure.module.ts`): Đăng ký Controller và Services.
+- **Kiểm thử:**
+  - `dlq-alert.service.spec.ts`: 2/2 tests PASS (AC2: Gửi cảnh báo đồng thời Discord & Slack khi cấu hình URL, bỏ qua an toàn khi không cấu hình webhook URL).
+  - `dlq-operations.service.spec.ts`: 6/6 tests PASS (AC1: Replay an toàn idempotent, kiểm tra ràng buộc dữ liệu, lọc theo carrier/status, xử lý lỗi inbox không tồn tại, reset stuck outbox events, record DLQ & kích hoạt alert).
+  - `dlq-operations.controller.spec.ts`: 3/3 tests PASS (Phân quyền và ủy thác chính xác tới service).
+  - `epic-12-integrated-flow.spec.ts`: 2/2 tests PASS (Kiểm thử chu trình khép kín: Distributed Tracing từ Request Header -> Async Context -> Structured JSON Log -> Outbox Metadata -> Cloudflare Queue Header; DLQ Event Ingress -> Instant Slack/Discord Alert -> Admin DLQ Inspection -> Idempotent Replay không trùng lặp -> Reset Stuck Outbox Events).
+- **Biên dịch:** `npm run build` (`nest build`) thành công 100%.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 12
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP12-T01** | Tích Hợp Correlation ID & Truy Vết Phân Tán (Distributed Tracing) | `DONE` | 11/11 PASS (`correlation-id.middleware.spec.ts`, `structured-logger.service.spec.ts`, `outbox-tracing.spec.ts`) |
+| **EP12-T02** | Xây Dựng Công Cụ Bắn Lại Sự Kiện Lỗi & Xử Lý Dead Letter Queue (DLQ Replay) | `DONE` | 13/13 PASS (`dlq-alert.service.spec.ts`, `dlq-operations.service.spec.ts`, `dlq-operations.controller.spec.ts`) |
+| **INTEGRATION** | Epic 12 End-to-End Tracing & DLQ Replay Integrated Flow | `DONE` | 2/2 PASS (`epic-12-integrated-flow.spec.ts`) |
+
+
+
 
 

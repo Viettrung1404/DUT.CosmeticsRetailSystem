@@ -2,12 +2,16 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Inject,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { IOutboxWriter, OUTBOX_WRITER } from '@modules/async-infrastructure';
+import { CodManagementService } from '@modules/finance/application/services/cod-management.service';
+import { AuditLogService } from '@core/services/audit-log.service';
 import {
   CompletePackingDto,
   CompletePackingResponseDto,
@@ -23,6 +27,10 @@ export class PackingService {
     private readonly prisma: PrismaService,
     @Inject(OUTBOX_WRITER)
     private readonly outboxWriter: IOutboxWriter,
+    @Optional()
+    private readonly codManagementService?: CodManagementService,
+    @Optional()
+    private readonly auditLogService?: AuditLogService,
   ) {}
 
   /**
@@ -64,6 +72,15 @@ export class PackingService {
       throw new NotFoundException(
         `Không tìm thấy FulfillmentOrder với ID: ${fulfillmentOrderId}`,
       );
+    }
+
+    // OCC: Kiểm tra version nếu client cung cấp expectedVersion (AC1)
+    if (dto.expectedVersion !== undefined && fo.version !== dto.expectedVersion) {
+      throw new ConflictException({
+        statusCode: 409,
+        errorCode: 'CONCURRENT_MODIFICATION_DETECTED',
+        message: 'Dữ liệu đơn hàng đã bị cập nhật bởi người dùng khác. Vui lòng tải lại trang.',
+      });
     }
 
     // Idempotency: Nếu đơn đã hoàn thành đóng gói PACKED
@@ -180,13 +197,25 @@ export class PackingService {
     const carrierCode =
       fo.shippingServiceCode === 'EXPRESS_2H' ? 'AHAMOVE' : 'GHN';
 
-    // Xác định tiền thu hộ COD nếu đơn thanh toán COD
-    const codPayment = fo.order.payments.find(
-      (p) => p.paymentMethod === 'COD' && p.status === 'PENDING',
-    );
-    const codAmount = codPayment
-      ? codPayment.amount
-      : new Prisma.Decimal(0);
+    // Xác định tiền thu hộ COD nếu đơn thanh toán COD (phân bổ theo tỷ lệ nếu tách đơn)
+    let codAmount = new Prisma.Decimal(0);
+    if (this.codManagementService) {
+      try {
+        const allocated = await this.codManagementService.calculateFulfillmentOrderCod(fo.id);
+        codAmount = new Prisma.Decimal(allocated);
+      } catch (err: any) {
+        this.logger.warn(`Lỗi khi tính toán COD qua CodManagementService: ${err.message}. Fallback về payment amount.`);
+        const codPayment = fo.order.payments.find(
+          (p) => p.paymentMethod === 'COD' && p.status === 'PENDING',
+        );
+        codAmount = codPayment ? codPayment.amount : new Prisma.Decimal(0);
+      }
+    } else {
+      const codPayment = fo.order.payments.find(
+        (p) => p.paymentMethod === 'COD' && p.status === 'PENDING',
+      );
+      codAmount = codPayment ? codPayment.amount : new Prisma.Decimal(0);
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // 1. Tạo Shipment ở trạng thái PENDING_CREATION
@@ -264,8 +293,22 @@ export class PackingService {
         data: {
           status: 'PACKED',
           packedAt: now,
+          version: { increment: 1 },
         },
       });
+
+      // Ghi Universal Audit Log
+      if (this.auditLogService) {
+        await this.auditLogService.recordTransition(tx, {
+          entityType: 'FULFILLMENT_ORDER',
+          entityId: fo.id,
+          fromStatus: fo.status,
+          toStatus: 'PACKED',
+          action: 'COMPLETE_PACKING',
+          actorType: 'ADMIN_USER',
+          actorId: packedById || null,
+        });
+      }
 
       // 4. Ghi nhận Transactional Outbox Event SHIPMENT_DISPATCH_REQUESTED
       await this.outboxWriter.record(tx, {

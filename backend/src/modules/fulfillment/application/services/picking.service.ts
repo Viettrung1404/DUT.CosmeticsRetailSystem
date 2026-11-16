@@ -3,9 +3,11 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
+import { AuditLogService } from '@core/services/audit-log.service';
 import {
   CompletePickingDto,
   PickListResponseDto,
@@ -16,7 +18,11 @@ import {
 export class PickingService {
   private readonly logger = new Logger(PickingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly auditLogService?: AuditLogService,
+  ) {}
 
   /**
    * Lấy danh sách sản phẩm và mã lô FEFO chỉ định cần nhặt cho một FulfillmentOrder
@@ -100,10 +106,12 @@ export class PickingService {
 
   /**
    * Bắt đầu quy trình nhặt hàng: Chuyển trạng thái từ ALLOCATED -> PICKING
+   * DES-07 EP11-T03: Hỗ trợ OCC qua expectedVersion và ghi Universal Audit Log
    */
   async startPicking(
     fulfillmentOrderId: string,
     pickerId?: string,
+    expectedVersion?: number,
   ): Promise<{ success: boolean; status: string; assignedPickerId?: string | null }> {
     const fo = await this.prisma.fulfillmentOrder.findUnique({
       where: { id: fulfillmentOrderId },
@@ -111,6 +119,15 @@ export class PickingService {
 
     if (!fo) {
       throw new NotFoundException(`Không tìm thấy FulfillmentOrder với ID: ${fulfillmentOrderId}`);
+    }
+
+    // OCC: Kiểm tra version nếu client cung cấp expectedVersion (AC1)
+    if (expectedVersion !== undefined && fo.version !== expectedVersion) {
+      throw new ConflictException({
+        statusCode: 409,
+        errorCode: 'CONCURRENT_MODIFICATION_DETECTED',
+        message: 'Dữ liệu đơn hàng đã bị cập nhật bởi người dùng khác. Vui lòng tải lại trang.',
+      });
     }
 
     // Idempotent: Nếu đã ở trạng thái PICKING
@@ -128,16 +145,34 @@ export class PickingService {
       );
     }
 
-    const updated = await this.prisma.fulfillmentOrder.update({
-      where: { id: fulfillmentOrderId },
-      data: {
-        status: 'PICKING',
-        assignedPickerId: pickerId || fo.assignedPickerId,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const res = await tx.fulfillmentOrder.update({
+        where: { id: fulfillmentOrderId },
+        data: {
+          status: 'PICKING',
+          assignedPickerId: pickerId || fo.assignedPickerId,
+          version: { increment: 1 },
+        },
+      });
+
+      // Ghi Universal Audit Log
+      if (this.auditLogService) {
+        await this.auditLogService.recordTransition(tx, {
+          entityType: 'FULFILLMENT_ORDER',
+          entityId: fo.id,
+          fromStatus: fo.status,
+          toStatus: 'PICKING',
+          action: 'START_PICKING',
+          actorType: 'ADMIN_USER',
+          actorId: pickerId || null,
+        });
+      }
+
+      return res;
     });
 
     this.logger.log(
-      `FulfillmentOrder ${fo.fulfillmentOrderNumber} đã chuyển sang PICKING bởi nhân viên ${pickerId || 'N/A'}`,
+      `FulfillmentOrder ${fo.fulfillmentOrderNumber} đã chuyển sang PICKING bởi nhân viên ${pickerId || 'N/A'} (v${updated.version})`,
     );
 
     return {
@@ -181,6 +216,15 @@ export class PickingService {
 
     if (!fo) {
       throw new NotFoundException(`Không tìm thấy FulfillmentOrder với ID: ${fulfillmentOrderId}`);
+    }
+
+    // OCC: Kiểm tra version nếu client cung cấp expectedVersion (AC1)
+    if (dto.expectedVersion !== undefined && fo.version !== dto.expectedVersion) {
+      throw new ConflictException({
+        statusCode: 409,
+        errorCode: 'CONCURRENT_MODIFICATION_DETECTED',
+        message: 'Dữ liệu đơn hàng đã bị cập nhật bởi người dùng khác. Vui lòng tải lại trang.',
+      });
     }
 
     // Idempotent nếu đã hoàn thành nhặt hàng
@@ -269,8 +313,22 @@ export class PickingService {
           status: 'PICKED',
           pickedAt: now,
           assignedPickerId: pickerId || fo.assignedPickerId,
+          version: { increment: 1 },
         },
       });
+
+      // Ghi Universal Audit Log
+      if (this.auditLogService) {
+        await this.auditLogService.recordTransition(tx, {
+          entityType: 'FULFILLMENT_ORDER',
+          entityId: fo.id,
+          fromStatus: fo.status,
+          toStatus: 'PICKED',
+          action: 'COMPLETE_PICKING',
+          actorType: 'ADMIN_USER',
+          actorId: pickerId || null,
+        });
+      }
 
       // Cập nhật quantityFulfilled trên fulfillment_order_items
       for (const foItem of fo.items) {

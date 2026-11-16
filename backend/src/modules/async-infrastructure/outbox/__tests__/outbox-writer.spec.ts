@@ -61,10 +61,12 @@ describe('EP01-T02: Transactional Outbox Foundation & Event Contract Integration
       expect(persisted?.retryCount).toBe(0);
       expect(persisted?.lastError).toBeNull();
       expect(persisted?.publishedAt).toBeNull();
-      expect(persisted?.payload).toEqual({
-        orderNumber: 'ORD-20261115-0001',
-        totalAmount: 550000,
-      });
+      expect(persisted?.payload).toEqual(
+        expect.objectContaining({
+          orderNumber: 'ORD-20261115-0001',
+          totalAmount: 550000,
+        }),
+      );
     });
 
     it('phải tự động sinh UUID v4 nếu event không cung cấp id', async () => {

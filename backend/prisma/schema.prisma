@@ -830,6 +830,7 @@ model Shipment {
   events             ShipmentEvent[]
   packages           ShipmentPackage[]
   attempts           ShipmentAttempt[]
+  codReconciliationItems CodReconciliationItem[]
 
 
   @@index([orderId, status])
@@ -2065,6 +2066,7 @@ model FulfillmentOrder {
   status                 String                 @default("PENDING_ALLOCATION") @db.VarChar(35)
   shippingServiceCode    String                 @map("shipping_service_code") @db.VarChar(50)
   totalItemsCount        Int                    @map("total_items_count")
+  version                Int                    @default(1) @map("version")
   assignedPickerId       String?                @map("assigned_picker_id") @db.Uuid
   allocatedAt            DateTime?              @map("allocated_at") @db.Timestamptz
   pickedAt               DateTime?              @map("picked_at") @db.Timestamptz
@@ -2185,6 +2187,61 @@ model ShipmentAttempt {
   @@index([shipmentId, attemptedAt], map: "idx_shipment_attempts_shipment")
   @@map("shipment_attempts")
 }
+
+model CodReconciliation {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  reconciliationCode String                  @unique @map("reconciliation_code") @db.VarChar(60)
+  carrierCode        String                  @map("carrier_code") @db.VarChar(50)
+  reconciliationDate DateTime                @map("reconciliation_date") @db.Date
+  totalCodDeclared   Decimal                 @map("total_cod_declared") @db.Decimal(14, 2)
+  totalCodReceived   Decimal                 @map("total_cod_received") @db.Decimal(14, 2)
+  differenceAmount   Decimal                 @default(0) @map("difference_amount") @db.Decimal(14, 2)
+  status             String                  @db.VarChar(30)
+  bankStatementRef   String?                 @map("bank_statement_ref") @db.VarChar(100)
+  approvedBy         String?                 @map("approved_by") @db.Uuid
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  items              CodReconciliationItem[]
+
+  @@index([carrierCode, reconciliationDate], map: "idx_cod_reconciliations_carrier_date")
+  @@map("cod_reconciliations")
+}
+
+model CodReconciliationItem {
+  id                   String            @id @default(uuid()) @db.Uuid
+  reconciliationId     String            @map("reconciliation_id") @db.Uuid
+  shipmentId           String            @map("shipment_id") @db.Uuid
+  declaredCodAmount    Decimal           @map("declared_cod_amount") @db.Decimal(12, 2)
+  carrierPaidCodAmount Decimal           @map("carrier_paid_cod_amount") @db.Decimal(12, 2)
+  discrepancyAmount    Decimal           @default(0) @map("discrepancy_amount") @db.Decimal(12, 2)
+  carrierFeeCharged    Decimal           @default(0) @map("carrier_fee_charged") @db.Decimal(12, 2)
+  status               String            @db.VarChar(30)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  reconciliation       CodReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  shipment             Shipment          @relation(fields: [shipmentId], references: [id])
+
+  @@index([reconciliationId], map: "idx_cod_rec_items_reconciliation")
+  @@index([shipmentId], map: "idx_cod_rec_items_shipment")
+  @@map("cod_reconciliation_items")
+}
+
+model DomainStatusHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  entityType      String   @map("entity_type") @db.VarChar(50)
+  entityId        String   @map("entity_id") @db.Uuid
+  fromStatus      String   @map("from_status") @db.VarChar(50)
+  toStatus        String   @map("to_status") @db.VarChar(50)
+  actionPerformed String   @map("action_performed") @db.VarChar(80)
+  actorType       String   @map("actor_type") @db.VarChar(30)
+  actorId         String?  @map("actor_id") @db.VarChar(100)
+  reason          String?  @db.Text
+  metadata        Json?    @db.JsonB
+  occurredAt      DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  @@index([entityType, entityId, occurredAt(sort: Desc)], map: "idx_domain_status_audit")
+  @@map("domain_status_histories")
+}
+
 
 
 

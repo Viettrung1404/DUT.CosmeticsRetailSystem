@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -16,6 +16,7 @@ import { InventoryModule } from '@modules/inventory/inventory.module';
 import { NotificationsModule } from '@modules/notifications/notifications.module';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
+import { LocationScopeGuard } from '@core/guards/location-scope.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
 import { UploadsModule } from '@modules/uploads/uploads.module';
 import { CartModule } from '@modules/cart/cart.module';
@@ -37,6 +38,7 @@ import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-i
 import { OmsModule } from '@modules/oms/oms.module';
 import { FulfillmentModule } from '@modules/fulfillment/fulfillment.module';
 import { ShippingModule } from '@modules/shipping/shipping.module';
+import { CorrelationIdMiddleware } from '@core/middlewares/correlation-id.middleware';
 
 @Module({
   imports: [
@@ -98,6 +100,14 @@ import { ShippingModule } from '@modules/shipping/shipping.module';
       provide: APP_GUARD,
       useClass: PermissionGuard,
     },
+    {
+      provide: APP_GUARD,
+      useClass: LocationScopeGuard,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

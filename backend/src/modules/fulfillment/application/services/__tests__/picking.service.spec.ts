@@ -114,13 +114,15 @@ describe('EP04-T01: PickingService Unit Tests', () => {
       expect(result.success).toBe(true);
       expect(result.status).toBe('PICKING');
       expect(result.assignedPickerId).toBe('picker-user-99');
-      expect(prisma.fulfillmentOrder.update).toHaveBeenCalledWith({
-        where: { id: mockFoId },
-        data: {
-          status: 'PICKING',
-          assignedPickerId: 'picker-user-99',
-        },
-      });
+      expect(prisma.fulfillmentOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockFoId },
+          data: expect.objectContaining({
+            status: 'PICKING',
+            assignedPickerId: 'picker-user-99',
+          }),
+        }),
+      );
     });
 
     it('phải xử lý idempotent khi đơn đã ở trạng thái PICKING', async () => {

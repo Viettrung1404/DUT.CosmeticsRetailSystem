@@ -11,9 +11,16 @@ import { WebhookProcessorService } from './webhooks/webhook-processor.service';
 import { WebhookIngressController } from './webhooks/webhook-ingress.controller';
 import { InternalWebhookController } from './webhooks/internal-webhook.controller';
 import { InternalTokenGuard } from './webhooks/internal-token.guard';
+import { DlqAlertService } from './operations/dlq-alert.service';
+import { DlqOperationsService } from './operations/dlq-operations.service';
+import { DlqOperationsController } from './operations/dlq-operations.controller';
 
 @Module({
-  controllers: [WebhookIngressController, InternalWebhookController],
+  controllers: [
+    WebhookIngressController,
+    InternalWebhookController,
+    DlqOperationsController,
+  ],
   providers: [
     OutboxWriterService,
     {
@@ -29,6 +36,8 @@ import { InternalTokenGuard } from './webhooks/internal-token.guard';
     InternalTokenGuard,
     WebhookInboxService,
     WebhookProcessorService,
+    DlqAlertService,
+    DlqOperationsService,
   ],
   exports: [
     OutboxWriterService,
@@ -39,6 +48,8 @@ import { InternalTokenGuard } from './webhooks/internal-token.guard';
     InternalTokenGuard,
     WebhookInboxService,
     WebhookProcessorService,
+    DlqAlertService,
+    DlqOperationsService,
   ],
 })
 export class AsyncInfrastructureModule {}

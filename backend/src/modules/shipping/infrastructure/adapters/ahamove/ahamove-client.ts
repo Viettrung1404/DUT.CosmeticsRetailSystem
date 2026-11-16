@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { getCorrelationId } from '@core/logger/correlation-context';
 import {
   QuoteRequestDto,
   QuoteResponseDto,
@@ -215,12 +216,14 @@ export class AhamoveClient {
 
     try {
       const signal = AbortSignal.timeout(this.timeoutMs);
+      const correlationId = getCorrelationId();
       const res = await fetch(
         `${this.baseUrl}/v1/order/estimated_fee?token=${encodeURIComponent(this.token)}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
           },
           body: JSON.stringify(payload),
           signal,
@@ -268,12 +271,14 @@ export class AhamoveClient {
    */
   async createOrder(payload: Record<string, unknown>): Promise<any> {
     const signal = AbortSignal.timeout(10000);
+    const correlationId = getCorrelationId();
     const res = await fetch(
       `${this.baseUrl}/v1/order/create?token=${encodeURIComponent(this.token)}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
         },
         body: JSON.stringify(payload),
         signal,
@@ -320,11 +325,15 @@ export class AhamoveClient {
   async cancelOrder(orderId: string, comment = 'Khách yêu cầu hủy hoặc đổi phương thức'): Promise<boolean> {
     try {
       const signal = AbortSignal.timeout(5000);
+      const correlationId = getCorrelationId();
       const res = await fetch(
         `${this.baseUrl}/v1/order/cancel?token=${encodeURIComponent(this.token)}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
+          },
           body: JSON.stringify({ order_id: orderId, comment }),
           signal,
         },

@@ -2,12 +2,15 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Inject,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { IOutboxWriter, OUTBOX_WRITER } from '@modules/async-infrastructure';
 import { OrderStateAggregator } from '@modules/oms/application/services/order-state-aggregator';
+import { AuditLogService } from '@core/services/audit-log.service';
 import {
   ConfirmHandoverDto,
   ConfirmHandoverResponseDto,
@@ -22,6 +25,8 @@ export class HandoverService {
     @Inject(OUTBOX_WRITER)
     private readonly outboxWriter: IOutboxWriter,
     private readonly orderStateAggregator: OrderStateAggregator,
+    @Optional()
+    private readonly auditLogService?: AuditLogService,
   ) {}
 
   /**
@@ -49,6 +54,15 @@ export class HandoverService {
       throw new NotFoundException(
         `Không tìm thấy FulfillmentOrder với ID: ${fulfillmentOrderId}`,
       );
+    }
+
+    // OCC: Kiểm tra version nếu client cung cấp expectedVersion (AC1)
+    if (dto?.expectedVersion !== undefined && fo.version !== dto.expectedVersion) {
+      throw new ConflictException({
+        statusCode: 409,
+        errorCode: 'CONCURRENT_MODIFICATION_DETECTED',
+        message: 'Dữ liệu đơn hàng đã bị cập nhật bởi người dùng khác. Vui lòng tải lại trang.',
+      });
     }
 
     // Idempotency: Nếu đơn đã bàn giao cho tài xế
@@ -110,8 +124,22 @@ export class HandoverService {
         data: {
           status: 'HANDED_OVER',
           handedOverAt: now,
+          version: { increment: 1 },
         },
       });
+
+      // Ghi Universal Audit Log
+      if (this.auditLogService) {
+        await this.auditLogService.recordTransition(tx, {
+          entityType: 'FULFILLMENT_ORDER',
+          entityId: fo.id,
+          fromStatus: fo.status,
+          toStatus: 'HANDED_OVER',
+          action: 'CONFIRM_HANDOVER',
+          actorType: 'ADMIN_USER',
+          actorId: handoverById || null,
+        });
+      }
 
       // 2. Cập nhật các Shipments liên kết sang HANDED_OVER
       for (const shipment of activeShipments) {
