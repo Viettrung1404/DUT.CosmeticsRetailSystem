@@ -27,7 +27,7 @@ export default function PushPage(){
  const t=getFieldValue('target') as string;return t==='individual'?<Form.Item label="UUID khách hàng (ít nhất một)" name="customerIds" rules={[{required:true,type:'array',min:1}]}><Select mode="tags" placeholder="UUID khách test"/></Form.Item>:
  t==='segment'?<Form.Item label="Nhóm RFM" name="rfmSegments"><Select mode="multiple" options={['CHAMPIONS','LOYAL','NEW','AT_RISK','LOST','NEEDS_ATTENTION'].map(x=>({label:x,value:x}))}/></Form.Item>:null
  }}</Form.Item>
- <Form.Item label="Màn hình mở khi bấm" name="route" rules={[{required:true}]}><Input placeholder="Giá trị route do Backend hỗ trợ"/></Form.Item>
+ <Form.Item label="Màn hình mở khi bấm" name="route" rules={[{required:true}]}><Select options={[{value:"PRODUCT",label:"Sản phẩm"},{value:"PROMOTION",label:"Khuyến mãi"},{value:"BLOG",label:"Bài viết"}]}/></Form.Item>
  <Form.Item label="UUID tài nguyên đi kèm" name="resourceId" rules={[{required:true},{pattern:/^[a-f0-9-]{36}$/i,message:'UUID không hợp lệ'}]}><Input/></Form.Item>
  </Form>
  </Modal></div>
