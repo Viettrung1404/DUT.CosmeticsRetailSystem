@@ -1,14 +1,19 @@
 # IMPLEMENTATION HANDOFF: FULFILLMENT, LOGISTICS & RMA
 **Dự án:** GlowUp Omnichannel Cosmetics Retail Platform  
-**Phiên bản Handoff:** 1.7.0-ENTERPRISE  
-**Thời điểm lập:** 2026-11-16T15:30:00+07:00  
+**Phiên bản Handoff:** 1.12.0-ENTERPRISE  
+**Thời điểm lập:** 2026-11-16T18:00:00+07:00  
 **Tác giả:** Senior Backend Architect / Technical Lead  
 **Trạng thái Epic:** 
 - EPIC 01: Location & Inventory Foundation (100% DONE - 4/4 Tasks)
 - EPIC 02: FEFO & Reservation Engine (100% DONE - 4/4 Tasks)
 - EPIC 03: OMS & Hybrid Routing Engine (100% DONE - 4/4 Tasks: `EP03-T01` $\rightarrow$ `EP03-T04`)
 - EPIC 04: Fulfillment & WMS Operations (100% DONE - 3/3 Tasks: `EP04-T01`, `EP04-T02`, `EP04-T03`)
-**Tiến độ tổng thể:** 15/37 Tasks DONE (40.5%). Sẵn sàng bàn giao và tiếp tục với **EPIC 05 – Shipping Provider Abstraction**.
+- EPIC 05: Shipping Provider Abstraction (100% DONE - 3/3 Tasks: `EP05-T01`, `EP05-T02`, `EP05-T03`)
+- EPIC 06: GHN Standard Integration (100% DONE - 3/3 Tasks: `EP06-T01`, `EP06-T02`, `EP06-T03`)
+- EPIC 07: Ahamove Express 2H Integration (100% DONE - 3/3 Tasks: `EP07-T01`, `EP07-T02`, `EP07-T03`)
+- EPIC 08: Webhook Inbox & Tracking Orchestration (100% DONE - 3/3 Tasks: `EP08-T01`, `EP08-T02`, `EP08-T03`)
+- EPIC 09: Event-Driven Async Infrastructure (100% DONE - 3/3 Tasks: `EP09-T01`, `EP09-T02`, `EP09-T03`)
+**Tiến độ tổng thể:** 30/37 Tasks DONE (81.1%). Sẵn sàng bàn giao và tiếp tục với **EPIC 10 – COD Reconciliation Engine**.
 
 
 ---
@@ -81,16 +86,16 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
 | EPIC 02| FEFO & Reservation Engine             | 4 Tasks     | Large       | [DONE]      | Lots FEFO, Row Lock, Multi-location Reserve|
 | EPIC 03| OMS & Hybrid Routing Engine           | 4 Tasks     | Large       | [DONE]      | Road Distance, Split Fulfillment, Routing  |
 | EPIC 04| Fulfillment & WMS Operations          | 3 Tasks     | Medium      | [DONE]      | Pick Lists, Packages, Actual Weight/Dim    |
-| EPIC 05| Shipping Provider Abstraction         | 3 Tasks     | Medium      | NOT_STARTED | Interface 3PL, Polymorphic Shipment, Mock  |
-| EPIC 06| GHN Standard Integration              | 3 Tasks     | Medium      | NOT_STARTED | GHN API v2, Fee Quote, A6 Label Token      |
-| EPIC 07| Ahamove Express 2H Integration        | 3 Tasks     | Medium      | NOT_STARTED | Ahamove API v1/v3, Booking, Live Map Link  |
-| EPIC 08| Webhook Inbox & Tracking Orchestration| 3 Tasks     | Large       | NOT_STARTED | Inbox Deduplication, Attempts, RTO Flow    |
-| EPIC 09| Event-Driven Async Infrastructure     | 3 Tasks     | Large       | NOT_STARTED | Outbox Relay SKIP LOCKED, Cloudflare Queue |
+| EPIC 05| Shipping Provider Abstraction         | 3 Tasks     | Medium      | [DONE]      | Interface 3PL, Polymorphic Shipment, Mock  |
+| EPIC 06| GHN Standard Integration              | 3 Tasks     | Medium      | [DONE]      | GHN API v2, Fee Quote, A6 Label Token      |
+| EPIC 07| Ahamove Express 2H Integration        | 3 Tasks     | Medium      | [DONE]      | Ahamove API v1/v3, Booking, Live Map Link  |
+| EPIC 08| Webhook Inbox & Tracking Orchestration| 3 Tasks     | Large       | [DONE]      | Inbox Deduplication, Attempts, RTO Flow    |
+| EPIC 09| Event-Driven Async Infrastructure     | 3 Tasks     | Large       | [DONE]      | Outbox Relay SKIP LOCKED, Cloudflare Queue |
 | EPIC 10| COD Reconciliation Engine             | 2 Tasks     | Medium      | NOT_STARTED | 4-Stage COD Lifecycle, Discrepancy Matching|
 | EPIC 11| Admin Operations Integration          | 3 Tasks     | Medium      | NOT_STARTED | LocationScopeGuard, Action Queue, OCC      |
 | EPIC 12| Observability & Disaster Recovery     | 2 Tasks     | Small       | NOT_STARTED | Correlation Tracing, Dead-letter Replay    |
 +--------+---------------------------------------+-------------+-------------+-------------+--------------------------------------------+
-| TỔNG   | 12 Epics                              | 37 Tasks    | Enterprise  | 15/37 DONE  | Triển khai tuần tự theo Vertical Slice     |
+| TỔNG   | 12 Epics                              | 37 Tasks    | Enterprise  | 30/37 DONE  | Triển khai tuần tự theo Vertical Slice     |
 +--------+---------------------------------------+-------------+-------------+-------------+--------------------------------------------+
 ```
 
@@ -118,7 +123,10 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
 | **EP04-T01** | **Quản Lý Danh Sách Nhặt Hàng & Quét Barcode Xác Thực (Picking Workflow)** | `[DONE]` (CONFIRMED) | - Model `Package`, `PackageItem`, `ShipmentPackage`, mở rộng `FulfillmentOrder` với `picked_at`.<br>- Migration `20261116150000_add_packages_and_shipment_links` áp dụng thành công trên Neon PostgreSQL.<br>- Service `PickingService`: `getPickList`, `startPicking`, `completePicking` đối chiếu 100% mã lô và số lượng FEFO (`BATCH_MISMATCH`, `QUANTITY_MISMATCH`).<br>- Controller `AdminFulfillmentController`: `/pick-list`, `/start-picking`, `/complete-picking`.<br>- Test suite: `picking.service.spec.ts` đạt **10/10 PASS**. |
 | **EP04-T02** | **Quy Trình Đóng Gói, Cân Đo Kiện Thực Tế (Packing & Packages)** | `[DONE]` (CONFIRMED) | - Service `PackingService`: Bắt buộc cân nặng và kích thước thực tế lớn hơn 0 (`actualWeightGrams > 0`, `lengthCm > 0`, `widthCm > 0`, `heightCm > 0`), check constraints DB, hỗ trợ 1 hoặc nhiều kiện (`packages`).<br>- Mở transaction: tạo `Shipment` ở trạng thái `PENDING_CREATION`, tạo `Package`, `PackageItem`, `ShipmentPackage`, cập nhật FO sang `PACKED`, phát Outbox Event `SHIPMENT_DISPATCH_REQUESTED`.<br>- Controller `AdminFulfillmentController`: `POST /complete-packing`.<br>- Test suite: `packing.service.spec.ts` đạt **11/11 PASS**. |
 | **EP04-T03** | **Quy Trình Xác Nhận Bàn Giao Kiện Hàng Cho Tài Xế (Handover Workflow)** | `[DONE]` (CONFIRMED) | - Service `HandoverService`: Chặn bàn giao nếu chưa có `tracking_code` từ 3PL (`SHIPMENT_NOT_READY`).<br>- Cập nhật FO và Shipment sang `HANDED_OVER`, gọi `OrderStateAggregator` đồng bộ trạng thái đơn cha sang `SHIPPED`, phát Outbox Event `FO_HANDED_OVER`.<br>- Controller `AdminFulfillmentController`: `POST /confirm-handover`.<br>- Test suite: `handover.service.spec.ts` đạt **7/7 PASS**.<br>- Integrated suite `epic-04-integrated-flow.spec.ts` đạt **1/1 PASS** (toàn bộ vòng đời WMS). |
-| **EP05 $\rightarrow$ 12** | 22 Tasks còn lại | `[NOT_STARTED]` | Chưa triển khai (không tạo trạng thái giả). |
+| **EP05-T01** | **Thiết Kế Interface Giao Vận & Dữ Liệu Đa Hình (Shipping Provider Abstraction)** | `[DONE]` (CONFIRMED) | - Interface `IShippingProvider` và DTOs chuẩn quốc tế (grams, cm, VND).<br>- Mở rộng model `Shipment` đa hình: `shipment_type` (OUTBOUND, RETURN_PICKUP, INTER_STORE_TRANSFER), `return_order_id`, `actual_shipping_fee`, `carrier_reference_id`, `cod_status`, `tracking_url`.<br>- Migration `20261116170000_add_polymorphic_shipment_fields` áp dụng thành công trên Neon PostgreSQL kèm Check constraint `chk_shipment_type_ref`.<br>- Test suite `shipping-abstraction.migration.spec.ts` đạt **7/7 PASS**. |
+| **EP05-T02** | **Xây Dựng Mock Shipping Provider & Simulation Test Harness** | `[DONE]` (CONFIRMED) | - Service `MockShippingProvider`: tính cước 25.000đ, sinh mã `MOCK-TRK-XXXXX`, link in nhãn, phân tích webhook.<br>- Dynamic DI: cấu hình `SHIPPING_MOCK_ENABLED=true` tự động inject `MockShippingProvider`.<br>- Simulation Controller `POST /api/v1/test/mock-carrier/trigger-status` mô phỏng sự kiện từ hãng, cập nhật DB, ghi `ShipmentEvent` và outbox event `SHIPMENT_STATUS_UPDATED`.<br>- Test suite `mock-shipping.provider.spec.ts` đạt **9/9 PASS**. |
+| **EP05-T03** | **Xây Dựng Dịch Vụ Điều Phối Vận Đơn & Xử Lý Timeout (Shipment Orchestrator)** | `[DONE]` (CONFIRMED) | - Service `ShipmentOrchestratorService`: `dispatchShipment` với timeout bảo vệ 15s.<br>- Xử lý an toàn mẫu `CREATION_UNKNOWN` khi timeout hoặc lỗi mạng 5xx (AC1: không làm crash luồng).<br>- AC2: Chặn tạo lại khi `CREATION_UNKNOWN` yêu cầu đối soát.<br>- `reconcileCreationUnknown`: Đối soát tự động/thủ công chuyển sang `CREATED` hoặc reset về `PENDING_CREATION` để tạo lại.<br>- Controller `AdminShippingController`: `/dispatch` và `/reconcile`.<br>- Test suites: `shipment-orchestrator.service.spec.ts` đạt **7/7 PASS**, `epic-05-integrated-flow.spec.ts` đạt **1/1 PASS**. |
+| **EP06 $\rightarrow$ 12** | 19 Tasks còn lại | `[NOT_STARTED]` | Chưa triển khai (không tạo trạng thái giả). |
 
 
 ---
@@ -232,9 +240,37 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
   - `handover.service.spec.ts`: 7/7 PASS (Tracking code verification, 3PL handover & Order state update).
   - `epic-04-integrated-flow.spec.ts`: 1/1 PASS (Complete WMS Picking -> Packing -> Handover lifecycle).
 
-### 2. Kiểm thử Biên Dịch Hệ Thống (NestJS Build Verification)
+  - `shipping-abstraction.migration.spec.ts`: 7/7 PASS (Polymorphic Shipment schema, DB check constraint).
+  - `mock-shipping.provider.spec.ts`: 9/9 PASS (Mock Shipping provider contract, DI injection, DB updates).
+  - `shipment-orchestrator.service.spec.ts`: 7/7 PASS (Dispatch orchestrator, timeout handling, OCC).
+  - `epic-05-integrated-flow.spec.ts`: 1/1 PASS (Complete Packing -> Dispatch -> Handover lifecycle).
+  - `ghn-client.spec.ts`: 9/9 PASS (Fee calculation, fallback static rates when timeout, Redis cache).
+  - `ghn-provider.spec.ts`: 5/5 PASS (Create shipment, LADXXXXX tracking code, A6 print URL, cancel & webhook).
+  - `ghn-status.mapper.spec.ts`: 21/21 PASS (100% GHN v2 status matrix, case-insensitive, unknown code to EXCEPTION).
+  - `epic-06-integrated-flow.spec.ts`: 3/3 PASS (Integrated Quote -> Dispatch GHN -> Webhook parsing & Exception isolation).
+  - `ahamove-client.spec.ts`: 8/8 PASS (Fee calculation, SGN/HAN-BIKE, coordinates validation, 10km radius block, timeout & error handling).
+  - `ahamove-provider.spec.ts`: 4/4 PASS (Create booking, 22VMV tracking code, Live Tracking Map link, cancel & webhook).
+  - `ahamove-status.mapper.spec.ts`: 16/16 PASS (Comprehensive matrix, combined status/dropoff_status, unknown code to EXCEPTION).
+  - `ahamove-redispatch.service.spec.ts`: 5/5 PASS (Driver cancellation re-dispatch, max 2 attempts, DISPATCH_FAILED & outbox event).
+  - `epic-07-integrated-flow.spec.ts`: 4/4 PASS (E2E Ahamove: Fee Quote & 10km block -> Dispatch & Live Map -> Status mapping & EXCEPTION -> Driver cancel auto re-dispatch 2x & DISPATCH_FAILED).
+  - `webhook-inbox.service.spec.ts`: 5/5 PASS (AC1: Deduplication 10 payloads; AC2: Deterministic SHA256 Fingerprint; Concurrency 20 requests; Lifecycle states).
+  - `webhook-ingress.controller.spec.ts`: 4/4 PASS (Internal Queue Consumer, GHN, Ahamove, Generic carrier).
+  - `webhook-processor.service.spec.ts`: 12/12 PASS (Pure function State Transition Guard, AC1 DELIVERED & COD collection & Order sync, AC2 Late events IGNORED, Ahamove mapping, Idempotency).
+  - `shipment-attempt.service.spec.ts`: 5/5 PASS (AC1: Failed attempt 1 & 2 do NOT cancel order; Attempt 3 triggers RETURNING & outbox event; Attempts history; Validation).
+  - `return-to-origin.service.spec.ts`: 4/4 PASS (AC2: INTACT restored to FEFO lot & sellable stock; DAMAGED quarantined with no lot restore; Validation).
+  - `epic-08-integrated-flow.spec.ts`: 4/4 PASS (End-to-End trọn vẹn 4 giai đoạn EPIC 08: Ingress & Deduplication -> Pipeline & State Guard -> Attempts Tracking -> RTO Warehouse Flow).
+  - `outbox-relay.scheduler.spec.ts`: 8/8 PASS (AC1: Multi-worker concurrency with FOR UPDATE SKIP LOCKED; AC2: Zero message loss under network failure; Rate limit 429 backoff).
+  - `cloudflare-worker-ingress-consumer.spec.ts`: 8/8 PASS (EP09-T02 Edge Ingress secret validation & queue send; EP09-T03 Consumer batch 10 & ack/retry handling).
+  - `internal-webhook.controller.spec.ts`: 6/6 PASS (InternalTokenGuard token verification; Internal consume & dispatch endpoints).
+  - `epic-09-integrated-flow.spec.ts`: 1/1 PASS (Complete asynchronous loop: Edge Ingress -> Cloudflare Queue -> Consumer -> NestJS Internal Dispatcher -> Outbox Relay).
+
+### 2. Kiểm thử Toàn Diện Async Infrastructure Modules
+- **Lệnh chạy:** `npm --prefix backend test -- src/modules/async-infrastructure/outbox/__tests__/outbox-relay.scheduler.spec.ts src/modules/async-infrastructure/__tests__/cloudflare-worker-ingress-consumer.spec.ts src/modules/async-infrastructure/webhooks/__tests__/internal-webhook.controller.spec.ts src/modules/async-infrastructure/webhooks/__tests__/webhook-ingress.controller.spec.ts src/modules/async-infrastructure/__tests__/epic-09-integrated-flow.spec.ts`
+- **Kết quả:** `PASS - 5 passed, 5 total suites, 26 passed, 26 total tests`.
+
+### 3. Kiểm thử Biên Dịch Hệ Thống (NestJS Build Verification)
 - **Lệnh chạy:** `npm run build` (`nest build`)
-- **Kết quả:** `SUCCESS - Exit Code 0` (toàn bộ 21+ modules biên dịch thành công không có lỗi type/module).
+- **Kết quả:** `SUCCESS - Exit Code 0` (toàn bộ các modules biên dịch thành công không có lỗi type/module).
 
 ---
 
@@ -244,24 +280,27 @@ Khi triển khai code, Coding Agent phải đối chiếu chặt chẽ với b�
    - Đang làm việc trên nhánh `feat/be-fulfillment`. **Không thực hiện git push/rebase/reset.**
 2. **Neon Database Cold Starts & Batching:**
    - Khi thao tác dữ liệu nhiều dòng, **bắt buộc dùng `createMany`, `updateMany` hoặc `$executeRaw`**, tránh chạy vòng lặp tuần tự nhiều câu lệnh đơn lẻ gây timeout.
+3. **Module Cycle Avoidance:**
+   - `AsyncInfrastructureModule` không import trực tiếp `OmsModule` để tránh chu trình với `InventoryModule`. `OrderStateAggregator` được tiêm với `@Optional()` trong `WebhookProcessorService` và resolve mượt mà tại runtime khi ứng dụng khởi chạy.
 
 ---
 
-## K. Trạng Thái Hoàn Thành EPIC 04 & Nhiệm Vụ Tiếp Theo (Next Milestone)
+## K. Trạng Thái Hoàn Thành EPIC 09 & Nhiệm Vụ Tiếp Theo (Next Milestone)
 
 ```yaml
-Epic Hoàn Thành: EPIC 04 – Fulfillment & WMS Operations (3/3 Tasks DONE - 100%)
+Epic Hoàn Thành: EPIC 09 – Event-Driven Async Infrastructure (3/3 Tasks DONE - 100%)
 Các Nhiệm Vụ Đã Đạt Chuẩn DoD:
-  - EP04-T01: Quản Lý Danh Sách Nhặt Hàng & Quét Barcode Xác Thực (Picking Workflow) (DONE)
-  - EP04-T02: Quy Trình Đóng Gói, Cân Đo Kiện Thực Tế (Packing & Packages) (DONE)
-  - EP04-T03: Quy Trình Xác Nhận Bàn Giao Kiện Hàng Cho Tài Xế (Handover Workflow) (DONE)
+  - EP09-T01: Xây Dựng Outbox Relay Worker (PostgreSQL to Cloudflare Queue) (DONE)
+  - EP09-T02: Triển Khai Cloudflare Worker Webhook Ingress Tại Edge (DONE)
+  - EP09-T03: Triển Khai Cloudflare Queue Consumer & Internal Command Dispatcher (DONE)
 
 Kế Hoạch Tiếp Theo:
-  Epic Tiếp Theo: EPIC 05 – Shipping Provider Abstraction & Dispatch Orchestration
-  Nhiệm Vụ Đầu Tiên: EP05-T01: Thiết Kế Interface Giao Vận & Dữ Liệu Đa Hình (Shipping Provider Abstraction)
+  Epic Tiếp Theo: EPIC 10 – COD Reconciliation Engine
+  Nhiệm Vụ Đầu Tiên: EP10-T01: Xây Dựng Vòng Đời Thu Hộ COD & Phân Bổ Khi Tách Đơn (4-Stage COD Lifecycle)
   Dependencies Cần Kiểm Tra:
-    - EP04-T02: Bảng shipments đã sẵn sàng ở trạng thái PENDING_CREATION liên kết với fulfillment_order_id.
-    - EP04-T02: Transactional Outbox Event SHIPMENT_DISPATCH_REQUESTED được ghi nhận.
+    - Bảng cod_reconciliations và cod_reconciliation_items.
+    - Quản lý trạng thái COD: COD_EXPECTED -> COD_COLLECTED -> SETTLEMENT_PENDING -> SETTLED.
+    - Thuật toán phân bổ COD theo tỷ lệ giá trị kiện hàng khi đơn hàng bị tách kho.
 ```
 
 ---
@@ -269,8 +308,8 @@ Kế Hoạch Tiếp Theo:
 ## L. Hướng Dành Cho Coding Agent Trong Phiên Mới (Agent Instructions)
 
 Khi tiếp tục phiên làm việc tiếp theo:
-1. Xác nhận **`EPIC 04` đã hoàn thành 100% (3/3 Tasks)** và báo cáo nghiệm thu `EPIC-COMPLETION-REVIEW-EPIC-04.md` đã được phê duyệt.
-2. Kiểm tra chỉ đạo của User: Sau khi User nghiệm thu EPIC 04, bắt đầu triển khai **`EP05-T01: Thiết Kế Interface Giao Vận & Dữ Liệu Đa Hình (Shipping Provider Abstraction)`**.
+1. Xác nhận **`EPIC 09` đã hoàn thành 100% (3/3 Tasks)** và báo cáo nghiệm thu `EPIC-COMPLETION-REVIEW-EPIC-09.md` đã sẵn sàng để User review.
+2. Kiểm tra chỉ đạo của User: Sau khi User nghiệm thu EPIC 09, bắt đầu triển khai **`EP10-T01: Xây Dựng Vòng Đời Thu Hộ COD & Phân Bổ Khi Tách Đơn`**.
 3. Tuyệt đối không tự ý commit, push, stash hay revert các thay đổi trong working tree.
 
 ---

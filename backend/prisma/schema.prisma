@@ -802,14 +802,21 @@ model OrderItemBatch {
 model Shipment {
   id                 String    @id @default(uuid()) @db.Uuid
   orderId            String    @map("order_id") @db.Uuid
-  shipmentCode       String    @unique @map("shipment_code") @db.VarChar(50)
+  shipmentCode       String    @unique @map("shipment_code") @db.VarChar(60)
+  shipmentType       String    @default("OUTBOUND") @map("shipment_type") @db.VarChar(30)
+  fulfillmentOrderId String?   @map("fulfillment_order_id") @db.Uuid
+  returnOrderId      String?   @map("return_order_id") @db.Uuid
   carrierCode        String    @map("carrier_code") @db.VarChar(50)
   carrierServiceCode String?   @map("carrier_service_code") @db.VarChar(50)
   trackingCode       String?   @unique @map("tracking_code") @db.VarChar(100)
+  carrierReferenceId String?   @map("carrier_reference_id") @db.VarChar(100)
+  status             String    @db.VarChar(35)
   codAmount          Decimal   @default(0) @map("cod_amount") @db.Decimal(12, 2)
-  shippingFeePaid    Decimal   @map("shipping_fee_paid") @db.Decimal(12, 2)
-  status             String    @db.VarChar(30)
+  codStatus          String?   @default("COD_EXPECTED") @map("cod_status") @db.VarChar(30)
+  shippingFeePaid    Decimal   @default(0) @map("shipping_fee_paid") @db.Decimal(12, 2)
+  actualShippingFee  Decimal?  @default(0) @map("actual_shipping_fee") @db.Decimal(12, 2)
   shippingLabelUrl   String?   @map("shipping_label_url") @db.Text
+  trackingUrl        String?   @map("tracking_url") @db.Text
   carrierMetadata    Json?     @map("carrier_metadata") @db.JsonB
   handedOverAt       DateTime? @map("handed_over_at") @db.Timestamptz
   deliveredAt        DateTime? @map("delivered_at") @db.Timestamptz
@@ -818,13 +825,17 @@ model Shipment {
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  fulfillmentOrderId String?            @map("fulfillment_order_id") @db.Uuid
   fulfillmentOrder   FulfillmentOrder?  @relation(fields: [fulfillmentOrderId], references: [id], onDelete: SetNull)
+  returnOrder        ReturnOrder?       @relation(fields: [returnOrderId], references: [id], onDelete: SetNull)
   events             ShipmentEvent[]
   packages           ShipmentPackage[]
+  attempts           ShipmentAttempt[]
+
 
   @@index([orderId, status])
   @@index([fulfillmentOrderId])
+  @@index([returnOrderId])
+  @@index([carrierCode, trackingCode], map: "idx_shipments_carrier_tracking")
   @@index([carrierMetadata], type: Gin, map: "idx_shipments_carrier_metadata")
   @@map("shipments")
 }
@@ -865,6 +876,7 @@ model ReturnOrder {
   handler        User?                 @relation(fields: [handledBy], references: [id])
   items          ReturnOrderItem[]
   refunds        Refund[]
+  shipments      Shipment[]
   quoteVersion   Int                   @default(0) @map("quote_version")
   quoteExpiresAt DateTime?             @map("quote_expires_at") @db.Timestamptz
   quoteSnapshot  Json?                 @map("quote_snapshot") @db.JsonB
@@ -2138,4 +2150,41 @@ model ShipmentPackage {
   @@unique([shipmentId, packageId], map: "uq_shipment_package")
   @@map("shipment_packages")
 }
+
+model ShippingWebhookInbox {
+  id              String    @id @default(uuid()) @db.Uuid
+  carrierCode     String    @map("carrier_code") @db.VarChar(50)
+  eventId         String    @map("event_id") @db.VarChar(150)
+  eventType       String?   @map("event_type") @db.VarChar(80)
+  trackingCode    String?   @map("tracking_code") @db.VarChar(100)
+  payload         Json      @db.JsonB
+  processedStatus String    @default("PENDING") @map("processed_status") @db.VarChar(30)
+  errorMessage    String?   @map("error_message") @db.Text
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz
+
+  @@unique([carrierCode, eventId], map: "uq_webhook_carrier_event")
+  @@index([processedStatus, receivedAt], map: "idx_webhook_inbox_status_received")
+  @@index([trackingCode], map: "idx_webhook_inbox_tracking")
+  @@map("shipping_webhook_inbox")
+}
+
+model ShipmentAttempt {
+  id                  String   @id @default(uuid()) @db.Uuid
+  shipmentId          String   @map("shipment_id") @db.Uuid
+  attemptNumber       Int      @map("attempt_number")
+  attemptedAt         DateTime @map("attempted_at") @db.Timestamptz
+  failureReasonCode   String?  @map("failure_reason_code") @db.VarChar(50)
+  failureReasonDetail String?  @map("failure_reason_detail") @db.Text
+  carrierRawStatus    String?  @map("carrier_raw_status") @db.VarChar(50)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  shipment            Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, attemptNumber], map: "uq_shipment_attempt")
+  @@index([shipmentId, attemptedAt], map: "idx_shipment_attempts_shipment")
+  @@map("shipment_attempts")
+}
+
+
 

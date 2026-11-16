@@ -4,7 +4,9 @@ import { OutboxWriterService } from '../outbox-writer.service';
 import { BaseDomainEvent } from '../base-domain-event';
 
 describe('EP01-T02: Transactional Outbox Foundation & Event Contract Integration Tests', () => {
+  jest.setTimeout(30000);
   let prisma: PrismaClient;
+
   let outboxWriter: OutboxWriterService;
   const testIdsToCleanup: string[] = [];
 

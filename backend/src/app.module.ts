@@ -36,6 +36,7 @@ import { HealthModule } from '@core/health/health.module';
 import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-infrastructure.module';
 import { OmsModule } from '@modules/oms/oms.module';
 import { FulfillmentModule } from '@modules/fulfillment/fulfillment.module';
+import { ShippingModule } from '@modules/shipping/shipping.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { FulfillmentModule } from '@modules/fulfillment/fulfillment.module';
     AsyncInfrastructureModule,
     OmsModule,
     FulfillmentModule,
+    ShippingModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

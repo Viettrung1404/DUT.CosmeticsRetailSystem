@@ -1,0 +1,23 @@
+name = "glowup-logistics-ingress"
+main = "src/index.ts"
+compatibility_date = "2024-11-12"
+
+[vars]
+ENVIRONMENT = "production"
+GHN_WEBHOOK_SECRET = "ghn-webhook-secret-prod"
+AHAMOVE_WEBHOOK_SECRET = "ahamove-webhook-secret-prod"
+NESTJS_INTERNAL_URL = "https://api.glowup.vn"
+INTERNAL_DISPATCH_SECRET = "glowup-internal-auth-secret-key"
+
+# Queue Producer Binding (EP09-T02)
+[[queues.producers]]
+binding = "LOGISTICS_WEBHOOK_QUEUE"
+queue = "glowup-logistics-webhooks"
+
+# Queue Consumer Binding (EP09-T03)
+[[queues.consumers]]
+queue = "glowup-logistics-webhooks"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "glowup-logistics-webhooks-dlq"
