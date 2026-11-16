@@ -13,7 +13,7 @@ export default function BlogPage(){
  const [rows,setRows]=useState<Post[]>([]),[total,setTotal]=useState(0),[categories,setCategories]=useState<Category[]>([])
  const [loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[editor,setEditor]=useState<Post|'new'|null>(null)
  const [schedule,setSchedule]=useState<Post|null>(null),[publishAt,setPublishAt]=useState<dayjs.Dayjs|null>(null)
- const [catOpen,setCatOpen]=useState(false),[catName,setCatName]=useState('')
+ const [catOpen,setCatOpen]=useState(false),[catName,setCatName]=useState(''),[editingCategory,setEditingCategory]=useState<Category|null>(null)
  const [form]=Form.useForm()
  const load=useCallback(async()=>{setLoading(true);try{const p=await apiGet<Page<Post>>('/admin/blog/posts',query);setRows(p.data??[]);setTotal(p.meta?.itemCount??0)}catch(e){msg.error(errorText(e))}finally{setLoading(false)}},[query,msg])
  const loadCategories=useCallback(async()=>{try{const p=await apiGet<Page<Category>>('/admin/blog/categories',{page:1,limit:100});setCategories(p.data??[])}catch(e){msg.error(errorText(e))}},[msg])
@@ -24,7 +24,11 @@ export default function BlogPage(){
  const action=async(post:Post,kind:'publish'|'archive')=>{try{await apiPut(`/admin/blog/posts/${post.id}/${kind}`);msg.success('Đã cập nhật trạng thái bài');await load()}catch(e){msg.error(errorText(e))}}
  const plan=async()=>{if(!schedule||!publishAt)return;try{setBusy(true);await apiPut(`/admin/blog/posts/${schedule.id}/schedule`,{publishAt:publishAt.toISOString()});msg.success('Đã hẹn giờ đăng');setSchedule(null);await load()}catch(e){msg.error(errorText(e))}finally{setBusy(false)}}
  const deletePost=async(post:Post)=>{try{await apiDelete(`/admin/blog/posts/${post.id}`);msg.success('Đã xóa bài nháp');await load()}catch(e){msg.error(errorText(e))}}
- const addCategory=async()=>{if(catName.trim().length<2)return;try{await apiPost('/admin/blog/categories',{name:catName.trim()});setCatName('');setCatOpen(false);await loadCategories();msg.success('Đã tạo danh mục')}catch(e){msg.error(errorText(e))}}
+ const saveCategory=async()=>{if(catName.trim().length<2){msg.warning('Tên phải có ít nhất 2 ký tự');return}
+ try{if(editingCategory)await apiPut(`/admin/blog/categories/${editingCategory.id}`,{name:catName.trim()})
+ else await apiPost('/admin/blog/categories',{name:catName.trim()})
+ setCatName('');setEditingCategory(null);await loadCategories();msg.success('Đã lưu danh mục')}catch(e){msg.error(errorText(e))}}
+ const deleteCategory=async(c:Category)=>{try{await apiDelete(`/admin/blog/categories/${c.id}`);msg.success('Đã xóa danh mục');await loadCategories()}catch(e){msg.error(errorText(e))}}
  return <div>{holder}<div className="glowup-page-header"><div><Title level={2} className="glowup-page-title">Quản lý Blog</Title><Text className="glowup-page-subtitle">Soạn bài, chỉnh sửa SEO và lên lịch xuất bản.</Text></div><Space><Button onClick={()=>void load()}>Làm mới</Button><Button onClick={()=>setCatOpen(true)}>Danh mục blog</Button><Button type="primary" onClick={()=>void open('new')}>Viết bài</Button></Space></div>
  <Card className="glowup-toolbar-card" style={{marginBottom:16}}><Space wrap>
  <Input.Search value={search} onChange={e=>setSearch(e.target.value)} onSearch={()=>setQuery(q=>({...q,page:1,search:search||undefined}))} style={{width:280}} placeholder="Tìm bài viết"/>
@@ -51,7 +55,15 @@ export default function BlogPage(){
  </Form></Modal>
  <Modal title="Lên lịch đăng bài" open={Boolean(schedule)} onCancel={()=>setSchedule(null)} onOk={()=>void plan()} okText="Hẹn giờ" confirmLoading={busy}>
  <DatePicker showTime value={publishAt} onChange={setPublishAt} disabledDate={d=>d.isBefore(dayjs().startOf('day'))}/></Modal>
- <Modal title="Thêm danh mục Blog" open={catOpen} onCancel={()=>setCatOpen(false)} onOk={()=>void addCategory()} okText="Thêm">
- <Input value={catName} onChange={e=>setCatName(e.target.value)} maxLength={150} placeholder="Tên danh mục"/></Modal>
+ <Modal title="Quản lý danh mục Blog" open={catOpen} onCancel={()=>{setCatOpen(false);setEditingCategory(null);setCatName('')}} footer={<Button onClick={()=>setCatOpen(false)}>Đóng</Button>} width={670}>
+ <Space style={{marginBottom:12}}><Input value={catName} onChange={e=>setCatName(e.target.value)} maxLength={150} placeholder="Tên danh mục" style={{width:320}}/>
+ <Button type="primary" onClick={()=>void saveCategory()}>{editingCategory?'Cập nhật':'Thêm'}</Button>
+ {editingCategory&&<Button onClick={()=>{setEditingCategory(null);setCatName('')}}>Hủy sửa</Button>}</Space>
+ <Table<Category> rowKey="id" dataSource={categories} size="small" pagination={{pageSize:10}} columns={[
+ {title:'Danh mục',dataIndex:'name'},{title:'Slug',dataIndex:'slug'},
+ {title:'Thao tác',render:(_,c)=><Space><Button size="small" onClick={()=>{setEditingCategory(c);setCatName(c.name)}}>Sửa</Button>
+ <Popconfirm title="Xóa danh mục? Backend không cho xóa khi đang có bài viết." onConfirm={()=>void deleteCategory(c)}><Button size="small" danger>Xóa</Button></Popconfirm></Space>}
+ ]}/>
+ </Modal>
  </div>
 }
