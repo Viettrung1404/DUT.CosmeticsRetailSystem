@@ -418,6 +418,7 @@ export class CommerceCheckoutService {
         }),
       },
     });
+    const createdOrderItems: { id: string; productVariantId: string; quantity: number }[] = [];
     for (const line of quote.items) {
       const variant = quote.variants.find((v) => v.id === line.variantId)!;
       const item = await tx.orderItem.create({
@@ -434,6 +435,37 @@ export class CommerceCheckoutService {
             line.lineDiscount + line.couponDiscount + line.pointsValue,
           totalPrice: line.cashValue,
           pricingSnapshot: json({ version: 1, policy: "SPRINT5", ...line }),
+        },
+      });
+      createdOrderItems.push({
+        id: item.id,
+        productVariantId: line.variantId,
+        quantity: line.quantity,
+      });
+    }
+
+    // Tự động sinh FulfillmentOrder (WMS Allocation) để đơn hàng xuất hiện ngay trên Hàng Đợi Nhặt Hàng của Kho (Epic 04 & 11)
+    const totalItemsCount = createdOrderItems.reduce((sum, i) => sum + i.quantity, 0);
+    const foNumber = `${orderNumber}-FO01`;
+    const fo = await tx.fulfillmentOrder.create({
+      data: {
+        orderId: order.id,
+        fulfillmentOrderNumber: foNumber,
+        sourceLocationId: storeId,
+        status: 'ALLOCATED',
+        shippingServiceCode: 'STANDARD',
+        totalItemsCount,
+        allocatedAt: new Date(),
+      },
+    });
+
+    for (const orderItem of createdOrderItems) {
+      await tx.fulfillmentOrderItem.create({
+        data: {
+          fulfillmentOrderId: fo.id,
+          orderItemId: orderItem.id,
+          productVariantId: orderItem.productVariantId,
+          quantityRequested: orderItem.quantity,
         },
       });
     }

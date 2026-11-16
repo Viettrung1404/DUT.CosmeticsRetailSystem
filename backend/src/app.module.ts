@@ -32,7 +32,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { SeoModule } from '@modules/seo/seo.module';
 import { ReturnsModule } from '@modules/returns/returns.module';
-import { ShipmentsModule } from '@modules/shipments/shipments.module';
 import { HealthModule } from '@core/health/health.module';
 import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-infrastructure.module';
 import { OmsModule } from '@modules/oms/oms.module';
@@ -78,7 +77,6 @@ import { CorrelationIdMiddleware } from '@core/middlewares/correlation-id.middle
     CustomerCommerceModule,
     SeoModule,
     ReturnsModule,
-    ShipmentsModule,
     HealthModule,
     HrModule,
     SuppliersModule,

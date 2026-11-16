@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from '../../infrastructure/database/prisma.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 import { OutboxWriterService } from './outbox/outbox-writer.service';
 import { OUTBOX_WRITER } from './outbox/outbox-writer.interface';
 import {
@@ -16,6 +19,7 @@ import { DlqOperationsService } from './operations/dlq-operations.service';
 import { DlqOperationsController } from './operations/dlq-operations.controller';
 
 @Module({
+  imports: [PrismaModule, ConfigModule, PermissionsModule],
   controllers: [
     WebhookIngressController,
     InternalWebhookController,
