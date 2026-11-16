@@ -2,7 +2,7 @@ import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Typography, mes
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiGet, errorText, money } from '../../api/sprint5Api'
-import { BarPlot, LinePlot, SharePlot } from '../../components/analytics/MiniCharts'
+import { BarPlot, LinePlot, PiePlot } from '../../components/analytics/MiniCharts'
 interface Day { date:string; orders:number; revenue:number }
 interface Product { productId?:string; productName?:string; name?:string; quantity?:number; unitsSold?:number; revenue?:number }
 interface Channel { channel:string; orders:number; revenue:number; percent:number }
@@ -28,7 +28,7 @@ export default function AdminDashboardPage(){
     </Row>
     <Row gutter={[16,16]} style={{marginBottom:16}}>
       <Col xs={24} xl={15}><Card title="Doanh thu 7 ngày (VND)" loading={loading}><LinePlot data={data?.last7Days??[]} xKey="date" yKey="revenue"/></Card></Col>
-      <Col xs={24} xl={9}><Card title="Tỷ lệ doanh thu theo kênh" loading={loading}><SharePlot data={data?.channelShare??[]}/></Card></Col>
+      <Col xs={24} xl={9}><Card title="Tỷ lệ doanh thu theo kênh" loading={loading}><PiePlot data={data?.channelShare??[]}/></Card></Col>
     </Row>
     <Row gutter={[16,16]} style={{marginBottom:16}}>
       <Col xs={24} lg={12}><Card title="Top 5 sản phẩm bán chạy" loading={loading}><BarPlot data={products} labelKey="label" valueKey="sold"/></Card></Col>
