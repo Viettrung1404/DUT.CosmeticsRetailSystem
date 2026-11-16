@@ -31,3 +31,22 @@ export function SharePlot({ data }: {data:{channel:string;percent:number;revenue
     {data.map((d,i)=><Space key={i}><span style={{background:colors[i%colors.length],width:10,height:10,borderRadius:3}}/><Text>{d.channel}: {d.percent}%</Text></Space>)}
   </Space>
 }
+
+export function PiePlot({ data }: {data:{channel:string;percent:number;revenue:number}[]}) {
+ if(!data.length)return <Empty description="Chưa có số liệu"/>
+ const colors=['#be123c','#2563eb','#16a34a','#ca8a04']
+ const radius=60, circumference=2*Math.PI*radius
+ let total=0
+ return <div style={{display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
+  <svg viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Tỷ trọng doanh thu theo kênh">
+   <circle cx="90" cy="90" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="36"/>
+   {data.map((d,i)=>{const start=total;total+=Math.max(0,d.percent);
+      return <circle key={i} cx="90" cy="90" r={radius} fill="none" stroke={colors[i%colors.length]} strokeWidth="36"
+        strokeDasharray={`${Math.max(0,d.percent)/100*circumference} ${circumference}`}
+        strokeDashoffset={-start/100*circumference} transform="rotate(-90 90 90)">
+        <title>{d.channel}: {d.percent}%</title></circle>
+   })}
+  </svg>
+  <SharePlot data={data}/>
+ </div>
+}
