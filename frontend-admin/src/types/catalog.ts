@@ -169,6 +169,7 @@ export interface ProductPayload {
   metaKeywords?: string | null
   variants: ProductVariantPayload[]
   images?: ProductImagePayload[]
+  tags?: string[]
 }
 
 export interface ProductUpdatePayload extends Omit<Partial<ProductPayload>, 'variants'> {}
