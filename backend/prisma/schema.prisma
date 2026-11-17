@@ -196,6 +196,7 @@ model Category {
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children Category[] @relation("CategoryHierarchy")
   products Product[]
+  returnPolicyRules ReturnPolicyRule[]
 
   @@map("categories")
 }
@@ -385,6 +386,7 @@ model Store {
   goodsReceipts         GoodsReceipt[]
   invoices              Invoice[]
   returnOrders          ReturnOrder[]
+  dropoffReturnOrders   ReturnOrder[]          @relation("ReturnDropoffStore")
   restockReturnItems    ReturnOrderItem[]      @relation("RestockStore")
   shifts                Shift[]
   shippingQuotes        ShippingQuote[]
@@ -743,6 +745,8 @@ model Order {
   pricingSnapshot         Json?                      @map("pricing_snapshot") @db.JsonB
   exchangeSettlement      ExchangeSettlement?
   outgoingExchangeFunding ExchangeFunding[]
+  policyVersionId         String?                    @map("policy_version_id") @db.Uuid
+  policyVersion           ReturnPolicyVersion?       @relation(fields: [policyVersionId], references: [id])
 
   @@index([customerId, createdAt])
   @@index([storeId, status])
@@ -750,6 +754,7 @@ model Order {
   @@index([shippingAddress], type: Gin, map: "idx_orders_shipping_address")
   @@index([salesStaffId])
   @@index([status, createdAt])
+  @@index([policyVersionId])
   @@map("orders")
 }
 
@@ -857,51 +862,69 @@ model OrderStatusHistory {
 }
 
 model ReturnOrder {
-  id           String   @id @default(uuid()) @db.Uuid
-  returnCode   String   @unique @map("return_code") @db.VarChar(50)
-  orderId      String   @map("order_id") @db.Uuid
-  customerId   String   @map("customer_id") @db.Uuid
-  storeId      String   @map("store_id") @db.Uuid
-  returnType   String   @map("return_type") @db.VarChar(20)
-  status       String   @db.VarChar(30)
-  reason       String   @db.VarChar(100)
-  refundAmount Decimal  @default(0) @map("refund_amount") @db.Decimal(12, 2)
-  handledBy    String?  @map("handled_by") @db.Uuid
-  adminNote    String?  @map("admin_note") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                  String    @id @default(uuid()) @db.Uuid
+  returnCode          String    @unique @map("return_code") @db.VarChar(50)
+  orderId             String    @map("order_id") @db.Uuid
+  customerId          String    @map("customer_id") @db.Uuid
+  storeId             String    @map("store_id") @db.Uuid
+  returnType          String    @map("return_type") @db.VarChar(20)
+  status              String    @db.VarChar(30)
+  reason              String    @db.VarChar(100)
+  refundAmount        Decimal   @default(0) @map("refund_amount") @db.Decimal(12, 2)
+  handledBy           String?   @map("handled_by") @db.Uuid
+  adminNote           String?   @map("admin_note") @db.Text
+  policyVersionId     String?   @map("policy_version_id") @db.Uuid
+  dropoffLocationId   String?   @map("dropoff_location_id") @db.Uuid
+  pickupAddress       Json?     @map("pickup_address") @db.JsonB
+  returnChannel       String    @default("STORE_DROPOFF") @map("return_channel") @db.VarChar(30)
+  totalRefundApproved Decimal   @default(0) @map("total_refund_approved") @db.Decimal(12, 2)
+  customerNote        String?   @map("customer_note") @db.Text
+  rejectionReason     String?   @map("rejection_reason") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order          Order                 @relation(fields: [orderId], references: [id])
-  customer       Customer              @relation(fields: [customerId], references: [id])
-  store          Store                 @relation(fields: [storeId], references: [id])
-  handler        User?                 @relation(fields: [handledBy], references: [id])
-  items          ReturnOrderItem[]
-  refunds        Refund[]
-  shipments      Shipment[]
-  quoteVersion   Int                   @default(0) @map("quote_version")
-  quoteExpiresAt DateTime?             @map("quote_expires_at") @db.Timestamptz
-  quoteSnapshot  Json?                 @map("quote_snapshot") @db.JsonB
-  attachments    ReturnAttachment[]
-  history        ReturnStatusHistory[]
-  exchangeItems  ExchangeItem[]
-  settlement     ExchangeSettlement?
+  order           Order                 @relation(fields: [orderId], references: [id])
+  customer        Customer              @relation(fields: [customerId], references: [id])
+  store           Store                 @relation(fields: [storeId], references: [id])
+  handler         User?                 @relation(fields: [handledBy], references: [id])
+  policyVersion   ReturnPolicyVersion?  @relation(fields: [policyVersionId], references: [id])
+  dropoffLocation Store?                @relation("ReturnDropoffStore", fields: [dropoffLocationId], references: [id])
+  items           ReturnOrderItem[]
+  refunds         Refund[]
+  shipments       Shipment[]
+  quoteVersion    Int                   @default(0) @map("quote_version")
+  quoteExpiresAt  DateTime?             @map("quote_expires_at") @db.Timestamptz
+  quoteSnapshot   Json?                 @map("quote_snapshot") @db.JsonB
+  attachments     ReturnAttachment[]
+  history         ReturnStatusHistory[]
+  exchangeItems   ExchangeItem[]
+  settlement      ExchangeSettlement?
 
   @@index([orderId, status])
   @@index([customerId, createdAt, id])
+  @@index([policyVersionId])
+  @@index([dropoffLocationId])
   @@map("return_orders")
 }
 
 model ReturnOrderItem {
-  id               String   @id @default(uuid()) @db.Uuid
-  returnOrderId    String   @map("return_order_id") @db.Uuid
-  orderItemId      String   @map("order_item_id") @db.Uuid
-  productVariantId String   @map("product_variant_id") @db.Uuid
-  quantity         Int
-  condition        String?  @db.VarChar(30)
-  restockStoreId   String?  @map("restock_store_id") @db.Uuid
-  restockBatchId   String?  @map("restock_batch_id") @db.Uuid
-  note             String?  @db.Text
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                  String   @id @default(uuid()) @db.Uuid
+  returnOrderId       String   @map("return_order_id") @db.Uuid
+  orderItemId         String   @map("order_item_id") @db.Uuid
+  productVariantId    String   @map("product_variant_id") @db.Uuid
+  quantity            Int
+  condition           String?  @db.VarChar(30)
+  restockStoreId      String?  @map("restock_store_id") @db.Uuid
+  restockBatchId      String?  @map("restock_batch_id") @db.Uuid
+  note                String?  @db.Text
+  reasonCode          String   @default("CHANGE_OF_MIND") @map("reason_code") @db.VarChar(50)
+  customerNote        String?  @map("customer_note") @db.Text
+  refundAmountPerUnit Decimal  @default(0) @map("refund_amount_per_unit") @db.Decimal(12, 2)
+  inspectionStatus    String   @default("PENDING") @map("inspection_status") @db.VarChar(30)
+  disposition         String?  @db.VarChar(30)
+  evidenceImages      Json?    @map("evidence_images") @db.JsonB
+  evidenceVideoUrl    String?  @map("evidence_video_url") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   returnOrder     ReturnOrder    @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
   orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
@@ -915,6 +938,46 @@ model ReturnOrderItem {
   @@unique([returnOrderId, orderItemId])
   @@index([orderItemId])
   @@map("return_order_items")
+}
+
+model ReturnPolicyVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  versionName   String    @unique @map("version_name") @db.VarChar(50)
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz
+  isActive      Boolean   @default(true) @map("is_active")
+  description   String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  rules        ReturnPolicyRule[]
+  orders       Order[]
+  returnOrders ReturnOrder[]
+
+  @@map("return_policy_versions")
+}
+
+model ReturnPolicyRule {
+  id                    String   @id @default(uuid()) @db.Uuid
+  policyVersionId       String   @map("policy_version_id") @db.Uuid
+  reasonCode            String   @map("reason_code") @db.VarChar(50)
+  categoryId            String?  @map("category_id") @db.Uuid
+  windowDays            Int      @map("window_days")
+  requiresOriginalSeal  Boolean  @default(true) @map("requires_original_seal")
+  maxUsagePercentage    Int      @default(0) @map("max_usage_percentage")
+  shippingFeeBearer     String   @default("CUSTOMER") @map("shipping_fee_bearer") @db.VarChar(30)
+  requiresEvidenceVideo Boolean  @default(false) @map("requires_evidence_video")
+  requiresEvidenceImage Boolean  @default(true) @map("requires_evidence_image")
+  allowStoreDropoff     Boolean  @default(true) @map("allow_store_dropoff")
+  allowCarrierPickup    Boolean  @default(true) @map("allow_carrier_pickup")
+  requiresManualReview  Boolean  @default(false) @map("requires_manual_review")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  policyVersion ReturnPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+  category      Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([policyVersionId, reasonCode])
+  @@map("return_policy_rules")
 }
 
 // =============================================================================

@@ -871,6 +871,90 @@
 | **EP12-T02** | Xây Dựng Công Cụ Bắn Lại Sự Kiện Lỗi & Xử Lý Dead Letter Queue (DLQ Replay) | `DONE` | 13/13 PASS (`dlq-alert.service.spec.ts`, `dlq-operations.service.spec.ts`, `dlq-operations.controller.spec.ts`) |
 | **INTEGRATION** | Epic 12 End-to-End Tracing & DLQ Replay Integrated Flow | `DONE` | 2/2 PASS (`epic-12-integrated-flow.spec.ts`) |
 
+---
+
+# GIAI ĐOẠN P1: ADVANCED RETURNS & REVERSE LOGISTICS (RMA)
+
+## EPIC 13: Policy Versioning & RMA Claims Engine
+
+### [2026-11-17] Triển Khai Task EP13-T01: Khởi Tạo Schema Return Policy Versions & Rules
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Database Migration (`backend/prisma/migrations/20261117010000_add_return_policy_versions/migration.sql`):
+    - Tạo bảng `return_policy_versions` lưu trữ phiên bản chính sách đổi trả theo thời gian hiệu lực (`version_name`, `effective_from`, `effective_to`, `is_active`).
+    - Tạo bảng `return_policy_rules` cấu hình ma trận điều kiện đổi trả theo từng lý do (`reason_code`, `category_id`, `window_days`, `requires_original_seal`, `max_usage_percentage`, `shipping_fee_bearer`, `requires_evidence_video`, `requires_evidence_image`, `allow_store_dropoff`, `allow_carrier_pickup`, `requires_manual_review`).
+    - Thêm các ràng buộc toàn vẹn dữ liệu: `chk_policy_window_days_positive` (`window_days > 0`), `chk_policy_usage_percentage_range` (`0 <= max_usage_percentage <= 100`), `chk_policy_shipping_fee_bearer` (`IN ('CUSTOMER', 'GLOWUP')`), `chk_return_channel` (`IN ('STORE_DROPOFF', 'CARRIER_PICKUP')`), `chk_return_total_refund_approved_non_negative`, `chk_return_item_inspection_status`, `chk_return_item_disposition`.
+    - Mở rộng bảng `orders` gắn khóa ngoại `policy_version_id` (chụp phiên bản chính sách tại thời điểm đặt hàng).
+    - Mở rộng bảng `return_orders` và `return_order_items` với các trường phục vụ quy trình RMA đa kênh, phân loại lý do và kiểm định.
+  - Schema Prisma (`backend/prisma/schema.prisma`):
+    - Thêm models `ReturnPolicyVersion`, `ReturnPolicyRule`, cập nhật quan hệ với `Order`, `ReturnOrder`, `Category`, `Store`.
+    - Sinh Prisma Client v6.19.3.
+  - Domain Entities & Seed Logic (`backend/src/modules/returns/`):
+    - `domain/entities/return-policy.entity.ts`: Enums `ReturnReasonCode`, `ReturnChannel`, `ShippingFeeBearer`, `ReturnInspectionStatus`, `ReturnDisposition`, `ReturnOrderStatus` và interfaces.
+    - `domain/rules/default-policies.ts`: Cấu hình phiên bản mặc định `POLICY-V1-2026` với 6 bộ quy tắc chuẩn, tuân thủ DEC-05 (`ALLERGIC`: window 14 ngày, max usage 20%, GlowUp chịu phí ship, `requires_manual_review = true` do chờ phê duyệt y tế/pháp lý).
+    - `infrastructure/seeds/return-policy.seed.ts`: Hàm gieo dữ liệu hạt giống ban đầu an toàn.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/infrastructure/__tests__/return-policy.migration.spec.ts`: 4/4 tests PASS trên PostgreSQL thực tế (Seed policy version, kiểm tra check constraints `window_days`, `usage_percentage`, `shipping_fee_bearer`).
+
+### [2026-11-17] Triển Khai Task EP13-T02: Engine Kiểm Tra Tính Hợp Lệ Của Yêu Cầu Đổi Trả (RMA Eligibility Service)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - DTOs & Interfaces (`backend/src/modules/returns/presentation/dtos/return-eligibility.dto.ts`):
+    - `AllowedReturnRuleDto`: Chi tiết quy tắc cho phép (lý do, số ngày còn lại, yêu cầu seal, video, hình ảnh, dropoff/pickup, manual review).
+    - `ItemEligibilityDto`: Đánh giá chi tiết từng mặt hàng trong đơn hàng, số lượng đã mua, số lượng đã trả trước đó, số lượng khả dụng để trả.
+    - `OrderEligibilityResultDto`: Kết quả tổng thể cho toàn bộ đơn hàng.
+  - Eligibility Engine (`backend/src/modules/returns/application/services/rma-eligibility.service.ts`):
+    - Xác minh quyền sở hữu đơn hàng của khách hàng (`order.customerId === customerId`), bảo mật tuyệt đối chống truy vấn chéo.
+    - Kiểm tra trạng thái đơn hàng (`validDeliveredStatuses = ['DELIVERED', 'COMPLETED']`); nếu đơn chưa giao thành công, trả `isEligible: false`, mã lỗi `ORDER_NOT_DELIVERED`.
+    - Phân giải chính xác thời điểm giao hàng (`deliveredAt`) từ `shipments` hoặc `order.updatedAt`.
+    - Phân giải `policyVersion` (ưu tiên policy gắn kèm đơn hàng hoặc tìm version active theo thời gian).
+    - Lọc và tổng hợp số lượng đang trong tiến trình RMA (`status NOT IN ('REJECTED', 'CANCELLED')`), ngăn chặn tạo trùng lặp (`DUPLICATE_RMA_PENDING`).
+    - Tính toán chênh lệch thời gian (`elapsedDays`), đối chiếu ma trận quy tắc theo ngành hàng (`categoryId`) hoặc quy tắc chung (`categoryId = null`).
+    - Hỗ trợ đầy đủ chính sách kích ứng da DEC-05 (`ALLERGIC`: window 14 ngày, max usage 20%, GlowUp chịu phí ship, `requiresManualReview: true`).
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/rma-eligibility.service.spec.ts`: 10/10 tests PASS (Đơn không tồn tại, sai khách hàng, đơn chưa giao, giao 1 ngày đủ 6 rules, giao 5 ngày hết hạn damaged transit nhưng còn lý do khác, quá 40 ngày hết hạn toàn bộ, trùng lặp RMA, hoàn một phần số lượng, bỏ qua đơn từ chối/hủy, ghi đè quy tắc theo ngành hàng).
+
+### [2026-11-17] Triển Khai Task EP13-T03: API Tiếp Nhận Hồ Sơ Đổi Trả Khách Hàng (Customer RMA Claim Submission)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - DTOs (`backend/src/modules/returns/presentation/dtos/submit-return-request.dto.ts`):
+    - `ReturnItemSubmissionDto`: Validate `orderItemId`, `quantity >= 1`, `reasonCode`, `customerNote`, mảng `evidenceImages` (ít nhất 1 ảnh), `evidenceVideoUrl`.
+    - `SubmitReturnRequestDto`: Validate `orderId`, `returnChannel` (`STORE_DROPOFF` / `CARRIER_PICKUP`), `dropoffLocationId`, `pickupAddress`, `items` (ít nhất 1 món).
+  - Use Case (`backend/src/modules/returns/application/use-cases/submit-return-request.use-case.ts`):
+    - Kiểm tra eligibility đơn hàng và từng món hàng qua `RmaEligibilityService`.
+    - Kiểm tra ràng buộc video bằng chứng đối với lý do `DAMAGED_IN_TRANSIT` (bắt buộc) và hình ảnh bằng chứng cho tất cả các lý do.
+    - Kiểm tra tính hợp lệ của Showroom tiếp nhận khi chọn `STORE_DROPOFF` hoặc địa chỉ nhận hàng khi chọn `CARRIER_PICKUP`.
+    - Giao dịch ACID: Sinh mã `returnCode` (`RET-YYYYMMDD-XXXX`), tạo `ReturnOrder` ở trạng thái `SUBMITTED`, tạo các dòng `ReturnOrderItem` (trạng thái kiểm định ban đầu: `PENDING`), và ghi Outbox Event `RMA_REQUEST_SUBMITTED` vào bảng `outbox_events` trong cùng một transaction.
+  - Controller (`backend/src/modules/returns/presentation/controllers/customer-return.controller.ts`):
+    - `POST /api/v1/customers/me/returns`: Tiếp nhận hồ sơ RMA.
+    - `GET /api/v1/customers/me/orders/:orderId/return-eligibility`: Kiểm tra tính hợp lệ đổi trả của đơn hàng.
+    - `GET /api/v1/customers/me/returns`: Danh sách yêu cầu đổi trả của khách hàng (kèm phân trang).
+    - `GET /api/v1/customers/me/returns/:id`: Chi tiết hồ sơ đổi trả (kiểm soát quyền sở hữu đa tầng).
+  - Module Wiring (`backend/src/modules/returns/returns.module.ts`):
+    - Tích hợp `PrismaModule`, `AsyncInfrastructureModule`.
+    - Đăng ký và export `RmaEligibilityService`, `SubmitReturnRequestUseCase`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/use-cases/__tests__/submit-return-request.use-case.spec.ts`: 9/9 tests PASS (Từ chối đơn không đủ điều kiện, từ chối món ngoài đơn, từ chối số lượng vượt mức, bắt buộc video cho hàng bể vỡ, kiểm tra showroom/địa chỉ, tạo thành công ReturnOrder + Outbox Event ACID, hỗ trợ claim dị ứng DEC-05).
+  - `src/modules/returns/presentation/controllers/__tests__/customer-return.controller.spec.ts`: 8/8 tests PASS (Xác thực customerId, gọi eligibility service, gọi submit use-case, phân trang danh sách, kiểm tra quyền sở hữu đơn hoàn, xử lý ngoại lệ Unauthorized/Forbidden/NotFound).
+  - `src/modules/returns/__tests__/epic-13-integrated-flow.spec.ts`: 5/5 tests PASS (Kiểm thử tích hợp chu trình E2E khép kín trên PostgreSQL Neon thực tế: Seed policy -> Kiểm tra eligibility đơn hàng -> Submit claim dị ứng da DEC-05 kèm ảnh -> Ghi Outbox Event -> Cập nhật giảm số lượng khả dụng -> Chặn trùng lặp RMA -> Chặn đơn giao quá hạn 45 ngày).
+- **Biên dịch & Regression:**
+  - `npm run build` (`nest build`): Thành công 100%, 0 lỗi biên dịch TypeScript.
+  - P0 Regression Test: PASS (Epic 01, Epic 03, Epic 04, Epic 05 đều đạt 100%).
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 13
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP13-T01** | Khởi Tạo Schema Return Policy Versions & Rules | `IMPLEMENTED` | 4/4 PASS (`return-policy.migration.spec.ts`) |
+| **EP13-T02** | Xây Dựng Engine Kiểm Tra Tính Hợp Lệ Của Yêu Cầu Đổi Trả (RMA Eligibility Service) | `IMPLEMENTED` | 10/10 PASS (`rma-eligibility.service.spec.ts`) |
+| **EP13-T03** | API Tiếp Nhận Hồ Sơ Đổi Trả Khách Hàng (Customer RMA Claim Submission) | `IMPLEMENTED` | 17/17 PASS (`submit-return-request.use-case.spec.ts`, `customer-return.controller.spec.ts`) |
+| **INTEGRATION** | Epic 13 End-to-End RMA Claim & Policy Verification Integrated Flow | `IMPLEMENTED` | 5/5 PASS (`epic-13-integrated-flow.spec.ts`) |
+
+
+
+
 
 
 
