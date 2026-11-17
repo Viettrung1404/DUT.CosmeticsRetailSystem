@@ -947,10 +947,87 @@
 
 | Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
 | :--- | :--- | :--- | :--- |
-| **EP13-T01** | Khởi Tạo Schema Return Policy Versions & Rules | `IMPLEMENTED` | 4/4 PASS (`return-policy.migration.spec.ts`) |
-| **EP13-T02** | Xây Dựng Engine Kiểm Tra Tính Hợp Lệ Của Yêu Cầu Đổi Trả (RMA Eligibility Service) | `IMPLEMENTED` | 10/10 PASS (`rma-eligibility.service.spec.ts`) |
-| **EP13-T03** | API Tiếp Nhận Hồ Sơ Đổi Trả Khách Hàng (Customer RMA Claim Submission) | `IMPLEMENTED` | 17/17 PASS (`submit-return-request.use-case.spec.ts`, `customer-return.controller.spec.ts`) |
-| **INTEGRATION** | Epic 13 End-to-End RMA Claim & Policy Verification Integrated Flow | `IMPLEMENTED` | 5/5 PASS (`epic-13-integrated-flow.spec.ts`) |
+| **EP13-T01** | Khởi Tạo Schema Return Policy Versions & Rules | `DONE` (APPROVED) | 4/4 PASS (`return-policy.migration.spec.ts`) |
+| **EP13-T02** | Xây Dựng Engine Kiểm Tra Tính Hợp Lệ Của Yêu Cầu Đổi Trả (RMA Eligibility Service) | `DONE` (APPROVED) | 10/10 PASS (`rma-eligibility.service.spec.ts`) |
+| **EP13-T03** | API Tiếp Nhận Hồ Sơ Đổi Trả Khách Hàng (Customer RMA Claim Submission) | `DONE` (APPROVED) | 17/17 PASS (`submit-return-request.use-case.spec.ts`, `customer-return.controller.spec.ts`) |
+| **INTEGRATION** | Epic 13 End-to-End RMA Claim & Policy Verification Integrated Flow | `DONE` (APPROVED) | 5/5 PASS (`epic-13-integrated-flow.spec.ts`) |
+
+---
+
+### [2026-11-17] Triển Khai Task EP14-T01: Quy Trình Tiếp Nhận Hàng Hoàn Tại Cửa Hàng (Store Drop-off Workflow)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Database Schema & Migration (`backend/prisma/migrations/20261117020000_add_return_receipts/migration.sql`):
+    - Tạo bảng `return_receipts` lưu thông tin biên bản tiếp nhận hàng hoàn (`receipt_code`, `return_order_id`, `location_id`, `received_by`, `received_items_count`, `package_condition_note`, `created_at`, `updated_at`).
+    - Cập nhật quan hệ `ReturnOrder.receipts`, `Store.returnReceipts`, `User.receivedReturnReceipts`.
+  - Security & Authorization:
+    - Mở rộng `@LocationScoped({ resourceType: 'RETURN_ORDER' })` trong `backend/src/core/decorators/location-scoped.decorator.ts`.
+    - Mở rộng `LocationScopeGuard` (`backend/src/core/guards/location-scope.guard.ts`) phân giải `dropoffLocationId` hoặc `storeId` đối chiếu phạm vi dữ liệu chi nhánh của nhân viên.
+  - DTO & Use Case:
+    - DTO `ReceiveStoreDropoffDto` (`packageConditionNote`, `receivedItemsCount`).
+    - Use Case `ReceiveStoreDropoffUseCase` (`backend/src/modules/returns/application/use-cases/receive-store-dropoff.use-case.ts`):
+      - Enforce các trạng thái hợp lệ tiếp nhận: `SUBMITTED`, `APPROVED`, `AWAITING_RETURN`.
+      - Transaction ACID: Tạo `ReturnReceipt` (`RCP-YYYYMMDD-XXXX`), tăng `inventory.quantity` và `inventory.quarantinedQuantity` (tuyệt đối KHÔNG tăng `available_quantity` bán lẻ), ghi nhật ký `inventory_transactions` (`RETURN_INBOUND`), cập nhật `ReturnOrder.status = 'RECEIVED'`, ghi Outbox Event `RMA_RECEIVED_AT_STORE`.
+- **Kiểm thử tự động:**
+  - `src/core/guards/__tests__/location-scope.guard.spec.ts`: 8/8 tests PASS (bao gồm test tài nguyên `RETURN_ORDER`).
+  - `src/modules/returns/application/use-cases/__tests__/receive-store-dropoff.use-case.spec.ts`: 4/4 tests PASS.
+
+---
+
+### [2026-11-17] Triển Khai Task EP14-T02: Tích Hợp Vận Chuyển Thu Gom Tận Nhà Với GHN Reverse Logistics
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - DTO `DispatchReturnPickupDto` (`destinationWarehouseId`, `pickupTimeSlot`, `operatorNote`).
+  - Service `ReverseShippingService` (`backend/src/modules/returns/application/services/reverse-shipping.service.ts`):
+    - `dispatchReturnPickup`: Kiểm tra kênh `CARRIER_PICKUP`, kiểm tra địa chỉ thu gom, kiểm tra trạng thái hồ sơ RMA và chặn tạo trùng vận đơn thu gom đang hoạt động.
+    - Sinh mã vận đơn ngược và mã vận đơn đối tác chuẩn GHN Reverse (`LADXXXXXX`, link tem in A5).
+    - Transaction ACID: Tạo `Shipment` với `shipmentType = 'RETURN_PICKUP'`, `carrierCode = 'GHN'`, trạng thái `READY_TO_PICK`; cập nhật `ReturnOrder.status = 'APPROVED'`, ghi Outbox Event `RETURN_PICKUP_DISPATCHED`.
+    - `handleCarrierPickedUp`: Xử lý webhook cập nhật `Shipment.status = 'IN_TRANSIT'` và `ReturnOrder.status = 'IN_TRANSIT'`, ghi Outbox Event `RMA_IN_TRANSIT`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/reverse-shipping.service.spec.ts`: 9/9 tests PASS.
+
+---
+
+### [2026-11-17] Triển Khai Task EP14-T03: Tiếp Nhận Kiện Hàng Hoàn Tại Tổng Kho (Warehouse Reverse Inbound)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - DTO `ReceiveWarehouseReturnDto` (`warehouseId`, `packageConditionNote`, `receivedItemsCount`).
+  - Use Case `ReceiveWarehouseReturnUseCase` (`backend/src/modules/returns/application/use-cases/receive-warehouse-return.use-case.ts`):
+    - Hỗ trợ quét tiếp nhận đa năng qua UUID hồ sơ, mã RMA (`returnCode`), hoặc quét trực tiếp mã barcode vận đơn bưu tá (`trackingCode`).
+    - Transaction ACID: Tạo `ReturnReceipt` tại Tổng kho (`RCP-WH-YYYYMMDD-XXXX`), đưa hàng vào tồn kho cách ly KCS (`quarantinedQuantity` tăng, `available_quantity` không đổi), ghi `inventory_transactions` (`RETURN_INBOUND`), cập nhật `Shipment.status = 'DELIVERED'`, cập nhật `ReturnOrder.status = 'RECEIVED'`, ghi Outbox Event `RMA_RECEIVED_AT_WAREHOUSE`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/use-cases/__tests__/receive-warehouse-return.use-case.spec.ts`: 4/4 tests PASS.
+
+---
+
+### [2026-11-17] Presentation Layer & Integrated Flow: Admin Returns Controller & Epic 14 Flow
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Controller `AdminReturnController` (`backend/src/modules/returns/presentation/controllers/admin-return.controller.ts`):
+    - `POST /api/v1/admin/returns/:id/receive-at-store`: Gắn `@LocationScoped({ resourceType: 'RETURN_ORDER' })`, `LocationScopeGuard`, RBAC.
+    - `POST /api/v1/admin/returns/:id/dispatch-pickup`: Phát lệnh bưu tá GHN thu hồi tận nhà.
+    - `POST /api/v1/admin/returns/:id/receive-at-warehouse`: Tiếp nhận hàng hoàn tại Tổng kho.
+    - `GET /api/v1/admin/returns`: Tra cứu danh sách hồ sơ RMA toàn hệ thống (phân trang, lọc theo status, returnChannel, search).
+    - `GET /api/v1/admin/returns/:id`: Chi tiết hồ sơ RMA kèm sản phẩm, lịch sử vận chuyển, biên bản tiếp nhận.
+  - Module Registration: Đăng ký Use Cases, Services, Controllers vào `ReturnsModule`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/presentation/controllers/__tests__/admin-return.controller.spec.ts`: 6/6 tests PASS.
+  - `src/modules/returns/__tests__/epic-14-integrated-flow.spec.ts`: 6/6 tests PASS (Kiểm thử tích hợp chu trình E2E khép kín trên PostgreSQL Neon thực tế cả 2 luồng: Store Drop-off & GHN Reverse Logistics Inbound).
+- **Biên dịch & Regression:**
+  - `npm run build` (`nest build`): Thành công 100%, 0 lỗi biên dịch TypeScript.
+  - P0 Regression Test: PASS 100% (Epic 01, Epic 03, Epic 04, Epic 05, Epic 13).
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 14
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP14-T01** | Quy Trình Tiếp Nhận Hàng Hoàn Tại Cửa Hàng (Store Drop-off Workflow) | `IMPLEMENTED` | 12/12 PASS (`receive-store-dropoff.use-case.spec.ts`, `location-scope.guard.spec.ts`) |
+| **EP14-T02** | Tích Hợp Vận Chuyển Thu Gom Tận Nhà Với GHN Reverse Logistics | `IMPLEMENTED` | 9/9 PASS (`reverse-shipping.service.spec.ts`) |
+| **EP14-T03** | Tiếp Nhận Kiện Hàng Hoàn Tại Tổng Kho (Warehouse Reverse Inbound) | `IMPLEMENTED` | 4/4 PASS (`receive-warehouse-return.use-case.spec.ts`) |
+| **PRESENTATION** | Admin Returns & Reverse Logistics Controller | `IMPLEMENTED` | 6/6 PASS (`admin-return.controller.spec.ts`) |
+| **INTEGRATION** | Epic 14 End-to-End Multi-Channel Reverse Logistics Integrated Flow | `IMPLEMENTED` | 6/6 PASS (`epic-14-integrated-flow.spec.ts`) |
 
 
 
@@ -959,3 +1036,353 @@
 
 
 
+
+
+---
+
+## EPIC 15: QC Inspection & Inventory Disposition
+
+### [2026-11-17] Triển Khai Task EP15-T01: Xây Dựng Schema & Dịch Vụ Kiểm Định Chất Lượng KCS (ReturnInspectionService)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Database Schema & Migration (`backend/prisma/migrations/20261117030000_add_qc_inspections_and_dispositions/migration.sql`):
+    - Tạo bảng `return_inspections`: `id`, `inspection_code` (UNIQUE `INS-YYYYMMDD-XXXX`), `return_order_id`, `inspector_id`, `overall_result` (`PASSED`, `FAILED`, `PARTIALLY_PASSED`, `DISPUTED`), `inspector_notes`, `created_at`, `updated_at`.
+    - Tạo bảng `return_inspection_items`: `id`, `inspection_id`, `return_item_id`, `passed_quantity`, `failed_quantity`, `is_seal_intact`, `remaining_percentage`, `disposition`, `reason_detail`, `created_at`, `updated_at`.
+    - Ràng buộc DB: `chk_inspection_quantities_non_negative`, `chk_inspection_remaining_percentage_range` (0-100), `chk_inspection_item_disposition` (`RESTOCK`, `QUARANTINE`, `SCRAP`, `RETURN_TO_CUSTOMER`).
+  - DTOs & Validation:
+    - `InspectionItemResultDto`: `returnItemId`, `passedQuantity`, `failedQuantity`, `isSealIntact`, `remainingPercentage`, `disposition`, `reasonDetail`, `lotId`.
+    - `CompleteInspectionDto`: `inspectorNotes`, `items` (ArrayMinSize 1).
+  - Service `ReturnInspectionService` (`backend/src/modules/returns/application/services/return-inspection.service.ts`):
+    - Kiểm tra trạng thái hồ sơ RMA (chỉ cho phép kiểm định từ `RECEIVED` hoặc `INSPECTING`).
+    - Khớp số lượng: `passedQuantity + failedQuantity === returnItem.quantity` (AC1).
+    - **Ràng buộc mỹ phẩm bóc seal (TC-RMA-05):** Nếu `CHANGE_OF_MIND` và `!isSealIntact` $\implies$ Chặn tuyệt đối tái nhập kho (`RESTOCK`).
+    - **Ràng buộc kích ứng da DEC-05 (TC-RMA-06):** Nếu `ALLERGIC` và `remainingPercentage < 80%` $\implies$ Chặn phê duyệt KCS (`passedQuantity > 0`); chặn tái nhập kho `RESTOCK` đối với mỹ phẩm kích ứng đã sử dụng.
+    - Transaction ACID: Tạo `ReturnInspection`, tạo `ReturnInspectionItem`, cập nhật `ReturnOrderItem`, gọi `InventoryDispositionService`, cập nhật `ReturnOrder.status`, ghi `ReturnStatusHistory`, phát Outbox Event `RMA_INSPECTION_COMPLETED`.
+    - `getInspectionByReturnOrderId`: Truy vấn biên bản kèm chi tiết hàng và thông tin KCS viên.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/return-inspection.service.spec.ts`: 9/9 tests PASS (Happy path, TC-RMA-05 seal rách, TC-RMA-06 allergic <80%, chặn RESTOCK allergic, trạng thái không hợp lệ, lệch số lượng, 100% failed ra REJECTED, lấy chi tiết biên bản, NotFound).
+
+---
+
+### [2026-11-17] Triển Khai Task EP15-T02: Xây Dựng Dịch Vụ Định Đoạt Tồn Kho Hàng Đổi Trả (InventoryDispositionService)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Database Schema & Migration:
+    - Tạo bảng `inventory_dispositions`: `id`, `disposition_code` (UNIQUE `DSP-YYYYMMDD-XXXX`), `location_id`, `product_variant_id`, `lot_id`, `return_item_id`, `disposition_type`, `quantity`, `executed_by`, `executed_at`, `notes`.
+  - Service `InventoryDispositionService` (`backend/src/modules/returns/application/services/inventory-disposition.service.ts`):
+    - Chạy trong cùng ACID transaction với kiểm định KCS (`tx: Prisma.TransactionClient`).
+    - **RESTOCK (AC1):** Giảm `quarantinedQuantity` trên bảng `inventory`, tự động khôi phục `available_quantity` bán lẻ; khôi phục `quantityOnHand` trên `inventory_lots`; ghi nhật ký `inventory_transactions` loại `RETURN_RESTOCK`.
+    - **SCRAP (AC2):** Giảm `quarantinedQuantity`, tăng `damagedQuantity` trên bảng `inventory` (tuyệt đối KHÔNG tăng `available_quantity` bán lẻ); ghi nhật ký `inventory_transactions` loại `RETURN_SCRAP`.
+    - **RETURN_TO_CUSTOMER (AC3):** Hàng bị từ chối xuất trả lại cho khách: Giảm `quarantinedQuantity`, giảm `quantity` vật lý (xuất khỏi kho); ghi nhật ký `inventory_transactions` loại `RETURN_REJECTED`.
+    - **QUARANTINE:** Tiếp tục giữ hàng trong diện cách ly chờ hội đồng y tế thẩm định; ghi nhật ký `RETURN_QUARANTINE`.
+    - Tạo bản ghi biên bản định đoạt `inventory_dispositions`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/inventory-disposition.service.spec.ts`: 5/5 tests PASS (RESTOCK, SCRAP, RETURN_TO_CUSTOMER, QUARANTINE, chặn quantity <= 0).
+
+---
+
+### [2026-11-17] Triển Khai Task EP15-T03: Xây Dựng Bộ Tổng Hợp Trạng Thái Đổi Trả Đa Dòng (RmaStatusAggregator)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Service `RmaStatusAggregator` (`backend/src/modules/returns/application/services/rma-status-aggregator.ts`):
+    - Phương thức thuần khiết `aggregate(items: ItemInspectionOutcome[]): AggregationResult`.
+    - 100% dòng sản phẩm `PASSED` $\implies$ Trả về `overallResult = 'PASSED'`, `returnOrderStatus = 'RESOLUTION_PENDING'` (AC1).
+    - 100% dòng sản phẩm `FAILED` $\implies$ Trả về `overallResult = 'FAILED'`, `returnOrderStatus = 'REJECTED'` (AC2).
+    - Hỗn hợp (có ít nhất 1 dòng `PASSED` và 1 dòng `FAILED`) $\implies$ Trả về `overallResult = 'PARTIALLY_PASSED'`, `returnOrderStatus = 'RESOLUTION_PENDING'` (để thanh toán phần đạt, ghi nhận từ chối phần không đạt) (AC3).
+    - Có bất kỳ dòng nào `DISPUTED` $\implies$ Trả về `overallResult = 'DISPUTED'`, `returnOrderStatus = 'DISPUTED'` (AC4).
+    - Bảo vệ an toàn khi danh sách rỗng.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/rma-status-aggregator.spec.ts`: 5/5 tests PASS.
+
+---
+
+### [2026-11-17] Presentation Layer & Integrated Flow: Admin Complete Inspection & Epic 15 Flow
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Controller `AdminReturnController`:
+    - `POST /api/v1/admin/returns/:id/complete-inspection`: Nhận `CompleteInspectionDto`, kiểm tra RBAC (`RETURN_MANAGE`, `ADMIN`, `QC_STAFF`, `STORE_MGR`, `WAREHOUSE_STAFF`), thực thi kiểm định và định đoạt tồn kho.
+    - `GET /api/v1/admin/returns/:id/inspection`: Tra cứu biên bản kiểm định KCS và lịch sử định đoạt tồn kho.
+    - Mở rộng `listAdminReturns` và `getAdminReturnDetail` nạp quan hệ `inspections`.
+  - Module Registration (`ReturnsModule`): Đăng ký `RmaStatusAggregator`, `InventoryDispositionService`, `ReturnInspectionService`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/presentation/controllers/__tests__/admin-return.controller.spec.ts`: 8/8 tests PASS (bao gồm 2 endpoint kiểm định mới).
+  - `src/modules/returns/__tests__/epic-15-integrated-flow.spec.ts`: 4/4 tests PASS trên PostgreSQL Neon:
+    - Flow 1: Kiểm định đạt chuẩn & RESTOCK: Chuyển `RESOLUTION_PENDING`, giải phóng cách ly, ghi nhận `RETURN_RESTOCK`, phát Outbox Event `RMA_INSPECTION_COMPLETED`.
+    - Flow 2: TC-RMA-05 Mỹ phẩm rách seal: Chặn `RESTOCK`, chấp thuận `SCRAP`, tăng `damagedQuantity`.
+    - Flow 3: TC-RMA-06 Kích ứng da DEC-05: Chặn khi còn < 80% dung tích, chặn `RESTOCK`, chấp thuận đền bù khi còn 90%.
+    - Flow 4: 100% Failed: Chuyển `REJECTED`, xuất trả lại cho khách hàng `RETURN_REJECTED`.
+- **Biên dịch & Regression:**
+  - `npm run build` (`nest build`): Thành công 100%, 0 lỗi biên dịch TypeScript.
+  - Regression toàn bộ Returns Module: 14 test suites, 90/90 tests PASS 100%.
+  - P0 Regression Test: PASS (Epic 01, Epic 03, Epic 04, Epic 05).
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 15
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP15-T01** | Xây Dựng Schema & Dịch Vụ Kiểm Định Chất Lượng KCS (ReturnInspectionService) | `IMPLEMENTED` | 9/9 PASS (`return-inspection.service.spec.ts`) |
+| **EP15-T02** | Xây Dựng Dịch Vụ Định Đoạt Tồn Kho Hàng Đổi Trả (InventoryDispositionService) | `IMPLEMENTED` | 5/5 PASS (`inventory-disposition.service.spec.ts`) |
+| **EP15-T03** | Xây Dựng Bộ Tổng Hợp Trạng Thái Đổi Trả Đa Dòng (RmaStatusAggregator) | `IMPLEMENTED` | 5/5 PASS (`rma-status-aggregator.spec.ts`) |
+| **PRESENTATION** | Admin Returns Controller Complete Inspection Endpoints | `IMPLEMENTED` | 8/8 PASS (`admin-return.controller.spec.ts`) |
+| **INTEGRATION** | Epic 15 QC Inspection & Inventory Disposition Integrated Flow | `IMPLEMENTED` | 4/4 PASS (`epic-15-integrated-flow.spec.ts`) |
+
+---
+
+### [2026-11-17] Triển Khai Task EP16-T01: Xây Dựng Thuật Toán Phân Bổ Tiền Hoàn Thực Trả (RefundCalculatorService)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Service `RefundCalculatorService` (`backend/src/modules/returns/application/services/refund-calculator.service.ts`):
+    - Triển khai công thức phân bổ chiết khấu Voucher / Điểm thưởng theo tỷ lệ đóng góp giá trị niêm yết của từng sản phẩm trong đơn gốc (TC-RMA-17, AC1):
+      $$\text{itemRatio} = \frac{\text{lineSubtotal}}{\text{orderSubtotal}}$$
+      $$\text{lineVoucherDiscount} = \text{round}(\text{orderDiscountAmount} \times \text{itemRatio})$$
+      $$\text{lineNetCash} = \max(0, \text{lineSubtotal} - \text{lineVoucherDiscount} - \text{linePointsDiscountVnd})$$
+    - Bảo toàn bất biến tài chính: Tổng tiền hoàn không bao giờ vượt quá số tiền mặt đã thanh toán (`totalCapturedCash`) và số điểm khôi phục không vượt quá số điểm đã tiêu (`totalPointsUsed`) (AC2, AC3).
+    - Khấu trừ phí vận chuyển thu hồi 25.000đ khi trả hàng vì lý do `CHANGE_OF_MIND` qua bưu tá lấy tận nhà (`CARRIER_PICKUP`) theo quyết định `DEC-04` (AC4).
+    - Miễn phí vận chuyển thu hồi (0đ) cho hình thức trả tại quầy (`STORE_DROPOFF`) hoặc các lỗi xuất phát từ sản phẩm / kích ứng da (`DEC-05`).
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/refund-calculator.service.spec.ts`: 9/9 tests PASS.
+
+---
+
+### [2026-11-17] Triển Khai Task EP16-T02: Mở Rộng Schema Lệnh Hoàn Tiền Chi Tiết Từng Dòng (RefundItem & RefundExecutionService)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Database Migration `20261117040000_add_refund_items`:
+    - Tạo bảng `refund_items` liên kết với `refunds`, `order_items` và `return_order_items`.
+    - Check constraints: `chk_refund_items_quantity_positive`, `chk_refund_items_amount_non_negative`, `chk_refund_items_points_non_negative`.
+    - Indexes: `idx_refund_items_refund`, `idx_refund_items_order_item`, `idx_refund_items_return_item`.
+  - Service `RefundExecutionService` (`backend/src/modules/returns/application/services/refund-execution.service.ts`):
+    - Cơ chế chống hoàn trùng / vượt hạn mức (Anti-duplication protection, AC1): Đối soát toàn bộ lịch sử `refund_items` trước khi phát sinh lệnh hoàn tiền mới. Chặn triệt để nếu sản phẩm đã hoàn đủ số lượng hoặc giá trị.
+    - Lọc sản phẩm đạt chuẩn KCS (`PASSED`) từ biên bản kiểm định để khởi tạo lệnh hoàn tiền `PENDING`.
+    - Phương thức `previewRefundForReturn(returnOrderId, deductedShippingFee)` hỗ trợ tính trước số tiền hoàn (Preview / Quote).
+- **Kiểm thử tự động:**
+  - `src/modules/returns/infrastructure/__tests__/refund-items.migration.spec.ts`: 5/5 tests PASS trên PostgreSQL Neon.
+  - `src/modules/returns/application/services/__tests__/refund-execution.service.spec.ts`: 6/6 tests PASS.
+
+---
+
+### [2026-11-17] Triển Khai Task EP16-T03: Tích Hợp Cổng Thanh Toán Hoàn Tiền Tự Động (PaymentRefundGatewayService & Adapter)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Adapter `PaymentRefundGatewayAdapter` (`backend/src/modules/returns/infrastructure/adapters/payment-refund-gateway.adapter.ts`):
+    - Kết nối cổng thanh toán VNPay / MoMo / SePay hoặc ủy nhiệm chi / tiền mặt tại quầy.
+  - Service `PaymentRefundGatewayService` (`backend/src/modules/returns/application/services/payment-refund-gateway.service.ts`):
+    - `approveRefund(refundId, approverUserId, note)`: Phê duyệt lệnh hoàn tiền (PENDING -> APPROVED).
+    - `executeRefund(refundId, operatorUserId, idempotencyKey)`: Giải ngân tự động qua Cổng thanh toán.
+    - Idempotency Protection (TC-RMA-12, AC1): Bỏ qua giao dịch trùng lặp nếu `refund.status === 'COMPLETED'`.
+    - Gateway Error Handling (TC-RMA-11, AC2): Khi cổng thanh toán trả về lỗi mạng / timeout (504), giữ trạng thái `PROCESSING` để đối soát thủ công, không làm gián đoạn hệ thống.
+    - Transactional Settlement (AC3): Khôi phục điểm tích lũy vào `Customer.totalPoints`, ghi nhật ký `LoyaltyPointsTransaction`, cập nhật `ReturnOrder.status = 'COMPLETED'`, phát sự kiện Outbox `REFUND_COMPLETED`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/payment-refund-gateway.service.spec.ts`: 7/7 tests PASS.
+
+---
+
+### [2026-11-17] Presentation Layer & Integrated Flow: Admin Refund Endpoints & Epic 16 Flow
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - DTOs `refund-operations.dto.ts` (`CalculateRefundDto`, `CreateRefundDto`, `ApproveRefundDto`, `ExecuteRefundDto`).
+  - Controller `AdminReturnController`:
+    - `POST /api/v1/admin/returns/:id/calculate-refund`: Tính toán phân bổ tiền hoàn và điểm thưởng theo tỷ lệ.
+    - `POST /api/v1/admin/returns/:id/create-refund`: Khởi tạo lệnh hoàn tiền chi tiết từng dòng với cơ chế chống hoàn trùng.
+    - `GET /api/v1/admin/returns/refunds/:refundId`: Tra cứu thông tin chi tiết lệnh hoàn tiền và các dòng sản phẩm liên quan.
+    - `POST /api/v1/admin/returns/refunds/:refundId/approve`: Phê duyệt lệnh hoàn tiền trước khi phát lệnh giải ngân.
+    - `POST /api/v1/admin/returns/refunds/:refundId/execute`: Giải ngân hoàn tiền tự động qua cổng thanh toán hoặc đối soát tiền mặt.
+  - Module Registration (`ReturnsModule`): Đăng ký `RefundCalculatorService`, `RefundExecutionService`, `PaymentRefundGatewayAdapter`, `PaymentRefundGatewayService`.
+- **Kiểm thử tự động:**
+  - `src/modules/returns/presentation/controllers/__tests__/admin-return.controller.spec.ts`: 13/13 tests PASS.
+  - `src/modules/returns/__tests__/epic-16-integrated-flow.spec.ts`: 10/10 tests PASS trên PostgreSQL Neon live:
+    - Scenario 1 (TC-RMA-17): Trả tại quầy -> QC PASSED -> Hoàn tiền phân bổ voucher tỷ lệ (180.000đ cash, 20 điểm) -> Approve & Execute -> COMPLETED, khôi phục điểm, Outbox REFUND_COMPLETED, Anti-duplication, Idempotency (TC-RMA-12).
+    - Scenario 2 (DEC-04): Lấy hàng tận nhà đổi ý (CHANGE_OF_MIND) -> Khấu trừ 25.000đ phí ship thu hồi.
+    - Scenario 3 (TC-RMA-11, AC2): Lỗi kết nối 504 Gateway Timeout -> Giữ trạng thái PROCESSING để đối soát thủ công an toàn, không crash.
+- **Biên dịch & Regression:**
+  - `npm run build` (`nest build`): Thành công 100%, 0 lỗi biên dịch TypeScript.
+  - Regression toàn bộ Returns Module: 19 test suites, 132/132 tests PASS 100%.
+  - P0 Regression Test: PASS (Epic 01, Epic 02, Epic 03, Epic 04, Epic 05).
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 16
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP16-T01** | Xây Dựng Thuật Toán Phân Bổ Tiền Hoàn Thực Trả (RefundCalculatorService) | `IMPLEMENTED` | 9/9 PASS (`refund-calculator.service.spec.ts`) |
+| **EP16-T02** | Mở Rộng Schema Lệnh Hoàn Tiền Chi Tiết Từng Dòng (RefundItem & RefundExecutionService) | `IMPLEMENTED` | 5/5 PASS (`refund-items.migration.spec.ts`), 6/6 PASS (`refund-execution.service.spec.ts`) |
+| **EP16-T03** | Tích Hợp Cổng Thanh Toán Hoàn Tiền Tự Động (PaymentRefundGatewayService & Adapter) | `IMPLEMENTED` | 7/7 PASS (`payment-refund-gateway.service.spec.ts`) |
+| **PRESENTATION** | Admin Returns Controller Refund Operations Endpoints | `IMPLEMENTED` | 13/13 PASS (`admin-return.controller.spec.ts`) |
+| **INTEGRATION** | Epic 16 Partial Refund Allocation & Settlement Integrated Flow | `IMPLEMENTED` | 10/10 PASS (`epic-16-integrated-flow.spec.ts`) |
+
+---
+
+### [2026-11-17] Triển Khai Task EP17-T01: Xây Dựng Dịch Vụ Quyết Toán Đổi Hàng (ExchangeSettlementService)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Định lý bù trừ tài chính đổi hàng & Ràng buộc toàn vẹn cơ sở dữ liệu `chk_exchange_amounts`:
+    $$\text{returnCredit} \ge 0, \quad \text{replacementPayable} \ge 0, \quad \text{creditApplied} \ge 0, \quad \text{additionalDue} \ge 0, \quad \text{refundDue} \ge 0$$
+    $$\text{creditApplied} + \text{additionalDue} = \text{replacementPayable}$$
+    $$\text{creditApplied} + \text{refundDue} = \text{returnCredit}$$
+    $$(\text{additionalDue} = 0 \quad \text{OR} \quad \text{refundDue} = 0)$$
+  - Triển khai phương thức `calculateExchangeQuote(returnOrderId, replacementItems, shippingFeeOverride)`:
+    - Tính toán giá trị tín dụng hoàn hàng (`returnCredit`) kế thừa thuật toán chia tỷ lệ pro-rata voucher từ `RefundCalculatorService`.
+    - Tính toán tổng số tiền hàng mới cần thanh toán (`replacementPayable`) từ bảng giá biến thể hiện hành.
+    - Phân bổ 3 trường hợp nghiệp vụ:
+      - Đổi ngang giá ($P = C$): $\text{creditApplied} = C, \text{additionalDue} = 0, \text{refundDue} = 0$ (TC-RMA-13).
+      - Đổi giá cao hơn ($P > C$): $\text{creditApplied} = C, \text{additionalDue} = P - C, \text{refundDue} = 0$ (TC-RMA-14).
+      - Đổi giá thấp hơn ($P < C$): $\text{creditApplied} = P, \text{additionalDue} = 0, \text{refundDue} = C - P$ (TC-RMA-15).
+  - Triển khai phương thức `getExchangeSettlementByReturnOrderId(returnOrderId)`: Truy vấn toàn diện chi tiết quyết toán, đơn thay thế, các dòng hàng đổi và nguồn gốc tài chính hoàn/bù (`ExchangeFunding`).
+- **Kiểm thử tự động:**
+  - `src/modules/returns/application/services/__tests__/exchange-settlement.service.spec.ts`: 13/13 tests PASS.
+
+---
+
+### [2026-11-17] Triển Khai Task EP17-T02: Tạo Đơn Hàng Thay Thế & Tích Hợp Luồng Fulfillment P0 (ExchangeSettlementService.createReplacementOrder)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Triển khai phương thức `createReplacementOrder(returnOrderId, operatorUserId, dto)`:
+    - Kiểm tra điều kiện tiên quyết: ReturnOrder ở trạng thái `RESOLUTION_PENDING` và chưa từng có bản ghi quyết toán đổi hàng nào trước đó (Chống đổi trùng lặp / Idempotency).
+    - Kiểm tra tồn kho khả dụng (ATP Check, TC-RMA-16, AC1): Tích hợp trực tiếp `AtpCalculatorService`, xác minh toàn bộ biến thể sản phẩm mới có đủ hàng khả dụng (physicalOnHand - reserved - safety - quarantined - damaged >= requestedQty). Chặn tạo đơn nếu hết hàng.
+    - Khởi tạo đơn hàng thay thế (`Order`): `orderType = 'EXCHANGE'`, `status = 'CONFIRMED'`, `totalAmount = replacementPayable`. Tái sử dụng luồng OMS/WMS Allocation của P0 để đơn đổi hàng lập tức bước vào quy trình phân bổ kho xuất xưởng.
+    - Tạo bản ghi `ExchangeSettlement` với trạng thái `SETTLED`.
+    - Lưu danh sách chi tiết các mặt hàng đổi mới vào bảng `exchange_items`.
+    - Phân bổ dòng tiền thanh toán và hoàn tiền:
+      - Nếu `creditApplied > 0`: Tạo `Payment` phương thức `EXCHANGE_CREDIT` với trạng thái `COMPLETED` cho đơn thay thế, ghi nhận liên kết dòng tiền `ExchangeFunding` từ đơn hàng gốc.
+      - Nếu `additionalDue > 0`: Tạo `Payment` phương thức `COD` (hoặc cổng thanh toán) với trạng thái `PENDING` cho phần tiền chênh lệch khách cần thanh toán khi nhận hàng (TC-RMA-14).
+      - Nếu `refundDue > 0`: Tự động tạo bản ghi `Refund` ở trạng thái `PENDING` trên đơn hàng gốc để hoàn trả khoản tiền thừa cho khách hàng (TC-RMA-15).
+    - Cập nhật trạng thái hồ sơ đổi trả `ReturnOrder.status = 'COMPLETED'` kèm nhật ký `ReturnStatusHistory`.
+    - Phát sinh sự kiện Outbox `EXCHANGE_REPLACEMENT_ORDER_CREATED` vào bảng `outbox_events`.
+- **Kiểm thử tự động:**
+  - Tích hợp trong unit test `exchange-settlement.service.spec.ts` (13/13 tests PASS).
+
+---
+
+### [2026-11-17] Triển Khai Task EP17-T03: Presentation Layer & E2E Integrated Flow Vòng Đời Đổi Hàng (epic-17-integrated-flow.spec.ts)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - DTOs `exchange-quote.dto.ts` (`ReplacementItemDto`, `CalculateExchangeQuoteDto`, `CreateExchangeOrderDto`).
+  - Presentation Controller `AdminReturnController`:
+    - `POST /api/v1/admin/returns/:id/exchange-quote`: Tính toán bảng báo giá chênh lệch đổi hàng theo định lý bù trừ tài chính.
+    - `POST /api/v1/admin/returns/:id/create-exchange-order`: Chốt đơn hàng thay thế và quyết toán tài chính đổi hàng tự động.
+    - `GET /api/v1/admin/returns/:id/exchange-settlement`: Truy vấn chi tiết bản quyết toán đổi hàng & nguồn gốc tài chính bù trừ.
+  - Module Registration: Import `InventoryModule`, đăng ký `ExchangeSettlementService` vào `ReturnsModule`.
+- **Kiểm thử tự động:**
+  - Unit Test Controller: `src/modules/returns/presentation/controllers/__tests__/admin-return.controller.spec.ts` (16/16 tests PASS).
+  - Integrated Flow: `src/modules/returns/__tests__/epic-17-integrated-flow.spec.ts` (9/9 tests PASS trên PostgreSQL Neon live):
+    - Kịch bản 1 (TC-RMA-13): Đổi ngang giá (200k -> 200k) -> additionalDue = 0, refundDue = 0 -> Tạo đơn EXCHANGE 200k, Settlement SETTLED, Payment EXCHANGE_CREDIT COMPLETED, ExchangeFunding provenance, ReturnOrder COMPLETED, Outbox event.
+    - Kịch bản 2 (TC-RMA-14): Đổi giá cao hơn (200k -> 500k) -> additionalDue = 300,000đ -> Tạo đơn EXCHANGE 500k, Payment 1 (Credit 200k COMPLETED), Payment 2 (COD 300k PENDING), ReturnOrder COMPLETED.
+    - Kịch bản 3 (TC-RMA-15): Đổi giá thấp hơn (200k -> 120k) -> refundDue = 80,000đ -> Tạo đơn EXCHANGE 120k, Credit 120k COMPLETED, tự động tạo Refund 80,000đ PENDING cho tiền thừa, ReturnOrder COMPLETED.
+    - Kịch bản 4 (TC-RMA-16, AC1): Hết hàng thay thế (ATP = 0) -> Chặn tạo đơn với BadRequestException, bảo toàn hồ sơ ở trạng thái RESOLUTION_PENDING.
+    - Kịch bản 5: Chống quyết toán đổi hàng trùng lặp -> Chặn lần gọi thứ 2 với BadRequestException.
+- **Biên dịch & Toàn Vẹn Hệ Thống:**
+  - `npm run build` (`nest build`): Hoàn thành 100%, 0 lỗi TypeScript.
+  - Toàn bộ Returns Module: 21 test suites, 157/157 tests PASS 100%.
+  - P0 Core Regression Suites: 5 test suites (Epic 01 - Epic 05), 13/13 tests PASS 100%.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 17
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP17-T01** | Xây Dựng Dịch Vụ Quyết Toán Đổi Hàng (ExchangeSettlementService.calculateExchangeQuote) | `IMPLEMENTED` | 13/13 PASS (`exchange-settlement.service.spec.ts`) |
+| **EP17-T02** | Tạo Đơn Hàng Thay Thế & Tích Hợp Luồng Fulfillment P0 (createReplacementOrder) | `IMPLEMENTED` | 13/13 PASS (`exchange-settlement.service.spec.ts`) |
+| **EP17-T03** | E2E Integrated Flow: Toàn Bộ Vòng Đời Đổi Hàng Mỹ Phẩm | `IMPLEMENTED` | 9/9 PASS (`epic-17-integrated-flow.spec.ts`) |
+| **PRESENTATION** | Admin Returns Controller Exchange Endpoints | `IMPLEMENTED` | 16/16 PASS (`admin-return.controller.spec.ts`) |
+
+---
+
+### [2026-11-17] Triển Khai Task EP18-T01: 4 Hàng Đợi Công Việc Điều Hành RMA (Admin RMA Work Queues)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Database Migration `20261117050000_add_return_order_version_and_queue_index`:
+    - Bổ sung cột `version Int @default(1)` vào bảng `return_orders` cho kiểm soát đồng thời lạc quan (OCC).
+    - Tạo Composite Index tối ưu truy vấn hàng đợi: `@@index([status, createdAt, dropoffLocationId])` trên `return_orders`.
+    - Unit test migration OCC: `src/modules/returns/infrastructure/__tests__/return-order-occ.migration.spec.ts` (2/2 tests PASS).
+  - DTOs `rma-queue.dto.ts`:
+    - `RmaQueueQueryDto`: Hỗ trợ phân trang (`page`, `limit`), tìm kiếm từ khóa (`search`), lọc theo địa điểm (`dropoffLocationId`), sắp xếp ưu tiên SLA (`sortBy`, `sortOrder`).
+    - `TransitionRmaDto`: Nhận `expectedVersion`, `targetStatus`, `note`, `reason` phục vụ kiểm soát đồng thời OCC.
+    - `RmaQueueSummaryDto`: Tổng hợp số lượng hồ sơ đang chờ xử lý trên cả 4 hàng đợi công việc.
+  - Domain / Application Service `RmaQueueService` (`backend/src/modules/returns/application/services/rma-queue.service.ts`):
+    - Triển khai 4 hàng đợi chuyên trách:
+      - `getReviewQueue`: Lọc hồ sơ `SUBMITTED`, sắp xếp theo thời gian nộp cũ nhất trước (`createdAt: asc`) để bảo đảm SLA thẩm tra CSKH.
+      - `getDropoffQueue`: Lọc hồ sơ `APPROVED` với `returnChannel = 'STORE_DROPOFF'`. Tự động áp dụng phân quyền địa bàn qua `LocationContext`: nhân viên Showroom chỉ thấy hồ sơ hẹn trả tại chi nhánh của mình (`dropoffLocationId = storeId`), HQ Admin có quyền xem toàn quốc hoặc lọc linh hoạt.
+      - `getInspectionQueue`: Lọc hồ sơ `RECEIVED`, hiển thị chi tiết số lượng thực nhận và ghi chú tình trạng vỏ hộp.
+      - `getSettlementQueue`: Lọc hồ sơ `RESOLUTION_PENDING`, chuẩn bị cho quy trình hoàn tiền hoặc duyệt đơn đổi hàng.
+    - `getQueueSummary`: Thống kê tổng hợp số lượng hồ sơ đang tồn đọng trên từng hàng đợi cho thanh tác vụ Admin.
+  - Controller `AdminRmaQueueController` (`backend/src/modules/returns/presentation/controllers/admin-rma-queue.controller.ts`):
+    - Đăng ký 5 endpoints:
+      - `GET /api/v1/admin/returns/queues/review`
+      - `GET /api/v1/admin/returns/queues/dropoff` (Tích hợp `@LocationScoped('storeId')` và `LocationScopeGuard`)
+      - `GET /api/v1/admin/returns/queues/inspection`
+      - `GET /api/v1/admin/returns/queues/settlement`
+      - `GET /api/v1/admin/returns/queues/summary`
+- **Kiểm thử tự động:**
+  - Unit Test Service: `src/modules/returns/application/services/__tests__/rma-queue.service.spec.ts` (8/8 tests PASS).
+  - Unit Test Controller: `src/modules/returns/presentation/controllers/__tests__/admin-rma-queue.controller.spec.ts` (5/5 tests PASS).
+
+---
+
+### [2026-11-17] Triển Khai Task EP18-T02: Ma Trận Hành Động Động & Kiểm Soát Đồng Thời OCC (RmaActionMatrixService)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Domain / Application Service `RmaActionMatrixService` (`backend/src/modules/returns/application/services/rma-action-matrix.service.ts`):
+    - Ma trận chuyển trạng thái hợp lệ (`ALLOWED_TRANSITIONS`): Kiểm tra tính toàn vẹn máy trạng thái State Machine, nghiêm cấm nhảy cóc trạng thái (ví dụ `SUBMITTED` -> `COMPLETED`).
+    - Tính toán động danh mục hành động khả dụng (`getAvailableActions`):
+      - `SUBMITTED` -> `['APPROVE', 'REJECT', 'REQUEST_MORE_INFO']`
+      - `APPROVED` (STORE_DROPOFF) -> `['RECEIVE_DROPOFF', 'CANCEL']`
+      - `APPROVED` (PICKUP) -> `['DISPATCH_PICKUP', 'CANCEL']`
+      - `RECEIVED` -> `['START_INSPECTION', 'COMPLETE_INSPECTION']` (AC2: Tuyệt đối không cho phép `CREATE_REFUND` hay `CREATE_EXCHANGE_ORDER` khi chưa qua KCS).
+      - `INSPECTING` -> `['COMPLETE_INSPECTION']`
+      - `RESOLUTION_PENDING` -> `['CREATE_REFUND', 'CREATE_EXCHANGE_ORDER', 'DISPUTE']`
+      - `DISPUTED` -> `['RESOLVE_DISPUTE', 'REJECT']`
+      - `COMPLETED` / `REJECTED` / `CANCELLED` -> `[]`
+    - Cơ chế kiểm soát đồng thời lạc quan OCC (`transitionWithOcc`):
+      - So khớp `expectedVersion` do client gửi lên với `currentVersion` trong CSDL.
+      - Nếu không khớp: Ném ngoại lệ `ConflictException` (`CONCURRENT_MODIFICATION_DETECTED`) ngăn chặn việc ghi đè trạng thái khi nhiều điều hành viên cùng xử lý một hồ sơ.
+      - Trong một Prisma Transaction ACID: Cập nhật trạng thái mới, tự động tăng `version` lên 1, ghi nhật ký vào `return_status_histories` và lưu sự kiện `RMA_STATUS_TRANSITIONED` vào `outbox_events`.
+  - Presentation Controller `AdminReturnController`:
+    - `POST /api/v1/admin/returns/:id/transition`: Endpoint chuyển trạng thái hồ sơ kèm xác thực OCC.
+    - Làm giàu endpoint `GET /api/v1/admin/returns/:id`: Trả về trường `availableActions` tương ứng với trạng thái hiện hành.
+- **Kiểm thử tự động:**
+  - Unit Test Service: `src/modules/returns/application/services/__tests__/rma-action-matrix.service.spec.ts` (11/11 tests PASS).
+  - Unit Test Controller: `src/modules/returns/presentation/controllers/__tests__/admin-return.controller.spec.ts` (17/17 tests PASS).
+
+---
+
+### [2026-11-17] Triển Khai Task EP18-T03: Presentation Layer & E2E Integrated Flow Khép Kín Vòng Đời Trả Hàng (epic-18-integrated-flow.spec.ts)
+- **Trạng thái:** `IMPLEMENTED` (Chờ nghiệm thu / `PENDING_REVIEW`)
+- **Phạm vi thay đổi:**
+  - Đăng ký đầy đủ `RmaQueueService`, `RmaActionMatrixService`, `AdminRmaQueueController` vào `backend/src/modules/returns/returns.module.ts`.
+  - Tích hợp bảo vệ đa tầng: `LocationScopeGuard`, `RolesGuard`, `JwtAuthGuard`.
+- **Kiểm thử tự động:**
+  - Integrated Flow: `src/modules/returns/__tests__/epic-18-integrated-flow.spec.ts` (10/10 tests PASS trên PostgreSQL Neon live):
+    - Kịch bản 1: Phân luồng & chuyển tiếp tuần tự qua 4 hàng đợi công việc:
+      - 1.1: Tạo đơn mới `SUBMITTED` -> Xuất hiện trên Review Queue (`availableActions = ['APPROVE', 'REJECT']`), `version = 1`.
+      - 1.2: Duyệt yêu cầu `APPROVED` (OCC v1 -> v2) -> Rời khỏi Review Queue, xuất hiện trên Dropoff Queue.
+      - 1.3: Tiếp nhận tại Showroom `RECEIVED` -> Rời khỏi Dropoff Queue, xuất hiện trên Inspection Queue (Chặn triệt để REFUND / EXCHANGE khi chưa KCS).
+      - 1.4: KCS đạt chuẩn -> Rời khỏi Inspection Queue, xuất hiện trên Settlement Queue (`availableActions = ['CREATE_REFUND', 'CREATE_EXCHANGE_ORDER']`).
+      - 1.5: Quyết toán hoàn tất `COMPLETED` -> Biến mất hoàn toàn khỏi 4 hàng đợi điều hành.
+    - Kịch bản 2: Phân quyền địa bàn chi nhánh Showroom (AC1 Location Scope):
+      - 2.1: Nhân viên Showroom A chỉ thấy hồ sơ hẹn trả tại Showroom A, không thấy hồ sơ của Showroom B.
+      - 2.2: Nhân viên Showroom B chỉ thấy hồ sơ Showroom B.
+      - 2.3: Quản trị viên tổng bộ (HQ Admin) có quyền lọc linh hoạt theo `dropoffLocationId` cho từng chi nhánh.
+    - Kịch bản 3: Kiểm soát đồng thời lạc quan OCC (EP18-T02 AC3):
+      - Nhân viên A gửi lệnh duyệt với `expectedVersion = 1` -> Thành công, version tăng lên 2.
+      - Nhân viên B thao tác cùng lúc vẫn giữ `expectedVersion = 1` -> Bị chặn ngay lập tức với HTTP 409 Conflict.
+    - Kịch bản 4: Toàn vẹn máy trạng thái State Machine:
+      - Cố tình chuyển thẳng từ `SUBMITTED` sang `COMPLETED` -> Bị chặn với BadRequestException, bảo toàn dữ liệu trạng thái.
+- **Biên dịch & Toàn Vẹn Hệ Thống:**
+  - `npm run build` (`nest build`): Hoàn thành 100%, 0 lỗi TypeScript.
+  - Toàn bộ Returns Module: 26 test suites, 194/194 tests PASS 100%.
+  - P0 Core Regression Suites: 5 test suites (Epic 01 - Epic 05), 13/13 tests PASS 100%.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tasks EPIC 18
+
+| Task ID | Tên Nhiệm Vụ | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :--- | :--- |
+| **EP18-T01** | Xây Dựng 4 Hàng Đợi Công Việc Điều Hành RMA (RmaQueueService, AdminRmaQueueController) | `IMPLEMENTED` | 8/8 PASS (`rma-queue.service.spec.ts`), 5/5 PASS (`admin-rma-queue.controller.spec.ts`) |
+| **EP18-T02** | Xây Dựng Ma Trận Hành Động Động & Kiểm Soát Đồng Thời OCC (RmaActionMatrixService, version) | `IMPLEMENTED` | 11/11 PASS (`rma-action-matrix.service.spec.ts`), 2/2 PASS (`return-order-occ.migration.spec.ts`) |
+| **EP18-T03** | E2E Integrated Flow: Vòng Đời Điều Hành RMA Khép Kín | `IMPLEMENTED` | 10/10 PASS (`epic-18-integrated-flow.spec.ts`) |
+| **PRESENTATION** | Admin Returns Controller OCC & AvailableActions Endpoints | `IMPLEMENTED` | 17/17 PASS (`admin-return.controller.spec.ts`) |

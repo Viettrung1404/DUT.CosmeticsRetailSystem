@@ -182,4 +182,31 @@ describe('LocationScopeGuard (EP11-T01)', () => {
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
   });
+
+  it('8. Hỗ trợ kiểm tra tài nguyên RETURN_ORDER theo dropoffLocationId', async () => {
+    reflector.getAllAndOverride.mockReturnValue({ paramName: 'id', resourceType: 'RETURN_ORDER' });
+    const returnOrderId = '55555555-5555-5555-5555-555555555555';
+
+    prisma.returnOrder = {
+      findUnique: jest.fn().mockResolvedValue({
+        id: returnOrderId,
+        dropoffLocationId: storeQ1,
+        storeId: storeQ10,
+      }),
+    };
+
+    userDataScope.execute.mockResolvedValue({
+      type: 'STORE',
+      storeIds: [storeQ1],
+      employeeId: null,
+    });
+
+    const context = createMockContext({
+      user: { userId: 'staff-q1', roleName: 'STAFF', dataScope: 'STORE' },
+      params: { id: returnOrderId },
+    });
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+  });
 });

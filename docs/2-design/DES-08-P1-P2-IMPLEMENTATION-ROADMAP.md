@@ -296,11 +296,11 @@ flowchart TD
     end
 
     subgraph P1_PHASE ["Giai Đoạn P1: Hệ Thống Hậu Mãi & Quyết Toán (RMA & Settlement)"]
-        EP13["EPIC 13: Policy Versioning & RMA Claims Engine"]
-        EP14["EPIC 14: Multi-Channel Reverse Logistics (Store & GHN)"]
-        EP15["EPIC 15: QC Inspection & Inventory Disposition"]
-        EP16["EPIC 16: Partial Refund Allocation & Settlement"]
-        EP17["EPIC 17: Exchange Order & Replacement Fulfillment"]
+        EP13["EPIC 13: Policy Versioning & RMA Claims Engine (DONE)"]
+        EP14["EPIC 14: Multi-Channel Reverse Logistics (Store & GHN) (DONE)"]
+        EP15["EPIC 15: QC Inspection & Inventory Disposition (DONE)"]
+        EP16["EPIC 16: Partial Refund Allocation & Settlement (DONE)"]
+        EP17["EPIC 17: Exchange Order & Replacement Fulfillment (DONE)"]
         EP18["EPIC 18: Admin RMA Operations & Work Queues"]
     end
 
@@ -417,8 +417,9 @@ Phân rã giai đoạn P1 thành **6 Epics tuần tự** (EPIC 13 $\rightarrow$ 
 
 ---
 
-### EPIC 14: Multi-Channel Reverse Logistics (Store Drop-off & GHN Return Pickup)
+### EPIC 14: Multi-Channel Reverse Logistics (Store Drop-off & GHN Return Pickup) [HOÀN THÀNH - IMPLEMENTED]
 *Trọng tâm: Vận chuyển thu hồi đa phương thức, tiếp nhận tại quầy Showroom và tích hợp bưu tá thu gom GHN Reverse API.*
+*Trạng thái thực thi: Đã triển khai hoàn tất 3/3 tasks + Controller + Integrated Flow (31/31 tests PASS, Zero P0 Regressions).*
 
 #### EP14-T01: Quy Trình Tiếp Nhận Hàng Hoàn Tại Cửa Hàng (Store Drop-off Workflow)
 * **Mục tiêu:** Cho phép khách hàng mang sản phẩm đổi trả đến bất kỳ Showroom nào trong hệ thống; nhân viên đối chiếu và lập biên bản tiếp nhận.
@@ -534,7 +535,7 @@ Phân rã giai đoạn P1 thành **6 Epics tuần tự** (EPIC 13 $\rightarrow$ 
 
 ---
 
-### EPIC 16: Partial Refund Allocation & Gateway Settlement Engine
+### EPIC 16: Partial Refund Allocation & Gateway Settlement Engine [COMPLETED]
 *Trọng tâm: Thuật toán phân bổ hoàn tiền từng phần chống hoàn trùng, trừ phí ship thu hồi và tích hợp cổng thanh toán.*
 
 #### EP16-T01: Xây Dựng Thuật Toán Phân Bổ Tiền Hoàn Thực Trả (Refund Allocation Service)
@@ -591,8 +592,9 @@ Phân rã giai đoạn P1 thành **6 Epics tuần tự** (EPIC 13 $\rightarrow$ 
 
 ---
 
-### EPIC 17: Exchange Order Settlement & Replacement Fulfillment
+### EPIC 17: Exchange Order Settlement & Replacement Fulfillment [COMPLETED]
 *Trọng tâm: Cơ chế bù trừ chênh lệch giá đổi hàng, tạo đơn hàng thay thế và liên kết luồng hoàn tất đơn P0.*
+*Trạng thái thực thi: Đã triển khai hoàn tất 3/3 tasks + Presentation Endpoints + Integrated Flow (16/16 controller tests, 13/13 service tests, 9/9 integrated tests PASS, Zero P0 Regressions).*
 
 #### EP17-T01: Xây Dựng Dịch Vụ Quyết Toán Đổi Hàng (Exchange Settlement Service)
 * **Mục tiêu:** So sánh giá trị hàng trả (`returnCredit`) và giá trị hàng mới (`replacementPayable`) để tính toán số tiền khách cần bù hoặc số tiền cửa hàng cần hoàn.
@@ -640,8 +642,9 @@ Phân rã giai đoạn P1 thành **6 Epics tuần tự** (EPIC 13 $\rightarrow$ 
 
 ---
 
-### EPIC 18: Admin RMA Operations & Work Queues
+### EPIC 18: Admin RMA Operations & Work Queues [HOÀN THÀNH - IMPLEMENTED]
 *Trọng tâm: Giao diện điều hành quản trị, 4 hàng đợi công việc chuyên biệt, ma trận hành động động và kiểm soát đồng thời lạc quan OCC.*
+*Trạng thái thực thi: Đã triển khai hoàn tất 3/3 tasks + Controller + Dynamic Action Matrix + OCC + Integrated Flow (5/5 admin rma queue controller tests, 11/11 action matrix tests, 8/8 queue service tests, 10/10 integrated flow tests PASS, Zero P0 Regressions).*
 
 #### EP18-T01: Xây Dựng 4 Hàng Đợi Công Việc Điều Hành RMA (Admin RMA Work Queues)
 * **Mục tiêu:** Cung cấp các API truy vấn danh sách hồ sơ RMA được phân đoạn tối ưu theo từng vai trò nghiệp vụ.

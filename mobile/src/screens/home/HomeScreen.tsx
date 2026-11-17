@@ -637,7 +637,7 @@ function ProductCard({ item, onPress }: { item: Product; onPress: () => void }) 
         <View style={prodCardStyles.ratingRow}>
           <Ionicons name="star" size={11} color="#FFD700" />
           <Text style={prodCardStyles.ratingTxt}>{rating.toFixed(1)}</Text>
-          {Boolean(item.totalSold && item.totalSold > 0) && (
+          {typeof item.totalSold === 'number' && item.totalSold > 0 && (
             <Text style={{ fontSize: 10, color: COLORS.textMuted, marginLeft: 4 }}>
               • Đã bán {item.totalSold >= 1000 ? `${(item.totalSold / 1000).toFixed(1)}k` : item.totalSold}
             </Text>

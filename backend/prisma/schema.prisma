@@ -95,6 +95,9 @@ model User {
   returnOrdersHandled        ReturnOrder[]
   commandReceipts CommandReceipt[]
   returnAttachments ReturnAttachment[]
+  receivedReturnReceipts ReturnReceipt[]
+  performedInspections ReturnInspection[]
+  executedDispositions InventoryDisposition[]
 
   @@index([roleId])
   @@map("users")
@@ -298,6 +301,7 @@ model ProductVariant {
   exchangeItems         ExchangeItem[]
   fulfillmentOrderItems FulfillmentOrderItem[]
   packageItems          PackageItem[]
+  inventoryDispositions InventoryDisposition[]
 
   @@unique([productId, option1Value, option2Value, option3Value])
   @@map("product_variants")
@@ -387,10 +391,12 @@ model Store {
   invoices              Invoice[]
   returnOrders          ReturnOrder[]
   dropoffReturnOrders   ReturnOrder[]          @relation("ReturnDropoffStore")
+  returnReceipts        ReturnReceipt[]
   restockReturnItems    ReturnOrderItem[]      @relation("RestockStore")
   shifts                Shift[]
   shippingQuotes        ShippingQuote[]
   fulfillmentOrders     FulfillmentOrder[]
+  inventoryDispositions InventoryDisposition[]
 
   @@map("stores")
 }
@@ -486,6 +492,7 @@ model InventoryLot {
   location         Store          @relation(fields: [locationId], references: [id], onDelete: Restrict)
   variant          ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
   reservationItems InventoryReservationItem[]
+  inventoryDispositions InventoryDisposition[]
 
   @@unique([locationId, productVariantId, batchCode], map: "uq_lot_batch")
   @@index([locationId, productVariantId, expiryDate], map: "idx_lots_fefo_search")
@@ -779,6 +786,7 @@ model OrderItem {
   promotion        Promotion?        @relation(fields: [promotionId], references: [id])
   orderItemBatches OrderItemBatch[]
   returnItems      ReturnOrderItem[]
+  refundItems      RefundItem[]
   invoiceItems     InvoiceItem[]
   fulfillmentOrderItems FulfillmentOrderItem[]
   pricingSnapshot  Json?             @map("pricing_snapshot") @db.JsonB
@@ -880,6 +888,7 @@ model ReturnOrder {
   totalRefundApproved Decimal   @default(0) @map("total_refund_approved") @db.Decimal(12, 2)
   customerNote        String?   @map("customer_note") @db.Text
   rejectionReason     String?   @map("rejection_reason") @db.Text
+  version             Int       @default(1) @map("version")
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -899,11 +908,14 @@ model ReturnOrder {
   history         ReturnStatusHistory[]
   exchangeItems   ExchangeItem[]
   settlement      ExchangeSettlement?
+  receipts        ReturnReceipt[]
+  inspections     ReturnInspection[]
 
   @@index([orderId, status])
   @@index([customerId, createdAt, id])
   @@index([policyVersionId])
   @@index([dropoffLocationId])
+  @@index([status, createdAt, dropoffLocationId])
   @@map("return_orders")
 }
 
@@ -934,6 +946,9 @@ model ReturnOrderItem {
   refundAmount    Decimal        @default(0) @map("refund_amount") @db.Decimal(12, 2)
   pointsToRestore Int            @default(0) @map("points_to_restore")
   pointsValue     Decimal        @default(0) @map("points_value") @db.Decimal(12, 2)
+  inspectionItems ReturnInspectionItem[]
+  dispositions    InventoryDisposition[]
+  refundItems     RefundItem[]
 
   @@unique([returnOrderId, orderItemId])
   @@index([orderItemId])
@@ -978,6 +993,92 @@ model ReturnPolicyRule {
 
   @@index([policyVersionId, reasonCode])
   @@map("return_policy_rules")
+}
+
+model ReturnReceipt {
+  id                   String      @id @default(uuid()) @db.Uuid
+  receiptCode          String      @unique @map("receipt_code") @db.VarChar(60)
+  returnOrderId        String      @map("return_order_id") @db.Uuid
+  locationId           String      @map("location_id") @db.Uuid
+  receivedBy           String?     @map("received_by") @db.Uuid
+  receivedItemsCount   Int         @default(0) @map("received_items_count")
+  packageConditionNote String?     @map("package_condition_note") @db.Text
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  returnOrder ReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  location    Store       @relation(fields: [locationId], references: [id])
+  receiver    User?       @relation(fields: [receivedBy], references: [id])
+
+  @@index([returnOrderId])
+  @@index([locationId])
+  @@index([createdAt])
+  @@map("return_receipts")
+}
+
+model ReturnInspection {
+  id             String   @id @default(uuid()) @db.Uuid
+  inspectionCode String   @unique @map("inspection_code") @db.VarChar(60)
+  returnOrderId  String   @map("return_order_id") @db.Uuid
+  inspectorId    String?  @map("inspector_id") @db.Uuid
+  overallResult  String   @map("overall_result") @db.VarChar(30)
+  inspectorNotes String?  @map("inspector_notes") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  returnOrder ReturnOrder            @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  inspector   User?                  @relation(fields: [inspectorId], references: [id])
+  items       ReturnInspectionItem[]
+
+  @@index([returnOrderId])
+  @@index([inspectorId])
+  @@map("return_inspections")
+}
+
+model ReturnInspectionItem {
+  id                  String   @id @default(uuid()) @db.Uuid
+  inspectionId        String   @map("inspection_id") @db.Uuid
+  returnItemId        String   @map("return_item_id") @db.Uuid
+  passedQuantity      Int      @default(0) @map("passed_quantity")
+  failedQuantity      Int      @default(0) @map("failed_quantity")
+  isSealIntact        Boolean  @default(true) @map("is_seal_intact")
+  remainingPercentage Int      @default(100) @map("remaining_percentage")
+  disposition         String?  @db.VarChar(30)
+  reasonDetail        String?  @map("reason_detail") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  inspection ReturnInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  returnItem ReturnOrderItem  @relation(fields: [returnItemId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@index([returnItemId])
+  @@map("return_inspection_items")
+}
+
+model InventoryDisposition {
+  id               String   @id @default(uuid()) @db.Uuid
+  dispositionCode  String   @unique @map("disposition_code") @db.VarChar(60)
+  locationId       String   @map("location_id") @db.Uuid
+  productVariantId String   @map("product_variant_id") @db.Uuid
+  lotId            String?  @map("lot_id") @db.Uuid
+  returnItemId     String?  @map("return_item_id") @db.Uuid
+  dispositionType  String   @map("disposition_type") @db.VarChar(30)
+  quantity         Int
+  executedBy       String?  @map("executed_by") @db.Uuid
+  executedAt       DateTime @default(now()) @map("executed_at") @db.Timestamptz
+  notes            String?  @db.Text
+
+  location   Store            @relation(fields: [locationId], references: [id])
+  variant    ProductVariant   @relation(fields: [productVariantId], references: [id])
+  lot        InventoryLot?    @relation(fields: [lotId], references: [id])
+  returnItem ReturnOrderItem? @relation(fields: [returnItemId], references: [id])
+  executor   User?            @relation(fields: [executedBy], references: [id])
+
+  @@index([locationId])
+  @@index([productVariantId])
+  @@index([returnItemId])
+  @@map("inventory_dispositions")
 }
 
 // =============================================================================
@@ -1110,10 +1211,32 @@ model Refund {
   posSession  PosSession?  @relation(fields: [posSessionId], references: [id])
   processor   User?        @relation("RefundProcessor", fields: [processedBy], references: [id])
   eventKey    String?      @unique @map("event_key") @db.VarChar(160)
+  items       RefundItem[]
 
   @@index([returnOrderId, status])
   @@index([posSessionId, status])
   @@map("refunds")
+}
+
+model RefundItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  refundId       String   @map("refund_id") @db.Uuid
+  orderItemId    String   @map("order_item_id") @db.Uuid
+  returnItemId   String?  @map("return_item_id") @db.Uuid
+  quantity       Int      @default(1)
+  amount         Decimal  @default(0) @db.Decimal(12, 2)
+  pointsRestored Int      @default(0) @map("points_restored")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  refund     Refund           @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  orderItem  OrderItem        @relation(fields: [orderItemId], references: [id])
+  returnItem ReturnOrderItem? @relation(fields: [returnItemId], references: [id])
+
+  @@index([refundId])
+  @@index([orderItemId])
+  @@index([returnItemId])
+  @@map("refund_items")
 }
 
 // =============================================================================

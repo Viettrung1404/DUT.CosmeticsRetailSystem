@@ -100,6 +100,21 @@ export class LocationScopeGuard implements CanActivate {
       }
       targetLocationId =
         shipment.fulfillmentOrder?.sourceLocationId || shipment.order?.storeId || null;
+    } else if (resourceType === 'RETURN_ORDER') {
+      if (!uuidRegex.test(resourceId)) {
+        throw new NotFoundException(`Không tìm thấy ReturnOrder với ID: ${resourceId}`);
+      }
+      const returnOrder = await this.prisma.returnOrder.findUnique({
+        where: { id: resourceId },
+        select: {
+          dropoffLocationId: true,
+          storeId: true,
+        },
+      });
+      if (!returnOrder) {
+        throw new NotFoundException(`Không tìm thấy ReturnOrder với ID: ${resourceId}`);
+      }
+      targetLocationId = returnOrder.dropoffLocationId || returnOrder.storeId;
     }
 
     if (!targetLocationId) {
