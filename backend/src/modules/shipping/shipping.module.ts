@@ -17,8 +17,10 @@ import { AhamoveRedispatchService } from './application/services/ahamove-redispa
 import { ShipmentOrchestratorService } from './application/services/shipment-orchestrator.service';
 import { ShipmentAttemptService } from './application/services/shipment-attempt.service';
 import { ReturnToOriginService } from './application/services/return-to-origin.service';
+import { LogisticsDashboardService } from './application/services/logistics-dashboard.service';
 import { TestMockCarrierController } from './presentation/controllers/test-mock-carrier.controller';
 import { AdminShippingController } from './presentation/controllers/admin-shipping.controller';
+import { AdminLogisticsDashboardController } from './presentation/controllers/admin-logistics-dashboard.controller';
 
 @Module({
   imports: [
@@ -27,7 +29,11 @@ import { AdminShippingController } from './presentation/controllers/admin-shippi
     AsyncInfrastructureModule,
     forwardRef(() => OmsModule),
   ],
-  controllers: [TestMockCarrierController, AdminShippingController],
+  controllers: [
+    TestMockCarrierController,
+    AdminShippingController,
+    AdminLogisticsDashboardController,
+  ],
   providers: [
     GHNClient,
     GHNProvider,
@@ -80,6 +86,7 @@ import { AdminShippingController } from './presentation/controllers/admin-shippi
     ShipmentOrchestratorService,
     ShipmentAttemptService,
     ReturnToOriginService,
+    LogisticsDashboardService,
   ],
   exports: [
     SHIPPING_PROVIDER,
@@ -93,6 +100,7 @@ import { AdminShippingController } from './presentation/controllers/admin-shippi
     ShipmentOrchestratorService,
     ShipmentAttemptService,
     ReturnToOriginService,
+    LogisticsDashboardService,
   ],
 })
 export class ShippingModule {}

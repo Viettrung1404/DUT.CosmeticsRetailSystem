@@ -1386,3 +1386,114 @@
 | **EP18-T02** | Xây Dựng Ma Trận Hành Động Động & Kiểm Soát Đồng Thời OCC (RmaActionMatrixService, version) | `IMPLEMENTED` | 11/11 PASS (`rma-action-matrix.service.spec.ts`), 2/2 PASS (`return-order-occ.migration.spec.ts`) |
 | **EP18-T03** | E2E Integrated Flow: Vòng Đời Điều Hành RMA Khép Kín | `IMPLEMENTED` | 10/10 PASS (`epic-18-integrated-flow.spec.ts`) |
 | **PRESENTATION** | Admin Returns Controller OCC & AvailableActions Endpoints | `IMPLEMENTED` | 17/17 PASS (`admin-return.controller.spec.ts`) |
+
+---
+
+# GIAI ĐOẠN P2: TỰ ĐỘNG HÓA DÀI HẠN, QUAN SÁT THỜI GIAN THỰC & PHÂN TÍCH CHUYÊN SÂU
+
+**Mục tiêu:** Hoàn thiện 4 phân hệ chính thức thuộc giai đoạn P2 theo chuẩn kiến trúc v3.1 (`DES-05 v3.1`, `DES-07`, `DES-08` và `07_functional_requirements.md` FR-09). Bỏ qua các mục đề xuất `[PROPOSED]`.
+
+---
+
+### [2026-11-17] TRIỂN KHAI HOÀN TẤT EPIC 19: Long-Running RMA Workflows / Automation Engine
+- **Mã Epic:** EPIC 19
+- **Trạng thái:** `IMPLEMENTED` (100% AC PASS)
+- **Phạm vi thay đổi:**
+  - Database Schema & Migration:
+    - Bổ sung bảng `carrier_claims` (`id`, `claim_code`, `shipment_id`, `return_order_id`, `carrier_code`, `claim_amount`, `status`, `resolution_notes`, `created_at`).
+    - Migration: `20261117060000_add_p2_carrier_claims_and_abuse_evaluations`.
+  - Service `RmaWorkflowService` (`backend/src/modules/returns/application/services/rma-workflow.service.ts`):
+    - `expireStaleApprovedRmas(thresholdDays = 7)`: Quét và tự động hủy các hồ sơ RMA quá hạn 7 ngày khách không gửi hàng (`TC-RMA-18`). Ghi nhận outbox event `RMA_EXPIRED_CANCELLED`.
+    - `checkQcSlaBreaches(thresholdHours = 48)`: Phát hiện các kiện hàng lưu kho quá 48h chưa được KCS kiểm định, tự động phát sự kiện cảnh báo `RMA_QC_SLA_BREACHED`.
+    - `handleLostReturnPackage(returnOrderId, carrierClaimAmount)`: Xử lý sự cố 3PL làm mất kiện hàng thu hồi (`TC-RMA-19`). Tự động hoàn tiền cho khách, tạo lệnh bồi thường `CarrierClaim` với 3PL và phát sự kiện `RMA_LOST_REFUNDED`.
+  - Controller `AdminRmaWorkflowController` (`backend/src/modules/returns/presentation/controllers/admin-rma-workflow.controller.ts`):
+    - `POST /api/v1/admin/returns/workflows/expire-stale`
+    - `POST /api/v1/admin/returns/workflows/qc-sla-breaches`
+    - `POST /api/v1/admin/returns/workflows/:id/lost-package`
+- **Kiểm thử tự động:**
+  - `rma-workflow.service.spec.ts`: 5/5 tests PASS.
+  - `admin-rma-workflow.controller.spec.ts`: 3/3 tests PASS.
+  - `epic-19-integrated-flow.spec.ts`: 3/3 tests PASS (TC-RMA-18 timeout cancellation, 48h QC SLA breaches, TC-RMA-19 carrier lost return claim).
+
+---
+
+### [2026-11-17] TRIỂN KHAI HOÀN TẤT EPIC 20: Real-Time Ops & Logistics Dashboard
+- **Mã Epic:** EPIC 20
+- **Trạng thái:** `IMPLEMENTED` (100% AC PASS)
+- **Phạm vi thay đổi:**
+  - DTOs `backend/src/modules/shipping/presentation/dtos/logistics-dashboard.dto.ts`.
+  - Service `LogisticsDashboardService` (`backend/src/modules/shipping/application/services/logistics-dashboard.service.ts`):
+    - `getFirstAttemptDeliveryRate`: Thống kê tỷ lệ giao thành công ngay lần đầu dựa trên `ShipmentAttempt` và `Shipment.status`.
+    - `getExpressSlaMetrics`: Đo lường tỷ lệ vi phạm cam kết giao hỏa tốc 2H (`Ahamove`) so sánh giữa `deliveredAt` và `deadlineAt`.
+    - `getCodReconciliationHeatmap`: Bản đồ nhiệt sai lệch đối soát COD giữa số tiền đối soát thực tế và tiền dự kiến thu theo từng đối tác vận chuyển.
+    - `getFulfillmentThroughput`: Đo lường sản lượng nhặt và đóng gói theo từng kho/cửa hàng từ `FulfillmentOrder`.
+    - `getDashboardOverview`: Tổng hợp toàn bộ các chỉ số vận hành thời gian thực.
+  - Controller `AdminLogisticsDashboardController` (`backend/src/modules/shipping/presentation/controllers/admin-logistics-dashboard.controller.ts`):
+    - `GET /api/v1/admin/shipping/dashboard/overview`
+    - `GET /api/v1/admin/shipping/dashboard/first-attempt-rate`
+    - `GET /api/v1/admin/shipping/dashboard/express-sla`
+    - `GET /api/v1/admin/shipping/dashboard/cod-heatmap`
+    - `GET /api/v1/admin/shipping/dashboard/throughput`
+- **Kiểm thử tự động:**
+  - `logistics-dashboard.service.spec.ts`: 6/6 tests PASS.
+  - `admin-logistics-dashboard.controller.spec.ts`: 5/5 tests PASS.
+  - `epic-20-integrated-flow.spec.ts`: 5/5 tests PASS.
+
+---
+
+### [2026-11-17] TRIỂN KHAI HOÀN TẤT EPIC 21: Return Abuse & Fraud Detection Engine [OFFICIAL P2]
+- **Mã Epic:** EPIC 21
+- **Trạng thái:** `IMPLEMENTED` (100% AC PASS)
+- **Phạm vi thay đổi:**
+  - Database Schema & Migration:
+    - Bổ sung `risk_score`, `risk_level`, `is_fraud_flagged`, `fraud_reason` vào bảng `return_orders`.
+    - Tạo bảng `return_abuse_evaluations` (`id`, `return_order_id`, `customer_id`, `risk_score`, `risk_level`, `risk_factors`, `action_recommendation`, `created_at`).
+  - Service `ReturnAbuseDetectorService` (`backend/src/modules/returns/application/services/return-abuse-detector.service.ts`):
+    - Thuật toán chấm điểm rủi ro khách hàng 0-100 (`ReturnRiskScore`):
+      * Tần suất đổi trả cao ($\ge 3$ lần trong 30 ngày: +25đ).
+      * Tỷ lệ trả hàng cao (> 50% số đơn: +30đ).
+      * Lịch sử tráo hàng / KCS từ chối trước đó (+35đ).
+      * So khớp Perceptual Hash trùng lặp ảnh/video (+40đ).
+    - Phân cấp rủi ro: `LOW` (< 30đ), `MEDIUM` (30-59đ), `HIGH` (60-79đ), `CRITICAL` ($\ge 80$đ).
+    - Tự động gắn cờ gian lận `isFraudFlagged = true` và đưa vào danh sách theo dõi `WATCHLIST` khi rủi ro cao.
+    - Phát sự kiện Outbox `RETURN_FRAUD_FLAGGED`.
+  - Controller `AdminReturnAbuseController` (`backend/src/modules/returns/presentation/controllers/admin-return-abuse.controller.ts`):
+    - `POST /api/v1/admin/returns/:id/evaluate-abuse`
+    - `GET /api/v1/admin/returns/risk-profiles/:customerId`
+- **Kiểm thử tự động:**
+  - `return-abuse-detector.service.spec.ts`: 4/4 tests PASS.
+  - `admin-return-abuse.controller.spec.ts`: 2/2 tests PASS.
+  - `epic-21-integrated-flow.spec.ts`: 3/3 tests PASS.
+
+---
+
+### [2026-11-17] TRIỂN KHAI HOÀN TẤT EPIC 22: Advanced BI & Lot Quality Analytics (FR-09)
+- **Mã Epic:** EPIC 22
+- **Trạng thái:** `IMPLEMENTED` (100% AC PASS)
+- **Phạm vi thay đổi:**
+  - DTOs `backend/src/modules/returns/presentation/dtos/lot-quality-analytics.dto.ts`.
+  - Service `LotQualityAnalyticsService` (`backend/src/modules/returns/application/services/lot-quality-analytics.service.ts`):
+    - `getLotQualityReport`: Tính toán tỷ lệ lỗi hỏng biến chất theo từng lô sản xuất `InventoryLot`. Khi tỷ lệ lỗi $\ge$ ngưỡng (mặc định 5%), tự động kích hoạt cảnh báo `isAlertTriggered = true`, đề xuất hành động `QUARANTINE_LOT_IMMEDIATELY` và phát sự kiện `LOT_DEFECT_ALERT`.
+    - `getReturnReasonBreakdown`: Phân rã tỷ trọng và giá trị tiền hoàn theo từng nhóm lý do (`DEFECTIVE`, `DAMAGED_IN_TRANSIT`, `CHANGE_OF_MIND`, `ALLERGIC`...).
+    - `getCarrierDamageComparison`: So sánh tỷ lệ hư hại trong quá trình vận chuyển giữa các hãng 3PL (`GHN` vs `AHAMOVE`).
+  - Controller `AdminReturnAnalyticsController` (`backend/src/modules/returns/presentation/controllers/admin-return-analytics.controller.ts`):
+    - `GET /api/v1/admin/returns/analytics/quality-by-lot`
+    - `GET /api/v1/admin/returns/analytics/reason-breakdown`
+    - `GET /api/v1/admin/returns/analytics/carrier-damage`
+- **Kiểm thử tự động:**
+  - `lot-quality-analytics.service.spec.ts`: 4/4 tests PASS.
+  - `admin-return-analytics.controller.spec.ts`: 3/3 tests PASS.
+  - `epic-22-integrated-flow.spec.ts`: 3/3 tests PASS.
+
+---
+
+## Bảng Theo Dõi Trạng Thái Tổng Thể Giai Đoạn P2 (Epics 19 - 22)
+
+| Mã Epic | Tên Epic Nghiệp Vụ P2 | Trạng Thái | Test Coverage / Evidence |
+| :--- | :--- | :---: | :--- |
+| **EPIC 19** | Long-Running RMA Cloudflare Workflows / Automation Engine | `IMPLEMENTED` | 5/5 unit, 3/3 controller, 3/3 integrated flow PASS (`epic-19-integrated-flow.spec.ts`) |
+| **EPIC 20** | Real-Time Ops & Logistics Dashboard | `IMPLEMENTED` | 6/6 unit, 5/5 controller, 5/5 integrated flow PASS (`epic-20-integrated-flow.spec.ts`) |
+| **EPIC 21** | Return Abuse & Fraud Detection Engine [OFFICIAL P2] | `IMPLEMENTED` | 4/4 unit, 2/2 controller, 3/3 integrated flow PASS (`epic-21-integrated-flow.spec.ts`) |
+| **EPIC 22** | Advanced BI & Lot Quality Analytics (FR-09) | `IMPLEMENTED` | 4/4 unit, 3/3 controller, 3/3 integrated flow PASS (`epic-22-integrated-flow.spec.ts`) |
+| **TỔNG P2** | **4 Epics P2 Hoàn Toàn Bộ** | **4/4 DONE** | **14/14 Integrated Tests PASS, 32/32 Unit Tests PASS, Zero Regressions** |
+

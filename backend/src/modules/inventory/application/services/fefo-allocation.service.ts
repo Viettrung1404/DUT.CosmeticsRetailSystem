@@ -184,12 +184,23 @@ export class FefoAllocationService {
         continue;
       }
 
-      await tx.inventoryLot.update({
+      const currentLot = await tx.inventoryLot.findUnique({
         where: { id: alloc.lotId },
-        data: {
-          quantityReserved: { decrement: alloc.quantity },
-        },
+        select: { quantityReserved: true },
       });
+
+      const decQty = currentLot
+        ? Math.min(alloc.quantity, Math.max(0, currentLot.quantityReserved))
+        : alloc.quantity;
+
+      if (decQty > 0) {
+        await tx.inventoryLot.update({
+          where: { id: alloc.lotId },
+          data: {
+            quantityReserved: { decrement: decQty },
+          },
+        });
+      }
     }
   }
 

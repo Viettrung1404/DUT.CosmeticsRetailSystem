@@ -295,20 +295,20 @@ flowchart TD
         EP12["EPIC 12: Correlation Tracing & DLQ Recovery"]
     end
 
-    subgraph P1_PHASE ["Giai Đoạn P1: Hệ Thống Hậu Mãi & Quyết Toán (RMA & Settlement)"]
+    subgraph P1_PHASE ["Giai Đoạn P1: Hệ Thống Hậu Mãi & Quyết Toán (RMA & Settlement) (100% DONE)"]
         EP13["EPIC 13: Policy Versioning & RMA Claims Engine (DONE)"]
         EP14["EPIC 14: Multi-Channel Reverse Logistics (Store & GHN) (DONE)"]
         EP15["EPIC 15: QC Inspection & Inventory Disposition (DONE)"]
         EP16["EPIC 16: Partial Refund Allocation & Settlement (DONE)"]
         EP17["EPIC 17: Exchange Order & Replacement Fulfillment (DONE)"]
-        EP18["EPIC 18: Admin RMA Operations & Work Queues"]
+        EP18["EPIC 18: Admin RMA Operations & Work Queues (DONE)"]
     end
 
-    subgraph P2_PHASE ["Giai Đoạn P2: Tự Động Hóa & Tối Ưu Nâng Cao"]
-        EP19["EPIC 19: Long-Running RMA Cloudflare Workflows"]
-        EP20["EPIC 20: Real-Time Ops & Logistics Dashboard"]
-        EP21["EPIC 21: Return Abuse & Fraud Detection Engine [OFFICIAL]"]
-        EP22["EPIC 22: Advanced BI & Lot Quality Analytics"]
+    subgraph P2_PHASE ["Giai Đoạn P2: Tự Động Hóa & Tối Ưu Nâng Cao (100% DONE)"]
+        EP19["EPIC 19: Long-Running RMA Cloudflare Workflows (DONE)"]
+        EP20["EPIC 20: Real-Time Ops & Logistics Dashboard (DONE)"]
+        EP21["EPIC 21: Return Abuse & Fraud Detection Engine [OFFICIAL] (DONE)"]
+        EP22["EPIC 22: Advanced BI & Lot Quality Analytics (DONE)"]
     end
 
     %% P0 -> P1 Dependencies

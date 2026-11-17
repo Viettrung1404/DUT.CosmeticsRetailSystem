@@ -345,17 +345,31 @@ export class InventoryReservationService {
     }
 
     for (const [variantId, totalQty] of variantTotalQtyMap.entries()) {
-      await tx.inventory.update({
+      const currentInv = await tx.inventory.findUnique({
         where: {
           storeId_productVariantId: {
             storeId: lockedRes.location_id,
             productVariantId: variantId,
           },
         },
-        data: {
-          reservedQuantity: { decrement: totalQty },
-        },
+        select: { reservedQuantity: true },
       });
+
+      const decQty = currentInv ? Math.min(totalQty, Math.max(0, currentInv.reservedQuantity)) : totalQty;
+
+      if (decQty > 0) {
+        await tx.inventory.update({
+          where: {
+            storeId_productVariantId: {
+              storeId: lockedRes.location_id,
+              productVariantId: variantId,
+            },
+          },
+          data: {
+            reservedQuantity: { decrement: decQty },
+          },
+        });
+      }
 
       // 6. Ghi sổ cái InventoryTransaction (loại RESERVATION_RELEASE)
       await tx.inventoryTransaction.create({

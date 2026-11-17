@@ -844,6 +844,7 @@ model Shipment {
   packages           ShipmentPackage[]
   attempts           ShipmentAttempt[]
   codReconciliationItems CodReconciliationItem[]
+  claims             CarrierClaim[]
 
 
   @@index([orderId, status])
@@ -889,6 +890,10 @@ model ReturnOrder {
   customerNote        String?   @map("customer_note") @db.Text
   rejectionReason     String?   @map("rejection_reason") @db.Text
   version             Int       @default(1) @map("version")
+  riskScore           Int?      @map("risk_score")
+  riskLevel           String?   @map("risk_level") @db.VarChar(20)
+  isFraudFlagged      Boolean   @default(false) @map("is_fraud_flagged")
+  fraudReason         String?   @map("fraud_reason") @db.Text
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -910,6 +915,8 @@ model ReturnOrder {
   settlement      ExchangeSettlement?
   receipts        ReturnReceipt[]
   inspections     ReturnInspection[]
+  abuseEvaluations ReturnAbuseEvaluation[]
+  carrierClaims   CarrierClaim[]
 
   @@index([orderId, status])
   @@index([customerId, createdAt, id])
@@ -1079,6 +1086,48 @@ model InventoryDisposition {
   @@index([productVariantId])
   @@index([returnItemId])
   @@map("inventory_dispositions")
+}
+
+model ReturnAbuseEvaluation {
+  id                String       @id @default(uuid()) @db.Uuid
+  returnOrderId     String       @map("return_order_id") @db.Uuid
+  customerId        String       @map("customer_id") @db.Uuid
+  riskScore         Int          @map("risk_score")
+  riskLevel         String       @map("risk_level") @db.VarChar(20)
+  isFlagged         Boolean      @default(false) @map("is_flagged")
+  factors           Json         @map("factors") @db.JsonB
+  actionRecommended String       @map("action_recommended") @db.VarChar(50)
+  evaluatedAt       DateTime     @default(now()) @map("evaluated_at") @db.Timestamptz
+
+  returnOrder       ReturnOrder  @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  customer          Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([returnOrderId])
+  @@index([customerId])
+  @@index([riskLevel, isFlagged])
+  @@map("return_abuse_evaluations")
+}
+
+model CarrierClaim {
+  id            String       @id @default(uuid()) @db.Uuid
+  claimCode     String       @unique @map("claim_code") @db.VarChar(50)
+  returnOrderId String?      @map("return_order_id") @db.Uuid
+  shipmentId    String?      @map("shipment_id") @db.Uuid
+  carrierCode   String       @map("carrier_code") @db.VarChar(30)
+  claimType     String       @map("claim_type") @db.VarChar(30)
+  claimAmount   Decimal      @map("claim_amount") @db.Decimal(12, 2)
+  status        String       @default("PENDING") @map("status") @db.VarChar(30)
+  notes         String?      @db.Text
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  returnOrder   ReturnOrder? @relation(fields: [returnOrderId], references: [id], onDelete: SetNull)
+  shipment      Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
+  @@index([returnOrderId])
+  @@index([shipmentId])
+  @@index([carrierCode, status])
+  @@map("carrier_claims")
 }
 
 // =============================================================================
@@ -1276,6 +1325,7 @@ model Customer {
   couponUsages        CouponUsage[]
   invoices            Invoice[]
   redemptions         LoyaltyRedemption[]
+  returnAbuseEvaluations ReturnAbuseEvaluation[]
 
   @@index([loyaltyTierId])
   @@map("customers")

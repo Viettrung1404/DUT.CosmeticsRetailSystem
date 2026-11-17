@@ -19,9 +19,15 @@ import { PaymentRefundGatewayService } from './application/services/payment-refu
 import { ExchangeSettlementService } from './application/services/exchange-settlement.service';
 import { RmaActionMatrixService } from './application/services/rma-action-matrix.service';
 import { RmaQueueService } from './application/services/rma-queue.service';
+import { RmaWorkflowService } from './application/services/rma-workflow.service';
+import { ReturnAbuseDetectorService } from './application/services/return-abuse-detector.service';
+import { LotQualityAnalyticsService } from './application/services/lot-quality-analytics.service';
 import { CustomerReturnController } from './presentation/controllers/customer-return.controller';
 import { AdminReturnController } from './presentation/controllers/admin-return.controller';
 import { AdminRmaQueueController } from './presentation/controllers/admin-rma-queue.controller';
+import { AdminRmaWorkflowController } from './presentation/controllers/admin-rma-workflow.controller';
+import { AdminReturnAbuseController } from './presentation/controllers/admin-return-abuse.controller';
+import { AdminReturnAnalyticsController } from './presentation/controllers/admin-return-analytics.controller';
 
 @Module({
   imports: [
@@ -35,6 +41,9 @@ import { AdminRmaQueueController } from './presentation/controllers/admin-rma-qu
     CustomerReturnController,
     AdminReturnController,
     AdminRmaQueueController,
+    AdminRmaWorkflowController,
+    AdminReturnAbuseController,
+    AdminReturnAnalyticsController,
   ],
   providers: [
     RmaEligibilityService,
@@ -52,12 +61,18 @@ import { AdminRmaQueueController } from './presentation/controllers/admin-rma-qu
     ExchangeSettlementService,
     RmaActionMatrixService,
     RmaQueueService,
+    RmaWorkflowService,
+    ReturnAbuseDetectorService,
+    LotQualityAnalyticsService,
   ],
   exports: [
     RmaEligibilityService,
     SubmitReturnRequestUseCase,
     ReceiveStoreDropoffUseCase,
     ReverseShippingService,
+    RmaWorkflowService,
+    ReturnAbuseDetectorService,
+    LotQualityAnalyticsService,
     ReceiveWarehouseReturnUseCase,
     RmaStatusAggregator,
     InventoryDispositionService,
