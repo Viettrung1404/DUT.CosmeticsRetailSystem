@@ -20,8 +20,8 @@ export default function ReportsPage({mode}:{mode:'revenue'|'products'}){
  }catch(e){msg.error(errorText(e))}finally{setLoading(false)}},[mode,dates,period,storeId,limit,msg])
  useEffect(()=>{void load()},[load])
  const download=async(format:'pdf'|'xlsx')=>{setExporting(true);try{await exportReport(mode,format,params);msg.success('Đã tải báo cáo')}catch(e){msg.error(errorText(e))}finally{setExporting(false)}}
- const rows=(revenue?.rows??[]).map((r,i)=>({key:i,...r}))
- const best=(products?.bestSellers??[]).map((r,i)=>({key:i,...r,label:r.productName??r.name??r.sku??'Sản phẩm',value:r.revenue??r.quantity??r.unitsSold??0}))
+ const rows:(RecordRow & {key:number})[]=(revenue?.rows??[]).map((r,i)=>({key:i,...r}))
+ const best:(RecordRow & {key:number;label:unknown;value:unknown})[]=(products?.bestSellers??[]).map((r,i)=>({key:i,...r,label:r.productName??r.name??r.sku??'Sản phẩm',value:r.revenue??r.quantity??r.unitsSold??0}))
  return <div>{holder}
   <div className="glowup-page-header"><div><Title level={2} className="glowup-page-title">{mode==='revenue'?'Báo cáo doanh thu':'Phân tích sản phẩm'}</Title>
     <Text className="glowup-page-subtitle">Báo cáo tổng hợp từ Backend, chỉ hiển thị cửa hàng thuộc phạm vi tài khoản.</Text></div>
