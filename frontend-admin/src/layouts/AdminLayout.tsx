@@ -25,18 +25,17 @@ import {
 } from '@ant-design/icons'
 import {
   Avatar,
-  Badge,
   Breadcrumb,
   Button,
   Dropdown,
   Input,
   Layout,
   Menu,
-  Select,
   Space,
 } from 'antd'
 import { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import NotificationCenter from '../components/common/NotificationCenter'
 import { useAuth } from '../contexts/AuthContext'
 
 const { Header, Sider, Content } = Layout
@@ -69,7 +68,7 @@ const menuItems = [
   {
     key: 'advanced-ops-group',
     type: 'group' as const,
-    label: 'VẬN HÀNH NÂNG CAO',
+    label: 'QUẢN TRỊ & VẬN HÀNH',
     children: [
       { key: '/admin/inventory/transfers', icon: <DeploymentUnitOutlined />, label: 'Chuyển kho' },
       { key: '/admin/stocktakes', icon: <AuditOutlined />, label: 'Kiểm kê' },
@@ -89,10 +88,21 @@ const menuItems = [
   {
     key: 'insights-group',
     type: 'group' as const,
-    label: 'BÁO CÁO & MARKETING',
+    label: 'BÁO CÁO & THỐNG KÊ',
     children: [
       { key: '/admin/reports/revenue', icon: <BarChartOutlined />, label: 'Báo cáo doanh thu' },
       { key: '/admin/reports/products', icon: <BarChartOutlined />, label: 'Phân tích sản phẩm' },
+      { key: '/admin/reports/customers', icon: <BarChartOutlined />, label: 'Phân tích RFM' },
+      { key: '/admin/customers/segments', icon: <TeamOutlined />, label: 'Phân nhóm khách hàng' },
+      { key: '/admin/reports/trends', icon: <BarChartOutlined />, label: 'Xu hướng mua hàng' },
+      { key: '/admin/reports/forecast', icon: <BarChartOutlined />, label: 'Dự báo doanh thu' },
+      { key: '/admin/reports/staff-kpi', icon: <BarChartOutlined />, label: 'Hiệu suất nhân viên' },
+      { key: '/admin/reports/hr', icon: <BarChartOutlined />, label: 'Báo cáo nhân sự' },
+    ],
+  },
+  {
+    key:'marketing-group', type:'group' as const, label:'MARKETING & NỘI DUNG', children:[
+      { key: '/admin/marketing/email', icon: <BellOutlined />, label: 'Email Marketing' },
       { key: '/admin/promotions', icon: <TagsOutlined />, label: 'Khuyến mãi' },
       { key: '/admin/coupons', icon: <TagsOutlined />, label: 'Voucher' },
       { key: '/admin/reviews', icon: <AuditOutlined />, label: 'Đánh giá sản phẩm' },
@@ -107,16 +117,17 @@ const menuItems = [
   {
     key: 'analytics-group',
     type: 'group' as const,
-    label: 'PHÂN TÍCH & HỆ THỐNG',
+    label: 'HỆ THỐNG',
     children: [
-      { key: 'reports', icon: <BarChartOutlined />, label: 'Báo cáo', disabled: true },
       { key: '/admin/users', icon: <SafetyCertificateOutlined />, label: 'Người dùng & phân quyền' },
-      { key: 'settings', icon: <SettingOutlined />, label: 'Cài đặt', disabled: true },
+      { key: '/admin/settings/seo', icon: <SettingOutlined />, label: 'Cấu hình SEO' },
     ],
   },
 ]
 
 function resolvePageName(pathname: string) {
+  const match=menuItems.flatMap(g=>g.children).find(x=>x.key===pathname)
+  if(match)return match.label
   if (pathname === '/admin/dashboard') return 'Tổng quan kinh doanh'
   const sprint5Names: Record<string, string> = {
     '/admin/reports/revenue': 'Báo cáo doanh thu',
@@ -180,7 +191,7 @@ export default function AdminLayout() {
 
   return (
     <Layout className="glowup-admin-shell">
-      <Sider trigger={null} collapsible collapsed={collapsed} collapsedWidth={80} width={252} className="glowup-sider">
+      <Sider trigger={null} collapsible collapsed={collapsed} collapsedWidth={80} width={252} breakpoint="lg" onBreakpoint={setCollapsed} className="glowup-sider">
         <div className="glowup-brand">
           <div className="glowup-brand-mark">GU</div>
           {!collapsed && (
@@ -232,8 +243,8 @@ export default function AdminLayout() {
           </Space>
 
           <Space size={12}>
-            <Select value="flagship" style={{ width: 220 }} options={[{ label: 'Chi nhánh Flagship Q1, TP.HCM', value: 'flagship' }]} />
-            <Badge dot offset={[-2, 3]}><Button type="text" shape="circle" icon={<BellOutlined />} /></Badge>
+            <span style={{fontSize:12}}>Phạm vi theo tài khoản</span>
+            <NotificationCenter/>
             <Dropdown trigger={['click']} menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', onClick: handleLogout }] }}>
               <Avatar src={user?.avatarUrl ?? undefined} icon={<UserOutlined />} style={{ cursor: 'pointer', background: '#BE123C' }} />
             </Dropdown>
@@ -241,7 +252,7 @@ export default function AdminLayout() {
         </Header>
 
         <Content className="glowup-content">
-          <Breadcrumb className="glowup-breadcrumb" items={[{ title: 'Quản trị' }, { title: currentTitle }]} />
+          <Breadcrumb className="glowup-breadcrumb" items={[{ title: <a onClick={()=>navigate('/admin/dashboard')}>Quản trị</a> }, ...(menuItems.find(g=>g.children.some(c=>c.key===selectedKey))?[{title:menuItems.find(g=>g.children.some(c=>c.key===selectedKey))?.label}]:[]), { title: currentTitle }]} />
           <div className="glowup-page-surface"><Outlet /></div>
         </Content>
       </Layout>
