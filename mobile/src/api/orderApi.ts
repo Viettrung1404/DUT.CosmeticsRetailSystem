@@ -128,3 +128,58 @@ export const orderApi = {
     return response.data;
   },
 };
+
+// Thông tin chuyển khoản SePay do server trả về trong qrCodeData.
+// Khớp với schema web dùng ở frontend/src/features/checkout/sepay-transfer.ts
+// (bank, accountNumber, accountName, amount, content GU + 32 ký tự hex, imageUrl).
+export interface SepayTransfer {
+  bank: string;
+  bankAccountId?: string;
+  accountNumber: string;
+  accountName: string;
+  amount: number;
+  content: string;
+  mode?: string;
+  imageUrl: string;
+}
+
+export function parseSepayQrCodeData(raw: string | null | undefined): SepayTransfer | null {
+  try {
+    const parsed = JSON.parse(raw || 'null');
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.accountNumber !== 'string' || !parsed.accountNumber) return null;
+    if (typeof parsed.content !== 'string' || !/^GU[A-F0-9]{32}$/.test(parsed.content)) return null;
+    if (typeof parsed.imageUrl !== 'string' || !parsed.imageUrl.startsWith('https://')) return null;
+    return {
+      bank: typeof parsed.bank === 'string' ? parsed.bank : '',
+      bankAccountId: typeof parsed.bankAccountId === 'string' ? parsed.bankAccountId : undefined,
+      accountNumber: parsed.accountNumber,
+      accountName: typeof parsed.accountName === 'string' ? parsed.accountName : '',
+      amount: Number(parsed.amount) || 0,
+      content: parsed.content,
+      mode: typeof parsed.mode === 'string' ? parsed.mode : undefined,
+      imageUrl: parsed.imageUrl,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export const paymentApi = {
+  // Khởi tạo thanh toán SePay cho 1 đơn đã tạo (POST /payments/sepay/create).
+  // Backend tự sinh mã chuyển khoản GU..., lấy tài khoản từ SEPAY_* trong env
+  // và trả về qrCodeData (JSON string). Mobile KHÔNG tự hardcode tài khoản nữa.
+  createSepayPayment: async (orderId: string) => {
+    const response = await apiClient.post('/payments/sepay/create', {
+      orderId,
+      platform: 'MOBILE',
+    });
+    return response?.data?.data || response?.data || response;
+  },
+
+  // Tra cứu trạng thái 1 lần thanh toán (GET /payments/:id/status)
+  getPaymentStatus: async (paymentId: string) => {
+    const response = await apiClient.get(`/payments/${paymentId}/status`);
+    return response?.data?.data || response?.data || response;
+  },
+};

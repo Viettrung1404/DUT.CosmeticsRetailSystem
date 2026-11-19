@@ -3,3 +3,9 @@
 /.expo
 
 /stitch_ng_d_ng_m_ph_m_mobile
+
+# Environment / secrets — never commit real credentials.
+# .env.example stays tracked as a template.
+.env
+.env.*
+!.env.example

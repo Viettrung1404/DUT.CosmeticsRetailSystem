@@ -19,6 +19,7 @@ export default function OrderSuccessScreen({ route, navigation }: any) {
     totalAmount = 0,
     paymentMethod = '',
     rawPaymentMethod = '',
+    sepayTransfer = null,
   } = route.params || {};
 
   const isSepay =
@@ -26,13 +27,19 @@ export default function OrderSuccessScreen({ route, navigation }: any) {
     paymentMethod.includes('SePay') ||
     paymentMethod.includes('Chuyển khoản');
 
-  const bankAccount = '0000000001';
-  const bankName = 'ACB - Ngân hàng Á Châu';
-  const accountHolder = 'CONG TY TNHH GLOWUP';
-  const transferContent = orderCode || 'GLW';
-  const qrUrl = `https://vietqr.app/img?bank=ACB&acc=${bankAccount}&amount=${totalAmount}&des=${encodeURIComponent(
-    transferContent
-  )}&holder=${encodeURIComponent(accountHolder)}&template=compact`;
+  // Thông tin chuyển khoản lấy từ server (POST /payments/sepay/create).
+  // Không hardcode tài khoản nữa: tài khoản/mã GU.../ảnh QR đều do backend
+  // sinh từ SEPAY_* trong env. Thiếu dữ liệu thì không hiện QR giả.
+  const sepayReady = isSepay && !!sepayTransfer;
+  const bankAccount = sepayTransfer?.accountNumber || '';
+  const bankName = sepayTransfer?.bank ? `Ngân hàng ${sepayTransfer.bank}` : '';
+  const accountHolder = sepayTransfer?.accountName || '';
+  const transferContent = sepayTransfer?.content || '';
+  const qrUrl = sepayTransfer?.imageUrl || '';
+  const sepayAmount =
+    Number.isFinite(Number(sepayTransfer?.amount)) && Number(sepayTransfer?.amount) > 0
+      ? Number(sepayTransfer.amount)
+      : totalAmount;
 
   const copyToClipboard = (text: string, label: string) => {
     Clipboard.setString(text);
@@ -120,8 +127,8 @@ export default function OrderSuccessScreen({ route, navigation }: any) {
           </View>
         </View>
 
-        {/* SePay VietQR Transfer Panel */}
-        {isSepay && (
+        {/* SePay VietQR Transfer Panel — chỉ hiện khi có dữ liệu thật từ server */}
+        {sepayReady && (
           <View style={styles.sepayCard}>
             <View style={styles.sepayHeader}>
               <Ionicons
@@ -178,7 +185,7 @@ export default function OrderSuccessScreen({ route, navigation }: any) {
                   { color: theme.colors.primary, fontWeight: '700' },
                 ]}
               >
-                {totalAmount.toLocaleString('vi-VN')} đ
+                {sepayAmount.toLocaleString('vi-VN')} đ
               </Text>
             </View>
 
@@ -207,6 +214,17 @@ export default function OrderSuccessScreen({ route, navigation }: any) {
             <Text style={styles.sepayNotice}>
               ⚡ Đơn hàng sẽ được tự động kích hoạt ngay sau khi hệ thống ghi nhận
               giao dịch thành công.
+            </Text>
+          </View>
+        )}
+
+        {/* SePay nhưng chưa lấy được mã QR từ server: không hiện QR giả */}
+        {isSepay && !sepayReady && (
+          <View style={styles.sepayCard}>
+            <Text style={styles.sepayNotice}>
+              ⚠️ Chưa lấy được mã VietQR cho đơn này. Đơn hàng đã được tạo, bạn
+              vui lòng mở chi tiết đơn hàng để xem hướng dẫn chuyển khoản và
+              thử lại.
             </Text>
           </View>
         )}

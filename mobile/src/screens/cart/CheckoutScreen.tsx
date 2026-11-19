@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useCartStore } from '../../store/useCartStore';
 
-import { orderApi } from '../../api/orderApi';
+import { orderApi, paymentApi, parseSepayQrCodeData } from '../../api/orderApi';
 
 export default function CheckoutScreen({ navigation }: any) {
   const { items, getTotalPrice, clearCart } = useCartStore();
@@ -139,15 +139,27 @@ export default function CheckoutScreen({ navigation }: any) {
       const serverOrderCode =
         createdOrder?.orderNumber ||
         createdOrder?.orderCode ||
-        createdOrder?.id ||
-        'GLW-' + Math.floor(100000 + Math.random() * 900000);
+        createdOrder?.id || null;
+
+      // SePay: sau khi tạo đơn, gọi API thanh toán để lấy thông tin chuyển
+      // khoản thật từ server (tài khoản, mã GU..., ảnh VietQR). Đơn đã tạo
+      // thì vẫn đi tiếp dù bước này lỗi — user xem lại trong chi tiết đơn.
+      let sepayTransfer = null;
+      if (paymentMethod === 'SEPAY' && createdOrder?.id) {
+        try {
+          const payment = await paymentApi.createSepayPayment(createdOrder.id);
+          sepayTransfer = parseSepayQrCodeData(payment?.qrCodeData);
+        } catch (err) {
+          console.warn('Create SePay payment failed', err);
+        }
+      }
 
       clearCart();
 
       navigation.replace('OrderSuccess', {
         orderId: createdOrder?.id,
         rawPaymentMethod: paymentMethod,
-        orderCode: serverOrderCode,
+        orderCode: serverOrderCode || 'GLW-' + Math.floor(100000 + Math.random() * 900000),
         totalAmount: Number.isFinite(Number(createdOrder?.totalAmount))
           ? Number(createdOrder.totalAmount)
           : grandTotal,
@@ -155,6 +167,7 @@ export default function CheckoutScreen({ navigation }: any) {
           paymentMethod === 'COD'
             ? 'Thanh toán khi nhận hàng (COD)'
             : 'Chuyển khoản SePay (QR Tự Động)',
+        sepayTransfer,
       });
     } catch (error: any) {
       const errorMsg =

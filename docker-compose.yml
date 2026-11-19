@@ -46,6 +46,11 @@ services:
       HOSTNAME: "0.0.0.0"
       # Gọi sang backend container qua mạng nội bộ Docker
       BACKEND_API_BASE_URL: http://backend:3000/api/v1
+      # Origin public của site (ngrok HTTPS). BFF dùng SITE_URL để kiểm tra
+      # Origin của các mutation (thêm giỏ, checkout, wishlist...). Không đặt
+      # thì mặc định localhost:3001, mọi mutation qua domain public đều 403
+      # INVALID_ORIGIN. Đây là domain đã reserve, public nên hardcode được.
+      SITE_URL: https://senseless-marcia-benefic.ngrok-free.dev
     ports:
       - "3001:3001"
     healthcheck:
@@ -77,6 +82,46 @@ services:
       EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
     ports:
       - "8081:8081"
+    networks:
+      - glowup-network
+
+  # =========================================================================
+  # 4. Caddy - Reverse proxy nội bộ, 1 domain public cho cả web + API.
+  #    ngrok kết thúc TLS rồi mới tới đây (HTTP :80 trong mạng Docker).
+  #    /api/v1/* -> backend:3000, còn lại -> frontend:3001.
+  # =========================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: glowup-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks:
+      - glowup-network
+
+  # =========================================================================
+  # 5. ngrok - Public HTTPS tunnel tới Caddy, dùng domain đã reserve.
+  #    Token lấy từ backend/.env (NGROK_AUTHTOKEN) qua env_file, KHÔNG
+  #    hardcode token vào file này. Domain là public, hardcode được.
+  #    Chạy: ngrok http caddy:80 --domain=<domain đã reserve>
+  # =========================================================================
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: glowup-ngrok
+    restart: unless-stopped
+    command: http caddy:80 --domain=senseless-marcia-benefic.ngrok-free.dev
+    env_file:
+      - ./backend/.env
+    depends_on:
+      caddy:
+        condition: service_started
     networks:
       - glowup-network
 

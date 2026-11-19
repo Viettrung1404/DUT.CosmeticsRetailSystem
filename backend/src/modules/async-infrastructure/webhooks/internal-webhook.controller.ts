@@ -9,6 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import { Public } from '@core/decorators/public.decorator';
 import { InternalTokenGuard } from './internal-token.guard';
 import { WebhookProcessorService } from './webhook-processor.service';
 import { WebhookInboxService } from './webhook-inbox.service';
@@ -23,7 +24,8 @@ export interface InternalWebhookDispatchDto {
 }
 
 @ApiTags('Internal Webhooks & Queue Dispatcher')
-@Controller('api/v1/internal')
+@Public()
+@Controller('internal')
 @UseGuards(InternalTokenGuard)
 export class InternalWebhookController {
   private readonly logger = new Logger(InternalWebhookController.name);

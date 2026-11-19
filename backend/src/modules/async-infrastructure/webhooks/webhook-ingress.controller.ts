@@ -9,6 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Public } from '@core/decorators/public.decorator';
 import { WebhookInboxService } from './webhook-inbox.service';
 
 export interface WebhookConsumeRequest {
@@ -19,7 +20,8 @@ export interface WebhookConsumeRequest {
 }
 
 @ApiTags('Shipping Webhooks')
-@Controller()
+@Public()
+@Controller('webhooks')
 export class WebhookIngressController {
   private readonly logger = new Logger(WebhookIngressController.name);
 
@@ -28,7 +30,7 @@ export class WebhookIngressController {
   /**
    * Endpoint tiếp nhận Webhook trực tiếp từ GHN (Giao Hàng Nhanh)
    */
-  @Post('api/v1/webhooks/ghn')
+  @Post('ghn')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook tiếp nhận sự kiện từ Giao Hàng Nhanh (GHN)' })
   async receiveGhnWebhook(
@@ -47,7 +49,7 @@ export class WebhookIngressController {
   /**
    * Endpoint tiếp nhận Webhook trực tiếp từ Ahamove On-Demand Delivery
    */
-  @Post('api/v1/webhooks/ahamove')
+  @Post('ahamove')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook tiếp nhận sự kiện từ Ahamove' })
   async receiveAhamoveWebhook(
@@ -66,7 +68,7 @@ export class WebhookIngressController {
   /**
    * Endpoint đa hình theo carrierCode
    */
-  @Post('api/v1/webhooks/shipping/:carrierCode')
+  @Post('shipping/:carrierCode')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Webhook đa hình theo mã nhà vận chuyển' })
   async receiveGenericCarrierWebhook(
