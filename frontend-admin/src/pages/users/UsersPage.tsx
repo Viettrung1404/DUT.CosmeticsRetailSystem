@@ -100,11 +100,6 @@ export default function UsersPage() {
         await updateUser(editor.id, {
           fullName: values.fullName.trim(), phone: values.phone?.trim() ?? '', roleId: values.roleId,
         } satisfies UpdateUserInput)
-        const current = editor.stores.map((s) => s.id)
-        const desired = values.storeIds ?? []
-        if (current.length !== desired.length || current.some((id) => !desired.includes(id))) {
-          await setUserStores(editor.id, desired)
-        }
         messageApi.success('Đã cập nhật người dùng')
       }
       setEditor(null)
