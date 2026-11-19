@@ -3,7 +3,7 @@ import type { TablePaginationConfig } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { apiGet, apiPost, apiPut, errorText, money, type Page } from '../../api/sprint5Api'
-interface Promo { id:string; name:string; description:string|null; type:string; value:number; startDate:string; endDate:string; minOrderAmount:number; maxDiscountAmount:number|null; isFlashSale:boolean; isActive:boolean; usedCount:number; usageLimit:number|null; applicableProducts:string[]|null; applicableCategories:string[]|null }
+interface Promo { id:string; name:string; description:string|null; type:Values['type']; value:number; startDate:string; endDate:string; minOrderAmount:number; maxDiscountAmount:number|null; isFlashSale:boolean; isActive:boolean; usedCount:number; usageLimit:number|null; applicableProducts:string[]|null; applicableCategories:string[]|null }
 interface Values {name:string;description?:string;type:'PERCENTAGE'|'FIXED_AMOUNT'|'FREE_SHIPPING';value:number;dates:[dayjs.Dayjs,dayjs.Dayjs];minOrderAmount?:number;maxDiscountAmount?:number;isFlashSale?:boolean;usageLimit?:number;applicableProducts?:string[];applicableCategories?:string[]}
 const {Title,Text}=Typography
 export default function PromotionsPage(){
@@ -13,7 +13,7 @@ export default function PromotionsPage(){
  const [form]=Form.useForm<Values>()
  const load=useCallback(async()=>{setLoading(true);try{const r=await apiGet<Page<Promo>>('/admin/promotions',query);setRows(r.data??[]);setTotal(r.meta?.itemCount??0)}catch(e){msg.error(errorText(e))}finally{setLoading(false)}},[msg,query])
  useEffect(()=>{void load()},[load])
- const open=(row:Promo|'new')=>{setEditor(row);form.resetFields();if(row==='new')form.setFieldsValue({type:'PERCENTAGE',value:10,dates:[dayjs(),dayjs().add(7,'day')],isFlashSale:false});else form.setFieldsValue({...row,dates:[dayjs(row.startDate),dayjs(row.endDate)],applicableProducts:row.applicableProducts??[],applicableCategories:row.applicableCategories??[]})}
+ const open=(row:Promo|'new')=>{setEditor(row);form.resetFields();if(row==='new')form.setFieldsValue({type:'PERCENTAGE',value:10,dates:[dayjs(),dayjs().add(7,'day')],isFlashSale:false});else form.setFieldsValue({name:row.name,description:row.description??undefined,type:row.type,value:row.value,dates:[dayjs(row.startDate),dayjs(row.endDate)],minOrderAmount:row.minOrderAmount,maxDiscountAmount:row.maxDiscountAmount??undefined,usageLimit:row.usageLimit??undefined,isFlashSale:row.isFlashSale,applicableProducts:row.applicableProducts??[],applicableCategories:row.applicableCategories??[]})}
  const save=async()=>{try{const v=await form.validateFields();if(v.dates[1].isBefore(v.dates[0])){msg.error('Ngày kết thúc phải sau ngày bắt đầu');return}
  setBusy(true);const {dates,...values}=v;const payload={...values,startDate:dates[0].toISOString(),endDate:dates[1].toISOString()}
  if(editor==='new')await apiPost('/admin/promotions',payload);else if(editor)await apiPut(`/admin/promotions/${editor.id}`,payload)
