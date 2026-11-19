@@ -39,8 +39,8 @@ export default function AdvancedReportsPage({mode}:{mode:Mode}){
  <Card loading={busy}>{!data?<Empty description={error?'Không tải được báo cáo':'Chưa có dữ liệu'}/>:<>
  {(mode==='rfm'||mode==='segments')&&<Space direction="vertical" style={{width:'100%'}} size={16}>
  <Typography.Text>Khoảng phân tích: {String(data.windowFrom)} – {String(data.windowTo)} · Tổng {data.totalCustomers} khách</Typography.Text>
- {stats(groups.map(g=>[label(g.segment),g.count??0]))}
- <BarPlot data={groups.map(g=>({...g,label:label(g.segment)}))} labelKey="label" valueKey="count"/>
+ {stats(groups.map(g=>[label(g.segment),g.customers??0]))}
+ <BarPlot data={groups.map(g=>({...g,label:label(g.segment)}))} labelKey="label" valueKey="customers"/>
  {mode==='segments'&&<Button href="/admin/reports/customers">Xem danh sách và ma trận RFM</Button>}
  {mode==='rfm'&&<><Typography.Title level={4}>Ma trận R × F (khách trong danh sách đang tải)</Typography.Title><div style={{overflowX:'auto'}}><table style={{width:'100%',textAlign:'center'}}><thead><tr><th>F / R</th>{[1,2,3,4,5].map(r=><th key={r}>{r}</th>)}</tr></thead><tbody>{[5,4,3,2,1].map(f=><tr key={f}><th>{f}</th>{[1,2,3,4,5].map(r=>{const n=customers.filter(c=>c.rScore===r&&c.fScore===f).length;return <td key={r} style={{padding:12,background:'rgba(190,18,60,'+(n?0.15+0.7*n/Math.max(1,customers.length):0.03)+')'}}>{n}</td>})}</tr>)}</tbody></table></div>
  {table(customers.map(c=>({...c,segment:label(c.segment)})),[['Khách hàng','fullName'],['R','rScore'],['F','fScore'],['M','mScore'],['Số lần mua','frequency'],['Chi tiêu','monetary',true],['Nhóm','segment']])}</>}
