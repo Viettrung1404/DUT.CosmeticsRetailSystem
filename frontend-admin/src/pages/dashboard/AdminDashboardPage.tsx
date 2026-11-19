@@ -27,7 +27,7 @@ export default function AdminDashboardPage(){
         <Col key={x.label} xs={24} sm={12} xl={6}><Card><Statistic title={x.label} value={x.value} loading={loading}/></Card></Col>)}
     </Row>
     <Row gutter={[16,16]} style={{marginBottom:16}}>
-      <Col xs={24} xl={15}><Card title="Doanh thu 7 ngày (VND)" loading={loading}><LinePlot data={data?.last7Days??[]} xKey="date" yKey="revenue"/></Card></Col>
+      <Col xs={24} xl={15}><Card title="Doanh thu 7 ngày (VND)" loading={loading}><LinePlot data={(data?.last7Days??[]).map(day=>({...day}))} xKey="date" yKey="revenue"/></Card></Col>
       <Col xs={24} xl={9}><Card title="Tỷ lệ doanh thu theo kênh" loading={loading}><PiePlot data={data?.channelShare??[]}/></Card></Col>
     </Row>
     <Row gutter={[16,16]} style={{marginBottom:16}}>
