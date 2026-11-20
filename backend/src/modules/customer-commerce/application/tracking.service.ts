@@ -33,12 +33,54 @@ export class TrackingService {
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           select: {
             id: true,
+            shipmentCode: true,
             carrierCode: true,
+            carrierServiceCode: true,
             trackingCode: true,
             status: true,
+            trackingUrl: true,
+            failedAttempts: true,
             handedOverAt: true,
             deliveredAt: true,
             updatedAt: true,
+            packages: {
+              select: {
+                package: {
+                  select: {
+                    id: true,
+                    packageCode: true,
+                    actualWeightGrams: true,
+                    items: {
+                      select: {
+                        quantity: true,
+                        variant: {
+                          select: {
+                            sku: true,
+                            option1Value: true,
+                            option2Value: true,
+                            product: {
+                              select: {
+                                name: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            attempts: {
+              orderBy: { attemptNumber: 'asc' },
+              select: {
+                id: true,
+                attemptNumber: true,
+                attemptedAt: true,
+                failureReasonCode: true,
+                failureReasonDetail: true,
+              },
+            },
             events: {
               orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
               select: {
@@ -66,13 +108,43 @@ export class TrackingService {
     const templates = configured?.value as Record<string, string> | null;
     return {
       ...order,
-      shipments: order.shipments.map((shipment) => ({
-        ...shipment,
-        trackingUrl: trackingLink(
+      shipments: order.shipments.map((shipment) => {
+        const computedUrl = trackingLink(
           templates?.[shipment.carrierCode],
           shipment.trackingCode,
-        ),
-      })),
+        );
+        return {
+          ...shipment,
+          trackingUrl: shipment.trackingUrl || computedUrl || null,
+          packages:
+            shipment.packages?.map((sp) => ({
+              id: sp.package.id,
+              packageCode: sp.package.packageCode,
+              actualWeightGrams: sp.package.actualWeightGrams,
+              items:
+                sp.package.items?.map((it) => {
+                  const v = it.variant;
+                  const variantName =
+                    [v?.option1Value, v?.option2Value].filter(Boolean).join(' - ') ||
+                    v?.sku ||
+                    '';
+                  return {
+                    quantity: it.quantity,
+                    productName: v?.product?.name ?? 'Sản phẩm',
+                    variantName,
+                  };
+                }) ?? [],
+            })) ?? [],
+          attempts:
+            shipment.attempts?.map((att) => ({
+              id: att.id,
+              attemptNumber: att.attemptNumber,
+              attemptedAt: att.attemptedAt,
+              failureReasonCode: att.failureReasonCode,
+              failureReasonDetail: att.failureReasonDetail,
+            })) ?? [],
+        };
+      }),
     };
   }
 }

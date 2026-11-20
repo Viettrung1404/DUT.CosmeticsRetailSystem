@@ -53,4 +53,10 @@ describe('DlqOperationsController (EP12-T02)', () => {
     expect(mockService.retryStuckOutboxEvents).toHaveBeenCalledWith(dto);
     expect(res.resetCount).toBe(3);
   });
+
+  it('should have route path without duplicate api/v1 prefix (BE-01)', () => {
+    const path = Reflect.getMetadata('path', DlqOperationsController);
+    expect(path).toBe('admin/operations');
+    expect(path).not.toContain('api/v1');
+  });
 });

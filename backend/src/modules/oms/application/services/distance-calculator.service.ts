@@ -63,8 +63,13 @@ const KNOWN_COORDINATES: Record<string, Record<string, Coordinates>> = {
   'đà nẵng': {
     'quận hải châu': { latitude: 16.0678, longitude: 108.2208 },
     'hải châu': { latitude: 16.0678, longitude: 108.2208 },
+    'thạch thang': { latitude: 16.0748, longitude: 108.2215 },
+    'phường thạch thang': { latitude: 16.0748, longitude: 108.2215 },
+    'phường hải châu': { latitude: 16.0810, longitude: 108.2184 },
     'quận thanh khê': { latitude: 16.0623, longitude: 108.1884 },
+    'thanh khê': { latitude: 16.0623, longitude: 108.1884 },
     'quận sơn trà': { latitude: 16.0827, longitude: 108.2435 },
+    'sơn trà': { latitude: 16.0827, longitude: 108.2435 },
     default: { latitude: 16.0678, longitude: 108.2208 },
   },
 };
@@ -187,15 +192,17 @@ export class DistanceCalculatorService {
 
     const cityNorm = (address.provinceCity || '').trim().toLowerCase();
     const districtNorm = (address.district || '').trim().toLowerCase();
+    const wardNorm = (address.ward || '').trim().toLowerCase();
 
     const cleanStr = (s: string) =>
       s
         .toLowerCase()
-        .replace(/^(tỉnh|thành phố|tp\.|quận|huyện|thị xã|tx\.)\s+/i, '')
+        .replace(/^(tỉnh|thành phố|tp\.|quận|huyện|thị xã|tx\.|phường|xã|thị trấn|đặc khu)\s+/i, '')
         .trim();
 
     const cleanCity = cleanStr(cityNorm);
     const cleanDist = cleanStr(districtNorm);
+    const cleanWard = cleanStr(wardNorm);
 
     // Tìm kiếm trong bảng địa danh
     for (const [cityKey, districts] of Object.entries(KNOWN_COORDINATES)) {
@@ -204,10 +211,16 @@ export class DistanceCalculatorService {
         cityNorm.includes(cityKey) ||
         cityKey.includes(cityNorm)
       ) {
-        // 1. Khớp chính xác tên quận/huyện
+        // 1. Khớp chính xác tên quận/huyện hoặc phường/xã
         for (const [distKey, coords] of Object.entries(districts)) {
           if (distKey === 'default') continue;
-          if (cleanStr(distKey) === cleanDist || distKey === districtNorm) {
+          const cleanK = cleanStr(distKey);
+          if (
+            cleanK === cleanDist ||
+            distKey === districtNorm ||
+            cleanK === cleanWard ||
+            distKey === wardNorm
+          ) {
             return coords;
           }
         }
@@ -218,7 +231,13 @@ export class DistanceCalculatorService {
           .sort((a, b) => b[0].length - a[0].length);
 
         for (const [distKey, coords] of sortedEntries) {
-          if (districtNorm.includes(distKey) || distKey.includes(districtNorm)) {
+          const cleanK = cleanStr(distKey);
+          if (
+            (cleanDist && (cleanDist.includes(cleanK) || cleanK.includes(cleanDist))) ||
+            (districtNorm && (districtNorm.includes(distKey) || distKey.includes(districtNorm))) ||
+            (cleanWard && (cleanWard.includes(cleanK) || cleanK.includes(cleanWard))) ||
+            (wardNorm && (wardNorm.includes(distKey) || distKey.includes(wardNorm)))
+          ) {
             return coords;
           }
         }

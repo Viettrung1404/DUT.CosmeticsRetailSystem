@@ -115,6 +115,21 @@ export class CreateOrderDto {
   storeId?: string;
 
   @IsOptional()
+  @IsUUID("all")
+  @ApiPropertyOptional({
+    format: "uuid",
+    description: "ID phiên tính phí vận chuyển từ ShippingQuoteService",
+  })
+  quoteGroupId?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiPropertyOptional({
+    description: "Mã tùy chọn vận chuyển đã chọn (serviceCode hoặc optionId)",
+  })
+  shippingOptionId?: string;
+
+  @IsOptional()
   @IsString()
   @ApiPropertyOptional()
   note?: string;

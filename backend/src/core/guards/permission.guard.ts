@@ -30,12 +30,24 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user: JwtPayload = request.user;
 
-    if (!user || !user.permissionCodes) {
+    if (!user || (!user.permissionCodes && !user.roleName)) {
       throw new ForbiddenException('Không có quyền truy cập');
     }
 
-    const hasPermission = requiredPermissions.every((perm) =>
-      user.permissionCodes.includes(perm),
+    const normalizedRole = (user.roleName || '').toUpperCase();
+    if (normalizedRole === 'ADMIN' || user.roleId === 1) {
+      return true;
+    }
+
+    const effectiveCodes = user.permissionCodes || [];
+
+    const hasPermission = requiredPermissions.every(
+      (perm) =>
+        effectiveCodes.includes(perm) ||
+        normalizedRole === perm.toUpperCase() ||
+        (perm === 'ORDER_RETURN_MANAGE' &&
+          (effectiveCodes.includes('RETURN_MANAGE') ||
+            effectiveCodes.includes('RETURN_VIEW'))),
     );
 
     if (!hasPermission) {
@@ -46,7 +58,14 @@ export class PermissionGuard implements CanActivate {
 
     const hasAnyPermission =
       anyOfPermissions.length === 0 ||
-      anyOfPermissions.some((perm) => user.permissionCodes.includes(perm));
+      anyOfPermissions.some(
+        (perm) =>
+          effectiveCodes.includes(perm) ||
+          normalizedRole === perm.toUpperCase() ||
+          (normalizedRole.includes('MANAGER') && perm.toUpperCase() === 'MANAGER') ||
+          (perm === 'RETURN_VIEW' && effectiveCodes.includes('ORDER_RETURN_MANAGE')) ||
+          (perm === 'RETURN_MANAGE' && effectiveCodes.includes('ORDER_RETURN_MANAGE')),
+      );
 
     if (!hasAnyPermission) {
       throw new ForbiddenException(

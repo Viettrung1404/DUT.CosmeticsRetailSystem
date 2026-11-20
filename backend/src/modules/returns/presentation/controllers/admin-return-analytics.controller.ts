@@ -23,7 +23,7 @@ import {
 @ApiTags('Admin Returns Analytics & BI')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@Controller('api/v1/admin/returns/analytics')
+@Controller('admin/returns/analytics')
 export class AdminReturnAnalyticsController {
   constructor(
     private readonly analyticsService: LotQualityAnalyticsService,

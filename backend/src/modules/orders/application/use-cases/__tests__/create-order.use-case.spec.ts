@@ -1,4 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { CreateOrderUseCase } from '../create-order.use-case';
 import { IOrderRepository } from '../../../domain/repositories/order.repository.interface';
 import { OrderPricingService } from '../../services/order-pricing.service';
@@ -6,13 +10,14 @@ import { StoreResolverService } from '../../services/store-resolver.service';
 import { OrderEntity } from '../../../domain/entities/order.entity';
 import { OrderStatus } from '../../../../../core/domain/orders/order-status.enum';
 
-describe('CreateOrderUseCase (TDD)', () => {
+describe('CreateOrderUseCase (TDD & BE-03 Shipping Quote Integration)', () => {
   let useCase: CreateOrderUseCase;
   let mockOrderRepo: jest.Mocked<IOrderRepository>;
   let mockPricingService: jest.Mocked<OrderPricingService>;
   let mockStoreResolver: jest.Mocked<StoreResolverService>;
   let mockVariantCatalogProvider: any;
   let mockCartRepository: any;
+  let mockShippingQuoteService: any;
 
   beforeEach(() => {
     mockOrderRepo = {
@@ -30,6 +35,7 @@ describe('CreateOrderUseCase (TDD)', () => {
 
     mockPricingService = {
       calculatePricing: jest.fn(),
+      configuredPointValue: jest.fn().mockResolvedValue(1),
     } as any;
 
     mockStoreResolver = {
@@ -45,12 +51,18 @@ describe('CreateOrderUseCase (TDD)', () => {
       clearCart: jest.fn(),
     };
 
+    mockShippingQuoteService = {
+      validateQuote: jest.fn(),
+    };
+
     useCase = new CreateOrderUseCase(
       mockOrderRepo,
       mockPricingService,
       mockStoreResolver,
       mockVariantCatalogProvider,
       mockCartRepository,
+      undefined, // commerce fallback path to test useCase logic directly
+      mockShippingQuoteService,
     );
   });
 
@@ -178,5 +190,121 @@ describe('CreateOrderUseCase (TDD)', () => {
       expect.objectContaining({ cartId: 'cart-1' }),
     );
     expect(mockCartRepository.clearCart).not.toHaveBeenCalled();
+  });
+
+  describe('BE-03: Real Shipping Quotes Integration', () => {
+    const customerId = 'cust-123';
+    const shippingAddress = {
+      recipientName: 'Lê Văn C',
+      phone: '0911223344',
+      addressLine: '789 Trần Hưng Đạo',
+      city: 'Đà Nẵng',
+    };
+
+    beforeEach(() => {
+      mockStoreResolver.resolveStoreForOrder.mockResolvedValue('store-dn');
+      mockOrderRepo.getNextOrderSequence.mockResolvedValue(10);
+      mockVariantCatalogProvider.getVariantsDetails.mockResolvedValue([
+        {
+          id: 'var-1',
+          productName: 'Toner Klairs',
+          option1Value: '150ml',
+          unitPrice: 250000,
+          unitCost: 150000,
+          sku: 'KLAIRS-150',
+        },
+      ]);
+      mockPricingService.calculatePricing.mockReturnValue({
+        subtotal: 250000,
+        shippingFee: 40000, // Policy estimated fee
+        discountAmount: 0,
+        pointsDiscount: 0,
+        totalAmount: 290000,
+      });
+      mockOrderRepo.createOrderWithTransaction.mockResolvedValue(
+        new OrderEntity({
+          id: 'ord-be03',
+          orderNumber: 'ORD202611190010',
+        } as any),
+      );
+    });
+
+    it('1. should validate real shipping quote and replace shipping fee from quote (BE-03)', async () => {
+      mockShippingQuoteService.validateQuote.mockResolvedValue({
+        quoteGroupId: 'quote-grp-1',
+        serviceCode: 'GHN_STANDARD',
+        estimatedFee: 22000, // Real quote fee (lower than initial policy 40000)
+      });
+
+      await useCase.execute({
+        customerId,
+        shippingAddress,
+        paymentMethod: 'COD',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+        quoteGroupId: 'quote-grp-1',
+        shippingOptionId: 'GHN_STANDARD',
+      });
+
+      expect(mockShippingQuoteService.validateQuote).toHaveBeenCalledWith(
+        'quote-grp-1',
+        'GHN_STANDARD',
+        'store-dn',
+      );
+      expect(mockOrderRepo.createOrderWithTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shippingFee: 22000,
+          totalAmount: 272000, // 250000 + 22000
+        }),
+      );
+    });
+
+    it('2. should reject with 422 SHIPPING_QUOTE_EXPIRED when quote has expired', async () => {
+      mockShippingQuoteService.validateQuote.mockRejectedValue(
+        new HttpException(
+          { code: 'SHIPPING_QUOTE_EXPIRED', message: 'Quote expired' },
+          HttpStatus.UNPROCESSABLE_ENTITY,
+        ),
+      );
+
+      await expect(
+        useCase.execute({
+          customerId,
+          shippingAddress,
+          paymentMethod: 'COD',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+          quoteGroupId: 'expired-quote',
+          shippingOptionId: 'GHN_STANDARD',
+        }),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('3. should reject with BadRequestException when quoteGroupId is provided without shippingOptionId', async () => {
+      await expect(
+        useCase.execute({
+          customerId,
+          shippingAddress,
+          paymentMethod: 'COD',
+          items: [{ variantId: 'var-1', quantity: 1 }],
+          quoteGroupId: 'quote-grp-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('4. should preserve default fee calculation when quoteGroupId is omitted (backward-compatibility)', async () => {
+      await useCase.execute({
+        customerId,
+        shippingAddress,
+        paymentMethod: 'COD',
+        items: [{ variantId: 'var-1', quantity: 1 }],
+      });
+
+      expect(mockShippingQuoteService.validateQuote).not.toHaveBeenCalled();
+      expect(mockOrderRepo.createOrderWithTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shippingFee: 40000,
+          totalAmount: 290000,
+        }),
+      );
+    });
   });
 });

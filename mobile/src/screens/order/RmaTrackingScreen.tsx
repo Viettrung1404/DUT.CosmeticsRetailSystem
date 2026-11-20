@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,53 +7,95 @@ import {
   ScrollView,
   Image,
   Alert,
-  Linking} from 'react-native';
+  Linking,
+  Clipboard,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import { orderApi } from '../../api/orderApi';
+import { RMA_STATUS_MAP, getRmaStatusMeta } from '../../utils/rmaHelper';
+
+export { RMA_STATUS_MAP, getRmaStatusMeta };
+
+const STEPS = [
+  { title: 'Nộp yêu cầu', key: 'SUBMITTED' },
+  { title: 'Xét duyệt hồ sơ', key: 'REVIEW' },
+  { title: 'Tiếp nhận hàng', key: 'RECEIVE' },
+  { title: 'Kiểm định KCS', key: 'INSPECT' },
+  { title: 'Quyết toán', key: 'SETTLE' },
+];
 
 export default function RmaTrackingScreen({ route, navigation }: any) {
-  const { rmaId = 'RMA-GU-89241' } = route.params || {};
+  const { rmaId = '' } = route.params || {};
 
-  const [activeStep] = useState(2); // 0: Đã tạo, 1: Đã duyệt, 2: Đang thu hồi hàng, 3: Đã hoàn tiền
+  const [returnOrder, setReturnOrder] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  const timeline = [
-    {
-      step: 0,
-      title: 'Đã gửi yêu cầu đổi trả',
-      time: '14:20 • Hôm nay',
-      desc: 'Hệ thống đã ghi nhận yêu cầu hoàn trả sản phẩm cho đơn hàng #GU-89241.',
-      done: true,
-    },
-    {
-      step: 1,
-      title: 'GlowUp Care đã phê duyệt hồ sơ',
-      time: '14:45 • Hôm nay',
-      desc: 'Chuyên viên kiểm định hình ảnh hợp lệ, áp dụng chính sách bảo hành da 100%.',
-      done: true,
-    },
-    {
-      step: 2,
-      title: 'Tài xế đang đến thu hồi hàng tận nơi',
-      time: '15:10 • Đang diễn ra',
-      desc: 'Shipper Nguyễn Văn Tài (0905 ••• 882) đang trên đường tới thu hồi sản phẩm.',
-      done: true,
-      current: true,
-    },
-    {
-      step: 3,
-      title: 'Kiểm định kho & Hoàn tiền',
-      time: 'Dự kiến trong ngày mai',
-      desc: 'Hoàn tiền sẽ được xử lý theo chính sách hiện hành (minh họa).',
-      done: false,
-    },
-  ];
+  const fetchReturnDetail = useCallback(async (isRefresh = false) => {
+    if (!rmaId) {
+      setError('Không tìm thấy mã hồ sơ đổi trả.');
+      setLoading(false);
+      return;
+    }
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
 
-  const handleCallShipper = () => {
-    Linking.openURL('tel:0905888882').catch(() => {
-      Alert.alert('Gọi tài xế', 'Đang kết nối tới số điện thoại 0905 888 882');
+    try {
+      const data = await orderApi.getReturnDetail(rmaId);
+      setReturnOrder(data);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Không thể tải chi tiết tiến trình đổi trả RMA.'
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [rmaId]);
+
+  useEffect(() => {
+    fetchReturnDetail();
+  }, [fetchReturnDetail]);
+
+  const handleCopy = (code: string) => {
+    if (!code) return;
+    Clipboard.setString(code);
+    setCopiedCode(code);
+    Alert.alert('Đã sao chép', `Mã tiếp nhận: ${code}`);
+    setTimeout(() => setCopiedCode(null), 2500);
+  };
+
+  const handleCall = (phone?: string) => {
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`).catch(() => {
+      Alert.alert('Lỗi', `Không thể quay số tới ${phone}`);
     });
   };
+
+  const statusKey = (returnOrder?.status || 'SUBMITTED').toUpperCase();
+  const statusMeta = RMA_STATUS_MAP[statusKey] || RMA_STATUS_MAP['SUBMITTED'];
+  const isStoreDropoff =
+    returnOrder?.returnChannel === 'STORE_DROPOFF' ||
+    Boolean(returnOrder?.dropoffLocationId);
+  const dropoffStore = returnOrder?.dropoffLocation;
+  const returnCode =
+    returnOrder?.returnCode || returnOrder?.returnNumber || returnOrder?.id || rmaId;
+  const currentStepIndex = statusMeta.stepIndex;
+  const pickupAddressDisplay = returnOrder?.pickupAddress
+    ? String(returnOrder.pickupAddress.addressLine || returnOrder.pickupAddress)
+    : '';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -68,151 +110,295 @@ export default function RmaTrackingScreen({ route, navigation }: any) {
         </TouchableOpacity>
         <View style={{ alignItems: 'center' }}>
           <Text style={styles.headerTitle}>Tiến trình Đổi trả RMA</Text>
-          <Text style={styles.headerSubtitle}>Mã RMA: #{rmaId}</Text>
+          <Text style={styles.headerSubtitle}>#{returnCode}</Text>
         </View>
         <TouchableOpacity
           style={styles.headActionBtn}
-          onPress={() => navigation.navigate('Đơn hàng')}
+          onPress={() => fetchReturnDetail(true)}
+          disabled={loading || refreshing}
         >
-          <Ionicons name="receipt-outline" size={20} color={theme.colors.primary} />
+          <Ionicons name="refresh-outline" size={22} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Status Card Hero */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroTop}>
-            <View style={styles.statusBadge}>
-              <View style={styles.livePulseDot} />
-              <Text style={styles.statusBadgeText}>ĐANG THU HỒI HÀNG</Text>
-            </View>
-            <Text style={styles.estimatedTimeText}>Dự kiến hoàn tất trong 24H</Text>
-          </View>
-
-          <Text style={styles.heroTitle}>Shipper đang đến thu hồi hàng</Text>
-          <Text style={styles.heroDesc}>
-            Vui lòng đóng gói sản phẩm kèm hộp hoặc túi giấy ban đầu. Bạn không cần thanh toán bất kỳ chi phí nào.{'\n'}
-            <Text style={styles.heroDisclaimer}>(Thông tin shipper bên dưới là minh họa)</Text>
-          </Text>
-
-          {/* Shipper Contact Box */}
-          <View style={styles.shipperCard}>
-            <Image
-              source={{
-                uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-              }}
-              style={styles.shipperAvatar}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shipperRole}>Tài xế thu hồi GlowUp Express</Text>
-              <Text style={styles.shipperName}>Nguyễn Văn Tài</Text>
-              <Text style={styles.shipperPlate}>Biển số: 43-C1 • 882.19</Text>
-            </View>
-            <TouchableOpacity style={styles.callBtn} onPress={handleCallShipper}>
-              <Ionicons name="call" size={16} color="#FFF" />
-              <Text style={styles.callText}>Gọi</Text>
-            </TouchableOpacity>
-          </View>
+      {loading && !refreshing ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Đang tải tiến trình hồ sơ đổi trả...</Text>
         </View>
-
-        {/* Timeline Stepper */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Các bước xử lý yêu cầu</Text>
-
-          <View style={styles.timelineContainer}>
-            {timeline.map((item, index) => {
-              const isLast = index === timeline.length - 1;
-              return (
-                <View key={index} style={styles.timelineRow}>
-                  {/* Left Column: Icon & Line */}
-                  <View style={styles.timelineIndicatorCol}>
-                    <View
-                      style={[
-                        styles.timelineDot,
-                        item.done && styles.timelineDotDone,
-                        item.current && styles.timelineDotCurrent,
-                      ]}
-                    >
-                      {item.done ? (
-                        <Ionicons name="checkmark" size={12} color="#FFF" />
-                      ) : (
-                        <View style={styles.innerDot} />
-                      )}
-                    </View>
-                    {!isLast && (
-                      <View
-                        style={[
-                          styles.timelineLine,
-                          item.done && styles.timelineLineDone,
-                        ]}
-                      />
-                    )}
-                  </View>
-
-                  {/* Right Column: Content */}
-                  <View style={styles.timelineContent}>
-                    <View style={styles.timelineHeaderRow}>
-                      <Text
-                        style={[
-                          styles.timelineStepTitle,
-                          item.current && styles.timelineStepTitleActive,
-                        ]}
-                      >
-                        {item.title}
-                      </Text>
-                    </View>
-                    <Text style={styles.timelineTime}>{item.time}</Text>
-                    <Text style={styles.timelineDesc}>{item.desc}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Sản phẩm thu hồi */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Sản phẩm thu hồi & Hoàn tiền</Text>
-          <View style={styles.productRow}>
-            <Image
-              source={{
-                uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-              }}
-              style={styles.productImg}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.productBrand}>GLOWUP LAB</Text>
-              <Text style={styles.productName} numberOfLines={2}>
-                Serum Rose Berry B5 Phục Hồi Hàng Rào Ẩm 50ml
-              </Text>
-              <Text style={styles.productVariant}>Dung tích: 50ml • Số lượng: x1</Text>
-              <View style={styles.priceRow}>
-                <Text style={styles.productPrice}>345.000₫</Text>
-                <View style={styles.refundTag}>
-                  <Text style={styles.refundTagText}>Hoàn tiền (minh họa)</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Trợ giúp nhanh */}
-        <View style={styles.helpCard}>
-          <MaterialIcons name="support-agent" size={24} color={theme.colors.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.helpTitle}>Cần hỗ trợ về yêu cầu RMA?</Text>
-            <Text style={styles.helpDesc}>
-              Bộ phận Chăm sóc khách hàng VIP luôn túc trực hỗ trợ 24/7.
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.chatSupportBtn}
-            onPress={() => Alert.alert('Tư vấn', 'Đang kết nối khung chat với chuyên viên GlowUp Care...')}
-          >
-            <Text style={styles.chatSupportText}>Chat ngay</Text>
+      ) : error ? (
+        <View style={styles.centerContainer}>
+          <Ionicons name="alert-circle-outline" size={52} color={theme.colors.textMuted} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => fetchReturnDetail()}>
+            <Text style={styles.retryBtnText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      ) : returnOrder ? (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchReturnDetail(true)}
+              colors={[theme.colors.primary]}
+            />
+          }
+        >
+          {/* Hero Status Card */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTop}>
+              <View
+                style={[styles.statusBadge, { backgroundColor: statusMeta.bg }]}
+              >
+                <Ionicons
+                  name={statusMeta.icon as any}
+                  size={14}
+                  color={statusMeta.color}
+                />
+                <Text
+                  style={[styles.statusBadgeText, { color: statusMeta.color }]}
+                >
+                  {statusMeta.label}
+                </Text>
+              </View>
+              <Text style={styles.heroDate}>
+                {returnOrder.createdAt
+                  ? new Date(returnOrder.createdAt).toLocaleDateString('vi-VN')
+                  : ''}
+              </Text>
+            </View>
+
+            <Text style={styles.heroTitle}>{statusMeta.label}</Text>
+            <Text style={styles.heroDesc}>{statusMeta.description}</Text>
+
+            {/* Rejection Notice if REJECTED */}
+            {statusKey === 'REJECTED' && returnOrder.rejectionReason && (
+              <View style={styles.rejectionBox}>
+                <Ionicons name="alert-circle" size={18} color="#C62828" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rejectionTitle}>Lý do từ chối:</Text>
+                  <Text style={styles.rejectionText}>
+                    {returnOrder.rejectionReason}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Stepper Progress Bar */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Các bước xử lý yêu cầu</Text>
+            <View style={styles.stepperContainer}>
+              {STEPS.map((step, idx) => {
+                const isPast = idx < currentStepIndex;
+                const isCurrent = idx === currentStepIndex;
+                const isFuture = idx > currentStepIndex;
+
+                return (
+                  <View key={idx} style={styles.stepperItem}>
+                    <View
+                      style={[
+                        styles.stepperCircle,
+                        isPast && styles.stepperCircleDone,
+                        isCurrent && styles.stepperCircleCurrent,
+                        isFuture && styles.stepperCircleFuture,
+                      ]}
+                    >
+                      {isPast ? (
+                        <Ionicons name="checkmark" size={11} color="#FFF" />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.stepperNum,
+                            isCurrent && styles.stepperNumCurrent,
+                          ]}
+                        >
+                          {idx + 1}
+                        </Text>
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.stepperLabel,
+                        isCurrent && styles.stepperLabelCurrent,
+                        isPast && styles.stepperLabelDone,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {step.title}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Omnichannel Logistics Card */}
+          {isStoreDropoff ? (
+            /* Store Dropoff Card with QR Code Container */
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.rowAlign}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#E8F5E9' }]}>
+                    <Ionicons name="business" size={16} color="#2E7D32" />
+                  </View>
+                  <Text style={styles.cardTitle}>Tiếp nhận tại Showroom GlowUp</Text>
+                </View>
+              </View>
+
+              {/* QR Container */}
+              <View style={styles.qrContainer}>
+                <Ionicons name="qr-code" size={100} color={theme.colors.textDark} />
+                <Text style={styles.qrHint}>Mã tiếp nhận quét tại quầy:</Text>
+                <View style={styles.qrCodeBox}>
+                  <Text style={styles.qrCodeText}>{returnCode}</Text>
+                  <TouchableOpacity onPress={() => handleCopy(returnCode)}>
+                    <Ionicons
+                      name={copiedCode === returnCode ? 'checkmark' : 'copy-outline'}
+                      size={16}
+                      color={theme.colors.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.qrSubText}>
+                  Vui lòng mang sản phẩm đến Showroom. Nhân viên quầy sẽ quét mã này để hoàn tất thủ tục tiếp nhận trong 2 phút.
+                </Text>
+              </View>
+
+              {dropoffStore && (
+                <View style={styles.storeDetailsCard}>
+                  <Text style={styles.storeNameText}>{dropoffStore.name}</Text>
+                  <Text style={styles.storeAddressText}>{dropoffStore.address}</Text>
+                  {dropoffStore.phone && (
+                    <View style={styles.rowBetween}>
+                      <Text style={styles.storePhoneText}>
+                        Hotline: {dropoffStore.phone}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.callStoreBtn}
+                        onPress={() => handleCall(dropoffStore.phone)}
+                      >
+                        <Ionicons name="call" size={12} color="#FFF" />
+                        <Text style={styles.callStoreBtnText}>Gọi</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          ) : (
+            /* Carrier Reverse Pickup Card */
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.rowAlign}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#E3F2FD' }]}>
+                    <Ionicons name="bicycle" size={16} color="#1565C0" />
+                  </View>
+                  <Text style={styles.cardTitle}>Thu hồi tận nơi (GHN Reverse)</Text>
+                </View>
+              </View>
+              <Text style={styles.carrierPickupDesc}>
+                Bưu tá GHN sẽ liên hệ trước khi tới thu hồi gói hàng. Vui lòng đóng gói sản phẩm cẩn thận kèm hộp bảo quản ban đầu.
+              </Text>
+
+              {Boolean(pickupAddressDisplay) && (
+                <View style={styles.pickupAddressBox}>
+                  <Text style={styles.pickupAddressTitle}>Địa chỉ bưu tá thu hồi:</Text>
+                  <Text style={styles.pickupAddressText}>{pickupAddressDisplay}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Returned Items & QC Outcomes */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              Sản phẩm trong hồ sơ ({returnOrder.items?.length || 0} món)
+            </Text>
+
+            <View style={{ gap: 10, marginTop: 8 }}>
+              {(returnOrder.items || []).map((it: any, idx: number) => {
+                const pName =
+                  it.variant?.product?.name || it.name || 'Sản phẩm mỹ phẩm';
+                const vName = [it.variant?.option1Value, it.variant?.option2Value]
+                  .filter(Boolean)
+                  .join(' - ');
+                const imgUri =
+                  it.variant?.product?.images?.[0] ||
+                  it.imageUrl ||
+                  null;
+
+                return (
+                  <View key={it.id || idx} style={styles.returnedItemRow}>
+                    {imgUri ? (
+                      <Image source={{ uri: imgUri }} style={styles.itemThumb} />
+                    ) : (
+                      <View style={styles.itemThumbPlaceholder}>
+                        <Ionicons name="image-outline" size={18} color="#999" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemNameText} numberOfLines={2}>
+                        {pName}
+                      </Text>
+                      {vName ? <Text style={styles.itemVarText}>{vName}</Text> : null}
+                      <Text style={styles.itemQtyText}>
+                        Số lượng: <Text style={{ fontWeight: '700' }}>{it.quantity}</Text> • Lý do: {it.reasonCode || returnOrder.reason}
+                      </Text>
+
+                      {/* QC Inspection Outcome if available */}
+                      {it.condition && (
+                        <View style={styles.qcResultBadge}>
+                          <Ionicons name="shield-checkmark" size={12} color="#00796B" />
+                          <Text style={styles.qcResultText}>
+                            KCS: {it.condition} {it.note ? `• ${it.note}` : ''}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Financial Settlement Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Quyết toán tài chính</Text>
+            <View style={styles.summaryLine}>
+              <Text style={styles.summaryLabel}>Tiền hoàn trả dự kiến:</Text>
+              <Text style={styles.summaryVal}>
+                {Number(returnOrder.refundAmount || 0).toLocaleString('vi-VN')} đ
+              </Text>
+            </View>
+
+            {Number(returnOrder.totalRefundApproved || 0) > 0 && (
+              <View style={styles.summaryLine}>
+                <Text style={styles.summaryLabel}>Số tiền đã duyệt hoàn:</Text>
+                <Text style={[styles.summaryVal, { color: '#2E7D32', fontWeight: '800' }]}>
+                  {Number(returnOrder.totalRefundApproved).toLocaleString('vi-VN')} đ
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.settlementNoteBox}>
+              <Ionicons name="information-circle-outline" size={14} color="#666" />
+              <Text style={styles.settlementNoteText}>
+                Số tiền hoàn sẽ được chuyển về tài khoản ban đầu hoặc ví điểm thưởng sau khi bước kiểm định KCS hoàn tất.
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      ) : (
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>Không tìm thấy thông tin hồ sơ đổi trả này.</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -220,48 +406,61 @@ export default function RmaTrackingScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFF8F6',
+    backgroundColor: theme.colors.backgroundCanvas,
   },
   header: {
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#FFF8F6',
+    backgroundColor: theme.colors.surfaceCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3E9EB',
+    borderBottomColor: theme.colors.borderSubtle,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  headActionBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#281811',
+    color: theme.colors.textDark,
   },
   headerSubtitle: {
     fontSize: 11,
     color: theme.colors.textMuted,
-    marginTop: 2,
+  },
+  headActionBtn: {
+    padding: 6,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: theme.colors.textMuted,
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 16,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   content: {
     flex: 1,
@@ -269,19 +468,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     gap: 14,
-    paddingBottom: 40,
   },
   heroCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.rounded.lg,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F3E9EB',
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: theme.colors.borderSubtle,
   },
   heroTop: {
     flexDirection: 'row',
@@ -292,265 +485,316 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FAF0F2',
-    paddingHorizontal: 10,
+    gap: 5,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-  },
-  livePulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.primary,
+    borderRadius: 6,
   },
   statusBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: theme.colors.primary,
-    letterSpacing: 0.5,
   },
-  estimatedTimeText: {
+  heroDate: {
     fontSize: 11,
     color: theme.colors.textMuted,
   },
   heroTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#281811',
-    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '800',
+    color: theme.colors.textDark,
+    marginTop: 2,
   },
   heroDesc: {
     fontSize: 12,
-    color: '#725950',
-    lineHeight: 17,
-    marginBottom: 14,
+    color: theme.colors.textMuted,
+    marginTop: 4,
+    lineHeight: 18,
   },
-  shipperCard: {
+  rejectionBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  rejectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#C62828',
+  },
+  rejectionText: {
+    fontSize: 11,
+    color: '#B71C1C',
+    marginTop: 2,
+  },
+  card: {
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.rounded.lg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+    gap: 8,
+  },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FEFAFC',
-    padding: 12,
+    justifyContent: 'space-between',
+  },
+  rowAlign: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iconCircle: {
+    width: 28,
+    height: 28,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  shipperAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFF',
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.textDark,
   },
-  shipperRole: {
+
+  /* Stepper */
+  stepperContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  stepperItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  stepperCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  stepperCircleDone: {
+    backgroundColor: '#2E7D32',
+  },
+  stepperCircleCurrent: {
+    backgroundColor: theme.colors.primary,
+  },
+  stepperCircleFuture: {
+    backgroundColor: '#EEEEEE',
+  },
+  stepperNum: {
     fontSize: 10,
-    color: theme.colors.textMuted,
+    fontWeight: '700',
+    color: '#999',
+  },
+  stepperNumCurrent: {
+    color: '#FFF',
+  },
+  stepperLabel: {
+    fontSize: 9,
+    textAlign: 'center',
+    color: '#999',
+    lineHeight: 12,
+  },
+  stepperLabelCurrent: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+  },
+  stepperLabelDone: {
+    color: '#2E7D32',
     fontWeight: '600',
   },
-  shipperName: {
+
+  /* QR Container */
+  qrContainer: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceSubtle,
+    padding: 18,
+    borderRadius: 12,
+    marginTop: 6,
+    gap: 8,
+  },
+  qrHint: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 4,
+  },
+  qrCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+  },
+  qrCodeText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.textDark,
+    letterSpacing: 0.5,
+  },
+  qrSubText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  storeDetailsCard: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    padding: 12,
+    borderRadius: 8,
+    gap: 4,
+    marginTop: 6,
+  },
+  storeNameText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#281811',
-    marginTop: 1,
+    color: theme.colors.textDark,
   },
-  shipperPlate: {
+  storeAddressText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  storePhoneText: {
     fontSize: 11,
     color: theme.colors.primary,
     fontWeight: '600',
   },
-  callBtn: {
+  callStoreBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-  },
-  callText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F3E9EB',
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#281811',
-    marginBottom: 14,
-  },
-  timelineContainer: {
-    paddingLeft: 4,
-  },
-  timelineRow: {
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 65,
-  },
-  timelineIndicatorCol: {
-    alignItems: 'center',
-    width: 20,
-  },
-  timelineDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#EFE5E7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timelineDotDone: {
-    backgroundColor: theme.colors.primary,
-  },
-  timelineDotCurrent: {
-    borderWidth: 3,
-    borderColor: '#FFD9DD',
-  },
-  innerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.textMuted,
-  },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: '#EFE5E7',
-    marginVertical: 4,
-  },
-  timelineLineDone: {
-    backgroundColor: theme.colors.primaryFixedDim,
-  },
-  timelineContent: {
-    flex: 1,
-    paddingBottom: 14,
-  },
-  timelineHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  timelineStepTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#554244',
-  },
-  timelineStepTitleActive: {
-    color: theme.colors.primary,
-    fontWeight: '700',
-  },
-  timelineTime: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  timelineDesc: {
-    fontSize: 11,
-    color: '#725950',
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  productRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    backgroundColor: '#FEFAFC',
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
-  },
-  productImg: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    backgroundColor: '#F8EFF1',
-  },
-  productBrand: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  productName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#281811',
-    marginTop: 1,
-  },
-  productVariant: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  productPrice: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  refundTag: {
-    backgroundColor: '#FAD9CD',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 6,
   },
-  refundTagText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: theme.colors.primaryDeep,
-  },
-  helpCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FAF0F2',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#F3DCE1',
-  },
-  helpTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#281811',
-  },
-  helpDesc: {
-    fontSize: 11,
-    color: '#725950',
-    marginTop: 1,
-  },
-  chatSupportBtn: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
-  chatSupportText: {
-    fontSize: 11,
+  callStoreBtnText: {
+    fontSize: 10,
     fontWeight: '700',
     color: '#FFF',
   },
-  heroDisclaimer: {
+
+  /* Carrier reverse */
+  carrierPickupDesc: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    lineHeight: 18,
+  },
+  pickupAddressBox: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    padding: 10,
+    borderRadius: 6,
+    marginTop: 4,
+    gap: 2,
+  },
+  pickupAddressTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  pickupAddressText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+
+  /* Returned Items */
+  returnedItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
+  },
+  itemThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    backgroundColor: '#EEE',
+  },
+  itemThumbPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    backgroundColor: '#EEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemNameText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textDark,
+  },
+  itemVarText: {
     fontSize: 10,
     color: theme.colors.textMuted,
-    fontStyle: 'italic',
+  },
+  itemQtyText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  qcResultBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E0F2F1',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 3,
+    alignSelf: 'flex-start',
+  },
+  qcResultText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#00796B',
+  },
+
+  /* Settlement */
+  summaryLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  summaryVal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  settlementNoteBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.surfaceSubtle,
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  settlementNoteText: {
+    flex: 1,
+    fontSize: 10,
+    color: '#666',
+    lineHeight: 14,
   },
 });
-

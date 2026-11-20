@@ -43,8 +43,9 @@ export function AddressEditor({
     return () => element?.close();
   }, []);
   async function save() {
-    const parsed = addressInput.safeParse({ ...value, district: "" });
-    if (!parsed.success || !isCurrentAddress({ ...value, district: "" })) {
+    const parsed = addressInput.safeParse(value);
+    const isAddressCurrent = isCurrentAddress(value) || isCurrentAddress({ ...value, district: "" });
+    if (!parsed.success || !isAddressCurrent) {
       setError("Vui lòng kiểm tra tên, số điện thoại và chọn tỉnh/thành, phường/xã hiện tại.");
       return;
     }

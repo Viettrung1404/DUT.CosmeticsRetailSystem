@@ -9,6 +9,11 @@ export interface User {
   fullName?: string;
   phone?: string;
   avatarUrl?: string;
+  roleName?: string;
+  role?: string;
+  roleId?: number;
+  storeId?: string;
+  dataScope?: string;
 }
 
 export interface AuthState {
@@ -93,8 +98,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       const token = await SecureStore.getItemAsync('userToken');
       const refreshToken = await SecureStore.getItemAsync('userRefreshToken');
       if (token) {
-        const res = await apiClient.get('/users/me');
-        const user = res?.data?.data || res?.data || null;
+        let user = null;
+        try {
+          const authMeRes = await apiClient.get('/auth/me');
+          user = authMeRes?.data?.data || authMeRes?.data || null;
+        } catch {
+          const res = await apiClient.get('/users/me');
+          user = res?.data?.data || res?.data || null;
+        }
         set({ user, token, refreshToken, isLoading: false });
       } else {
         set({ user: null, token: null, refreshToken: null, isLoading: false });

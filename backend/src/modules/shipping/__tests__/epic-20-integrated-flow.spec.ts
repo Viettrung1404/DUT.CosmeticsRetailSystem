@@ -3,6 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { LogisticsDashboardService } from '../application/services/logistics-dashboard.service';
+import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
 
 describe('EPIC 20 INTEGRATED FLOW: Real-Time Ops & Logistics Dashboard', () => {
   jest.setTimeout(90000);
@@ -177,38 +181,19 @@ describe('EPIC 20 INTEGRATED FLOW: Real-Time Ops & Logistics Dashboard', () => {
   });
 
   afterAll(async () => {
-    const safeDelete = async (fn: () => Promise<any>) => {
-      try {
-        await fn();
-      } catch (e) {}
-    };
-
-    if (createdShipmentIds.length > 0) {
-      await safeDelete(() =>
-        prisma.shipment.deleteMany({ where: { id: { in: createdShipmentIds } } }),
-      );
+    try {
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        orderIds: createdOrderIds,
+        shipmentIds: createdShipmentIds,
+      });
+    } catch (err) {
+      console.warn('Epic 20 Teardown warning:', err);
+    } finally {
+      await prisma.$disconnect();
     }
-
-    if (createdFulfillmentOrderIds.length > 0) {
-      await safeDelete(() =>
-        prisma.fulfillmentOrder.deleteMany({ where: { id: { in: createdFulfillmentOrderIds } } }),
-      );
-    }
-
-    if (createdOrderIds.length > 0) {
-      await safeDelete(() =>
-        prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }),
-      );
-    }
-
-    await safeDelete(() =>
-      prisma.store.deleteMany({ where: { id: testStoreId } }),
-    );
-    await safeDelete(() =>
-      prisma.customer.deleteMany({ where: { id: testCustomerId } }),
-    );
-
-    await prisma.$disconnect();
   });
 
   describe('Kịch bản 1: Tỷ lệ giao hàng thành công lần đầu (First-attempt Delivery Rate)', () => {

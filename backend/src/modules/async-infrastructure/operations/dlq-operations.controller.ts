@@ -26,7 +26,7 @@ import {
 
 @ApiTags('Admin Operations & DLQ Management (EP12)')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/v1/admin/operations')
+@Controller('admin/operations')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DlqOperationsController {
   constructor(private readonly dlqOperationsService: DlqOperationsService) {}

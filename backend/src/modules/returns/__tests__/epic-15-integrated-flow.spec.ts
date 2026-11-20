@@ -14,6 +14,10 @@ import { OutboxWriterService } from '../../async-infrastructure/outbox/outbox-wr
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
 import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
+import {
   ReturnChannel,
   ReturnOrderStatus,
   ReturnReasonCode,
@@ -218,85 +222,26 @@ describe('EPIC 15 INTEGRATED FLOW: QC Inspection & Inventory Disposition', () =>
   });
 
   afterAll(async () => {
-    // Delete in reverse dependency order
-    if (createdInspectionIds.length > 0) {
-      await prisma.returnInspectionItem.deleteMany({
-        where: { inspectionId: { in: createdInspectionIds } },
+    try {
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId, testWarehouseId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [testVariantId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        userIds: [testInspectorUserId].filter(Boolean),
+        orderIds: [testOrderId].filter(Boolean),
+        returnOrderIds: createdReturnOrderIds,
+        shipmentIds: createdShipmentIds,
+        receiptIds: createdReceiptIds,
+        inspectionIds: createdInspectionIds,
       });
-      await prisma.returnInspection.deleteMany({
-        where: { id: { in: createdInspectionIds } },
-      });
+    } catch (err) {
+      console.warn('Epic 15 Teardown warning:', err);
+    } finally {
+      await prisma.$disconnect();
     }
-
-    await prisma.inventoryDisposition.deleteMany({
-      where: { locationId: { in: [testStoreId, testWarehouseId] } },
-    });
-
-    if (createdReceiptIds.length > 0) {
-      await prisma.returnReceipt.deleteMany({
-        where: { id: { in: createdReceiptIds } },
-      });
-    }
-
-    if (createdReturnOrderIds.length > 0) {
-      await prisma.outboxEvent.deleteMany({
-        where: { aggregateId: { in: createdReturnOrderIds } },
-      });
-      await prisma.returnStatusHistory.deleteMany({
-        where: { returnOrderId: { in: createdReturnOrderIds } },
-      });
-      await prisma.returnOrderItem.deleteMany({
-        where: { returnOrderId: { in: createdReturnOrderIds } },
-      });
-      await prisma.shipment.deleteMany({
-        where: { returnOrderId: { in: createdReturnOrderIds } },
-      });
-      await prisma.returnOrder.deleteMany({
-        where: { id: { in: createdReturnOrderIds } },
-      });
-    }
-
-    if (createdShipmentIds.length > 0) {
-      await prisma.shipment.deleteMany({
-        where: { id: { in: createdShipmentIds } },
-      });
-    }
-
-    await prisma.inventoryTransaction.deleteMany({
-      where: { storeId: { in: [testStoreId, testWarehouseId] } },
-    });
-    await prisma.inventory.deleteMany({
-      where: { storeId: { in: [testStoreId, testWarehouseId] } },
-    });
-
-    if (testOrderId) {
-      await prisma.orderItem.deleteMany({ where: { orderId: testOrderId } });
-      await prisma.order.deleteMany({ where: { id: testOrderId } });
-    }
-
-    if (testVariantId) {
-      await prisma.productVariant.deleteMany({ where: { id: testVariantId } });
-    }
-    if (testProductId) {
-      await prisma.product.deleteMany({ where: { id: testProductId } });
-    }
-    if (testCategoryId) {
-      await prisma.category.deleteMany({ where: { id: testCategoryId } });
-    }
-    if (testCustomerId) {
-      await prisma.customer.deleteMany({ where: { id: testCustomerId } });
-    }
-    if (testInspectorUserId) {
-      await prisma.user.deleteMany({ where: { id: testInspectorUserId } });
-    }
-    if (testStoreId) {
-      await prisma.store.deleteMany({ where: { id: testStoreId } });
-    }
-    if (testWarehouseId) {
-      await prisma.store.deleteMany({ where: { id: testWarehouseId } });
-    }
-
-    await prisma.$disconnect();
   });
 
   it('1. Standard QC Inspection & RESTOCK Flow (EP15-T01, EP15-T02, EP15-T03)', async () => {

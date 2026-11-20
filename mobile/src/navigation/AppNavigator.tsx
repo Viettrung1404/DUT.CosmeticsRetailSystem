@@ -24,6 +24,7 @@ import AddEditAddressScreen from '../screens/profile/AddEditAddressScreen';
 import StoreLocatorScreen from '../screens/store/StoreLocatorScreen';
 import HelpCenterScreen from '../screens/profile/HelpCenterScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
+import StaffNavigator from './StaffNavigator';
 
 import { COLORS } from '../constants/theme';
 
@@ -117,6 +118,9 @@ export default function AppNavigator() {
           options={{ presentation: 'modal' }}
         />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+
+        {/* 8. Phân hệ Nhân viên Vận hành Cửa hàng / Kho (Store Staff Operations) */}
+        <Stack.Screen name="StaffMode" component={StaffNavigator} />
       </Stack.Navigator>
     </NavigationContainer>
   );

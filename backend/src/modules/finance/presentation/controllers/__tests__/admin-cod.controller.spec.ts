@@ -66,4 +66,10 @@ describe('AdminCodController', () => {
     expect(service.getReconciliation).toHaveBeenCalledWith('rec-1');
     expect(res.reconciliationCode).toBe('REC-001');
   });
+
+  it('route prefix không bị double api/v1 (BE-01)', () => {
+    const path = Reflect.getMetadata('path', AdminCodController);
+    expect(path).toBe('admin/cod');
+    expect(path).not.toContain('api/v1');
+  });
 });

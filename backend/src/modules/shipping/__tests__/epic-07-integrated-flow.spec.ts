@@ -17,6 +17,7 @@ import { GHNClient } from '../infrastructure/adapters/ghn/ghn-client';
 import { GHNProvider } from '../infrastructure/adapters/ghn/ghn.provider';
 import { ShipmentOrchestratorService } from '../application/services/shipment-orchestrator.service';
 import { QuoteRequestDto } from '../domain/dtos/shipping-provider.dto';
+import { cleanupTestEntities } from '../../../core/test/test-cleanup.helper';
 
 jest.setTimeout(60000);
 
@@ -183,26 +184,11 @@ describe('EPIC 07: Ahamove Express 2H Integration - End-to-End Integrated Flow',
     global.fetch = originalFetch;
 
     try {
-      if (testShipmentId) {
-        await prisma.outboxEvent.deleteMany({
-          where: { aggregateId: testShipmentId },
-        });
-        await prisma.shipmentPackage.deleteMany({ where: { shipmentId: testShipmentId } });
-        await prisma.shipment.delete({ where: { id: testShipmentId } });
-      }
-      if (testPackageId) {
-        await prisma.packageItem.deleteMany({ where: { packageId: testPackageId } });
-        await prisma.package.delete({ where: { id: testPackageId } });
-      }
-      if (testFulfillmentOrderId) {
-        await prisma.fulfillmentOrder.delete({ where: { id: testFulfillmentOrderId } });
-      }
-      if (testOrderId) {
-        await prisma.order.delete({ where: { id: testOrderId } });
-      }
-      if (testStoreId) {
-        await prisma.store.delete({ where: { id: testStoreId } });
-      }
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId].filter(Boolean),
+        orderIds: [testOrderId].filter(Boolean),
+        shipmentIds: [testShipmentId].filter(Boolean),
+      });
     } catch {
       // Ignore cleanup error in test
     }

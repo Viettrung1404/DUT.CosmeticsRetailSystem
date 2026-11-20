@@ -28,7 +28,7 @@ import {
 
 @ApiTags('Admin COD & Reconciliation (Kế Toán - Đối Soát)')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/v1/admin/cod')
+@Controller('admin/cod')
 export class AdminCodController {
   constructor(
     private readonly reconciliationService: CodReconciliationService,

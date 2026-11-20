@@ -31,6 +31,7 @@ import { GetAdminOrderDetailUseCase } from './application/use-cases/get-admin-or
 import { ConfirmAdminOrderUseCase } from './application/use-cases/confirm-admin-order.use-case';
 import { UpdateAdminOrderStatusUseCase } from './application/use-cases/update-admin-order-status.use-case';
 import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-order.use-case';
+import { OmsModule } from '@modules/oms/oms.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { CancelAdminOrderUseCase } from './application/use-cases/cancel-admin-or
     CustomerExperienceModule,
     CustomerCommerceModule,
     PaymentsModule,
+    OmsModule,
   ],
   controllers: [
     CustomerOrderController,

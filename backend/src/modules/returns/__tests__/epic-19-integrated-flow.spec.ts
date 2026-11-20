@@ -13,6 +13,10 @@ import {
   ReturnReasonCode,
 } from '../domain/entities/return-policy.entity';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
+import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
 
 describe('EPIC 19 INTEGRATED FLOW: Long-Running RMA Cloudflare Workflows & Automation (TC-RMA-18 & 19)', () => {
   jest.setTimeout(90000);
@@ -133,80 +137,25 @@ describe('EPIC 19 INTEGRATED FLOW: Long-Running RMA Cloudflare Workflows & Autom
   });
 
   afterAll(async () => {
-    const safeDelete = async (fn: () => Promise<any>) => {
-      try {
-        await fn();
-      } catch (e) {}
-    };
-
-    if (createdRefundIds.length > 0) {
-      await safeDelete(() =>
-        prisma.refundItem.deleteMany({ where: { refundId: { in: createdRefundIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.refund.deleteMany({ where: { id: { in: createdRefundIds } } }),
-      );
+    try {
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [testVariantId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        userIds: [testOperatorId].filter(Boolean),
+        orderIds: createdOrderIds,
+        returnOrderIds: createdReturnOrderIds,
+        shipmentIds: createdShipmentIds,
+        refundIds: createdRefundIds,
+      });
+    } catch (err) {
+      console.warn('Epic 19 Teardown warning:', err);
+    } finally {
+      await prisma.$disconnect();
     }
-
-    if (createdClaimIds.length > 0) {
-      await safeDelete(() =>
-        prisma.carrierClaim.deleteMany({ where: { id: { in: createdClaimIds } } }),
-      );
-    }
-
-    if (createdShipmentIds.length > 0) {
-      await safeDelete(() =>
-        prisma.shipment.deleteMany({ where: { id: { in: createdShipmentIds } } }),
-      );
-    }
-
-    if (createdReturnOrderIds.length > 0) {
-      await safeDelete(() =>
-        prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: createdReturnOrderIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.returnStatusHistory.deleteMany({ where: { returnOrderId: { in: createdReturnOrderIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.returnOrderItem.deleteMany({ where: { returnOrderId: { in: createdReturnOrderIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.returnReceipt.deleteMany({ where: { returnOrderId: { in: createdReturnOrderIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.returnOrder.deleteMany({ where: { id: { in: createdReturnOrderIds } } }),
-      );
-    }
-
-    if (createdOrderIds.length > 0) {
-      await safeDelete(() =>
-        prisma.payment.deleteMany({ where: { orderId: { in: createdOrderIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.orderItem.deleteMany({ where: { orderId: { in: createdOrderIds } } }),
-      );
-      await safeDelete(() =>
-        prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }),
-      );
-    }
-
-    await safeDelete(() =>
-      prisma.productVariant.deleteMany({ where: { productId: testProductId } }),
-    );
-    await safeDelete(() =>
-      prisma.product.deleteMany({ where: { id: testProductId } }),
-    );
-    await safeDelete(() =>
-      prisma.store.deleteMany({ where: { id: testStoreId } }),
-    );
-    await safeDelete(() =>
-      prisma.customer.deleteMany({ where: { id: testCustomerId } }),
-    );
-    await safeDelete(() =>
-      prisma.user.deleteMany({ where: { id: testOperatorId } }),
-    );
-
-    await prisma.$disconnect();
   });
 
   const createDeliveredOrder = async (seq: number): Promise<any> => {

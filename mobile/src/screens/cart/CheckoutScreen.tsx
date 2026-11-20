@@ -7,13 +7,20 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Image} from 'react-native';
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useCartStore } from '../../store/useCartStore';
 
-import { orderApi, paymentApi, parseSepayQrCodeData } from '../../api/orderApi';
+import {
+  orderApi,
+  paymentApi,
+  parseSepayQrCodeData,
+  ShippingQuoteOption,
+} from '../../api/orderApi';
 
 export default function CheckoutScreen({ navigation }: any) {
   const { items, getTotalPrice, clearCart } = useCartStore();
@@ -22,12 +29,18 @@ export default function CheckoutScreen({ navigation }: any) {
   // Form địa chỉ giao hàng
   const [fullName, setFullName] = useState('Thảo Linh Nguyễn');
   const [phoneNumber, setPhoneNumber] = useState('0912 345 678');
-  const [address, setAddress] = useState('Tòa nhà Landmark 81, 720A Điện Biên Phủ, Phường 22, Quận Bình Thạnh');
+  const [address, setAddress] = useState('Tòa nhà Landmark 81, 720A Điện Biên Phủ, Phường 22');
+  const [district, setDistrict] = useState('Quận Bình Thạnh');
   const [city, setCity] = useState('TP. Hồ Chí Minh');
   const [deliveryPreference, setDeliveryPreference] = useState<'OFFICE' | 'CALL_15'>('OFFICE');
 
-  // Phương thức vận chuyển
-  const [shippingOption, setShippingOption] = useState<'EXPRESS' | 'STANDARD'>('EXPRESS');
+  // Phương thức vận chuyển & Báo giá thời gian thực từ Backend
+  const [shippingQuotes, setShippingQuotes] = useState<ShippingQuoteOption[]>([]);
+  const [quoteGroupId, setQuoteGroupId] = useState<string | null>(null);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [quotesLoading, setQuotesLoading] = useState<boolean>(false);
+  const [quotesError, setQuotesError] = useState<string | null>(null);
+  const [isQuoteExpired, setIsQuoteExpired] = useState<boolean>(false);
 
   // Phương thức thanh toán (Backend hỗ trợ COD và SEPAY)
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'SEPAY'>('COD');
@@ -70,16 +83,76 @@ export default function CheckoutScreen({ navigation }: any) {
     fetchPreview();
   }, [fetchPreview]);
 
-  // Tính toán chi phí
+  // Lấy báo giá thời gian thực từ Backend khi địa chỉ hoặc giỏ hàng thay đổi
+  const fetchShippingQuotes = useCallback(async () => {
+    if (selectedItems.length === 0 || !city.trim()) return;
+    try {
+      setQuotesLoading(true);
+      setQuotesError(null);
+      setIsQuoteExpired(false);
+      const res = await orderApi.getShippingQuotes({
+        items: selectedItems.map((it) => ({
+          variantId: it.variantId || it.id,
+          quantity: it.quantity,
+        })),
+        shippingAddress: {
+          provinceCity: city.trim(),
+          district: district.trim() || city.trim(),
+          addressLine: address.trim(),
+        },
+      });
+
+      if (res?.quoteGroupId) {
+        setQuoteGroupId(res.quoteGroupId);
+      }
+      if (Array.isArray(res?.options)) {
+        setShippingQuotes(res.options);
+        const availableOptions = res.options.filter((opt) => opt.isAvailable);
+        setSelectedOptionId((prev) => {
+          if (
+            prev &&
+            res.options.some(
+              (o) => (o.id === prev || o.serviceCode === prev) && o.isAvailable
+            )
+          ) {
+            return prev;
+          }
+          return (
+            availableOptions[0]?.id ||
+            availableOptions[0]?.serviceCode ||
+            null
+          );
+        });
+      }
+    } catch (err: any) {
+      console.warn('Get shipping quotes failed', err);
+      setQuotesError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Không thể tải báo giá vận chuyển thời gian thực'
+      );
+    } finally {
+      setQuotesLoading(false);
+    }
+  }, [selectedItems, city, district, address]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchShippingQuotes();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [fetchShippingQuotes]);
+
+  // Tính toán chi phí thực tế từ Quote của Backend
   const subtotal = getTotalPrice();
-  const tierShippingFee = (() => {
-    if (serverShippingFee !== null) return serverShippingFee;
-    if (subtotal >= 459000) return 0;
-    if (subtotal >= 359000) return 5000;
-    if (subtotal >= 129000) return 15000;
-    return 30000;
-  })();
-  const shippingFee = shippingOption === 'EXPRESS' ? tierShippingFee + 15000 : tierShippingFee;
+  const selectedQuoteOption = shippingQuotes.find(
+    (opt) => opt.id === selectedOptionId || opt.serviceCode === selectedOptionId
+  );
+  const shippingFee = selectedQuoteOption?.isAvailable
+    ? selectedQuoteOption.estimatedFee
+    : serverShippingFee !== null
+    ? serverShippingFee
+    : 0;
   const grandTotal = Math.max(subtotal - serverDiscount + shippingFee, 0);
 
   const handleApplyVoucher = () => {
@@ -91,7 +164,7 @@ export default function CheckoutScreen({ navigation }: any) {
   };
 
   const handlePlaceOrder = async () => {
-    if (!fullName.trim() || !phoneNumber.trim() || !address.trim()) {
+    if (!fullName.trim() || !phoneNumber.trim() || !address.trim() || !city.trim()) {
       Alert.alert('Thiếu thông tin', 'Vui lòng điền đầy đủ địa chỉ nhận hàng.');
       return;
     }
@@ -101,11 +174,14 @@ export default function CheckoutScreen({ navigation }: any) {
       return;
     }
 
+    if (shippingQuotes.length > 0 && (!selectedQuoteOption || !selectedQuoteOption.isAvailable)) {
+      Alert.alert('Chưa chọn phương thức vận chuyển', 'Vui lòng chọn một phương thức vận chuyển khả dụng.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Đơn hàng lấy các mặt hàng đã chọn từ giỏ hàng phía máy chủ.
-      // Lấy báo giá hợp lệ (quoteVersion) nếu chưa có sẵn
       let activeQuoteVersion = quoteVersion;
       if (!activeQuoteVersion) {
         try {
@@ -129,9 +205,12 @@ export default function CheckoutScreen({ navigation }: any) {
           phone: phoneNumber.trim(),
           addressLine: address.trim(),
           city: city.trim(),
+          district: district.trim() || undefined,
         },
         paymentMethod: paymentMethod === 'COD' ? 'COD' : 'SEPAY',
         quoteVersion: activeQuoteVersion || undefined,
+        quoteGroupId: quoteGroupId || undefined,
+        shippingOptionId: selectedOptionId || undefined,
         note: deliveryPreference === 'OFFICE' ? 'Giao giờ hành chính' : 'Gọi trước 15p',
       });
 
@@ -141,9 +220,6 @@ export default function CheckoutScreen({ navigation }: any) {
         createdOrder?.orderCode ||
         createdOrder?.id || null;
 
-      // SePay: sau khi tạo đơn, gọi API thanh toán để lấy thông tin chuyển
-      // khoản thật từ server (tài khoản, mã GU..., ảnh VietQR). Đơn đã tạo
-      // thì vẫn đi tiếp dù bước này lỗi — user xem lại trong chi tiết đơn.
       let sepayTransfer = null;
       if (paymentMethod === 'SEPAY' && createdOrder?.id) {
         try {
@@ -170,6 +246,22 @@ export default function CheckoutScreen({ navigation }: any) {
         sepayTransfer,
       });
     } catch (error: any) {
+      const errorCode = error?.response?.data?.code || error?.code;
+      if (errorCode === 'SHIPPING_QUOTE_EXPIRED') {
+        setIsQuoteExpired(true);
+        Alert.alert(
+          'Báo giá vận chuyển hết hạn',
+          'Báo giá vận chuyển đã hết hiệu lực 15 phút. Vui lòng bấm "Làm mới báo giá" để cập nhật.',
+          [
+            {
+              text: 'Làm mới báo giá',
+              onPress: () => fetchShippingQuotes(),
+            },
+          ]
+        );
+        return;
+      }
+
       const errorMsg =
         error?.response?.data?.message ||
         error?.message ||
@@ -245,10 +337,11 @@ export default function CheckoutScreen({ navigation }: any) {
                 navigation.navigate('AddressList', {
                   isSelectMode: true,
                   onSelectAddress: (addr: any) => {
-                    setFullName(addr.recipientName);
-                    setPhoneNumber(addr.phone);
-                    setAddress(addr.addressLine);
-                    setCity(addr.city + (addr.district ? `, ${addr.district}` : ''));
+                    setFullName(addr.recipientName || '');
+                    setPhoneNumber(addr.phone || '');
+                    setAddress(addr.addressLine || '');
+                    setCity(addr.city || '');
+                    if (addr.district) setDistrict(addr.district);
                   },
                 })
               }
@@ -289,12 +382,22 @@ export default function CheckoutScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Tỉnh / Thành phố, Quận / Huyện</Text>
+            <Text style={styles.inputLabel}>Quận / Huyện</Text>
+            <TextInput
+              style={styles.textInput}
+              value={district}
+              onChangeText={setDistrict}
+              placeholder="Quận Bình Thạnh, Quận 1..."
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Tỉnh / Thành phố</Text>
             <TextInput
               style={styles.textInput}
               value={city}
               onChangeText={setCity}
-              placeholder="Tỉnh/Thành phố..."
+              placeholder="TP. Hồ Chí Minh, Hà Nội..."
             />
           </View>
 
@@ -331,7 +434,7 @@ export default function CheckoutScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* 4. Phương Thức Vận Chuyển Mỹ Phẩm (Shipping Options) */}
+        {/* 4. Phương Thức Vận Chuyển Mỹ Phẩm (Real-time Shipping Quotes) */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.rowAlign}>
@@ -340,48 +443,140 @@ export default function CheckoutScreen({ navigation }: any) {
               </View>
               <Text style={styles.cardTitle}>Vận chuyển chuyên biệt</Text>
             </View>
+            {quoteGroupId && (
+              <TouchableOpacity onPress={fetchShippingQuotes} disabled={quotesLoading}>
+                <Ionicons name="refresh" size={16} color={theme.colors.primary} />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Option 1: Hỏa tốc 2H Silk-Drop */}
-          <TouchableOpacity
-            style={[styles.shippingOptionBox, shippingOption === 'EXPRESS' && styles.shippingOptionSelected]}
-            onPress={() => setShippingOption('EXPRESS')}
-          >
-            <View style={styles.radioIndicator}>
-              {shippingOption === 'EXPRESS' && <View style={styles.radioInner} />}
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <View style={styles.rowAlign}>
-                <Text style={styles.shippingTitle}>Hỏa tốc 2H Silk-Drop</Text>
-                <View style={styles.coolBadge}>
-                  <Ionicons name="snow-outline" size={11} color={theme.colors.tertiary} />
-                  <Text style={styles.coolBadgeText}>Bảo quản mát 24°C</Text>
-                </View>
+          {isQuoteExpired && (
+            <View style={styles.quoteExpiredBox}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.quoteExpiredTitle}>Báo giá vận chuyển đã hết hạn</Text>
+                <Text style={styles.quoteExpiredDesc}>
+                  Vui lòng làm mới để cập nhật biểu phí và thời gian giao hàng chính xác nhất.
+                </Text>
               </View>
-              <Text style={styles.shippingDesc}>
-                Khuyên dùng cho Mỹ phẩm & Serum hoạt tính (Giao trước 17:30 hôm nay)
+              <TouchableOpacity style={styles.refreshQuoteBtn} onPress={fetchShippingQuotes}>
+                <Text style={styles.refreshQuoteText}>Làm mới</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {quotesLoading ? (
+            <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={[styles.shippingDesc, { marginTop: 8 }]}>
+                Đang lấy báo giá vận chuyển thời gian thực...
               </Text>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.freePriceText}>0 đ</Text>
-              <Text style={styles.oldPriceText}>35.000 đ</Text>
+          ) : quotesError && shippingQuotes.length === 0 ? (
+            <View style={{ paddingVertical: 12 }}>
+              <Text style={[styles.shippingDesc, { color: theme.colors.error }]}>{quotesError}</Text>
+              <TouchableOpacity onPress={fetchShippingQuotes} style={{ marginTop: 6 }}>
+                <Text style={styles.linkText}>Thử lại</Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+          ) : shippingQuotes.length > 0 ? (
+            <View style={{ gap: 10 }}>
+              {shippingQuotes.map((opt, idx) => {
+                const optKey = opt.id || opt.serviceCode || String(idx);
+                const isSelected = selectedOptionId === optKey || selectedOptionId === opt.serviceCode;
+                const isAhamove = opt.carrierCode === 'AHAMOVE' || opt.serviceCode === 'EXPRESS_2H';
 
-          {/* Option 2: Tiêu chuẩn */}
-          <TouchableOpacity
-            style={[styles.shippingOptionBox, shippingOption === 'STANDARD' && styles.shippingOptionSelected]}
-            onPress={() => setShippingOption('STANDARD')}
-          >
-            <View style={styles.radioIndicator}>
-              {shippingOption === 'STANDARD' && <View style={styles.radioInner} />}
+                return (
+                  <TouchableOpacity
+                    key={optKey}
+                    style={[
+                      styles.shippingOptionBox,
+                      isSelected && styles.shippingOptionSelected,
+                      !opt.isAvailable && styles.shippingOptionDisabled,
+                    ]}
+                    onPress={() => {
+                      if (opt.isAvailable) {
+                        setSelectedOptionId(opt.id || opt.serviceCode);
+                      } else {
+                        Alert.alert(
+                          'Không khả dụng',
+                          opt.unavailableReason ||
+                            'Phương thức giao hàng không khả dụng cho địa chỉ hoặc thời điểm này.'
+                        );
+                      }
+                    }}
+                  >
+                    <View style={styles.radioIndicator}>
+                      {isSelected && opt.isAvailable && <View style={styles.radioInner} />}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <View style={styles.rowAlign}>
+                        <View
+                          style={[
+                            styles.carrierBadge,
+                            isAhamove && styles.carrierBadgeAhamove,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.carrierBadgeText,
+                              isAhamove && { color: '#E65100' },
+                            ]}
+                          >
+                            {isAhamove ? 'AHAMOVE' : 'GHN'}
+                          </Text>
+                        </View>
+                        <Text style={styles.shippingTitle}>
+                          {opt.serviceName ||
+                            (isAhamove
+                              ? 'Hỏa tốc 2H (Ahamove Silk-Drop)'
+                              : 'Giao Tiêu Chuẩn (GHN)')}
+                        </Text>
+                        {isAhamove && opt.distanceKm != null && (
+                          <View style={styles.coolBadge}>
+                            <Ionicons name="navigate-outline" size={10} color={theme.colors.tertiary} />
+                            <Text style={styles.coolBadgeText}>{opt.distanceKm.toFixed(1)} km</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {opt.estimatedDeliveryTime && (
+                        <Text style={styles.shippingDesc}>
+                          Nhận hàng dự kiến: {new Date(opt.estimatedDeliveryTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}{' '}
+                          {new Date(opt.estimatedDeliveryTime).toLocaleDateString('vi-VN')}
+                        </Text>
+                      )}
+
+                      {!opt.isAvailable && opt.unavailableReason && (
+                        <View style={styles.unavailableBadge}>
+                          <Text style={styles.unavailableText}>
+                            ⚠️ {opt.unavailableReason}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                      <Text
+                        style={[
+                          styles.freePriceText,
+                          !opt.isAvailable && { color: theme.colors.textMuted },
+                        ]}
+                      >
+                        {opt.estimatedFee === 0
+                          ? 'Miễn phí'
+                          : `${opt.estimatedFee.toLocaleString('vi-VN')} đ`}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.shippingTitle}>Giao Tiêu Chuẩn Toàn Quốc</Text>
-              <Text style={styles.shippingDesc}>Nhận hàng trong vòng 2-3 ngày làm việc</Text>
+          ) : (
+            <View style={{ paddingVertical: 10 }}>
+              <Text style={styles.shippingDesc}>
+                Vui lòng điền địa chỉ để nhận báo giá vận chuyển thời gian thực từ Backend.
+              </Text>
             </View>
-            <Text style={styles.shippingDesc}>Miễn phí 0đ</Text>
-          </TouchableOpacity>
+          )}
         </View>
 
         {/* 5. Tóm Tắt Kiện Hàng */}
@@ -791,6 +986,70 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: theme.colors.textMuted,
     textDecorationLine: 'line-through',
+  },
+  shippingOptionDisabled: {
+    opacity: 0.55,
+    backgroundColor: '#F8F9FA',
+  },
+  carrierBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  carrierBadgeAhamove: {
+    backgroundColor: '#FFF3E0',
+  },
+  carrierBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#1565C0',
+  },
+  unavailableBadge: {
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  unavailableText: {
+    fontSize: 10,
+    color: '#C62828',
+    fontWeight: '600',
+  },
+  quoteExpiredBox: {
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  quoteExpiredTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E65100',
+  },
+  quoteExpiredDesc: {
+    fontSize: 11,
+    color: '#795548',
+    marginTop: 2,
+  },
+  refreshQuoteBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  refreshQuoteText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   /* Item Row */

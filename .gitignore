@@ -1,5 +1,7 @@
 /docs/4-stitch_design
 /.tmp/
+node_modules/
+.vitest-cache/
 
 # Environment / secrets — never commit real credentials.
 # .env.example files stay tracked as templates.

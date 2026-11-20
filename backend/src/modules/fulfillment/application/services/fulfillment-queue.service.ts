@@ -53,14 +53,14 @@ export class FulfillmentQueueService {
   }
 
   /**
-   * Lấy danh sách nhiệm vụ nhặt hàng (Picking Queue: status = ALLOCATED)
-   * DES-07 EP11-T02 AC1: Chỉ nạp đơn ALLOCATED thuộc kho nhân viên phụ trách.
+   * Lấy danh sách nhiệm vụ nhặt hàng (Picking Queue: status = ALLOCATED hoặc PICKING)
+   * DES-07 EP11-T02 AC1: Chỉ nạp đơn ALLOCATED/PICKING thuộc kho nhân viên phụ trách.
    */
   async getPickingTasks(
     user: any,
     query: TaskQueueQueryDto = {},
   ): Promise<TaskQueueResponseDto> {
-    return this.getTaskQueueByStatus('ALLOCATED', user, query, {
+    return this.getTaskQueueByStatus(['ALLOCATED', 'PICKING'], user, query, {
       allocatedAt: 'asc',
     });
   }
@@ -93,7 +93,7 @@ export class FulfillmentQueueService {
    * Truy vấn hàng đợi theo trạng thái và phạm vi phân quyền chi nhánh.
    */
   private async getTaskQueueByStatus(
-    status: string,
+    status: string | string[],
     user: any,
     query: TaskQueueQueryDto,
     orderBy: Record<string, 'asc' | 'desc'>,
@@ -111,7 +111,7 @@ export class FulfillmentQueueService {
       };
     }
 
-    const where: any = { status };
+    const where: any = Array.isArray(status) ? { status: { in: status } } : { status };
 
     if (query.storeId) {
       if (accessibleStoreIds !== null && !accessibleStoreIds.includes(query.storeId)) {
@@ -140,6 +140,11 @@ export class FulfillmentQueueService {
         include: {
           sourceLocation: {
             select: { id: true, name: true, code: true },
+          },
+          shipments: {
+            select: { trackingCode: true, carrierCode: true },
+            take: 1,
+            orderBy: { createdAt: 'desc' },
           },
           order: {
             select: {
@@ -181,6 +186,8 @@ export class FulfillmentQueueService {
         allocatedAt: fo.allocatedAt,
         pickedAt: fo.pickedAt,
         packedAt: fo.packedAt,
+        trackingCode: fo.shipments?.[0]?.trackingCode || null,
+        carrierCode: fo.shipments?.[0]?.carrierCode || null,
         availableActions: this.actionMatrix.getAvailableActions(fo, user),
       };
     });

@@ -151,4 +151,22 @@ describe('EP13-T03: CustomerReturnController Unit Tests', () => {
       NotFoundException,
     );
   });
+
+  it('9. should mount under both customers/me and root prefix without collision (BE-02)', () => {
+    const path = Reflect.getMetadata('path', CustomerReturnController);
+    expect(path).toEqual(['customers/me', '']);
+  });
+
+  it('10. should filter returns by status and provide backward-compatible items structure', async () => {
+    const req = { user: { customerId: mockCustomerId } };
+    const result = await controller.listReturns(req, '1', '10', 'SUBMITTED');
+
+    expect(prisma.returnOrder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { customerId: mockCustomerId, status: 'SUBMITTED' },
+      }),
+    );
+    expect(result.items).toBeDefined();
+    expect(result.total).toBe(1);
+  });
 });

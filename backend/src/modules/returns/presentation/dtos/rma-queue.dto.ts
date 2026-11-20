@@ -76,22 +76,32 @@ export class RmaQueueQueryDto {
 }
 
 export class TransitionRmaDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
       'Phiên bản mong đợi của hồ sơ để kiểm soát đồng thời lạc quan OCC',
     example: 1,
   })
+  @IsOptional()
   @IsInt()
   @Min(1)
-  expectedVersion: number;
+  expectedVersion?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Trạng thái đích muốn chuyển sang',
     enum: ReturnOrderStatus,
     example: ReturnOrderStatus.APPROVED,
   })
+  @IsOptional()
   @IsEnum(ReturnOrderStatus)
-  targetStatus: ReturnOrderStatus;
+  targetStatus?: ReturnOrderStatus;
+
+  @ApiPropertyOptional({
+    description: 'Hành động chuyển trạng thái (APPROVE | REJECT)',
+    example: 'APPROVE',
+  })
+  @IsOptional()
+  @IsString()
+  action?: string;
 
   @ApiPropertyOptional({
     description: 'Ghi chú nghiệp vụ của điều phối viên / nhân viên xử lý',

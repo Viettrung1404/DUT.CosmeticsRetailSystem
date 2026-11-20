@@ -20,7 +20,7 @@ import { SubmitReturnRequestDto } from '../dtos/submit-return-request.dto';
 
 @ApiTags('Customer - Returns & RMA')
 @ApiBearerAuth('JWT-auth')
-@Controller('customers/me')
+@Controller(['customers/me', ''])
 @UseGuards(JwtAuthGuard)
 export class CustomerReturnController {
   constructor(
@@ -31,7 +31,7 @@ export class CustomerReturnController {
 
   private async resolveCustomerId(req: any): Promise<string> {
     const directCustomerId =
-      req.user?.customerId || req.headers?.['x-customer-id'];
+      req.customerId || req.user?.customerId || req.headers?.['x-customer-id'];
     if (directCustomerId) {
       return directCustomerId;
     }
@@ -82,17 +82,23 @@ export class CustomerReturnController {
     @Req() req: any,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
+    @Query('status') status?: string,
   ) {
     const customerId = await this.resolveCustomerId(req);
     const take = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
     const skip = Math.max(0, (parseInt(page, 10) || 1) - 1) * take;
 
+    const where: any = { customerId };
+    if (status) {
+      where.status = status;
+    }
+
     const [total, returns] = await Promise.all([
       this.prisma.returnOrder.count({
-        where: { customerId },
+        where,
       }),
       this.prisma.returnOrder.findMany({
-        where: { customerId },
+        where,
         include: {
           items: {
             include: {
@@ -127,12 +133,16 @@ export class CustomerReturnController {
 
     return {
       data: returns,
+      items: returns,
       meta: {
         total,
         page: parseInt(page, 10) || 1,
         limit: take,
         totalPages: Math.ceil(total / take),
       },
+      total,
+      page: parseInt(page, 10) || 1,
+      limit: take,
     };
   }
 

@@ -70,6 +70,12 @@ export class TaskQueueItemDto {
   @ApiPropertyOptional()
   packedAt?: Date | null;
 
+  @ApiPropertyOptional()
+  trackingCode?: string | null;
+
+  @ApiPropertyOptional()
+  carrierCode?: string | null;
+
   @ApiProperty({ type: [String] })
   availableActions: string[];
 }

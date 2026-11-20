@@ -20,6 +20,10 @@ import { OutboxWriterService } from '../../async-infrastructure/outbox/outbox-wr
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
 import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
+import {
   ReturnChannel,
   ReturnOrderStatus,
   ReturnReasonCode,
@@ -388,158 +392,29 @@ describe('EPIC 17 INTEGRATED FLOW: Exchange Order Settlement & Replacement Fulfi
   });
 
   afterAll(async () => {
-    const safeDelete = async (fn: () => Promise<any>) => {
-      try {
-        await fn();
-      } catch (e) {
-        // ignore cascading errors
-      }
-    };
-
     try {
-      if (createdSettlementIds.length > 0) {
-        await safeDelete(() =>
-          prisma.exchangeFunding.deleteMany({
-            where: { settlementId: { in: createdSettlementIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.exchangeSettlement.deleteMany({
-            where: { id: { in: createdSettlementIds } },
-          }),
-        );
-      }
-
-      if (createdReplacementOrderIds.length > 0) {
-        await safeDelete(() =>
-          prisma.payment.deleteMany({
-            where: { orderId: { in: createdReplacementOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.orderItem.deleteMany({
-            where: { orderId: { in: createdReplacementOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.order.deleteMany({
-            where: { id: { in: createdReplacementOrderIds } },
-          }),
-        );
-      }
-
-      if (createdRefundIds.length > 0) {
-        await safeDelete(() =>
-          prisma.refundItem.deleteMany({
-            where: { refundId: { in: createdRefundIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.refund.deleteMany({
-            where: { id: { in: createdRefundIds } },
-          }),
-        );
-      }
-
-      if (createdInspectionIds.length > 0) {
-        await safeDelete(() =>
-          prisma.returnInspectionItem.deleteMany({
-            where: { inspectionId: { in: createdInspectionIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnInspection.deleteMany({
-            where: { id: { in: createdInspectionIds } },
-          }),
-        );
-      }
-
-      if (createdReceiptIds.length > 0) {
-        await safeDelete(() =>
-          prisma.returnReceipt.deleteMany({
-            where: { id: { in: createdReceiptIds } },
-          }),
-        );
-      }
-
-      if (createdReturnOrderIds.length > 0) {
-        await safeDelete(() =>
-          prisma.exchangeItem.deleteMany({
-            where: { returnOrderId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.outboxEvent.deleteMany({
-            where: { aggregateId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnStatusHistory.deleteMany({
-            where: { returnOrderId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnOrderItem.deleteMany({
-            where: { returnOrderId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnOrder.deleteMany({
-            where: { id: { in: createdReturnOrderIds } },
-          }),
-        );
-      }
-
-      if (createdOrderIds.length > 0) {
-        await safeDelete(() =>
-          prisma.payment.deleteMany({
-            where: { orderId: { in: createdOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.shipment.deleteMany({
-            where: { orderId: { in: createdOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.orderItem.deleteMany({
-            where: { orderId: { in: createdOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.order.deleteMany({
-            where: { id: { in: createdOrderIds } },
-          }),
-        );
-      }
-
-      await safeDelete(() =>
-        prisma.inventory.deleteMany({
-          where: { storeId: testStoreId },
-        }),
-      );
-      await safeDelete(() =>
-        prisma.productVariant.deleteMany({
-          where: { productId: testProductId },
-        }),
-      );
-      await safeDelete(() =>
-        prisma.product.deleteMany({ where: { id: testProductId } }),
-      );
-      await safeDelete(() =>
-        prisma.category.deleteMany({ where: { id: testCategoryId } }),
-      );
-      await safeDelete(() =>
-        prisma.store.deleteMany({ where: { id: testStoreId } }),
-      );
-      await safeDelete(() =>
-        prisma.customer.deleteMany({ where: { id: testCustomerId } }),
-      );
-      await safeDelete(() =>
-        prisma.user.deleteMany({ where: { id: testOperatorUserId } }),
-      );
-    } catch (e) {
-      // final teardown error ignore
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [
+          testVariantEqualId,
+          testVariantHigherId,
+          testVariantLowerId,
+          testVariantOosId,
+        ].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        userIds: [testOperatorUserId].filter(Boolean),
+        orderIds: [...createdOrderIds, ...createdReplacementOrderIds].filter(Boolean),
+        returnOrderIds: createdReturnOrderIds,
+        shipmentIds: createdShipmentIds,
+        refundIds: createdRefundIds,
+        receiptIds: createdReceiptIds,
+        inspectionIds: createdInspectionIds,
+      });
+    } catch (err) {
+      console.warn('Epic 17 Teardown warning:', err);
     } finally {
       await prisma.$disconnect();
     }

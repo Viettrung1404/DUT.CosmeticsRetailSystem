@@ -7,11 +7,53 @@ export interface ShippingAddressInput {
   city: string;
   ward?: string;
   district?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface OrderItemInput {
   variantId: string;
   quantity: number;
+}
+
+export interface ShippingQuoteItemInput {
+  variantId: string;
+  quantity: number;
+}
+
+export interface ShippingQuoteAddressInput {
+  provinceCity: string;
+  district: string;
+  ward?: string;
+  addressLine?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface CalculateShippingQuoteInput {
+  items: ShippingQuoteItemInput[];
+  shippingAddress: ShippingQuoteAddressInput;
+  orderType?: string;
+}
+
+export interface ShippingQuoteOption {
+  id?: string;
+  carrierCode: 'AHAMOVE' | 'GHN' | string;
+  serviceCode: 'EXPRESS_2H' | 'STANDARD' | string;
+  serviceName: string;
+  sourceLocationId?: string;
+  sourceLocationName?: string;
+  estimatedFee: number;
+  estimatedDeliveryTime?: string | Date;
+  distanceKm?: number;
+  isAvailable: boolean;
+  unavailableReason?: string;
+}
+
+export interface ShippingQuoteResponse {
+  quoteGroupId: string;
+  expiresAt: string | Date;
+  options: ShippingQuoteOption[];
 }
 
 export interface CreateOrderPayload {
@@ -23,23 +65,91 @@ export interface CreateOrderPayload {
   usePoints?: number;
   quoteVersion?: string;
   storeId?: string;
+  quoteGroupId?: string;
+  shippingOptionId?: string;
 }
 
-export type ReturnReasonType =
-  | 'WRONG_ITEM'
+export type ReturnReasonCode =
+  | 'CHANGE_OF_MIND'
+  | 'DAMAGED_IN_TRANSIT'
   | 'DEFECTIVE'
-  | 'EXPIRED'
   | 'ALLERGIC'
+  | 'WRONG_ITEM'
+  | 'EXPIRED';
+
+// Hỗ trợ cả type cũ cho tương thích ngược
+export type ReturnReasonType =
+  | ReturnReasonCode
   | 'CUSTOMER_CHANGE_MIND';
+
+export type ReturnChannel = 'STORE_DROPOFF' | 'CARRIER_PICKUP';
+
+export interface AllowedReturnRule {
+  reasonCode: ReturnReasonCode | string;
+  requiresUnopenedSeal: boolean;
+  requiresEvidenceVideo: boolean;
+  maxReturnWindowDays: number;
+  customerPaysReturnShipping: boolean;
+}
+
+export interface EligibleReturnItem {
+  orderItemId: string;
+  variantId: string;
+  productName: string;
+  variantName?: string;
+  sku?: string;
+  imageUrl?: string;
+  unitPrice: number;
+  paidQuantity: number;
+  alreadyReturnedQuantity: number;
+  availableReturnQuantity: number;
+  allowedReasons: (ReturnReasonCode | string)[];
+}
+
+export interface OrderReturnEligibility {
+  orderId: string;
+  orderNumber?: string;
+  deliveredAt?: string;
+  policyVersionId?: string;
+  isEligibleForReturn: boolean;
+  ineligibilityReason?: string;
+  items: EligibleReturnItem[];
+  allowedRules?: AllowedReturnRule[];
+}
+
+export interface StoreLocation {
+  id: string;
+  name: string;
+  code?: string;
+  address: string;
+  city?: string;
+  district?: string;
+  phone?: string;
+  email?: string;
+  latitude?: number;
+  longitude?: number;
+  openingHours?: string;
+}
+
+export interface CreateRmaItemInput {
+  orderItemId: string;
+  quantity: number;
+  reasonCode: ReturnReasonCode | string;
+  customerNote?: string;
+  evidenceImages: string[];
+  evidenceVideoUrl?: string;
+}
 
 export interface CreateRmaPayload {
   orderId: string;
-  type: 'REFUND' | 'EXCHANGE';
-  reason: ReturnReasonType;
-  items: Array<{
-    orderItemId: string;
-    quantity: number;
-  }>;
+  returnChannel?: ReturnChannel;
+  dropoffLocationId?: string;
+  pickupAddress?: Record<string, any>;
+  customerNote?: string;
+  items: CreateRmaItemInput[];
+  // Cho tương thích ngược
+  type?: 'REFUND' | 'EXCHANGE';
+  reason?: string;
   attachmentIds?: string[];
   replacements?: Array<{
     productVariantId: string;
@@ -52,6 +162,12 @@ export const orderApi = {
   previewOrder: async (payload: any) => {
     const response = await apiClient.post('/orders/preview', payload);
     return response.data;
+  },
+
+  // Tính toán báo giá cước vận chuyển thời gian thực (POST /shipping/quotes)
+  getShippingQuotes: async (payload: CalculateShippingQuoteInput): Promise<ShippingQuoteResponse> => {
+    const response = await apiClient.post('/shipping/quotes', payload);
+    return response.data?.data || response.data;
   },
 
   // Đặt hàng mới (FR-02.06 - Tạo đơn COD / SEPAY)
@@ -72,29 +188,41 @@ export const orderApi = {
     const response = await apiClient.get('/customers/me/orders', {
       params: { status },
     });
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // Lấy chi tiết 1 đơn hàng (FR-04.02)
   getOrderDetail: async (orderId: string) => {
     const response = await apiClient.get(`/orders/${orderId}`);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // Hủy đơn hàng PENDING (FR-04.05)
   cancelOrder: async (orderId: string, reason?: string) => {
     const response = await apiClient.put(`/orders/${orderId}/cancel`, { reason });
-    return response.data;
+    return response.data?.data || response.data;
   },
 
-  // Upload ảnh chứng từ đổi trả (trả về { attachmentId, mimeType, size })
+  // Upload ảnh/video chứng từ đổi trả (trả về { attachmentId, mimeType, size })
   uploadReturnImage: async (formData: FormData) => {
     const response = await apiClient.post('/uploads/return-images', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    return response.data?.data || response.data;
+  },
+
+  // Kiểm tra tính hợp lệ đổi trả của đơn hàng (GET /customers/me/orders/:id/return-eligibility)
+  getOrderReturnEligibility: async (orderId: string): Promise<OrderReturnEligibility> => {
+    const response = await apiClient.get(`/customers/me/orders/${orderId}/return-eligibility`);
+    return response.data?.data || response.data;
+  },
+
+  // Lấy danh sách Showroom thực tế (GET /stores)
+  getStores: async (): Promise<StoreLocation[]> => {
+    const response = await apiClient.get('/stores');
+    return response.data?.data || response.data;
   },
 
   // Gửi yêu cầu đổi trả / hoàn tiền RMA (POST /returns)
@@ -107,25 +235,25 @@ export const orderApi = {
         'Idempotency-Key': key,
       },
     });
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // Lấy danh sách yêu cầu RMA của tôi (GET /returns)
   getMyReturns: async (params?: { page?: number; limit?: number; status?: string }) => {
     const response = await apiClient.get('/returns', { params });
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // Lấy chi tiết tiến trình RMA (GET /returns/:id)
   getReturnDetail: async (returnId: string) => {
     const response = await apiClient.get(`/returns/${returnId}`);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   // Lấy thông tin tracking nhiều kiện hàng của đơn (GET /orders/:id/tracking)
   getOrderTracking: async (orderId: string) => {
     const response = await apiClient.get(`/orders/${orderId}/tracking`);
-    return response.data;
+    return response.data?.data || response.data;
   },
 };
 

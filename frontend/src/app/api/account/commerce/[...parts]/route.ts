@@ -10,6 +10,7 @@ import {
   imageUrlSchema,
   loyaltySchema,
   notificationsSchema,
+  orderEligibilitySchema,
   readNotificationSchema,
   redeemInputSchema,
   redemptionSchema,
@@ -20,6 +21,8 @@ import {
   reviewInputSchema,
   reviewResultSchema,
   rewardsSchema,
+  storeLocationsSchema,
+  submitReturnInputSchema,
   wishlistChangeSchema,
   wishlistResultSchema,
   wishlistSchema,
@@ -58,6 +61,17 @@ export async function GET(request: Request, context: Context) {
     } else if (parts.length === 1 && parts[0] === "rewards") {
       path = "/customers/me/loyalty/rewards";
       schema = rewardsSchema;
+    } else if (parts.length === 1 && parts[0] === "stores") {
+      path = "/stores";
+      schema = storeLocationsSchema;
+    } else if (
+      parts.length === 3 &&
+      parts[0] === "orders" &&
+      z.uuid().safeParse(parts[1]).success &&
+      parts[2] === "return-eligibility"
+    ) {
+      path = `/orders/${parts[1]}/return-eligibility`;
+      schema = orderEligibilitySchema;
     } else if (parts.length === 1 && parts[0] === "returns") {
       path = `/returns?${pagination(request, true)}`;
       schema = returnsSchema;
@@ -111,15 +125,15 @@ async function mutate(request: Request, context: Context) {
       path = "/customers/me/loyalty/redeem";
       schema = redemptionSchema;
     } else if (request.method === "POST" && parts.join("/") === "returns") {
-      const input = createReturnInputSchema.parse(raw);
+      const input = submitReturnInputSchema.parse(raw);
       key = input.idempotencyKey;
       body = {
         orderId: input.orderId,
-        type: input.type,
-        reason: input.reason,
+        returnChannel: input.returnChannel,
+        dropoffLocationId: input.dropoffLocationId,
+        pickupAddress: input.pickupAddress,
+        customerNote: input.customerNote,
         items: input.items,
-        attachmentIds: input.attachmentIds,
-        replacements: input.replacements,
       };
       path = "/returns";
       schema = returnCreatedSchema;

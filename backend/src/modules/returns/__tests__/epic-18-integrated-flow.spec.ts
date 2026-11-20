@@ -22,6 +22,10 @@ import { OutboxWriterService } from '../../async-infrastructure/outbox/outbox-wr
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
 import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
+import {
   ReturnChannel,
   ReturnOrderStatus,
   ReturnReasonCode,
@@ -268,115 +272,24 @@ describe('EPIC 18 INTEGRATED FLOW: Admin RMA Operations & Work Queues', () => {
   });
 
   afterAll(async () => {
-    const safeDelete = async (fn: () => Promise<any>) => {
-      try {
-        await fn();
-      } catch (e) {
-        // ignore cascading errors
-      }
-    };
-
     try {
-      if (createdRefundIds.length > 0) {
-        await safeDelete(() =>
-          prisma.refundItem.deleteMany({
-            where: { refundId: { in: createdRefundIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.refund.deleteMany({
-            where: { id: { in: createdRefundIds } },
-          }),
-        );
-      }
-
-      if (createdInspectionIds.length > 0) {
-        await safeDelete(() =>
-          prisma.returnInspectionItem.deleteMany({
-            where: { inspectionId: { in: createdInspectionIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnInspection.deleteMany({
-            where: { id: { in: createdInspectionIds } },
-          }),
-        );
-      }
-
-      if (createdReceiptIds.length > 0) {
-        await safeDelete(() =>
-          prisma.returnReceipt.deleteMany({
-            where: { id: { in: createdReceiptIds } },
-          }),
-        );
-      }
-
-      if (createdReturnOrderIds.length > 0) {
-        await safeDelete(() =>
-          prisma.exchangeItem.deleteMany({
-            where: { returnOrderId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.outboxEvent.deleteMany({
-            where: { aggregateId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnStatusHistory.deleteMany({
-            where: { returnOrderId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnOrderItem.deleteMany({
-            where: { returnOrderId: { in: createdReturnOrderIds } },
-          }),
-        );
-        await safeDelete(() =>
-          prisma.returnOrder.deleteMany({
-            where: { id: { in: createdReturnOrderIds } },
-          }),
-        );
-      }
-
-      if (createdOrderIds.length > 0) {
-        await safeDelete(() =>
-          prisma.payment.deleteMany({ where: { orderId: { in: createdOrderIds } } }),
-        );
-        await safeDelete(() =>
-          prisma.shipment.deleteMany({ where: { orderId: { in: createdOrderIds } } }),
-        );
-        await safeDelete(() =>
-          prisma.orderItem.deleteMany({ where: { orderId: { in: createdOrderIds } } }),
-        );
-        await safeDelete(() =>
-          prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }),
-        );
-      }
-      await safeDelete(() =>
-        prisma.productVariant.deleteMany({ where: { productId: testProductId } }),
-      );
-      await safeDelete(() =>
-        prisma.product.deleteMany({ where: { id: testProductId } }),
-      );
-      await safeDelete(() =>
-        prisma.category.deleteMany({ where: { id: testCategoryId } }),
-      );
-      await safeDelete(() =>
-        prisma.store.deleteMany({
-          where: { id: { in: [testStoreAId, testStoreBId] } },
-        }),
-      );
-      await safeDelete(() =>
-        prisma.customer.deleteMany({ where: { id: testCustomerId } }),
-      );
-      await safeDelete(() =>
-        prisma.user.deleteMany({
-          where: { id: { in: [testOperatorHqId, testOperatorStoreAId] } },
-        }),
-      );
-    } catch (e) {
-      // final teardown ignore
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreAId, testStoreBId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [testVariantId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        userIds: [testOperatorHqId, testOperatorStoreAId].filter(Boolean),
+        orderIds: createdOrderIds,
+        returnOrderIds: createdReturnOrderIds,
+        shipmentIds: createdShipmentIds,
+        refundIds: createdRefundIds,
+        receiptIds: createdReceiptIds,
+        inspectionIds: createdInspectionIds,
+      });
+    } catch (err) {
+      console.warn('Epic 18 Teardown warning:', err);
     } finally {
       await prisma.$disconnect();
     }

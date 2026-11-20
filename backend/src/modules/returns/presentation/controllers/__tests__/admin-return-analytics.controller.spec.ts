@@ -76,4 +76,10 @@ describe('AdminReturnAnalyticsController', () => {
     expect(result.carriers).toBeDefined();
     expect(service.getCarrierDamageComparison).toHaveBeenCalledWith({});
   });
+
+  it('route prefix không bị double api/v1 (BE-01)', () => {
+    const path = Reflect.getMetadata('path', AdminReturnAnalyticsController);
+    expect(path).toBe('admin/returns/analytics');
+    expect(path).not.toContain('api/v1');
+  });
 });

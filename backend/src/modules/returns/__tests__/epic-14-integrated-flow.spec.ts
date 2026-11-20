@@ -10,6 +10,10 @@ import { OutboxWriterService } from '../../async-infrastructure/outbox/outbox-wr
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
 import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
+import {
   ReturnChannel,
   ReturnOrderStatus,
   ReturnReasonCode,
@@ -201,69 +205,25 @@ describe('EPIC 14 INTEGRATED FLOW: Multi-Channel Reverse Logistics (Store Drop-o
   });
 
   afterAll(async () => {
-    // Delete in reverse order of foreign keys
-    if (createdReceiptIds.length > 0) {
-      await prisma.returnReceipt.deleteMany({
-        where: { id: { in: createdReceiptIds } },
+    try {
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId, testWarehouseId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [testVariantId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        userIds: [testStaffUserId].filter(Boolean),
+        orderIds: [testOrderId].filter(Boolean),
+        returnOrderIds: createdReturnOrderIds,
+        shipmentIds: createdShipmentIds,
+        receiptIds: createdReceiptIds,
       });
+    } catch (err) {
+      console.warn('Epic 14 Teardown warning:', err);
+    } finally {
+      await prisma.$disconnect();
     }
-
-    if (createdReturnOrderIds.length > 0) {
-      await prisma.outboxEvent.deleteMany({
-        where: { aggregateId: { in: createdReturnOrderIds } },
-      });
-      await prisma.returnOrderItem.deleteMany({
-        where: { returnOrderId: { in: createdReturnOrderIds } },
-      });
-      await prisma.shipment.deleteMany({
-        where: { returnOrderId: { in: createdReturnOrderIds } },
-      });
-      await prisma.returnOrder.deleteMany({
-        where: { id: { in: createdReturnOrderIds } },
-      });
-    }
-
-    if (createdShipmentIds.length > 0) {
-      await prisma.shipment.deleteMany({
-        where: { id: { in: createdShipmentIds } },
-      });
-    }
-
-    await prisma.inventoryTransaction.deleteMany({
-      where: { storeId: { in: [testStoreId, testWarehouseId] } },
-    });
-    await prisma.inventory.deleteMany({
-      where: { storeId: { in: [testStoreId, testWarehouseId] } },
-    });
-
-    if (testOrderId) {
-      await prisma.orderItem.deleteMany({ where: { orderId: testOrderId } });
-      await prisma.order.deleteMany({ where: { id: testOrderId } });
-    }
-
-    if (testVariantId) {
-      await prisma.productVariant.deleteMany({ where: { id: testVariantId } });
-    }
-    if (testProductId) {
-      await prisma.product.deleteMany({ where: { id: testProductId } });
-    }
-    if (testCategoryId) {
-      await prisma.category.deleteMany({ where: { id: testCategoryId } });
-    }
-    if (testCustomerId) {
-      await prisma.customer.deleteMany({ where: { id: testCustomerId } });
-    }
-    if (testStaffUserId) {
-      await prisma.user.deleteMany({ where: { id: testStaffUserId } });
-    }
-    if (testStoreId) {
-      await prisma.store.deleteMany({ where: { id: testStoreId } });
-    }
-    if (testWarehouseId) {
-      await prisma.store.deleteMany({ where: { id: testWarehouseId } });
-    }
-
-    await prisma.$disconnect();
   });
 
   describe('Flow 1: Showroom Store Drop-off Workflow (EP14-T01)', () => {

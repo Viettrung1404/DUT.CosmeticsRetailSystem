@@ -6,6 +6,10 @@ import { OutboxWriterService } from '../../async-infrastructure/outbox/outbox-wr
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
 import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
+import {
   ReturnChannel,
   ReturnOrderStatus,
   ReturnReasonCode,
@@ -152,42 +156,22 @@ describe('EPIC 13 INTEGRATED FLOW: Policy Versioning & RMA Claims Engine', () =>
   });
 
   afterAll(async () => {
-    // Clean up created test data
-    if (createdReturnOrderId) {
-      await prisma.outboxEvent.deleteMany({
-        where: { aggregateId: createdReturnOrderId },
+    try {
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [testVariantId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        orderIds: [testOrderId].filter(Boolean),
+        returnOrderIds: [createdReturnOrderId].filter(Boolean),
       });
-      await prisma.returnOrderItem.deleteMany({
-        where: { returnOrderId: createdReturnOrderId },
-      });
-      await prisma.returnOrder.deleteMany({
-        where: { id: createdReturnOrderId },
-      });
+    } catch (err) {
+      console.warn('Epic 13 Teardown warning:', err);
+    } finally {
+      await prisma.$disconnect();
     }
-
-    if (testOrderId) {
-      await prisma.shipment.deleteMany({ where: { orderId: testOrderId } });
-      await prisma.orderItem.deleteMany({ where: { orderId: testOrderId } });
-      await prisma.order.deleteMany({ where: { id: testOrderId } });
-    }
-
-    if (testVariantId) {
-      await prisma.productVariant.deleteMany({ where: { id: testVariantId } });
-    }
-    if (testProductId) {
-      await prisma.product.deleteMany({ where: { id: testProductId } });
-    }
-    if (testCategoryId) {
-      await prisma.category.deleteMany({ where: { id: testCategoryId } });
-    }
-    if (testCustomerId) {
-      await prisma.customer.deleteMany({ where: { id: testCustomerId } });
-    }
-    if (testStoreId) {
-      await prisma.store.deleteMany({ where: { id: testStoreId } });
-    }
-
-    await prisma.$disconnect();
   });
 
   it('Step 1: Check Order RMA Eligibility when delivered 1 day ago', async () => {

@@ -14,12 +14,19 @@ export const orderStatusText: Record<string, string> = {
   RETURNED: "Đã trả hàng",
 };
 export const returnStatusText: Record<string, string> = {
+  DRAFT: "Bản nháp",
+  SUBMITTED: "Chờ tiếp nhận",
   REQUESTED: "Đã gửi yêu cầu",
-  APPROVED: "Đã chấp thuận",
-  RECEIVED: "Đã nhận hàng",
-  INSPECTED: "Đã kiểm tra",
+  APPROVED: "Đã duyệt yêu cầu",
+  REJECTED: "Từ chối yêu cầu",
+  SHIPPED: "Đang gửi hàng về",
+  RECEIVED: "Đã tiếp nhận hàng",
+  INSPECTING: "Đang kiểm định (QC)",
+  INSPECTED: "Đã kiểm định (QC)",
+  RESOLUTION_PENDING: "Đang xử lý đổi / hoàn",
+  DISPUTED: "Đang khiếu nại",
   COMPLETED: "Hoàn tất",
-  REJECTED: "Từ chối",
+  CANCELLED: "Đã hủy yêu cầu",
 };
 export function AccountHeading({
   title,

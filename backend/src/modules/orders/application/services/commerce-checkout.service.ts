@@ -4,6 +4,7 @@ import {
   Injectable,
   ServiceUnavailableException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "@infrastructure/database/prisma.service";
 import { Prisma } from "@prisma/client";
@@ -29,6 +30,10 @@ import { validatePaymentAmount } from "@modules/payments/domain/payment-policy";
 import { assertGatewayReady } from "@modules/payments/domain/gateway-readiness";
 import { createVariantNameSnapshot } from "../utils/variant-name-snapshot.util";
 import { STORE_SHIPPING_POLICY } from "@modules/customer-experience/domain/pricing-engine";
+import {
+  ShippingQuoteService,
+  ValidatedShippingQuote,
+} from "@modules/oms/application/services/shipping-quote.service";
 
 type CheckoutSelection = Omit<PreviewOrderInput, "customerId"> & {
   customerId?: string;
@@ -51,6 +56,7 @@ export class CommerceCheckoutService {
     private readonly pricing: CommercePricingService,
     private readonly commands: CustomerCommands,
     private readonly stores: StoreResolverService,
+    @Optional() private readonly shippingQuoteService?: ShippingQuoteService,
   ) {}
   private async selection(
     input: CheckoutSelection,
@@ -350,10 +356,6 @@ export class CommerceCheckoutService {
     if (customerId !== input.customerId)
       throw new BadRequestException("CUSTOMER_REQUIRED");
     const selection = await this.selection(input, tx);
-    const storeId = await this.stores.resolveStoreForOrder({
-      requestedStoreId: input.storeId,
-      items: selection.items,
-    });
     const quote = await this.pricing.quote(
       { ...input, items: selection.items },
       tx,
@@ -362,7 +364,41 @@ export class CommerceCheckoutService {
     if (!input.quoteVersion)
       throw new BadRequestException("PRICE_QUOTE_REQUIRED");
     this.pricing.assertQuote(input.quoteVersion, quote);
-    validatePaymentAmount(paymentMethod, quote.totalAmount);
+
+    let finalShippingFee = quote.shippingFee;
+    let finalTotalAmount = quote.totalAmount;
+    let validatedQuote: ValidatedShippingQuote | undefined;
+
+    if (input.quoteGroupId) {
+      if (!input.shippingOptionId) {
+        throw new BadRequestException(
+          "Vui lòng chọn phương thức vận chuyển (shippingOptionId)",
+        );
+      }
+      if (this.shippingQuoteService) {
+        validatedQuote = await this.shippingQuoteService.validateQuote(
+          input.quoteGroupId,
+          input.shippingOptionId,
+        );
+        finalShippingFee = validatedQuote.estimatedFee;
+        const discountAmount =
+          quote.lineDiscount + quote.couponDiscount + quote.pointsDiscount;
+        finalTotalAmount = Math.max(
+          0,
+          quote.subtotal - discountAmount + finalShippingFee,
+        );
+      }
+    }
+
+    const storeId =
+      input.storeId ||
+      validatedQuote?.sourceLocationId ||
+      (await this.stores.resolveStoreForOrder({
+        requestedStoreId: input.storeId,
+        items: selection.items,
+      }));
+
+    validatePaymentAmount(paymentMethod, finalTotalAmount);
     const variantIds = selection.items.map((i) => i.variantId);
     const inventory = await tx.$queryRaw<
       {
@@ -397,9 +433,9 @@ export class CommerceCheckoutService {
         subtotal: quote.subtotal,
         discountAmount:
           quote.lineDiscount + quote.couponDiscount + quote.pointsDiscount,
-        shippingFee: quote.shippingFee,
+        shippingFee: finalShippingFee,
         taxAmount: 0,
-        totalAmount: quote.totalAmount,
+        totalAmount: finalTotalAmount,
         shippingAddress: json(input.shippingAddress),
         note: input.note,
         couponId: quote.couponId,
@@ -409,11 +445,24 @@ export class CommerceCheckoutService {
           policy: "SPRINT5",
           ...(guest ? { guest } : {}),
           quoteVersion: quote.quoteVersion,
+          quoteGroupId: input.quoteGroupId,
+          shippingOptionId: input.shippingOptionId,
+          ...(validatedQuote
+            ? {
+                shippingQuote: {
+                  quoteGroupId: validatedQuote.quoteGroupId,
+                  quoteId: validatedQuote.quoteId,
+                  carrierCode: validatedQuote.carrierCode,
+                  serviceCode: validatedQuote.serviceCode,
+                  estimatedFee: validatedQuote.estimatedFee,
+                },
+              }
+            : {}),
           lineDiscount: quote.lineDiscount,
           couponDiscount: quote.couponDiscount,
           pointsDiscount: quote.pointsDiscount,
           pointsValueVnd: 1,
-          shippingFee: quote.shippingFee,
+          shippingFee: finalShippingFee,
           taxAmount: 0,
         }),
       },
@@ -453,7 +502,7 @@ export class CommerceCheckoutService {
         fulfillmentOrderNumber: foNumber,
         sourceLocationId: storeId,
         status: 'ALLOCATED',
-        shippingServiceCode: 'STANDARD',
+        shippingServiceCode: validatedQuote?.serviceCode || 'STANDARD',
         totalItemsCount,
         allocatedAt: new Date(),
       },

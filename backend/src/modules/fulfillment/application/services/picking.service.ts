@@ -243,64 +243,91 @@ export class PickingService {
       );
     }
 
-    if (!fo.reservation || fo.reservation.items.length === 0) {
-      throw new BadRequestException(
-        `FulfillmentOrder ${fo.fulfillmentOrderNumber} chưa có thông tin phân bổ lô hàng giữ chỗ (InventoryReservation)`,
-      );
-    }
+    if (fo.reservation && fo.reservation.items.length > 0) {
+      // 1. Xây dựng bản đồ phân bổ mong đợi (Expected Allocation) từ reservation items
+      // Key: `${variantId}_${batchCode}` -> expectedQuantity
+      const expectedMap = new Map<string, number>();
+      const expectedVariants = new Set<string>();
 
-    // 1. Xây dựng bản đồ phân bổ mong đợi (Expected Allocation) từ reservation items
-    // Key: `${variantId}_${batchCode}` -> expectedQuantity
-    const expectedMap = new Map<string, number>();
-    const expectedVariants = new Set<string>();
+      for (const resItem of fo.reservation.items) {
+        const key = `${resItem.productVariantId}_${resItem.lot.batchCode}`;
+        expectedMap.set(key, (expectedMap.get(key) || 0) + resItem.quantity);
+        expectedVariants.add(resItem.productVariantId);
+      }
 
-    for (const resItem of fo.reservation.items) {
-      const key = `${resItem.productVariantId}_${resItem.lot.batchCode}`;
-      expectedMap.set(key, (expectedMap.get(key) || 0) + resItem.quantity);
-      expectedVariants.add(resItem.productVariantId);
-    }
+      // 2. Xây dựng bản đồ thực tế quét được (Scanned Items)
+      const scannedMap = new Map<string, number>();
 
-    // 2. Xây dựng bản đồ thực tế quét được (Scanned Items)
-    const scannedMap = new Map<string, number>();
+      for (const scanned of dto.items) {
+        // Kiểm tra xem sản phẩm có trong đơn không
+        if (!expectedVariants.has(scanned.variantId)) {
+          throw new BadRequestException(
+            `ITEM_NOT_FOUND_IN_ORDER: Sản phẩm ${scanned.variantId} không thuộc FulfillmentOrder này!`,
+          );
+        }
 
-    for (const scanned of dto.items) {
-      // Kiểm tra xem sản phẩm có trong đơn không
-      if (!expectedVariants.has(scanned.variantId)) {
-        throw new BadRequestException(
-          `ITEM_NOT_FOUND_IN_ORDER: Sản phẩm ${scanned.variantId} không thuộc FulfillmentOrder này!`,
+        const key = `${scanned.variantId}_${scanned.batchCode}`;
+
+        // AC1: Kiểm tra mã lô có trùng khớp với lô được hệ thống FEFO chỉ định không
+        if (!expectedMap.has(key)) {
+          throw new BadRequestException(
+            `BATCH_MISMATCH: Mã lô '${scanned.batchCode}' cho sản phẩm ${scanned.variantId} không khớp với lô hàng được phân bổ! Vui lòng nhặt đúng lô hàng theo danh sách FEFO.`,
+          );
+        }
+
+        scannedMap.set(key, (scannedMap.get(key) || 0) + scanned.quantity);
+      }
+
+      // 3. Đối chiếu số lượng từng lô giữa thực tế quét và kế hoạch
+      for (const [key, expectedQty] of expectedMap.entries()) {
+        const scannedQty = scannedMap.get(key) || 0;
+        if (scannedQty !== expectedQty) {
+          const [variantId, batchCode] = key.split('_');
+          throw new BadRequestException(
+            `QUANTITY_MISMATCH: Số lượng quét không khớp cho sản phẩm ${variantId}, lô ${batchCode}. Yêu cầu: ${expectedQty}, Thực quét: ${scannedQty}`,
+          );
+        }
+      }
+
+      // Đảm bảo không quét thừa các lô ngoài danh sách
+      for (const [key] of scannedMap.entries()) {
+        if (!expectedMap.has(key)) {
+          const [, batchCode] = key.split('_');
+          throw new BadRequestException(
+            `BATCH_MISMATCH: Lô ${batchCode} không nằm trong danh sách phân bổ!`,
+          );
+        }
+      }
+    } else {
+      // Fallback khi đơn hàng chưa gắn reservation items chi tiết: Đối chiếu theo fo.items
+      const expectedMap = new Map<string, number>();
+      for (const item of fo.items) {
+        expectedMap.set(
+          item.productVariantId,
+          (expectedMap.get(item.productVariantId) || 0) + item.quantityRequested,
         );
       }
 
-      const key = `${scanned.variantId}_${scanned.batchCode}`;
-
-      // AC1: Kiểm tra mã lô có trùng khớp với lô được hệ thống FEFO chỉ định không
-      if (!expectedMap.has(key)) {
-        throw new BadRequestException(
-          `BATCH_MISMATCH: Mã lô '${scanned.batchCode}' cho sản phẩm ${scanned.variantId} không khớp với lô hàng được phân bổ! Vui lòng nhặt đúng lô hàng theo danh sách FEFO.`,
+      const scannedMap = new Map<string, number>();
+      for (const scanned of dto.items) {
+        if (!expectedMap.has(scanned.variantId)) {
+          throw new BadRequestException(
+            `ITEM_NOT_FOUND_IN_ORDER: Sản phẩm ${scanned.variantId} không thuộc FulfillmentOrder này!`,
+          );
+        }
+        scannedMap.set(
+          scanned.variantId,
+          (scannedMap.get(scanned.variantId) || 0) + scanned.quantity,
         );
       }
 
-      scannedMap.set(key, (scannedMap.get(key) || 0) + scanned.quantity);
-    }
-
-    // 3. Đối chiếu số lượng từng lô giữa thực tế quét và kế hoạch
-    for (const [key, expectedQty] of expectedMap.entries()) {
-      const scannedQty = scannedMap.get(key) || 0;
-      if (scannedQty !== expectedQty) {
-        const [variantId, batchCode] = key.split('_');
-        throw new BadRequestException(
-          `QUANTITY_MISMATCH: Số lượng quét không khớp cho sản phẩm ${variantId}, lô ${batchCode}. Yêu cầu: ${expectedQty}, Thực quét: ${scannedQty}`,
-        );
-      }
-    }
-
-    // Đảm bảo không quét thừa các lô ngoài danh sách
-    for (const [key, scannedQty] of scannedMap.entries()) {
-      if (!expectedMap.has(key)) {
-        const [, batchCode] = key.split('_');
-        throw new BadRequestException(
-          `BATCH_MISMATCH: Lô ${batchCode} không nằm trong danh sách phân bổ!`,
-        );
+      for (const [variantId, expectedQty] of expectedMap.entries()) {
+        const scannedQty = scannedMap.get(variantId) || 0;
+        if (scannedQty !== expectedQty) {
+          throw new BadRequestException(
+            `QUANTITY_MISMATCH: Số lượng quét không khớp cho sản phẩm ${variantId}. Yêu cầu: ${expectedQty}, Thực quét: ${scannedQty}`,
+          );
+        }
       }
     }
 

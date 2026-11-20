@@ -417,7 +417,31 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* 7. Nút Đăng Xuất */}
+        {/* 7. Vận Hành Nội Bộ & Kho Cửa Hàng (Store Operations) */}
+        <Text style={styles.sectionHeaderLabel}>VẬN HÀNH NỘI BỘ (DÀNH CHO NHÂN VIÊN)</Text>
+        <View style={styles.settingsGroupCard}>
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => navigation.navigate('StaffMode')}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={[styles.settingsIconBox, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="scan-circle-outline" size={18} color="#2563EB" />
+              </View>
+              <View>
+                <Text style={[styles.settingsTitle, { color: '#1D4ED8', fontWeight: '700' }]}>
+                  Chế độ Nhân viên Cửa hàng (Staff Mode)
+                </Text>
+                <Text style={styles.settingsSub}>
+                  Nhặt hàng (Picking), Bàn giao (Handover) & Tiếp nhận RMA
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* 8. Nút Đăng Xuất */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={18} color={theme.colors.error} />
           <Text style={styles.logoutText}>Đăng xuất tài khoản</Text>

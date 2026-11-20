@@ -4,11 +4,13 @@ import {
   Get,
   Param,
   Body,
+  Query,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { PrismaService } from '@infrastructure/database/prisma.service';
 import { ShipmentOrchestratorService } from '../../application/services/shipment-orchestrator.service';
 import { ShipmentAttemptService } from '../../application/services/shipment-attempt.service';
 import { ReturnToOriginService } from '../../application/services/return-to-origin.service';
@@ -34,7 +36,107 @@ export class AdminShippingController {
     private readonly shipmentOrchestrator: ShipmentOrchestratorService,
     private readonly shipmentAttemptService: ShipmentAttemptService,
     private readonly returnToOriginService: ReturnToOriginService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Tra cứu danh sách vận đơn bưu kiện 3PL',
+  })
+  async getShipments(
+    @Query('carrier') carrier?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') pageStr?: string,
+    @Query('limit') limitStr?: string,
+  ) {
+    const where: any = {};
+    if (carrier) {
+      where.carrierCode = carrier;
+    }
+    if (status) {
+      where.status = status;
+    }
+    if (search) {
+      where.OR = [
+        { shipmentCode: { contains: search, mode: 'insensitive' } },
+        { trackingCode: { contains: search, mode: 'insensitive' } },
+        { order: { orderNumber: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const page = Math.max(1, parseInt(pageStr || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitStr || '50', 10) || 50));
+    const skip = (page - 1) * limit;
+
+    const [total, shipments] = await Promise.all([
+      this.prisma.shipment.count({ where }),
+      this.prisma.shipment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          order: {
+            select: {
+              orderNumber: true,
+              shippingAddress: true,
+              customer: {
+                select: { fullName: true, phone: true },
+              },
+            },
+          },
+          attempts: true,
+        },
+      }),
+    ]);
+
+    const items = shipments.map((s) => {
+      const shippingAddr: any = s.order?.shippingAddress;
+      const recipientName =
+        shippingAddr?.recipientName ||
+        shippingAddr?.name ||
+        s.order?.customer?.fullName;
+      const recipientPhone =
+        shippingAddr?.recipientPhone ||
+        shippingAddr?.phone ||
+        s.order?.customer?.phone;
+      const addressLine = shippingAddr?.addressLine || '';
+      const ward = shippingAddr?.ward || '';
+      const district = shippingAddr?.district || '';
+      const city = shippingAddr?.city || '';
+      const deliveryAddress = [addressLine, ward, district, city]
+        .filter(Boolean)
+        .join(', ');
+
+      return {
+        id: s.id,
+        shipmentCode: s.shipmentCode,
+        orderId: s.orderId,
+        orderNumber: s.order?.orderNumber,
+        carrierCode: s.carrierCode,
+        trackingCode: s.trackingCode,
+        status: s.status,
+        codAmount: Number(s.codAmount || 0),
+        shippingFee: Number(s.actualShippingFee || s.shippingFeePaid || 0),
+        recipientName,
+        recipientPhone,
+        deliveryAddress,
+        shippingLabelUrl: s.shippingLabelUrl,
+        trackingUrl: s.trackingUrl,
+        createdAt: s.createdAt.toISOString(),
+        attemptCount: s.attempts.length || s.failedAttempts || 0,
+      };
+    });
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 
   @Post(':id/dispatch')
   @HttpCode(HttpStatus.OK)

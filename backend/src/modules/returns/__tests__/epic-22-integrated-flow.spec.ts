@@ -11,6 +11,10 @@ import {
   ReturnChannel,
 } from '../domain/entities/return-policy.entity';
 import { seedDefaultReturnPolicy } from '../infrastructure/seeds/return-policy.seed';
+import {
+  cleanupTestDataByPattern,
+  cleanupTestEntities,
+} from '../../../core/test/test-cleanup.helper';
 
 describe('EPIC 22 INTEGRATED FLOW: Advanced BI & Lot Quality Analytics (FR-09)', () => {
   jest.setTimeout(90000);
@@ -23,6 +27,7 @@ describe('EPIC 22 INTEGRATED FLOW: Advanced BI & Lot Quality Analytics (FR-09)',
   let testStoreId: string;
   let testCustomerId: string;
   let testPolicyVersionId: string;
+  let testCategoryId: string;
   let testProductId: string;
   let testVariantId: string;
   let testLotId: string;
@@ -82,6 +87,7 @@ describe('EPIC 22 INTEGRATED FLOW: Advanced BI & Lot Quality Analytics (FR-09)',
         slug: `duong-da-e22-${testSuffix}`,
       },
     });
+    testCategoryId = category.id;
 
     const product = await prisma.product.create({
       data: {
@@ -309,83 +315,25 @@ describe('EPIC 22 INTEGRATED FLOW: Advanced BI & Lot Quality Analytics (FR-09)',
   });
 
   afterAll(async () => {
-    const safeDelete = async (fn: () => Promise<any>) => {
-      try {
-        await fn();
-      } catch (e) {}
-    };
-
-    if (createdDispositionIds.length > 0) {
-      await safeDelete(() =>
-        prisma.inventoryDisposition.deleteMany({
-          where: { id: { in: createdDispositionIds } },
-        }),
-      );
+    try {
+      await cleanupTestDataByPattern(prisma, testSuffix);
+      await cleanupTestEntities(prisma, {
+        storeIds: [testStoreId].filter(Boolean),
+        categoryIds: [testCategoryId].filter(Boolean),
+        productIds: [testProductId].filter(Boolean),
+        variantIds: [testVariantId].filter(Boolean),
+        customerIds: [testCustomerId].filter(Boolean),
+        orderIds: [...createdOrderIds, testOrderId].filter(Boolean),
+        returnOrderIds: [...createdReturnOrderIds, testReturnOrderId].filter(Boolean),
+        shipmentIds: createdShipmentIds,
+        lotIds: [...createdLotIds, testLotId].filter(Boolean),
+        dispositionIds: createdDispositionIds,
+      });
+    } catch (e) {
+      // ignore
+    } finally {
+      await prisma.$disconnect();
     }
-    if (createdReturnOrderIds.length > 0) {
-      await safeDelete(() =>
-        prisma.returnOrderItem.deleteMany({
-          where: { returnOrderId: { in: createdReturnOrderIds } },
-        }),
-      );
-      await safeDelete(() =>
-        prisma.returnStatusHistory.deleteMany({
-          where: { returnOrderId: { in: createdReturnOrderIds } },
-        }),
-      );
-      await safeDelete(() =>
-        prisma.returnOrder.deleteMany({
-          where: { id: { in: createdReturnOrderIds } },
-        }),
-      );
-    }
-    if (createdShipmentIds.length > 0) {
-      await safeDelete(() =>
-        prisma.shipment.deleteMany({
-          where: { id: { in: createdShipmentIds } },
-        }),
-      );
-    }
-    if (createdOrderIds.length > 0) {
-      await safeDelete(() =>
-        prisma.orderItem.deleteMany({
-          where: { orderId: { in: createdOrderIds } },
-        }),
-      );
-      await safeDelete(() =>
-        prisma.order.deleteMany({
-          where: { id: { in: createdOrderIds } },
-        }),
-      );
-    }
-    if (createdLotIds.length > 0) {
-      await safeDelete(() =>
-        prisma.inventoryLot.deleteMany({
-          where: { id: { in: createdLotIds } },
-        }),
-      );
-    }
-    if (testVariantId) {
-      await safeDelete(() =>
-        prisma.productVariant.deleteMany({ where: { id: testVariantId } }),
-      );
-    }
-    if (testProductId) {
-      await safeDelete(() =>
-        prisma.product.deleteMany({ where: { id: testProductId } }),
-      );
-    }
-    if (testCustomerId) {
-      await safeDelete(() =>
-        prisma.customer.deleteMany({ where: { id: testCustomerId } }),
-      );
-    }
-    if (testStoreId) {
-      await safeDelete(() =>
-        prisma.store.deleteMany({ where: { id: testStoreId } }),
-      );
-    }
-    await prisma.$disconnect();
   });
 
   describe('Kịch bản 1: Báo cáo chất lượng theo lô & Kích hoạt cảnh báo cách ly (LOT_DEFECT_ALERT)', () => {

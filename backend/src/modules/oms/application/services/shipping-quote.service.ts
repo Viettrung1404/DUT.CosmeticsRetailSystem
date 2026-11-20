@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Inject,
   Logger,
@@ -458,14 +460,21 @@ export class ShippingQuoteService {
     }
 
     if (new Date() > new Date(group.expiresAt)) {
-      throw new BadRequestException(
-        'Báo giá vận chuyển đã hết hạn (quá 15 phút), vui lòng tính lại cước',
+      throw new HttpException(
+        {
+          code: 'SHIPPING_QUOTE_EXPIRED',
+          message:
+            'Báo giá vận chuyển đã hết hạn (quá 15 phút), vui lòng tính lại cước',
+        },
+        HttpStatus.UNPROCESSABLE_ENTITY,
       );
     }
 
     const matched = group.options.find(
       (opt) =>
-        opt.serviceCode === serviceCode &&
+        (opt.serviceCode === serviceCode ||
+          opt.id === serviceCode ||
+          opt.carrierCode === serviceCode) &&
         (!sourceLocationId || opt.sourceLocationId === sourceLocationId),
     );
 

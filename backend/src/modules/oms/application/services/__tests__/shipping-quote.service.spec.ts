@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { CACHE_SERVICE } from '@core/cache/cache.service.interface';
 import { LocationService } from '@modules/inventory/application/services/location.service';
@@ -369,7 +374,7 @@ describe('ShippingQuoteService', () => {
       expect(validated.serviceCode).toBe('STANDARD');
     });
 
-    it('validateQuote phải ném lỗi BadRequestException khi báo giá đã hết hạn quá 15 phút', async () => {
+    it('validateQuote phải ném lỗi 422 SHIPPING_QUOTE_EXPIRED khi báo giá đã hết hạn quá 15 phút (BE-03)', async () => {
       const quoteGroupId = 'expired-group-id';
       const expiredQuoteGroup = {
         quoteGroupId,
@@ -387,9 +392,44 @@ describe('ShippingQuoteService', () => {
 
       cacheService.get.mockResolvedValue(expiredQuoteGroup);
 
-      await expect(
-        service.validateQuote(quoteGroupId, 'STANDARD'),
-      ).rejects.toThrow(BadRequestException);
+      try {
+        await service.validateQuote(quoteGroupId, 'STANDARD');
+        fail('Should have thrown HttpException');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect(err.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+        expect(err.getResponse()).toMatchObject({
+          code: 'SHIPPING_QUOTE_EXPIRED',
+        });
+      }
+    });
+
+    it('validateQuote hỗ trợ match option bằng serviceCode, id hoặc carrierCode', async () => {
+      const quoteGroupId = 'quote-multi-match';
+      const quoteGroup = {
+        quoteGroupId,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        options: [
+          {
+            id: 'opt-custom-id',
+            carrierCode: 'GHN',
+            serviceCode: 'GHN_STANDARD',
+            sourceLocationId: 'wh-tb-id',
+            estimatedFee: 25000,
+            isAvailable: true,
+          },
+        ],
+      };
+
+      cacheService.get.mockResolvedValue(quoteGroup);
+
+      // Match by option id
+      const resById = await service.validateQuote(quoteGroupId, 'opt-custom-id');
+      expect(resById.estimatedFee).toBe(25000);
+
+      // Match by service code
+      const resByCode = await service.validateQuote(quoteGroupId, 'GHN_STANDARD');
+      expect(resByCode.estimatedFee).toBe(25000);
     });
 
     it('validateQuote phải ném lỗi khi khách chọn tùy chọn không khả dụng', async () => {

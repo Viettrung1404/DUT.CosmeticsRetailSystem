@@ -2,7 +2,7 @@
 import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { cartSchema } from "@/features/catalog/cart";
@@ -13,12 +13,15 @@ import {
   ArrowRight,
   Banknote,
   Check,
+  Clock,
   CreditCard,
   Gift,
   LockKeyhole,
   QrCode,
+  RefreshCw,
   ShieldCheck,
   Truck,
+  Zap,
 } from "lucide-react";
 import { addressesSchema } from "@/features/addresses/contracts";
 import { readBff, requestBff } from "@/shared/api/browser";
@@ -31,6 +34,7 @@ import {
   previewSchema,
   shippingSchema,
   checkoutBenefitsSchema,
+  shippingQuoteResponseSchema,
 } from "./contracts";
 import { paymentMethodsSchema } from "./payment-methods";
 import { CheckoutAddress } from "./checkout-address";
@@ -41,6 +45,21 @@ import { isCurrentAddress } from "@/features/addresses/vietnam-divisions";
 type Address = z.infer<typeof shippingSchema>;
 const blank: Address = blankDeliveryAddress;
 const commandStorage = "glowup-checkout-command";
+
+function formatEstimatedDelivery(time: string) {
+  if (!time) return "";
+  try {
+    const d = new Date(time);
+    if (isNaN(d.getTime())) return time;
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return `Giao dự kiến: ${hours}:${minutes} ngày ${day}/${month}`;
+  } catch {
+    return time;
+  }
+}
 
 export function CheckoutPage() {
   const router = useRouter();
@@ -95,6 +114,14 @@ export function CheckoutPage() {
   const [error, setError] = useState("");
   const [orderId, setOrderId] = useState("");
   const previewSerial = useRef(0);
+
+  // Real-time shipping quotes states
+  const [shippingQuotes, setShippingQuotes] = useState<z.infer<typeof shippingQuoteResponseSchema> | null>(null);
+  const [selectedShippingOptionId, setSelectedShippingOptionId] = useState<string>("");
+  const [shippingQuotesLoading, setShippingQuotesLoading] = useState(false);
+  const [shippingQuotesError, setShippingQuotesError] = useState("");
+  const [quoteExpired, setQuoteExpired] = useState(false);
+
   const items = useMemo(
     () =>
       cart.data?.items
@@ -123,6 +150,71 @@ export function CheckoutPage() {
         }
       : blank
     : (addressOverride ?? blank);
+
+  const effectiveDistrict =
+    address.district ||
+    address.ward?.replace(/^(phường|xã|thị trấn|đặc khu)\s+/i, "") ||
+    address.ward ||
+    address.city;
+  const hasShippingAddress = !!(address.city && (address.district || address.ward));
+  const shippingAddressKey = `${address.city}|${effectiveDistrict}|${address.ward ?? ""}|${address.addressLine ?? ""}|${address.latitude ?? ""}|${address.longitude ?? ""}`;
+
+  const fetchShippingQuotes = useCallback(async () => {
+    if (!hasShippingAddress || !items.length) {
+      setShippingQuotes(null);
+      setSelectedShippingOptionId("");
+      return;
+    }
+    setShippingQuotesLoading(true);
+    setShippingQuotesError("");
+    setQuoteExpired(false);
+    try {
+      const quotes = await requestBff("/api/checkout/shipping-quotes", shippingQuoteResponseSchema, {
+        method: "POST",
+        body: {
+          items,
+          shippingAddress: {
+            provinceCity: address.city,
+            district: effectiveDistrict,
+            ward: address.ward || undefined,
+            addressLine: address.addressLine || undefined,
+            latitude: address.latitude ?? undefined,
+            longitude: address.longitude ?? undefined,
+          },
+        },
+      });
+      setShippingQuotes(quotes);
+      const available = quotes.options.filter((o) => o.isAvailable);
+      setSelectedShippingOptionId((prev) => {
+        if (prev && available.some((o) => (o.id || o.serviceCode) === prev)) {
+          return prev;
+        }
+        return available[0] ? (available[0].id || available[0].serviceCode) : "";
+      });
+    } catch (err) {
+      setShippingQuotesError(apiErrorMessage(err));
+    } finally {
+      setShippingQuotesLoading(false);
+    }
+  }, [hasShippingAddress, items, address.city, effectiveDistrict, address.ward, address.addressLine, address.latitude, address.longitude]);
+
+  useEffect(() => {
+    void fetchShippingQuotes();
+  }, [items, shippingAddressKey, fetchShippingQuotes]);
+
+  const selectedShippingOption = useMemo(() => {
+    if (!shippingQuotes) return null;
+    return (
+      shippingQuotes.options.find(
+        (o) => (o.id || o.serviceCode) === selectedShippingOptionId,
+      ) ?? null
+    );
+  }, [shippingQuotes, selectedShippingOptionId]);
+
+  const effectiveShippingFee = selectedShippingOption
+    ? selectedShippingOption.estimatedFee
+    : (quoteState?.value?.shippingFee ?? 0);
+
   const selectionKey = JSON.stringify({ items, couponCode: effectiveCoupon });
   const matchingQuote = quoteState?.selectionKey === selectionKey ? quoteState.value : null;
   const maximumPoints = maximumCheckoutPoints(benefits.data?.points, matchingQuote);
@@ -135,6 +227,10 @@ export function CheckoutPage() {
     previewRetry,
   });
   const quote = quoteState?.key === previewKey ? quoteState.value : null;
+
+  const effectiveTotalAmount = quote
+    ? Math.max(0, quote.totalAmount - (quote.shippingFee ?? 0) + effectiveShippingFee)
+    : 0;
   useEffect(() => {
     const serial = ++previewSerial.current;
     if (!items.length || invalidSelection) return;
@@ -182,7 +278,8 @@ export function CheckoutPage() {
       return;
     }
     const shipping = shippingSchema.safeParse(address);
-    if (!shipping.success || !isCurrentAddress(address) || (session.data && !selectedAddress)) {
+    const isAddressCurrent = isCurrentAddress(address) || isCurrentAddress({ ...address, district: "" });
+    if (!shipping.success || !isAddressCurrent || (session.data && !selectedAddress)) {
       setError(
         "Vui lòng kiểm tra tên, số điện thoại và chọn địa chỉ với tỉnh/thành, phường/xã hiện tại.",
       );
@@ -193,9 +290,16 @@ export function CheckoutPage() {
       couponCode: effectiveCoupon || undefined,
       usePoints: effectivePoints,
       quoteVersion: quote.quoteVersion,
-      shippingAddress: shipping.data,
+      shippingAddress: {
+        ...shipping.data,
+        district: shipping.data.district || effectiveDistrict,
+      },
       paymentMethod: method,
       idempotencyKey: crypto.randomUUID(),
+      quoteGroupId: shippingQuotes?.quoteGroupId,
+      shippingOptionId: selectedShippingOption
+        ? (selectedShippingOption.id || selectedShippingOption.serviceCode)
+        : undefined,
     });
     if (!payload.success) {
       setError("Thông tin đơn hàng chưa hợp lệ.");
@@ -255,7 +359,16 @@ export function CheckoutPage() {
       sessionStorage.removeItem(commandStorage);
       router.push(`/payment/return?paymentId=${payment.paymentId}`);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
+      if (
+        e instanceof ApiError &&
+        (e.status === 422 ||
+          e.code === "SHIPPING_QUOTE_EXPIRED" ||
+          e.message?.includes("báo giá") ||
+          e.message?.includes("hết hạn"))
+      ) {
+        setQuoteExpired(true);
+        setError("Báo giá vận chuyển đã hết hạn. Vui lòng bấm 'Làm mới báo giá' để cập nhật cước phí mới nhất.");
+      } else if (e instanceof ApiError && e.status === 409) {
         setQuote(null);
         cart.refetch();
         setPreviewRetry((value) => value + 1);
@@ -359,34 +472,108 @@ export function CheckoutPage() {
                 <Truck size={20} />
               </span>
               <div>
-                <h2>Thông tin giao hàng</h2>
-                <p>Cửa hàng chuẩn bị và sắp xếp giao đơn cho bạn</p>
+                <h2>Phương thức vận chuyển</h2>
+                <p>Tính phí theo khoảng cách và thời gian giao hàng thực tế</p>
               </div>
             </div>
-            <div className="checkout-shipping-option">
-              <span className="checkout-shipping-icon">
-                <Truck size={25} />
-              </span>
-              <div>
-                <strong>Giao hàng tiêu chuẩn</strong>
-                <p>Giao tận nơi, đóng gói cẩn thận để bảo vệ sản phẩm.</p>
+
+            {shippingQuotesLoading && (
+              <p role="status" className="checkout-quote-updating">
+                <Clock size={16} style={{ display: "inline", marginRight: 6 }} /> Đang tính toán phí vận chuyển thực tế…
+              </p>
+            )}
+
+            {shippingQuotesError && (
+              <p role="alert" className="cart-warning">
+                {shippingQuotesError}{" "}
+                <button
+                  type="button"
+                  onClick={() => void fetchShippingQuotes()}
+                  className="checkout-shipping-refresh-btn"
+                >
+                  Thử lại
+                </button>
+              </p>
+            )}
+
+            {!hasShippingAddress && (
+              <p className="checkout-shipping-note">
+                Vui lòng chọn hoặc nhập đầy đủ địa chỉ giao hàng (Tỉnh/Thành, Quận/Huyện) để kiểm tra các phương thức vận chuyển khả dụng.
+              </p>
+            )}
+
+            {quoteExpired && (
+              <div className="checkout-shipping-expired-alert" role="alert">
+                <p>Báo giá vận chuyển đã hết hạn (sau 15 phút). Vui lòng cập nhật lại báo giá để tiếp tục đặt hàng.</p>
+                <button
+                  type="button"
+                  className="button secondary checkout-shipping-refresh-btn"
+                  onClick={() => void fetchShippingQuotes()}
+                >
+                  <RefreshCw size={14} style={{ display: "inline", marginRight: 6 }} /> Làm mới báo giá
+                </button>
               </div>
-              <strong className={quote?.shippingFee === 0 ? "is-free" : ""}>
-                {quote
-                  ? quote.shippingFee === 0
-                    ? "Miễn phí"
-                    : formatPrice(quote.shippingFee)
-                  : "Đang tính…"}
-              </strong>
-            </div>
+            )}
+
+            {shippingQuotes && shippingQuotes.options.length > 0 && (
+              <div className="checkout-shipping-options" role="radiogroup" aria-label="Phương thức vận chuyển">
+                {shippingQuotes.options.map((option) => {
+                  const optionKey = option.id || option.serviceCode;
+                  const isSelected = selectedShippingOptionId === optionKey;
+                  const isExpress = option.serviceCode === "EXPRESS_2H" || option.carrierCode === "AHAMOVE";
+                  return (
+                    <label
+                      key={optionKey}
+                      className={`checkout-shipping-option ${isSelected ? "is-selected" : ""} ${!option.isAvailable ? "is-disabled" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="shippingOption"
+                        value={optionKey}
+                        checked={isSelected}
+                        disabled={!option.isAvailable}
+                        onChange={() => {
+                          if (option.isAvailable) {
+                            setSelectedShippingOptionId(optionKey);
+                            setError("");
+                          }
+                        }}
+                      />
+                      <span className="checkout-shipping-icon">
+                        {isExpress ? <Zap size={22} /> : <Truck size={22} />}
+                      </span>
+                      <div className="checkout-shipping-info">
+                        <div className="checkout-shipping-heading">
+                          <strong>{option.serviceName || (isExpress ? "Giao hỏa tốc 2H" : "Giao hàng tiêu chuẩn")}</strong>
+                          <span className={`checkout-shipping-badge ${isExpress ? "is-express" : "is-standard"}`}>
+                            {option.carrierCode === "AHAMOVE" ? "Ahamove 2H" : "GHN Standard"}
+                          </span>
+                          {!option.isAvailable && (
+                            <span className="checkout-shipping-badge is-unavailable">Không khả dụng</span>
+                          )}
+                        </div>
+                        <p className="checkout-shipping-sub">
+                          {formatEstimatedDelivery(option.estimatedDeliveryTime)}
+                          {option.distanceKm != null && ` · Khoảng cách ~${option.distanceKm} km`}
+                          {option.sourceLocationName && ` · Từ ${option.sourceLocationName}`}
+                        </p>
+                        {!option.isAvailable && option.unavailableReason && (
+                          <p className="checkout-shipping-unavailable-desc">
+                            {option.unavailableReason}
+                          </p>
+                        )}
+                      </div>
+                      <strong className={`checkout-shipping-fee ${option.estimatedFee === 0 ? "is-free" : ""}`}>
+                        {option.estimatedFee === 0 ? "Miễn phí" : formatPrice(option.estimatedFee)}
+                      </strong>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
             <p className="checkout-shipping-note">
-              {quote?.shippingPolicy && (
-                <>
-                  Phí tiêu chuẩn {formatPrice(quote.shippingPolicy.fee)}. Đơn từ 129k giảm 15k · từ 359k giảm 25k · từ{" "}
-                  {formatPrice(quote.shippingPolicy.freeFrom)} miễn phí toàn quốc.{" "}
-                </>
-              )}
-              Cửa hàng sẽ xác nhận lịch giao khi xử lý đơn.
+              Đơn hàng được chuẩn bị kỹ lưỡng và bàn giao cho đơn vị vận chuyển chuyên nghiệp.
             </p>
           </section>
           <section className="checkout-panel">
@@ -554,15 +741,20 @@ export function CheckoutPage() {
               )}
               <div>
                 <dt>
-                  Phí giao hàng <small>Theo chính sách cửa hàng</small>
+                  Phí giao hàng{" "}
+                  <small>
+                    {selectedShippingOption
+                      ? selectedShippingOption.serviceName
+                      : "Theo chính sách cửa hàng"}
+                  </small>
                 </dt>
-                <dd className={quote.shippingFee === 0 ? "is-saving" : ""}>
-                  {quote.shippingFee === 0 ? "Miễn phí" : formatPrice(quote.shippingFee)}
+                <dd className={effectiveShippingFee === 0 ? "is-saving" : ""}>
+                  {effectiveShippingFee === 0 ? "Miễn phí" : formatPrice(effectiveShippingFee)}
                 </dd>
               </div>
               <div className="checkout-grand-total">
                 <dt>Tổng thanh toán</dt>
-                <dd>{formatPrice(quote.totalAmount)}</dd>
+                <dd>{formatPrice(effectiveTotalAmount)}</dd>
               </div>
             </dl>
           )}
@@ -574,9 +766,12 @@ export function CheckoutPage() {
               quoteBusy ||
               couponBusy ||
               busy ||
+              shippingQuotesLoading ||
+              quoteExpired ||
+              (!!shippingQuotes && shippingQuotes.options.length > 0 && !selectedShippingOption) ||
               !!orderId ||
               (!!session.data &&
-                (!selectedAddress || addresses.isError || !isCurrentAddress(address)))
+                (!selectedAddress || addresses.isError || (!isCurrentAddress(address) && !isCurrentAddress({ ...address, district: "" }))))
             }
             onClick={() => void submit()}
           >

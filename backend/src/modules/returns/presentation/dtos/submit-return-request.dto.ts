@@ -50,8 +50,8 @@ export class SubmitReturnRequestDto {
   orderId: string;
 
   @IsEnum(ReturnChannel)
-  @IsNotEmpty()
-  returnChannel: ReturnChannel;
+  @IsOptional()
+  returnChannel?: ReturnChannel;
 
   @IsOptional()
   @IsString()

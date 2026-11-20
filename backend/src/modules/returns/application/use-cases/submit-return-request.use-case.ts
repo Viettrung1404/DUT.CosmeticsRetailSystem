@@ -90,7 +90,10 @@ export class SubmitReturnRequestUseCase {
     }
 
     // 3. Xác thực kênh tiếp nhận hoàn trả
-    if (dto.returnChannel === ReturnChannel.STORE_DROPOFF) {
+    const channel = dto.returnChannel || ReturnChannel.CARRIER_PICKUP;
+    dto.returnChannel = channel;
+
+    if (channel === ReturnChannel.STORE_DROPOFF) {
       if (!dto.dropoffLocationId) {
         throw new BadRequestException(
           'Vui lòng chọn Showroom để mang sản phẩm đến đổi trả',
@@ -104,11 +107,19 @@ export class SubmitReturnRequestUseCase {
           `Không tìm thấy Showroom tiếp nhận với ID: ${dto.dropoffLocationId}`,
         );
       }
-    } else if (dto.returnChannel === ReturnChannel.CARRIER_PICKUP) {
+    } else if (channel === ReturnChannel.CARRIER_PICKUP) {
       if (!dto.pickupAddress || typeof dto.pickupAddress !== 'object') {
-        throw new BadRequestException(
-          'Vui lòng cung cấp địa chỉ chi tiết để bưu tá đến thu hồi sản phẩm',
-        );
+        const order = await this.prisma.order.findUnique({
+          where: { id: dto.orderId },
+          select: { shippingAddress: true },
+        });
+        if (order?.shippingAddress && typeof order.shippingAddress === 'object') {
+          dto.pickupAddress = order.shippingAddress as Record<string, any>;
+        } else {
+          throw new BadRequestException(
+            'Vui lòng cung cấp địa chỉ chi tiết để bưu tá đến thu hồi sản phẩm',
+          );
+        }
       }
     }
 

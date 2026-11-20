@@ -87,6 +87,8 @@ export class CustomerOrderController {
       shippingAddress: dto.shippingAddress,
       idempotencyKey,
       quoteVersion: dto.quoteVersion,
+      quoteGroupId: dto.quoteGroupId,
+      shippingOptionId: dto.shippingOptionId,
       paymentMethod: dto.paymentMethod,
       items: dto.items,
       couponCode: dto.couponCode,

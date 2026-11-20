@@ -121,8 +121,18 @@ export class RmaActionMatrixService {
         );
       }
 
+      // Map action -> targetStatus nếu client dùng format { action }
+      const targetStatus: ReturnOrderStatus =
+        dto.targetStatus ||
+        (dto.action === 'APPROVE'
+          ? ReturnOrderStatus.APPROVED
+          : ReturnOrderStatus.REJECTED);
+
+      const expectedVersion =
+        dto.expectedVersion !== undefined ? dto.expectedVersion : current.version;
+
       // 2. Kiểm tra xung đột phiên bản OCC (EP18-T02 AC3)
-      if (current.version !== dto.expectedVersion) {
+      if (current.version !== expectedVersion) {
         this.logger.warn(
           `[OCC_CONFLICT] Hồ sơ RMA ${current.returnCode} phát hiện xung đột đồng thời. Phiên bản hiện tại: ${current.version}, Phiên bản yêu cầu: ${dto.expectedVersion}`,
         );
@@ -132,13 +142,13 @@ export class RmaActionMatrixService {
       }
 
       // 3. Kiểm tra tính hợp lệ của việc chuyển trạng thái
-      this.validateStatusTransition(current.status as ReturnOrderStatus, dto.targetStatus);
+      this.validateStatusTransition(current.status as ReturnOrderStatus, targetStatus);
 
       // 4. Cập nhật trạng thái và tăng số version
       const updated = await tx.returnOrder.update({
         where: { id: returnOrderId },
         data: {
-          status: dto.targetStatus,
+          status: targetStatus,
           version: { increment: 1 },
           handledBy: operatorUserId,
           rejectionReason: dto.reason || current.rejectionReason,
@@ -154,9 +164,9 @@ export class RmaActionMatrixService {
       await tx.returnStatusHistory.create({
         data: {
           returnOrderId: current.id,
-          status: dto.targetStatus,
+          status: targetStatus,
           changedBy: operatorUserId,
-          note: dto.note || `Chuyển trạng thái sang ${dto.targetStatus} (v${updated.version})`,
+          note: dto.note || `Chuyển trạng thái sang ${targetStatus} (v${updated.version})`,
         },
       });
 

@@ -35,6 +35,9 @@ export const userSchema = z.object({
   fullName: z.string(),
   avatarUrl: z.string().nullable().optional(),
   roleName: z.string().optional(),
+  role: z.string().optional(),
+  dataScope: z.string().optional(),
+  storeId: z.string().optional(),
 });
 export type AuthUser = z.infer<typeof userSchema>;
 export const tokensSchema = z.object({
