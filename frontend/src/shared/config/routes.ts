@@ -50,7 +50,7 @@ export const resourceRoutes = {
   article: (slug: string) => `/blog/${encodeURIComponent(slug)}`,
   blogCategory: (slug: string) => `/blog/category/${encodeURIComponent(slug)}`,
   order: (id: string) => `/account/orders/${encodeURIComponent(id)}`,
-  tracking: (id: string) => `/account/orders/${encodeURIComponent(id)}/tracking`,
+  tracking: (id: string) => `/account/orders/${encodeURIComponent(id)}`,
   orderSuccess: (id: string) => `/order-success/${encodeURIComponent(id)}`,
   returnDetail: (id: string) => `/account/returns/${encodeURIComponent(id)}`,
 };

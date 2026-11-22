@@ -216,17 +216,17 @@ describe('buildPosPricing - đơn chị Hoa', () => {
     expect(huge.total).toBe(0);
   });
 
-  it('điểm chỉ tính trên phần còn lại sau KM và voucher (50%)', () => {
+  it('điểm chỉ tính trên phần còn lại sau KM và voucher (tối đa 100%)', () => {
     expect(() =>
       buildPosPricing({
         ...base,
         lines: [lines[1]],
         promotions: [],
         coupon: null,
-        pointsToUse: 60000,
-        availablePoints: 100000,
+        pointsToUse: 120000,
+        availablePoints: 200000,
       }),
-    ).toThrow('tối đa 50%');
+    ).toThrow('tối đa');
   });
 });
 

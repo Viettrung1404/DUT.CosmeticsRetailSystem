@@ -36,8 +36,9 @@ export async function guestWishlistIds() {
 export async function listGuestWishlist(page: number, limit: number) {
   const guest = await guestWishlist();
   if (!guest) return { items: [], page, limit, total: 0 };
+  const sliced = guest.value.items.slice((page - 1) * limit, page * limit);
   const products = await Promise.all(
-    guest.value.items.map(async (item) => {
+    sliced.map(async (item) => {
       try {
         const product = await getProduct(item.slug);
         return product.id === item.id ? product : null;
@@ -49,13 +50,13 @@ export async function listGuestWishlist(page: number, limit: number) {
   );
   const items = products.filter((product) => product !== null);
   return {
-    items: items.slice((page - 1) * limit, page * limit).map((product) => ({
+    items: items.map((product) => ({
       ...product,
       isWishlisted: true,
     })),
     page,
     limit,
-    total: items.length,
+    total: guest.value.items.length,
   };
 }
 

@@ -13,7 +13,7 @@ import {
   ProductIngredientProps,
   ProductVariantProps,
 } from '../../domain/entities/product.entity';
-import { ElasticsearchProductDocument } from '../search/elasticsearch-product.service';
+import { OpenSearchProductDocument } from '../search/opensearch-product.service';
 
 /** Prisma Product with eagerly-loaded relations */
 export type ProductWithRelations = PrismaProduct & {
@@ -40,6 +40,7 @@ export interface ProductPersistenceData {
   option1Name?: string | null;
   option2Name?: string | null;
   option3Name?: string | null;
+  videoUrl?: string | null;
   isActive: boolean;
   isFeatured: boolean;
   metaTitle?: string | null;
@@ -64,6 +65,7 @@ export class ProductMapper {
       option1Name: raw.option1Name,
       option2Name: raw.option2Name,
       option3Name: raw.option3Name,
+      videoUrl: (raw as any).videoUrl ?? null,
       isActive: raw.isActive,
       isFeatured: raw.isFeatured,
       avgRating: Number(raw.avgRating ?? 0),
@@ -127,6 +129,7 @@ export class ProductMapper {
       option1Name: entity.option1Name,
       option2Name: entity.option2Name,
       option3Name: entity.option3Name,
+      videoUrl: entity.videoUrl ?? null,
       isActive: entity.isActive,
       isFeatured: entity.isFeatured,
       metaTitle: entity.metaTitle,
@@ -150,22 +153,44 @@ export class ProductMapper {
     };
   }
 
-  static toSearchDocument(entity: ProductEntity): ElasticsearchProductDocument {
+  static toSearchDocument(entity: ProductEntity): OpenSearchProductDocument {
+    const activeVariants = (entity.variants || []).filter((v) => v.isActive !== false);
+    const variantPrices = activeVariants.map((v) => Number(v.price));
+    const minPrice =
+      variantPrices.length > 0
+        ? Math.min(...variantPrices)
+        : Number(entity.salePrice ?? entity.basePrice);
+    const maxPrice =
+      variantPrices.length > 0
+        ? Math.max(...variantPrices)
+        : Number(entity.basePrice);
+
     return {
       id: entity.id!,
       name: entity.name,
       slug: entity.slug,
       sku: entity.sku,
-      brandName: entity.brandName,
+      categoryId: entity.categoryId,
       categoryName: entity.categoryName,
-      ingredients: entity.ingredients.map((i) => i.ingredientName),
-      tags: entity.tags,
-      basePrice: entity.basePrice,
-      salePrice: entity.salePrice,
+      categorySlug: entity.categorySlug,
+      brandId: entity.brandId ?? null,
+      brandName: entity.brandName ?? null,
+      ingredients: (entity.ingredients || []).map((i) => i.ingredientName),
+      tags: entity.tags || [],
+      basePrice: Number(entity.basePrice),
+      salePrice: entity.salePrice ? Number(entity.salePrice) : null,
+      minPrice,
+      maxPrice,
       primaryImage: entity.primaryImageUrl,
-      avgRating: entity.avgRating,
-      totalSold: entity.totalSold,
-      isActive: entity.isActive,
+      avgRating: Number(entity.avgRating ?? 0),
+      totalReviews: Number(entity.totalReviews ?? 0),
+      totalSold: Number(entity.totalSold ?? 0),
+      isActive:
+        entity.isActive &&
+        entity.isCategoryActive !== false &&
+        entity.isBrandActive !== false,
+      hasActiveVariants: activeVariants.length > 0,
+      createdAt: (entity.createdAt || new Date()).toISOString(),
     };
   }
 

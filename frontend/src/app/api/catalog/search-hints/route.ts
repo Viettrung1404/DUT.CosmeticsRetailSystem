@@ -9,7 +9,9 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   try {
-    return Response.json(await getSearchHints(query), { headers: { "Cache-Control": "no-store" } });
+    return Response.json(await getSearchHints(query), {
+      headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     return Response.json(
       { code: error instanceof ApiError ? error.code : "SERVICE_UNAVAILABLE" },

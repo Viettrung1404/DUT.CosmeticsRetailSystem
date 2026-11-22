@@ -24,6 +24,8 @@ export const productSchema = z.object({
   slug: z.string(),
   description: z.string().nullable().optional(),
   shortDescription: z.string().nullable().optional(),
+  howToUse: z.string().nullable().optional(),
+  specifications: z.record(z.string(), z.any()).nullable().optional(),
   basePrice: money,
   salePrice: money.nullable().optional(),
   effectivePrice: money.nullable().optional(),
@@ -33,6 +35,7 @@ export const productSchema = z.object({
   totalSold: z.number().optional(),
   option1Name: z.string().nullable().optional(),
   option2Name: z.string().nullable().optional(),
+  videoUrl: z.string().nullable().optional(),
   variants: z.array(variant).default([]),
   images: z
     .array(
@@ -50,6 +53,7 @@ export const productSchema = z.object({
         ingredientName: z.string(),
         percentage: z.string().nullable().optional(),
         isKeyIngredient: z.boolean().optional(),
+        purpose: z.string().nullable().optional(),
       }),
     )
     .optional(),

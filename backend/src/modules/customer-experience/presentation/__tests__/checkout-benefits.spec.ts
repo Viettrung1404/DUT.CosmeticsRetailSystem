@@ -47,9 +47,9 @@ describe("Checkout benefits", () => {
     expect(result.points).toEqual({
       balance: 75000,
       value: 1,
-      minimumBalance: 50000,
-      step: 10000,
-      maxRatio: 0.5,
+      minimumBalance: 0,
+      step: 1,
+      maxRatio: 1,
     });
     expect(db.customer.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: "customer-a" },

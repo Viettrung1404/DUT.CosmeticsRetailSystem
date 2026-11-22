@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PublicCatalogService } from './application/services/public-catalog.service';
 import { CatalogIndexWorker } from './infrastructure/search/catalog-index.worker';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
@@ -31,11 +31,14 @@ import { PRODUCT_VARIANT_REPOSITORY } from './domain/repositories/product-varian
 import { PrismaProductVariantRepository } from './infrastructure/persistence/prisma-product-variant.repository';
 import { PRODUCT_REPOSITORY } from './domain/repositories/product.repository.interface';
 import { PrismaProductRepository } from './infrastructure/persistence/prisma-product.repository';
-import { ElasticsearchProductService } from './infrastructure/search/elasticsearch-product.service';
+import {
+  OpenSearchProductService,
+  ElasticsearchProductService,
+} from './infrastructure/search/opensearch-product.service';
 import { ProductSearchSyncService } from './infrastructure/search/product-search-sync.service';
 
 @Module({
-  imports: [CustomerCommerceModule],
+  imports: [forwardRef(() => CustomerCommerceModule)],
   controllers: [
     ProductCustomerController,
     ProductImportAdminController,
@@ -64,8 +67,12 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     ImportProductsUseCase,
     ListProductTagsUseCase,
 
-    // Search Engine
-    ElasticsearchProductService,
+    // Search Engine (OpenSearch with legacy alias)
+    OpenSearchProductService,
+    {
+      provide: ElasticsearchProductService,
+      useExisting: OpenSearchProductService,
+    },
     ProductSearchSyncService,
 
     // Repository Port -> Adapter Mapping
@@ -89,6 +96,7 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     SearchProductsUseCase,
     SuggestProductsUseCase,
     GetRelatedProductsUseCase,
+    OpenSearchProductService,
     ElasticsearchProductService,
   ],
 })

@@ -8,7 +8,7 @@ import { paymentStatusSchema } from "./contracts";
 import { ContinueSepayPayment } from "./continue-sepay-payment";
 import { orderDetailSchema } from "@/features/account/contracts";
 import { OrderLines, OrderTotals, CheckoutSteps, StatusBadge } from "@/features/account/account-ui";
-import { Check, Package, MapPin, Clock3 } from "lucide-react";
+import { Check, Package, MapPin, Clock3, Truck, Search } from "lucide-react";
 
 export function OrderResult({ id }: { id: string }) {
   const order = useQuery({
@@ -45,6 +45,11 @@ export function OrderResult({ id }: { id: string }) {
   const completed = !paymentId || payment?.paymentStatus === "COMPLETED";
   const currentStatus = payment?.orderStatus ?? order.data.status;
   const cancelled = currentStatus === "CANCELLED";
+  const isGuest = Boolean(order.data.isGuest);
+  const guestPhone = order.data.shippingAddress?.phone || "";
+  const guestTrackingUrl = `/order-tracking?orderNumber=${encodeURIComponent(
+    order.data.orderNumber,
+  )}&phone=${encodeURIComponent(guestPhone)}`;
   return (
     <div className="result-page">
       <CheckoutSteps current={2} />
@@ -101,17 +106,96 @@ export function OrderResult({ id }: { id: string }) {
           }
         />
         <div className="result-actions">
-          {!order.data.isGuest && (
+          {!isGuest ? (
             <Link className="button" href={`/account/orders/${id}`}>
+              Theo dõi đơn hàng
+            </Link>
+          ) : (
+            <Link className="button" href={guestTrackingUrl}>
               Theo dõi đơn hàng
             </Link>
           )}
           <Link href="/products">Tiếp tục mua sắm</Link>
         </div>
-        {order.data.isGuest && (
-          <p className="muted">
-            Bạn có thể mở lại trang này để xem đơn hàng trên thiết bị và trình duyệt đang dùng.
-          </p>
+        {isGuest && (
+          <div
+            style={{
+              marginTop: 20,
+              padding: "16px 20px",
+              borderRadius: 12,
+              backgroundColor: currentStatus === "PENDING_PAYMENT" ? "#fffbeb" : "#f0fdf4",
+              border: `1px solid ${currentStatus === "PENDING_PAYMENT" ? "#fde68a" : "#bbf7d0"}`,
+              textAlign: "left",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+            }}
+          >
+            <Truck
+              size={22}
+              style={{
+                color: currentStatus === "PENDING_PAYMENT" ? "#d97706" : "#16a34a",
+                flexShrink: 0,
+                marginTop: 2,
+              }}
+            />
+            <div style={{ flex: 1 }}>
+              <h4
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: currentStatus === "PENDING_PAYMENT" ? "#92400e" : "#166534",
+                  margin: "0 0 4px",
+                }}
+              >
+                {currentStatus === "PENDING_PAYMENT"
+                  ? "Tra cứu đơn hàng khi chưa thanh toán"
+                  : "Tra cứu & theo dõi hành trình đơn hàng"}
+              </h4>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: currentStatus === "PENDING_PAYMENT" ? "#78350f" : "#15803d",
+                  margin: "0 0 10px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {currentStatus === "PENDING_PAYMENT"
+                  ? "Bạn đang đặt hàng với tư cách Khách. Bạn có thể tra cứu mã QR chuyển khoản và tiến trình xử lý đơn hàng bất kỳ lúc nào tại:"
+                  : "Bạn đang đặt hàng với tư cách Khách. Bạn có thể theo dõi tiến trình đóng gói và lộ trình giao vận theo thời gian thực tại:"}
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <Link
+                  href={guestTrackingUrl}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    backgroundColor: currentStatus === "PENDING_PAYMENT" ? "#d97706" : "#16a34a",
+                    color: "#fff",
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                  }}
+                >
+                  <Search size={14} /> Tra cứu đơn hàng tại đây
+                </Link>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: currentStatus === "PENDING_PAYMENT" ? "#b45309" : "#166534",
+                    backgroundColor: currentStatus === "PENDING_PAYMENT" ? "#fef3c7" : "#dcfce7",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                  }}
+                >
+                  Mã đơn: {order.data.orderNumber} {guestPhone ? `• SĐT: ${guestPhone}` : ""}
+                </span>
+              </div>
+            </div>
+          </div>
         )}
       </section>
       <div className="result-order-details">

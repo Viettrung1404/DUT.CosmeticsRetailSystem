@@ -43,6 +43,7 @@ export interface ProductProps {
   option1Name?: string | null;
   option2Name?: string | null;
   option3Name?: string | null;
+  videoUrl?: string | null;
   isActive?: boolean;
   isFeatured?: boolean;
   avgRating?: number;
@@ -79,6 +80,7 @@ export type ProductChanges = Partial<
     | 'option1Name'
     | 'option2Name'
     | 'option3Name'
+    | 'videoUrl'
     | 'isActive'
     | 'isFeatured'
     | 'metaTitle'
@@ -111,6 +113,7 @@ export class ProductEntity {
   private _option1Name?: string | null;
   private _option2Name?: string | null;
   private _option3Name?: string | null;
+  private _videoUrl?: string | null;
   private _isActive: boolean;
   private _isFeatured: boolean;
   private _avgRating: number;
@@ -145,6 +148,7 @@ export class ProductEntity {
     this._option1Name = props.option1Name;
     this._option2Name = props.option2Name;
     this._option3Name = props.option3Name;
+    this._videoUrl = props.videoUrl;
     this._isActive = props.isActive ?? true;
     this._isFeatured = props.isFeatured ?? false;
     this._avgRating = props.avgRating ?? 0;
@@ -180,6 +184,7 @@ export class ProductEntity {
   get option1Name(): string | null | undefined { return this._option1Name; }
   get option2Name(): string | null | undefined { return this._option2Name; }
   get option3Name(): string | null | undefined { return this._option3Name; }
+  get videoUrl(): string | null | undefined { return this._videoUrl; }
   get isActive(): boolean { return this._isActive; }
   get isFeatured(): boolean { return this._isFeatured; }
   get avgRating(): number { return this._avgRating; }
@@ -238,6 +243,7 @@ export class ProductEntity {
     if (changes.option1Name !== undefined) this._option1Name = changes.option1Name;
     if (changes.option2Name !== undefined) this._option2Name = changes.option2Name;
     if (changes.option3Name !== undefined) this._option3Name = changes.option3Name;
+    if (changes.videoUrl !== undefined) this._videoUrl = changes.videoUrl;
     if (changes.metaTitle !== undefined) this._metaTitle = changes.metaTitle;
     if (changes.metaDescription !== undefined) this._metaDescription = changes.metaDescription;
     if (changes.metaKeywords !== undefined) this._metaKeywords = changes.metaKeywords;

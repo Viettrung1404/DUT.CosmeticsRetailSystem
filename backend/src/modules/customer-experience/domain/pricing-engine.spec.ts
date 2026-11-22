@@ -183,16 +183,14 @@ describe('Sprint 5 shared pricing engine', () => {
     );
     expect(quote.items.reduce((s, l) => s + l.cashValue, 0)).toBeCloseTo(90000, 2);
   });
-  it('uses the same minimum balance, step and half-order limit as POS', () => {
+  it('allows points up to full order value like cash', () => {
     const order = { lines: [line('v1', 300000)] };
     expect(price({ ...order, pointsRequested: 150000, availablePoints: 320000 }))
       .toMatchObject({ pointsDiscount: 150000, shippingFee: 15000, totalAmount: 165000 });
-    expect(() => price({ ...order, pointsRequested: 300000, availablePoints: 320000 }))
-      .toThrow('50%');
-    expect(() => price({ ...order, pointsRequested: 10000, availablePoints: 30000 }))
-      .toThrow('50.000');
-    expect(() => price({ ...order, pointsRequested: 55000, availablePoints: 320000 }))
-      .toThrow('10.000');
+    expect(price({ ...order, pointsRequested: 300000, availablePoints: 320000 }))
+      .toMatchObject({ pointsDiscount: 300000, shippingFee: 30000, totalAmount: 30000 });
+    expect(() => price({ ...order, pointsRequested: 350000, availablePoints: 400000 }))
+      .toThrow('tối đa');
   });
   it('rejects duplicate variants, negative amounts, invalid tier and excess points', () => {
     expect(() => price({ lines: [line(), line()] })).toThrow();

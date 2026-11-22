@@ -236,11 +236,14 @@ model Product {
   sku              String   @unique @db.VarChar(50)
   description      String?  @db.Text
   shortDescription String?  @map("short_description") @db.Text
+  howToUse         String?  @map("how_to_use") @db.Text
+  specifications   Json?    @map("specifications") @db.JsonB
   basePrice        Decimal  @map("base_price") @db.Decimal(12, 2)
   salePrice        Decimal? @map("sale_price") @db.Decimal(12, 2)
   option1Name      String?  @map("option1_name") @db.VarChar(50)
   option2Name      String?  @map("option2_name") @db.VarChar(50)
   option3Name      String?  @map("option3_name") @db.VarChar(50)
+  videoUrl         String?  @map("video_url") @db.Text
   isActive         Boolean  @default(true) @map("is_active")
   isFeatured       Boolean  @default(false) @map("is_featured")
   avgRating        Decimal  @default(0) @map("avg_rating") @db.Decimal(3, 2)
@@ -333,6 +336,7 @@ model ProductIngredient {
   productId       String   @map("product_id") @db.Uuid
   ingredientName  String   @map("ingredient_name") @db.VarChar(150)
   percentage      String?  @db.VarChar(20)
+  purpose         String?  @db.VarChar(500)
   isKeyIngredient Boolean  @default(false) @map("is_key_ingredient")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 

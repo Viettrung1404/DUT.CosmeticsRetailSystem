@@ -22,7 +22,7 @@ export async function ProductListing({
   const filters = parseListingParams(params);
   const [result, facets] = await Promise.all([
     getProducts({ ...filters, categoryId: category?.id }),
-    getFacets().catch(() => null),
+    getFacets(category?.id).catch(() => null),
   ]);
   return (
     <main id="main-content" className="catalog-page site-container">

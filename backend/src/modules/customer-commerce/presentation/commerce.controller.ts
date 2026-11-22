@@ -151,6 +151,12 @@ export class CommerceController {
   ) {
     return this.wishlist.change(req.user.userId, key, id, dto.selected);
   }
+  @Get('wishlists/ids')
+  @ApiOperation({ summary: 'Lấy toàn bộ ID sản phẩm yêu thích của khách hàng' })
+  @CommerceResponse('wishlistIds')
+  getWishlistIds(@Req() req: CustomerRequest) {
+    return this.wishlist.getIds(req.customerId);
+  }
   @Get('wishlists')
   @ApiOperation({ summary: 'Danh sách sản phẩm yêu thích còn hiển thị' })
   @CommerceResponse('wishlists')

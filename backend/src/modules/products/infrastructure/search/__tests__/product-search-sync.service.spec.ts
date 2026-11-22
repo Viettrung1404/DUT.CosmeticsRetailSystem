@@ -1,5 +1,5 @@
 import { PrismaService } from '@infrastructure/database/prisma.service';
-import { ElasticsearchProductService } from '../elasticsearch-product.service';
+import { OpenSearchProductService } from '../opensearch-product.service';
 import { ProductSearchSyncService } from '../product-search-sync.service';
 
 const rawProduct = (id: string) => ({
@@ -41,7 +41,7 @@ describe('ProductSearchSyncService', () => {
   const createService = () =>
     new ProductSearchSyncService(
       { product: { findMany } } as unknown as PrismaService,
-      es as unknown as ElasticsearchProductService,
+      es as unknown as OpenSearchProductService,
     );
 
   beforeEach(() => {
@@ -60,7 +60,7 @@ describe('ProductSearchSyncService', () => {
     expect(findMany).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: { id: 'b' }, skip: 1 }));
   });
 
-  it('bỏ qua khi Elasticsearch không kết nối được', async () => {
+  it('bỏ qua khi OpenSearch không kết nối được', async () => {
     es.isAvailable = false;
     expect(await createService().reindexAll()).toBe(0);
     expect(findMany).not.toHaveBeenCalled();

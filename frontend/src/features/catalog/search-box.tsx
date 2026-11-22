@@ -8,6 +8,8 @@ import { formatPrice } from "./components";
 import { searchHintsSchema, type SearchHints } from "./search-hints";
 
 const empty: SearchHints = { keywords: [], brands: [], products: [] };
+const hintsCache = new Map<string, SearchHints>();
+
 export function SearchBox() {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -16,8 +18,22 @@ export function SearchBox() {
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
   const query = value.trim();
+
   useEffect(() => {
-    if (query.length < 2) return;
+    if (query.length < 2) {
+      setHints(empty);
+      setLoading(false);
+      return;
+    }
+
+    if (hintsCache.has(query)) {
+      setHints(hintsCache.get(query)!);
+      setLoading(false);
+      setOpen(true);
+      return;
+    }
+
+    setLoading(true);
     const controller = new AbortController();
     const timer = setTimeout(() => {
       readBff(
@@ -27,6 +43,7 @@ export function SearchBox() {
       )
         .then((result) => {
           if (!controller.signal.aborted) {
+            hintsCache.set(query, result);
             setHints(result);
             setLoading(false);
             setOpen(true);
@@ -35,12 +52,11 @@ export function SearchBox() {
         })
         .catch(() => {
           if (!controller.signal.aborted) {
-            setHints(empty);
             setLoading(false);
-            setOpen(true);
           }
         });
-    }, 300);
+    }, 150);
+
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -142,11 +158,23 @@ export function SearchBox() {
           if (query.length >= 2) setOpen(true);
         }}
         onChange={(event) => {
-          setValue(event.target.value);
+          const next = event.target.value;
+          setValue(next);
           setActive(-1);
-          setLoading(event.target.value.trim().length >= 2);
-          setOpen(event.target.value.trim().length >= 2);
-          setHints(empty);
+          const q = next.trim();
+          if (q.length >= 2) {
+            setOpen(true);
+            if (hintsCache.has(q)) {
+              setHints(hintsCache.get(q)!);
+              setLoading(false);
+            } else {
+              setLoading(true);
+            }
+          } else {
+            setOpen(false);
+            setLoading(false);
+            setHints(empty);
+          }
         }}
       />
       <button type="submit" className="sr-only">

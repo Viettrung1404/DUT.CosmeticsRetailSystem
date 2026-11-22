@@ -52,6 +52,20 @@ export function CartContents({
     setError("");
     queueCartChanges(client, changes, (cause) => setError(apiErrorMessage(cause)));
   }
+  function selectOnlyFirstItem() {
+    const selectedItems = data?.items.filter(
+      (item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded,
+    );
+    if (!selectedItems || selectedItems.length <= 1) return;
+    const [, ...rest] = selectedItems;
+    queue(
+      rest.map((item) => ({
+        id: item.id,
+        method: "PUT",
+        body: { isSelected: false },
+      })),
+    );
+  }
   function selectAll() {
     const current = client.getQueryData<Cart>(["cart"]);
     if (!current) return;
@@ -316,8 +330,38 @@ export function CartContents({
                 <dd>{formatPrice(quote.data?.totalAmount ?? data.selectedSubtotal)}</dd>
               </div>
             </dl>
-            {!quote.data && <p>Phí giao hàng và ưu đãi được xác nhận ở bước thanh toán.</p>}
-            {eligible.length > 0 &&
+            {!quote.data && !quote.isError && (
+              <p>Phí giao hàng và ưu đãi được xác nhận ở bước thanh toán.</p>
+            )}
+            {quote.isError && (
+              <div className="cart-warning cart-quote-warning" role="alert">
+                <p>
+                  <strong>Chưa thể giao chung đơn:</strong> {apiErrorMessage(quote.error)}
+                </p>
+                <small>
+                  Các sản phẩm đã chọn không có cùng tại 1 chi nhánh/kho để gom chung 1 đơn hàng.
+                </small>
+                {eligible.length > 1 && (
+                  <button
+                    type="button"
+                    className="button cart-split-button"
+                    onClick={selectOnlyFirstItem}
+                  >
+                    Tách đơn: Chỉ chọn sản phẩm đầu tiên để thanh toán
+                  </button>
+                )}
+              </div>
+            )}
+            {quote.isError ? (
+              <button
+                type="button"
+                className="button"
+                disabled
+                style={{ opacity: 0.5, cursor: "not-allowed" }}
+              >
+                <ShoppingCart size={18} /> Không thể thanh toán chung
+              </button>
+            ) : eligible.length > 0 &&
             eligible.length === data.items.filter((item) => item.isSelected).length ? (
               <Link href="/checkout" className="button" onClick={onNavigate}>
                 <ShoppingCart size={18} /> Tiến hành thanh toán ({eligible.length})

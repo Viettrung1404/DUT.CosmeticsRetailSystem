@@ -74,7 +74,7 @@ export class ProductCustomerController {
   @Get('search')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({
-    summary: 'Tìm kiếm sản phẩm theo từ khóa (Elasticsearch + fallback DB)',
+    summary: 'Tìm kiếm sản phẩm theo từ khóa (OpenSearch + fallback DB)',
   })
   @ApiOkResponse({ description: 'Kết quả tìm kiếm sản phẩm', type: PageDto })
   async searchProducts(
@@ -101,8 +101,8 @@ export class ProductCustomerController {
   @Public()
   @Get('facets')
   @ApiOperation({ summary: 'Số lượng sản phẩm đang bán theo danh mục, thương hiệu và tag' })
-  async facets() {
-    return this.catalog?.facets() ?? { categories: [], brands: [], tags: [] };
+  async facets(@Query('categoryId') categoryId?: string) {
+    return this.catalog?.facets(categoryId) ?? { categories: [], brands: [], tags: [] };
   }
 
   @Public()

@@ -35,6 +35,25 @@ import {
   ValidatedShippingQuote,
 } from "@modules/oms/application/services/shipping-quote.service";
 
+function resolveTrackingLink(template: unknown, code: string | null) {
+  if (
+    typeof template !== "string" ||
+    !code ||
+    !template.includes("{trackingCode}")
+  )
+    return null;
+  try {
+    const url = new URL(
+      template.replace("{trackingCode}", encodeURIComponent(code)),
+    );
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 type CheckoutSelection = Omit<PreviewOrderInput, "customerId"> & {
   customerId?: string;
   sessionId?: string;
@@ -256,7 +275,7 @@ export class CommerceCheckoutService {
         },
         payments: {
           orderBy: { createdAt: "desc" },
-          select: { id: true, paymentMethod: true, status: true },
+          select: { id: true, paymentMethod: true, status: true, paidAt: true, transactionId: true },
         },
       },
     });
@@ -313,7 +332,79 @@ export class CommerceCheckoutService {
         },
         payments: {
           orderBy: { createdAt: "desc" },
-          select: { id: true, paymentMethod: true, status: true },
+          select: { id: true, paymentMethod: true, status: true, paidAt: true, transactionId: true },
+        },
+        statusHistories: {
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            status: true,
+            note: true,
+            createdAt: true,
+          },
+        },
+        shipments: {
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            shipmentCode: true,
+            carrierCode: true,
+            carrierServiceCode: true,
+            trackingCode: true,
+            status: true,
+            trackingUrl: true,
+            failedAttempts: true,
+            handedOverAt: true,
+            deliveredAt: true,
+            updatedAt: true,
+            packages: {
+              select: {
+                package: {
+                  select: {
+                    id: true,
+                    packageCode: true,
+                    actualWeightGrams: true,
+                    items: {
+                      select: {
+                        quantity: true,
+                        variant: {
+                          select: {
+                            sku: true,
+                            option1Value: true,
+                            option2Value: true,
+                            product: {
+                              select: {
+                                name: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            attempts: {
+              orderBy: { attemptNumber: "asc" },
+              select: {
+                id: true,
+                attemptNumber: true,
+                attemptedAt: true,
+                failureReasonCode: true,
+                failureReasonDetail: true,
+              },
+            },
+            events: {
+              orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                status: true,
+                occurredAt: true,
+                receivedAt: true,
+              },
+            },
+          },
         },
       },
     });
@@ -326,6 +417,16 @@ export class CommerceCheckoutService {
     const orderPhone = (addr?.phone || "").replace(/\D/g, "");
     if (!orderPhone || !cleanPhone || !orderPhone.endsWith(cleanPhone.slice(-7))) {
       throw new NotFoundException("Thông tin số điện thoại không trùng khớp với đơn hàng");
+    }
+
+    let templates: Record<string, string> | null = null;
+    try {
+      const configured = await this.db.setting.findUnique({
+        where: { key: "carrier_tracking_urls" },
+      });
+      templates = configured?.value as Record<string, string> | null;
+    } catch {
+      // ignore
     }
 
     return {
@@ -342,6 +443,53 @@ export class CommerceCheckoutService {
         totalPrice: Number(item.totalPrice),
       })),
       payments: order.payments,
+      statusHistories: order.statusHistories?.length
+        ? order.statusHistories
+        : [
+            {
+              id: "initial",
+              status: order.status,
+              note: "Đơn hàng được khởi tạo",
+              createdAt: order.createdAt,
+            },
+          ],
+      shipments: (order.shipments || []).map((shipment) => {
+        const computedUrl = resolveTrackingLink(
+          templates?.[shipment.carrierCode],
+          shipment.trackingCode,
+        );
+        return {
+          ...shipment,
+          trackingUrl: shipment.trackingUrl || computedUrl || null,
+          packages:
+            shipment.packages?.map((sp) => ({
+              id: sp.package.id,
+              packageCode: sp.package.packageCode,
+              actualWeightGrams: sp.package.actualWeightGrams,
+              items:
+                sp.package.items?.map((it) => {
+                  const v = it.variant;
+                  const variantName =
+                    [v?.option1Value, v?.option2Value].filter(Boolean).join(" - ") ||
+                    v?.sku ||
+                    "";
+                  return {
+                    quantity: it.quantity,
+                    productName: v?.product?.name ?? "Sản phẩm",
+                    variantName,
+                  };
+                }) ?? [],
+            })) ?? [],
+          attempts:
+            shipment.attempts?.map((att) => ({
+              id: att.id,
+              attemptNumber: att.attemptNumber,
+              attemptedAt: att.attemptedAt,
+              failureReasonCode: att.failureReasonCode,
+              failureReasonDetail: att.failureReasonDetail,
+            })) ?? [],
+        };
+      }),
     };
   }
 

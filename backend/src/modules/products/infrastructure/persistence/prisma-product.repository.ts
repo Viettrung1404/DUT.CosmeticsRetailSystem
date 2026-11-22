@@ -10,7 +10,7 @@ import { ProductEntity, ProductImageProps } from '../../domain/entities/product.
 import { ProductMapper } from '../mappers/product.mapper';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { ProductFilterDto, ProductSortBy } from '../../presentation/dtos/product-filter.dto';
-import { ElasticsearchProductService } from '../search/elasticsearch-product.service';
+import { OpenSearchProductService } from '../search/opensearch-product.service';
 import { Prisma } from '@prisma/client';
 
 export const productIncludeConfig = {
@@ -28,7 +28,7 @@ export const productIncludeConfig = {
 export class PrismaProductRepository implements IProductRepository {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly esService?: ElasticsearchProductService,
+    @Optional() private readonly searchService?: OpenSearchProductService,
   ) {}
 
   async findById(id: string): Promise<ProductEntity | null> {
@@ -142,17 +142,17 @@ export class PrismaProductRepository implements IProductRepository {
   }
 
   async search(query: string, options: PageOptionsDto): Promise<{ items: ProductEntity[]; total: number }> {
-    // 1. Attempt Elasticsearch search first
-    if (this.esService) {
-      const esResult = await this.esService.search(query, options.skip, options.limit);
-      if (esResult !== null) {
-        if (esResult.ids.length === 0) {
+    // 1. Attempt OpenSearch search first
+    if (this.searchService) {
+      const searchResult = await this.searchService.search(query, options.skip, options.limit);
+      if (searchResult !== null) {
+        if (searchResult.ids.length === 0) {
           return { items: [], total: 0 };
         }
 
         const rawItems = await this.prisma.product.findMany({
           where: {
-            id: { in: esResult.ids },
+            id: { in: searchResult.ids },
             isActive: true,
             category: { isActive: true },
             OR: [
@@ -163,18 +163,18 @@ export class PrismaProductRepository implements IProductRepository {
           include: productIncludeConfig,
         });
 
-        // Preserve relevance order returned by Elasticsearch
+        // Preserve relevance order returned by OpenSearch
         const itemMap = new Map(rawItems.map((item) => [item.id, item]));
-        const sortedItems = esResult.ids
+        const sortedItems = searchResult.ids
           .map((id) => itemMap.get(id))
           .filter((item): item is NonNullable<typeof item> => !!item)
           .map((item) => ProductMapper.toDomain(item));
 
-        return { items: sortedItems, total: esResult.total };
+        return { items: sortedItems, total: searchResult.total };
       }
     }
 
-    // 2. Fallback to PostgreSQL ILIKE search (only if Elasticsearch is unavailable)
+    // 2. Fallback to PostgreSQL ILIKE search (only if OpenSearch is unavailable)
     const where: Prisma.ProductWhereInput = {
       isActive: true,
       category: { isActive: true },
@@ -214,10 +214,10 @@ export class PrismaProductRepository implements IProductRepository {
   }
 
   async suggest(query: string, limit = 8): Promise<ProductSuggestionItem[]> {
-    if (this.esService) {
-      const esSuggestions = await this.esService.suggest(query, limit);
-      if (esSuggestions !== null) {
-        return esSuggestions;
+    if (this.searchService) {
+      const suggestions = await this.searchService.suggest(query, limit);
+      if (suggestions !== null) {
+        return suggestions;
       }
     }
 

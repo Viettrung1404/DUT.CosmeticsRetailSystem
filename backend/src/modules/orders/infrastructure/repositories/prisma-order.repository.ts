@@ -538,23 +538,65 @@ export class PrismaOrderRepository implements IOrderRepository {
       if (existingRow.customer_id)
         await evaluateTier(tx, existingRow.customer_id);
 
-      // 4. Update Payment to CANCELLED
+      // 4. Update Payment to CANCELLED & Refund completed payments into points
       const completedPayments = await tx.payment.findMany({
         where: { orderId, status: 'COMPLETED' },
       });
-      for (const payment of completedPayments)
+      for (const payment of completedPayments) {
+        const paymentAmountNum = Math.round(Number(payment.amount));
+        let refundStatus = 'PENDING';
+
+        // Nếu khách hàng có tài khoản thành viên, hoàn tiền mặt trực tiếp thành điểm thưởng (xu)
+        if (existingRow.customer_id && paymentAmountNum > 0) {
+          await tx.customer.update({
+            where: { id: existingRow.customer_id },
+            data: {
+              totalPoints: { increment: paymentAmountNum },
+            },
+          });
+
+          await tx.loyaltyPointsTransaction.create({
+            data: {
+              customerId: existingRow.customer_id,
+              orderId: existingRow.id,
+              points: paymentAmountNum,
+              type: 'REFUND',
+              eventKey: `ORDER:${orderId}:REFUND_PAYMENT:${payment.id}`,
+              description: `Hoàn tiền thanh toán đơn ${existingRow.order_number} vào xu`,
+            },
+          });
+
+          refundStatus = 'COMPLETED';
+
+          await notifyCustomer(
+            tx,
+            existingRow.customer_id,
+            `ORDER:${orderId}:REFUND_COINS:${payment.id}`,
+            `Đơn hàng ${existingRow.order_number} đã hủy. Số tiền ${paymentAmountNum.toLocaleString('vi-VN')}đ đã được hoàn vào ví xu GlowUp.`,
+            'LOYALTY',
+            { orderId, points: paymentAmountNum },
+          );
+        }
+
         await tx.refund.upsert({
           where: { eventKey: `CANCEL:${orderId}:${payment.id}` },
-          update: {},
+          update: {
+            status: refundStatus,
+            reason: reason ? `${reason} (Hoàn vào xu)` : 'Hủy đơn hoàn vào xu',
+          },
           create: {
             orderId,
             paymentId: payment.id,
             amount: payment.amount,
-            reason: reason || 'Hủy đơn',
-            status: 'PENDING',
+            reason: reason ? `${reason} (Hoàn vào xu)` : 'Hủy đơn hoàn vào xu',
+            status: refundStatus,
             eventKey: `CANCEL:${orderId}:${payment.id}`,
           },
         });
+      }
+      if (existingRow.customer_id && completedPayments.length > 0) {
+        await evaluateTier(tx, existingRow.customer_id);
+      }
       await tx.payment.updateMany({
         where: { orderId: existingRow.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
         data: { status: 'CANCELLED' },

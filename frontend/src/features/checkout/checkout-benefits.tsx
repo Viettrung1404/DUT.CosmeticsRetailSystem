@@ -10,12 +10,15 @@ export function maximumCheckoutPoints(
   policy: z.infer<typeof checkoutBenefitsSchema>["points"] | undefined,
   quote: z.infer<typeof previewSchema> | null | undefined,
 ) {
-  if (!policy || !quote || policy.balance < policy.minimumBalance) return 0;
+  if (!policy || !quote || policy.balance <= 0) return 0;
   const base = Math.max(0, quote.subtotal - quote.discountAmount);
+  const step = policy.step || 1;
+  const value = policy.value || 1;
+  const maxRatio = policy.maxRatio ?? 1;
   return (
     Math.floor(
-      Math.min(policy.balance, Math.floor((base * policy.maxRatio) / policy.value)) / policy.step,
-    ) * policy.step
+      Math.min(policy.balance, Math.floor((base * maxRatio) / value)) / step,
+    ) * step
   );
 }
 
@@ -261,9 +264,7 @@ export function CheckoutBenefits({
               </>
             )}
             <p>
-              {data.points.balance < data.points.minimumBalance
-                ? `Tích lũy đủ ${data.points.minimumBalance.toLocaleString("vi-VN")} xu để bắt đầu sử dụng.`
-                : `Dùng theo mức ${data.points.step.toLocaleString("vi-VN")} xu, tối đa ${Math.round(data.points.maxRatio * 100)}% tiền hàng sau giảm giá.`}
+              Dùng xu tương đương tiền thật (1 xu = 1đ). Khấu trừ tối đa 100% tiền hàng.
             </p>
           </>
         )}

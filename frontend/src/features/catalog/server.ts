@@ -59,6 +59,7 @@ const blogPostSchema = z.object({
   metaDescription: z.string().nullable().optional(),
   category: z.object({ name: z.string(), slug: z.string() }).nullable().optional(),
   author: z.object({ fullName: z.string() }).nullable().optional(),
+  viewsCount: z.number().nullable().optional(),
 });
 const brandSchema = z.array(
   z.object({
@@ -254,7 +255,10 @@ export const getRelated = (id: string) =>
   request(`/customer/products/${encodeURIComponent(id)}/related?limit=4`, z.array(productSchema), {
     next: { revalidate: 120, tags: [`related-${id}`] },
   });
-export const getCategories = () => request("/categories/tree", z.array(categorySchema));
+export const getCategories = () =>
+  request("/categories/tree", z.array(categorySchema), {
+    next: { revalidate: 300, tags: ["categories"] },
+  });
 export const getBanners = (position: string) =>
   request(`/banners?position=${encodeURIComponent(position)}`, bannerSchema);
 export const getPosts = () => request("/blog/posts?page=1&limit=3", postSchema);
@@ -289,7 +293,14 @@ export const getFlashCards = (limit = 5) =>
     `/promotions/flash-sale/cards?limit=${Math.min(Math.max(limit, 1), 20)}`,
     flashCardsSchema,
   );
-export const getFacets = () => request("/customer/products/facets", facetsSchema);
+export const getFacets = (categoryId?: string) =>
+  request(
+    `/customer/products/facets${categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : ""}`,
+    facetsSchema,
+    {
+      next: { revalidate: 60, tags: [categoryId ? `facets-${categoryId}` : "facets"] },
+    },
+  );
 export const getAvailability = (productId: string, variantId: string) =>
   request(
     `/customer/products/${encodeURIComponent(productId)}/availability?variantId=${encodeURIComponent(variantId)}`,

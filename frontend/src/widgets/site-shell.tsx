@@ -51,6 +51,7 @@ export function SiteHeader({
   const wishlistDialog = useRef<HTMLDialogElement>(null);
   const wishlistTrigger = useRef<HTMLButtonElement>(null);
   const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
   const { data: cart } = useQuery(cartQuery());
   const { data: wishlistIds } = useQuery(wishlistIdsQuery());
   const cartCount = hydrated ? (cart?.totalQuantity ?? 0) : 0;
@@ -81,6 +82,7 @@ export function SiteHeader({
   }, [open]);
   useEffect(() => {
     const onOpenCart = () => {
+      setCartOpen(true);
       cartDialog.current?.showModal();
     };
     window.addEventListener("glowup:open-cart", onOpenCart);
@@ -195,7 +197,10 @@ export function SiteHeader({
               type="button"
               className="cart-entry"
               aria-label={`Mở giỏ hàng, ${cartCount} sản phẩm`}
-              onClick={() => cartDialog.current?.showModal()}
+              onClick={() => {
+                setCartOpen(true);
+                cartDialog.current?.showModal();
+              }}
             >
               <ShoppingBag />
               {cartCount > 0 && <span className="header-count">{cartCount}</span>}
@@ -339,9 +344,15 @@ export function SiteHeader({
         ref={cartDialog}
         className="mini-cart-drawer"
         aria-label="Giỏ hàng"
-        onClose={() => cartTrigger.current?.focus()}
+        onClose={() => {
+          setCartOpen(false);
+          cartTrigger.current?.focus();
+        }}
         onClick={(event) => {
-          if (event.target === event.currentTarget) cartDialog.current?.close();
+          if (event.target === event.currentTarget) {
+            setCartOpen(false);
+            cartDialog.current?.close();
+          }
         }}
       >
         <div className="drawer-heading">
@@ -350,12 +361,23 @@ export function SiteHeader({
             type="button"
             className="icon-button"
             aria-label="Đóng giỏ hàng"
-            onClick={() => cartDialog.current?.close()}
+            onClick={() => {
+              setCartOpen(false);
+              cartDialog.current?.close();
+            }}
           >
             <X />
           </button>
         </div>
-        {hydrated && <CartContents compact onNavigate={() => cartDialog.current?.close()} />}
+        {hydrated && cartOpen && (
+          <CartContents
+            compact
+            onNavigate={() => {
+              setCartOpen(false);
+              cartDialog.current?.close();
+            }}
+          />
+        )}
       </dialog>
     </>
   );

@@ -26,7 +26,7 @@ export default async function CategoryPage({
       base={`/categories/${slug}`}
       params={query}
       category={category}
-      categories={category.children.length ? category.children : categories}
+      categories={category.children.length > 0 ? category.children : undefined}
     />
   );
 }

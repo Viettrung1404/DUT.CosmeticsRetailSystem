@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { randomUUID } from 'crypto';
-import { ElasticsearchProductService } from './elasticsearch-product.service';
+import { OpenSearchProductService } from './opensearch-product.service';
 import { ProductMapper } from '../mappers/product.mapper';
 import { productIncludeConfig } from '../persistence/prisma-product.repository';
 
@@ -14,7 +14,7 @@ export class CatalogIndexWorker implements OnApplicationShutdown {
   private readonly logger = new Logger(CatalogIndexWorker.name);
   constructor(
     private readonly db: PrismaService,
-    private readonly es: ElasticsearchProductService,
+    private readonly searchService: OpenSearchProductService,
   ) {}
   @Interval(3000)
   async tick() {
@@ -24,11 +24,11 @@ export class CatalogIndexWorker implements OnApplicationShutdown {
       process.env.CATALOG_INDEX_WORKER_ENABLED !== 'true'
     )
       return;
-    if (!this.es.isAvailable) {
+    if (!this.searchService.isAvailable) {
       if (Date.now() < this.nextReconnect) return;
       this.nextReconnect = Date.now() + 30000;
-      await this.es.initIndex();
-      if (!this.es.isAvailable) return;
+      await this.searchService.initIndex();
+      if (!this.searchService.isAvailable) return;
     }
     this.active = this.processBatch();
     try {
@@ -71,7 +71,7 @@ export class CatalogIndexWorker implements OnApplicationShutdown {
             product.isActive &&
             product.isCategoryActive !== false &&
             product.isBrandActive !== false;
-          await this.es.syncVersioned(
+          await this.searchService.syncVersioned(
             job.product_id,
             visible ? ProductMapper.toSearchDocument(product) : null,
             Number(job.version),

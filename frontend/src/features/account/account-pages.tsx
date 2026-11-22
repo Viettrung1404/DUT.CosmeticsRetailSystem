@@ -18,6 +18,9 @@ import {
   AlertCircle,
   ExternalLink,
   Clock,
+  Check,
+  Copy,
+  RotateCcw,
 } from "lucide-react";
 import { AccountHeading, StatusBadge, OrderProgress, OrderLines, OrderTotals } from "./account-ui";
 import { ContentEmpty } from "@/features/catalog/content-layout";
@@ -471,7 +474,7 @@ export function OrdersPage() {
                   {order.status === "SHIPPING" && (
                     <Link
                       className="order-primary-action"
-                      href={`/account/orders/${order.id}/tracking`}
+                      href={`/account/orders/${order.id}`}
                     >
                       <Truck size={15} />
                       Theo dõi vận chuyển
@@ -517,16 +520,34 @@ export function OrderDetail({ id }: { id: string }) {
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
   const query = useQuery({
     queryKey: ["order-detail", id],
     queryFn: ({ signal }) => readBff(`/api/account/orders/${id}`, orderDetailSchema, signal),
     refetchInterval: (query) =>
       ["PENDING_PAYMENT", "PENDING"].includes(query.state.data?.status ?? "") ? 5000 : false,
   });
+
+  const trackingQuery = useQuery({
+    queryKey: ["tracking", id],
+    queryFn: ({ signal }) => readBff(`/api/account/orders/${id}/tracking`, trackingSchema, signal),
+    refetchInterval: (query) =>
+      ["SHIPPING", "OUT_FOR_DELIVERY", "PROCESSING"].includes(query.state.data?.status ?? "") ? 15000 : false,
+  });
+
+  const handleCopy = (code: string) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    }
+  };
+
   async function cancel() {
     if (
       !window.confirm(
-        "Bạn muốn hủy đơn hàng này? Nếu đã thanh toán, cửa hàng sẽ kiểm tra hoàn tiền.",
+        "Bạn muốn hủy đơn hàng này? Toàn bộ số tiền đã thanh toán và xu đã sử dụng sẽ được hoàn lại ngay vào ví xu GlowUp của bạn.",
       )
     )
       return;
@@ -539,12 +560,14 @@ export function OrderDetail({ id }: { id: string }) {
       });
       client.setQueryData(["order-detail", id], result);
       client.invalidateQueries({ queryKey: ["orders"] });
+      client.invalidateQueries({ queryKey: ["loyalty"] });
     } catch (e) {
       setError(apiErrorMessage(e));
     } finally {
       setBusy(false);
     }
   }
+
   if (query.isPending) return <ContentLoading variant="detail" label="Đang tải đơn hàng…" />;
   if (query.isError)
     return (
@@ -552,23 +575,529 @@ export function OrderDetail({ id }: { id: string }) {
         Không xem được đơn hàng này. <button onClick={() => query.refetch()}>Thử lại</button>
       </p>
     );
+
   const order = query.data;
+  const tracking = trackingQuery.data;
+
+  const isCancelled = order.status === "CANCELLED";
+  const isReturned = order.status === "RETURNED";
+
+  const placedTime =
+    tracking?.statusHistories?.find((h) => h.status === "PENDING" || h.status === "PENDING_PAYMENT")?.createdAt ||
+    order.createdAt;
+
+  const confirmedTime = tracking?.statusHistories?.find(
+    (h) => h.status === "CONFIRMED" || h.status === "PROCESSING",
+  )?.createdAt;
+
+  const shippingTime =
+    tracking?.statusHistories?.find((h) => h.status === "SHIPPING" || h.status === "OUT_FOR_DELIVERY")?.createdAt ||
+    tracking?.shipments?.[0]?.handedOverAt ||
+    tracking?.shipments?.[0]?.events?.[0]?.occurredAt;
+
+  const deliveredTime =
+    tracking?.statusHistories?.find((h) => h.status === "DELIVERED" || h.status === "COMPLETED")?.createdAt ||
+    tracking?.shipments?.[0]?.deliveredAt;
+
+  let activeIndex = 0;
+  if (order.status === "COMPLETED" || order.status === "DELIVERED") {
+    activeIndex = 3;
+  } else if (
+    order.status === "SHIPPING" ||
+    order.status === "OUT_FOR_DELIVERY" ||
+    tracking?.shipments?.some((s) => ["IN_TRANSIT", "DELIVERING", "SHIPPING", "PICKED_UP"].includes(s.status))
+  ) {
+    activeIndex = 2;
+  } else if (order.status === "CONFIRMED" || order.status === "PROCESSING") {
+    activeIndex = 1;
+  }
+
+  const milestones = [
+    {
+      step: 1,
+      title: "Đặt hàng",
+      desc: "Đơn hàng khởi tạo",
+      time: placedTime,
+      isCompleted: true,
+      isCurrent: activeIndex === 0 && !isCancelled && !isReturned,
+    },
+    {
+      step: 2,
+      title: "Chuẩn bị hàng",
+      desc: "Xác nhận & đóng gói",
+      time: confirmedTime,
+      isCompleted: activeIndex >= 1 && !isCancelled && !isReturned,
+      isCurrent: activeIndex === 1 && !isCancelled && !isReturned,
+    },
+    {
+      step: 3,
+      title: "Đang vận chuyển",
+      desc: "Bàn giao bưu tá",
+      time: shippingTime,
+      isCompleted: activeIndex >= 2 && !isCancelled && !isReturned,
+      isCurrent: activeIndex === 2 && !isCancelled && !isReturned,
+    },
+    {
+      step: 4,
+      title: "Giao thành công",
+      desc: "Nhận hàng hoàn tất",
+      time: deliveredTime,
+      isCompleted: activeIndex === 3 && !isCancelled && !isReturned,
+      isCurrent: activeIndex === 3 && !isCancelled && !isReturned,
+    },
+  ];
+
   return (
     <section className="account-screen">
       <AccountHeading
         title={`Đơn hàng #${order.orderNumber}`}
         description={`Đặt ngày ${date(order.createdAt)}`}
-        actions={<StatusBadge value={order.status} />}
-      />
-      <OrderProgress status={order.status} />
-      <div className="order-detail-grid">
-        <div className="account-surface">
-          <div className="account-surface-header">
-            <h2>Sản phẩm trong đơn</h2>
-            <span>{order.items.length} sản phẩm</span>
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Link className="button button-outline" href="/account/orders" style={{ fontSize: 13 }}>
+              Danh sách đơn
+            </Link>
+            <StatusBadge value={order.status} />
           </div>
-          <OrderLines items={order.items} />
+        }
+      />
+
+      {/* Thông báo nếu đã hủy hoặc hoàn trả */}
+      {isCancelled && (
+        <div
+          style={{
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 12,
+            padding: "14px 18px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            color: "#991b1b",
+          }}
+        >
+          <AlertCircle size={22} style={{ flexShrink: 0 }} />
+          <div>
+            <strong style={{ fontSize: 14 }}>Đơn hàng đã được hủy</strong>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: "#b91c1c" }}>
+              Nếu bạn đã thanh toán trực tuyến, hệ thống sẽ tiến hành kiểm tra và hoàn trả theo quy định.
+            </p>
+          </div>
         </div>
+      )}
+
+      {isReturned && (
+        <div
+          style={{
+            backgroundColor: "#fff7ed",
+            border: "1px solid #ffedd5",
+            borderRadius: 12,
+            padding: "14px 18px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            color: "#9a3412",
+          }}
+        >
+          <RotateCcw size={22} style={{ flexShrink: 0 }} />
+          <div>
+            <strong style={{ fontSize: 14 }}>Đơn hàng đã được hoàn trả</strong>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: "#c2410c" }}>
+              Kiện hàng đã được tiếp nhận và xử lý theo chính sách đổi trả của cửa hàng.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Stepper tiến trình đơn hàng */}
+      {!isCancelled && (
+        <div
+          style={{
+            backgroundColor: "#fff",
+            border: "1px solid #efe5e7",
+            borderRadius: 16,
+            padding: 20,
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {milestones.map((m) => {
+              const isDone = m.isCompleted && !m.isCurrent;
+              const isCur = m.isCurrent;
+              return (
+                <div
+                  key={m.step}
+                  style={{
+                    backgroundColor: isCur ? "#fdf2f8" : isDone ? "#f8fafc" : "#fafafa",
+                    border: isCur
+                      ? "1.5px solid var(--primary, #be185d)"
+                      : isDone
+                      ? "1px solid #cbd5e1"
+                      : "1px dashed #e2e8f0",
+                    borderRadius: 12,
+                    padding: "12px 14px",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        backgroundColor: isCur
+                          ? "var(--primary, #be185d)"
+                          : isDone
+                          ? "#16a34a"
+                          : "#e2e8f0",
+                        color: isCur || isDone ? "#fff" : "#64748b",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isDone ? <Check size={15} /> : m.step}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: isCur ? 700 : 600,
+                        color: isCur ? "var(--primary, #be185d)" : isDone ? "#0f172a" : "#64748b",
+                      }}
+                    >
+                      {m.title}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 4px 36px" }}>{m.desc}</p>
+                  {m.time ? (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: isCur ? "var(--primary, #be185d)" : "#475569",
+                        fontWeight: 600,
+                        marginLeft: 36,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <Clock size={11} /> {formatDateTime(m.time)}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginLeft: 36 }}>Chưa diễn ra</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bố cục lưới 2 cột: Cột chính (Vận chuyển, Sản phẩm, Nhật ký) + Cột phụ (Người nhận, Thanh toán, Thao tác) */}
+      <div className="order-detail-grid">
+        <div style={{ display: "grid", gap: 24 }}>
+          {/* Khối 1: Hành trình vận chuyển & Kiện hàng bưu tá */}
+          <section className="account-surface">
+            <div className="account-surface-header" style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Truck size={20} style={{ color: "var(--primary, #be185d)" }} />
+                <h2 style={{ margin: 0, fontSize: 16 }}>Hành trình vận chuyển & Kiện hàng</h2>
+              </div>
+              {tracking?.shipments && tracking.shipments.length > 0 && (
+                <span style={{ fontSize: 13, color: "#64748b" }}>
+                  {tracking.shipments.length} kiện hàng
+                </span>
+              )}
+            </div>
+
+            {tracking?.shipments && tracking.shipments.length > 0 ? (
+              <div style={{ display: "grid", gap: 18 }}>
+                {tracking.shipments.map((shipment, index) => {
+                  const isAhamove = shipment.carrierCode === "AHAMOVE";
+                  const carrierDisplayName = isAhamove
+                    ? "Ahamove Express"
+                    : shipment.carrierCode === "GHN"
+                    ? "Giao Hàng Nhanh (GHN)"
+                    : shipment.carrierCode;
+
+                  return (
+                    <div
+                      key={shipment.id}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 12,
+                        padding: 18,
+                        backgroundColor: "#fafafa",
+                      }}
+                    >
+                      {/* Header kiện hàng */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          flexWrap: "wrap",
+                          gap: 10,
+                          paddingBottom: 12,
+                          borderBottom: "1px solid #eee",
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
+                              Kiện {tracking.shipments.length > 1 ? `#${index + 1}` : "hàng"} · {carrierDisplayName}
+                            </h3>
+                            <span
+                              className={`tracking-carrier-badge ${isAhamove ? "is-ahamove" : "is-ghn"}`}
+                              style={{ margin: 0 }}
+                            >
+                              {shipment.carrierServiceCode || (isAhamove ? "HỎA TỐC 2H" : "TIÊU CHUẨN")}
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 12, color: "#64748b" }}>Mã vận đơn:</span>
+                            {shipment.trackingCode ? (
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <strong style={{ fontSize: 13, color: "#0f172a", fontFamily: "monospace" }}>
+                                  {shipment.trackingCode}
+                                </strong>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(shipment.trackingCode!)}
+                                  title="Sao chép mã vận đơn"
+                                  style={{
+                                    border: "none",
+                                    background: "#e2e8f0",
+                                    color: copiedCode === shipment.trackingCode ? "#16a34a" : "#475569",
+                                    cursor: "pointer",
+                                    borderRadius: 6,
+                                    padding: "2px 6px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {copiedCode === shipment.trackingCode ? (
+                                    <>
+                                      <Check size={11} /> Đã chép
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy size={11} /> Sao chép
+                                    </>
+                                  )}
+                                </button>
+                                {shipment.shipmentCode && (
+                                  <span style={{ fontSize: 11, color: "#94a3b8" }}>
+                                    (Mã nội bộ: {shipment.shipmentCode})
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>
+                                Đang cấp mã vận đơn...
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              backgroundColor: shipment.status === "DELIVERED" ? "#dcfce7" : "#e0f2fe",
+                              color: shipment.status === "DELIVERED" ? "#166534" : "#0369a1",
+                            }}
+                          >
+                            {shipmentStatusText[shipment.status] ?? shipment.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Nút hành động bản đồ trực tiếp / link tra cứu */}
+                      {shipment.trackingUrl && (
+                        <div style={{ marginTop: 12 }}>
+                          {isAhamove ? (
+                            <a
+                              className="tracking-live-map-btn"
+                              href={shipment.trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <MapPin size={16} /> Theo dõi tài xế trên bản đồ trực tiếp (Live Map)
+                            </a>
+                          ) : (
+                            <a
+                              className="button button-outline"
+                              href={shipment.trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}
+                            >
+                              Tra cứu tại {carrierDisplayName} <ExternalLink size={14} />
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Cảnh báo giao không thành công */}
+                      {(shipment.failedAttempts > 0 || (shipment.attempts && shipment.attempts.length > 0)) && (
+                        <div className="tracking-failure-alert" role="alert" style={{ marginTop: 12 }}>
+                          <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
+                          <div>
+                            <strong>
+                              Ghi nhận giao chưa thành công ({shipment.failedAttempts || shipment.attempts?.length} lần)
+                            </strong>
+                            <p style={{ margin: "2px 0 0" }}>
+                              Đơn vị vận chuyển sẽ sắp xếp giao lại theo quy định. Bạn có thể liên hệ tổng đài hoặc theo dõi cập nhật mới nhất.
+                            </p>
+                            {shipment.attempts && shipment.attempts.length > 0 && (
+                              <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                                {shipment.attempts.map((att) => (
+                                  <li key={att.id || att.attemptNumber}>
+                                    Lần {att.attemptNumber} ({formatDateTime(att.attemptedAt)}):{" "}
+                                    {att.failureReasonDetail || att.failureReasonCode || "Không liên lạc được hoặc người nhận hẹn lại"}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chi tiết sản phẩm trong kiện */}
+                      {shipment.packages && shipment.packages.length > 0 && (
+                        <div className="tracking-package-box" style={{ marginTop: 12 }}>
+                          <div className="tracking-package-header">
+                            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <Package size={15} />
+                              Sản phẩm trong kiện này
+                            </span>
+                            {(shipment.packages[0]?.actualWeightGrams ?? 0) > 0 && (
+                              <span style={{ fontSize: 12, color: "#64748b" }}>
+                                Trọng lượng:{" "}
+                                {(shipment.packages[0]?.actualWeightGrams ?? 0) >= 1000
+                                  ? `${((shipment.packages[0]?.actualWeightGrams ?? 0) / 1000).toFixed(2)} kg`
+                                  : `${shipment.packages[0]?.actualWeightGrams} g`}
+                              </span>
+                            )}
+                          </div>
+                          <ul className="tracking-package-items-list">
+                            {shipment.packages.flatMap((pkg) =>
+                              pkg.items.map((item, itemIdx) => (
+                                <li key={`${pkg.id}-${itemIdx}`}>
+                                  <span>
+                                    {item.productName}
+                                    {item.variantName ? ` (${item.variantName})` : ""}
+                                  </span>
+                                  <strong>x{item.quantity}</strong>
+                                </li>
+                              )),
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Lộ trình bưu tá */}
+                      <div style={{ marginTop: 16 }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 700, margin: "0 0 10px", color: "#334155" }}>
+                          Lộ trình di chuyển bưu tá & trạng thái vận đơn
+                        </h4>
+                        {shipment.events && shipment.events.length > 0 ? (
+                          <ol className="tracking-timeline" style={{ margin: "10px 0 0" }}>
+                            {shipment.events.map((event) => (
+                              <li key={event.id}>
+                                <time>{formatDateTime(event.occurredAt)}</time>
+                                <strong>{shipmentStatusText[event.status] ?? event.status}</strong>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <p className="muted" style={{ fontSize: 12, fontStyle: "italic", margin: 0 }}>
+                            Đang xử lý đóng gói và cập nhật lộ trình giao nhận từ bưu tá.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                style={{
+                  backgroundColor: "#f8fafc",
+                  borderRadius: 12,
+                  padding: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  border: "1px dashed #cbd5e1",
+                }}
+              >
+                <Package size={22} style={{ color: "var(--primary, #be185d)", flexShrink: 0 }} />
+                <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+                  Đơn hàng đang trong quá trình chuẩn bị và đóng gói tại kho. Thông tin mã vận đơn và lộ trình tài xế sẽ hiển thị ngay khi bưu tá tiếp nhận kiện hàng.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Khối 2: Sản phẩm trong đơn */}
+          <section className="account-surface">
+            <div className="account-surface-header">
+              <h2>Sản phẩm trong đơn</h2>
+              <span>{order.items.length} sản phẩm</span>
+            </div>
+            <OrderLines items={order.items} />
+          </section>
+
+          {/* Khối 3: Nhật ký xử lý & chuyển trạng thái đơn hàng */}
+          <section className="account-surface">
+            <div className="account-surface-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Clock size={18} style={{ color: "var(--primary, #be185d)" }} />
+                <h2 style={{ margin: 0, fontSize: 16 }}>Nhật ký chuyển trạng thái đơn hàng</h2>
+              </div>
+            </div>
+            {tracking?.statusHistories && tracking.statusHistories.length > 0 ? (
+              <ol className="tracking-timeline" style={{ margin: "12px 0 0" }}>
+                {tracking.statusHistories.map((item, index) => (
+                  <li key={`${item.createdAt}-${index}`}>
+                    <time>{formatDateTime(item.createdAt)}</time>
+                    <strong>{statusText[item.status] ?? item.status}</strong>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <ol className="tracking-timeline" style={{ margin: "12px 0 0" }}>
+                <li>
+                  <time>{formatDateTime(order.createdAt)}</time>
+                  <strong>{statusText[order.status] ?? order.status}</strong>
+                </li>
+              </ol>
+            )}
+          </section>
+        </div>
+
+        {/* Cột phụ bên phải: Thông tin nhận hàng, Thanh toán, Thao tác */}
         <aside className="order-detail-aside">
           <section className="account-surface order-recipient">
             <h2>
@@ -596,6 +1125,7 @@ export function OrderDetail({ id }: { id: string }) {
               <p>Chưa có thông tin nhận hàng.</p>
             )}
           </section>
+
           <section className="account-surface">
             <h2>Thanh toán & Chi phí</h2>
             <OrderTotals order={order} />
@@ -606,224 +1136,43 @@ export function OrderDetail({ id }: { id: string }) {
               </p>
             ))}
           </section>
+
+          <section className="account-surface">
+            <h2>Thao tác đơn hàng</h2>
+            <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+              <ContinueSepayPayment orderId={id} orderStatus={order.status} payments={order.payments} />
+              {order.status === "COMPLETED" && (
+                <Link className="button button-outline" href={`/account/returns/new?orderId=${id}`}>
+                  Yêu cầu đổi trả
+                </Link>
+              )}
+              {["PENDING_PAYMENT", "PENDING"].includes(order.status) && (
+                <button
+                  className="button button-outline"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void cancel()}
+                  style={{ color: "#dc2626", borderColor: "#fecaca" }}
+                >
+                  {busy ? "Đang hủy…" : "Hủy đơn hàng"}
+                </button>
+              )}
+              <Link className="button button-outline" href="/account/orders">
+                Quay lại danh sách đơn
+              </Link>
+            </div>
+            {error && (
+              <p role="alert" style={{ color: "#dc2626", fontSize: 13, marginTop: 8 }}>
+                {error}
+              </p>
+            )}
+          </section>
         </aside>
       </div>
-      <nav className="account-shortcuts">
-        <ContinueSepayPayment orderId={id} orderStatus={order.status} payments={order.payments} />
-        <Link href={`/account/orders/${id}/tracking`}>
-          <Truck size={18} />
-          Theo dõi vận chuyển
-        </Link>
-        {order.status === "COMPLETED" && (
-          <Link href={`/account/returns/new?orderId=${id}`}>Yêu cầu đổi trả</Link>
-        )}
-        {["PENDING_PAYMENT", "PENDING"].includes(order.status) && (
-          <button
-            className="button button-outline"
-            type="button"
-            disabled={busy}
-            onClick={() => void cancel()}
-          >
-            {busy ? "Đang hủy…" : "Hủy đơn hàng"}
-          </button>
-        )}
-      </nav>
-      {error && <p role="alert">{error}</p>}
     </section>
   );
 }
+
 export function TrackingPage({ id }: { id: string }) {
-  const query = useQuery({
-    queryKey: ["tracking", id],
-    queryFn: ({ signal }) => readBff(`/api/account/orders/${id}/tracking`, trackingSchema, signal),
-  });
-  if (query.isPending) return <ContentLoading variant="detail" label="Đang tải vận chuyển…" />;
-  if (query.isError)
-    return (
-      <p role="alert">
-        Không tải được vận chuyển. <button onClick={() => query.refetch()}>Thử lại</button>
-      </p>
-    );
-  const data = query.data;
-  return (
-    <section className="account-screen">
-      <AccountHeading
-        title="Hành trình vận chuyển"
-        description="Cập nhật các mốc giao nhận và trạng thái từng kiện hàng."
-        actions={
-          <Link className="button button-outline" href={`/account/orders/${id}`}>
-            Chi tiết đơn hàng
-          </Link>
-        }
-      />
-      <section className="tracking-hero">
-        <div>
-          <p className="account-kicker">CẬP NHẬT ĐƠN HÀNG</p>
-          <h2>{statusText[data.status] ?? data.status}</h2>
-          <p>
-            {data.shipments.length > 1
-              ? `Đơn hàng được chia thành ${data.shipments.length} kiện giao độc lập.`
-              : "Thông tin được cập nhật theo quá trình xử lý và bàn giao thực tế."}
-          </p>
-        </div>
-        <Truck size={64} />
-      </section>
-      {data.shipments.length ? (
-        data.shipments.map((shipment, index) => {
-          const isAhamove = shipment.carrierCode === "AHAMOVE";
-          const carrierDisplayName = isAhamove
-            ? "Ahamove Express"
-            : shipment.carrierCode === "GHN"
-              ? "Giao Hàng Nhanh (GHN)"
-              : shipment.carrierCode;
-          return (
-            <section className="account-surface" key={shipment.id}>
-              <div className="account-surface-header">
-                <div>
-                  <h2>
-                    Kiện hàng {data.shipments.length > 1 ? `#${index + 1}` : ""} · {carrierDisplayName}
-                    <span
-                      className={`tracking-carrier-badge ${isAhamove ? "is-ahamove" : "is-ghn"}`}
-                    >
-                      {shipment.carrierServiceCode || (isAhamove ? "HỎA TỐC 2H" : "TIÊU CHUẨN")}
-                    </span>
-                  </h2>
-                  <p className="muted" style={{ margin: "4px 0 0" }}>
-                    Mã vận đơn: <strong>{shipment.trackingCode ?? "Đang cấp mã vận đơn…"}</strong>
-                    {shipment.shipmentCode && ` (Mã nội bộ: ${shipment.shipmentCode})`}
-                  </p>
-                </div>
-                <span className="order-status">
-                  {shipmentStatusText[shipment.status] ?? shipment.status}
-                </span>
-              </div>
-
-              {shipment.trackingUrl && (
-                <div style={{ marginTop: 12 }}>
-                  {isAhamove ? (
-                    <a
-                      className="tracking-live-map-btn"
-                      href={shipment.trackingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <MapPin size={16} /> Theo dõi tài xế trên bản đồ trực tiếp (Live Map)
-                    </a>
-                  ) : (
-                    <a
-                      className="button button-outline"
-                      href={shipment.trackingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}
-                    >
-                      Tra cứu tại {carrierDisplayName} <ExternalLink size={14} />
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {/* Package items details */}
-              {shipment.packages && shipment.packages.length > 0 && (
-                <div className="tracking-package-box">
-                  <div className="tracking-package-header">
-                    <span>
-                      <Package size={15} style={{ display: "inline", marginRight: 6 }} />
-                      Sản phẩm trong kiện này
-                    </span>
-                    {(shipment.packages[0]?.actualWeightGrams ?? 0) > 0 && (
-                      <span className="muted">
-                        Trọng lượng:{" "}
-                        {(shipment.packages[0]?.actualWeightGrams ?? 0) >= 1000
-                          ? `${((shipment.packages[0]?.actualWeightGrams ?? 0) / 1000).toFixed(2)} kg`
-                          : `${shipment.packages[0]?.actualWeightGrams} g`}
-                      </span>
-                    )}
-                  </div>
-                  <ul className="tracking-package-items-list">
-                    {shipment.packages.flatMap((pkg) =>
-                      pkg.items.map((item, itemIdx) => (
-                        <li key={`${pkg.id}-${itemIdx}`}>
-                          <span>
-                            {item.productName}
-                            {item.variantName ? ` (${item.variantName})` : ""}
-                          </span>
-                          <strong>x{item.quantity}</strong>
-                        </li>
-                      )),
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              {/* Delivery failure / retry alerts */}
-              {(shipment.failedAttempts > 0 || (shipment.attempts && shipment.attempts.length > 0)) && (
-                <div className="tracking-failure-alert" role="alert">
-                  <AlertCircle size={20} style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div>
-                    <strong>
-                      Ghi nhận giao chưa thành công ({shipment.failedAttempts || shipment.attempts?.length} lần)
-                    </strong>
-                    <p style={{ margin: "2px 0 0" }}>
-                      Đơn vị vận chuyển sẽ sắp xếp giao lại theo quy định. Bạn có thể liên hệ tổng đài hoặc theo dõi cập nhật mới nhất.
-                    </p>
-                    {shipment.attempts && shipment.attempts.length > 0 && (
-                      <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
-                        {shipment.attempts.map((att) => (
-                          <li key={att.id || att.attemptNumber}>
-                            Lần {att.attemptNumber} ({formatDateTime(att.attemptedAt)}):{" "}
-                            {att.failureReasonDetail || att.failureReasonCode || "Không liên lạc được hoặc người nhận hẹn lại"}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Timeline */}
-              <div style={{ marginTop: 16 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 10px" }}>
-                  Hành trình vận đơn
-                </h3>
-                {shipment.events && shipment.events.length > 0 ? (
-                  <ol className="tracking-timeline">
-                    {shipment.events.map((event) => (
-                      <li key={event.id}>
-                        <time>{formatDateTime(event.occurredAt)}</time>
-                        <strong>{shipmentStatusText[event.status] ?? event.status}</strong>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="muted" style={{ fontSize: 13, fontStyle: "italic" }}>
-                    Đang chuẩn bị kiện hàng và cập nhật các mốc giao nhận.
-                  </p>
-                )}
-              </div>
-            </section>
-          );
-        })
-      ) : (
-        <div className="account-tip">
-          <Package size={22} />
-          <p>
-            Đơn hàng chưa được bàn giao cho đơn vị vận chuyển. Thông tin kiện hàng sẽ được cập nhật
-            tại đây ngay khi đóng gói xong.
-          </p>
-        </div>
-      )}
-      <section className="account-surface">
-        <h2>Nhật ký xử lý đơn hàng</h2>
-        <ol className="tracking-timeline">
-          {data.statusHistories.map((item, index) => (
-            <li key={`${item.createdAt}-${index}`}>
-              <time>{formatDateTime(item.createdAt)}</time>
-              <strong>{statusText[item.status] ?? item.status}</strong>
-            </li>
-          ))}
-        </ol>
-      </section>
-    </section>
-  );
+  return <OrderDetail id={id} />;
 }
