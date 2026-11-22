@@ -10,6 +10,7 @@ import { ProductPurchase } from "@/features/catalog/product-purchase";
 import { FavoriteButton } from "@/features/catalog/favorite-button";
 import { ProductTabs } from "@/features/catalog/product-tabs";
 import { ReviewForm } from "@/features/post-purchase/review-form";
+import { cache, Suspense } from "react";
 
 function plainText(html: string) {
   return html
@@ -25,14 +26,15 @@ function plainText(html: string) {
     .trim();
 }
 
-async function load(slug: string) {
+const load = cache(async (slug: string) => {
   try {
     return await getProduct(slug);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
-}
+});
+
 export async function generateMetadata({
   params,
 }: {
@@ -46,18 +48,63 @@ export async function generateMetadata({
     openGraph: product.primaryImage ? { images: [product.primaryImage] } : undefined,
   };
 }
+
+async function ReviewsContent({ productId }: { productId: string }) {
+  try {
+    const reviews = await getReviews(productId);
+    return (
+      <div className="pdp-reviews">
+        <h2>Đánh giá sản phẩm</h2>
+        <ReviewForm productId={productId} />
+        {reviews.items.length ? (
+          reviews.items.map((review) => (
+            <article key={review.id} className="pdp-review">
+              <strong>{review.reviewerName || "Khách hàng GlowUp"}</strong>
+              <span> {"★".repeat(review.rating)}</span>
+              <p>{review.title}</p>
+              <p>{review.content}</p>
+            </article>
+          ))
+        ) : (
+          <p>Chưa có đánh giá cho sản phẩm này.</p>
+        )}
+      </div>
+    );
+  } catch {
+    return (
+      <div className="pdp-reviews">
+        <h2>Đánh giá sản phẩm</h2>
+        <ReviewForm productId={productId} />
+        <p>Chưa tải được đánh giá. Vui lòng thử lại sau.</p>
+      </div>
+    );
+  }
+}
+
+async function RelatedContent({ productId }: { productId: string }) {
+  try {
+    const related = await getRelated(productId);
+    if (!related.length) return null;
+    return (
+      <section className="pdp-related">
+        <SectionTitle title="Sản phẩm thường được mua cùng" href="/products" />
+        <ProductGrid products={related} />
+      </section>
+    );
+  } catch {
+    return null;
+  }
+}
+
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await load(slug);
-  const [related, reviews] = await Promise.allSettled([
-    getRelated(product.id),
-    getReviews(product.id),
-  ]);
   const gallery = product.images?.length
     ? [...product.images].sort((a, b) => Number(!!b.isPrimary) - Number(!!a.isPrimary))
     : product.primaryImage
       ? [{ imageUrl: product.primaryImage, altText: product.name }]
       : [];
+
   return (
     <main id="main-content" className="pdp-page site-container">
       <nav className="catalog-breadcrumb" aria-label="Breadcrumb">
@@ -109,34 +156,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         category={product.categoryName}
         reviewCount={product.totalReviews}
         reviews={
-          <div className="pdp-reviews">
-            <h2>Đánh giá sản phẩm</h2>
-            <ReviewForm productId={product.id} />
-            {reviews.status === "fulfilled" ? (
-              reviews.value.items.length ? (
-                reviews.value.items.map((review) => (
-                  <article key={review.id} className="pdp-review">
-                    <strong>{review.reviewerName || "Khách hàng GlowUp"}</strong>
-                    <span> {"★".repeat(review.rating)}</span>
-                    <p>{review.title}</p>
-                    <p>{review.content}</p>
-                  </article>
-                ))
-              ) : (
-                <p>Chưa có đánh giá cho sản phẩm này.</p>
-              )
-            ) : (
-              <p>Chưa tải được đánh giá. Vui lòng thử lại sau.</p>
-            )}
-          </div>
+          <Suspense fallback={<p>Đang tải đánh giá...</p>}>
+            <ReviewsContent productId={product.id} />
+          </Suspense>
         }
       />
-      {related.status === "fulfilled" && related.value.length > 0 && (
-        <section className="pdp-related">
-          <SectionTitle title="Sản phẩm thường được mua cùng" href="/products" />
-          <ProductGrid products={related.value} />
-        </section>
-      )}
+      <Suspense fallback={null}>
+        <RelatedContent productId={product.id} />
+      </Suspense>
     </main>
   );
 }

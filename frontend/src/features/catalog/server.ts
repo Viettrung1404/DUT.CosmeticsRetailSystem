@@ -210,11 +210,14 @@ export const suggestionsSchema = z.array(
 );
 export type FlashCard = z.infer<typeof flashCardsSchema>[number];
 
-async function request<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+async function request<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
   const env = getServerEnv();
   const response = await fetchWithTimeout(
     `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}${path}`,
-    { headers: { Accept: "application/json", "X-Request-Id": crypto.randomUUID() } },
+    {
+      headers: { Accept: "application/json", "X-Request-Id": crypto.randomUUID() },
+      ...init,
+    },
     env.BACKEND_TIMEOUT_MS,
   );
   return (await readApiResponse(response, schema)).data;
@@ -244,9 +247,13 @@ export function getProducts(filters: ProductFilters = {}) {
   return request(`/customer/products${q ? "/search" : ""}?${params}`, productPageSchema);
 }
 export const getProduct = (slug: string) =>
-  request(`/customer/products/${encodeURIComponent(slug)}`, productSchema);
+  request(`/customer/products/${encodeURIComponent(slug)}`, productSchema, {
+    next: { revalidate: 60, tags: [`product-${slug}`] },
+  });
 export const getRelated = (id: string) =>
-  request(`/customer/products/${encodeURIComponent(id)}/related?limit=4`, z.array(productSchema));
+  request(`/customer/products/${encodeURIComponent(id)}/related?limit=4`, z.array(productSchema), {
+    next: { revalidate: 120, tags: [`related-${id}`] },
+  });
 export const getCategories = () => request("/categories/tree", z.array(categorySchema));
 export const getBanners = (position: string) =>
   request(`/banners?position=${encodeURIComponent(position)}`, bannerSchema);
@@ -275,6 +282,7 @@ export const getReviews = (id: string, page = 1) =>
   request(
     `/customer/products/${encodeURIComponent(id)}/reviews?page=${page}&limit=5`,
     reviewsSchema,
+    { next: { revalidate: 30, tags: [`reviews-${id}`] } },
   );
 export const getFlashCards = (limit = 5) =>
   request(

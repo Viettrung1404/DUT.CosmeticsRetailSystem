@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@infrastructure/database/prisma.service';
@@ -24,10 +24,11 @@ interface OutboxEventRow {
 }
 
 @Injectable()
-export class OutboxRelayScheduler {
+export class OutboxRelayScheduler implements OnModuleDestroy {
   private readonly logger = new Logger(OutboxRelayScheduler.name);
   private backoffUntil: Date | null = null;
   private isRunning = false;
+  private stopped = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -36,11 +37,20 @@ export class OutboxRelayScheduler {
     private readonly queueClient: ICloudflareQueueClient,
   ) {}
 
+  onModuleDestroy() {
+    this.stopped = true;
+    this.logger.log('OutboxRelayScheduler stopped gracefully.');
+  }
+
   /**
    * Cronjob chạy định kỳ quét outbox_events mỗi 3 giây
    */
   @Cron('*/3 * * * * *')
   async handleCron(): Promise<void> {
+    if (this.stopped) {
+      return;
+    }
+
     const isEnabled =
       this.configService.get<string>('OUTBOX_RELAY_ENABLED', 'true') !== 'false';
     if (!isEnabled) {
@@ -70,16 +80,22 @@ export class OutboxRelayScheduler {
   }
 
   /**
-   * Quét và xử lý một lô sự kiện PENDING sử dụng FOR UPDATE SKIP LOCKED
-   * Bảo đảm concurrency: các worker chạy song song không bao giờ xử lý trùng event.
+   * Quét và xử lý một lô sự kiện PENDING sử dụng Two-Phase Outbox Relay:
+   * - Phase 1: Truy vấn và khóa hàng trong transaction CSDL siêu ngắn (<5ms).
+   * - Phase 2: Gửi HTTP tới Cloudflare Queue HOÀN TOÀN BÊN NGOÀI Transaction, giải phóng DB connection.
+   * - Phase 3: Transaction CSDL ngắn thứ hai cập nhật trạng thái PUBLISHED / FAILED.
+   * Bảo đảm concurrency (FOR UPDATE SKIP LOCKED) và Zero Connection Exhaustion.
    */
   async relayBatch(batchSize = 50): Promise<OutboxRelayStats> {
     const stats: OutboxRelayStats = { processed: 0, succeeded: 0, failed: 0 };
+    if (this.stopped) {
+      return stats;
+    }
 
-    return this.prisma.$transaction(
+    // Phase 1: Quét tối đa batchSize events chưa publish với khóa SKIP LOCKED trong transaction ngắn
+    const rows = await this.prisma.$transaction(
       async (tx) => {
-        // 1. Quét tối đa batchSize events chưa publish với khóa SKIP LOCKED
-        const rows = await tx.$queryRaw<OutboxEventRow[]>`
+        return tx.$queryRaw<OutboxEventRow[]>`
           SELECT id, aggregate_type, aggregate_id, event_type, payload, retry_count
           FROM outbox_events
           WHERE status = 'PENDING'
@@ -87,73 +103,89 @@ export class OutboxRelayScheduler {
           LIMIT ${batchSize}
           FOR UPDATE SKIP LOCKED;
         `;
+      },
+      { timeout: 5000 },
+    );
 
-        if (!rows || rows.length === 0) {
-          return stats;
-        }
+    if (!rows || rows.length === 0) {
+      return stats;
+    }
 
-        stats.processed = rows.length;
+    stats.processed = rows.length;
 
-        for (const row of rows) {
-          const message: QueueMessage = {
-            id: row.id,
-            aggregateType: row.aggregate_type,
-            aggregateId: row.aggregate_id,
-            eventType: row.event_type,
-            payload: row.payload,
-            occurredAt: new Date().toISOString(),
-          };
+    // Phase 2: Gửi qua Cloudflare Queue bên ngoài Transaction (không giữ kết nối CSDL khi gọi mạng)
+    type DispatchResult = {
+      row: OutboxEventRow;
+      success: boolean;
+      statusCode?: number;
+      error?: string;
+    };
+    const dispatchResults: DispatchResult[] = [];
 
-          try {
-            const sendResult = await this.queueClient.sendMessage(message);
+    for (const row of rows) {
+      const message: QueueMessage = {
+        id: row.id,
+        aggregateType: row.aggregate_type,
+        aggregateId: row.aggregate_id,
+        eventType: row.event_type,
+        payload: row.payload,
+        occurredAt: new Date().toISOString(),
+      };
 
-            if (sendResult.success) {
-              // Đánh dấu PUBLISHED
-              await tx.$executeRaw`
-                UPDATE outbox_events
-                SET status = 'PUBLISHED',
-                    published_at = NOW(),
-                    last_error = NULL
-                WHERE id = ${row.id}::uuid;
-              `;
-              stats.succeeded++;
-            } else {
-              // Xử lý lỗi trả về từ Queue
-              const errorMsg = sendResult.error || `HTTP_${sendResult.statusCode}`;
-              await tx.$executeRaw`
-                UPDATE outbox_events
-                SET retry_count = retry_count + 1,
-                    last_error = ${errorMsg}
-                WHERE id = ${row.id}::uuid;
-              `;
-              stats.failed++;
+      try {
+        const sendResult = await this.queueClient.sendMessage(message);
+        dispatchResults.push({
+          row,
+          success: sendResult.success,
+          statusCode: sendResult.statusCode,
+          error: sendResult.error || `HTTP_${sendResult.statusCode}`,
+        });
+      } catch (err: any) {
+        dispatchResults.push({
+          row,
+          success: false,
+          error: `EXCEPTION: ${err.message}`,
+        });
+      }
+    }
 
-              // Kích hoạt Backoff nếu lỗi 429 hoặc 5xx
-              if (
-                sendResult.statusCode === 429 ||
-                (sendResult.statusCode && sendResult.statusCode >= 500)
-              ) {
-                this.triggerBackoff(10000); // 10 giây
-              }
-            }
-          } catch (err: any) {
-            // Lỗi mạng bất ngờ
-            const errorMsg = `EXCEPTION: ${err.message}`;
+    // Phase 3: Cập nhật trạng thái sự kiện trong transaction thứ hai ngắn gọn
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const res of dispatchResults) {
+          if (res.success) {
+            await tx.$executeRaw`
+              UPDATE outbox_events
+              SET status = 'PUBLISHED',
+                  published_at = NOW(),
+                  last_error = NULL
+              WHERE id = ${res.row.id}::uuid;
+            `;
+            stats.succeeded++;
+          } else {
             await tx.$executeRaw`
               UPDATE outbox_events
               SET retry_count = retry_count + 1,
-                  last_error = ${errorMsg}
-              WHERE id = ${row.id}::uuid;
+                  last_error = ${res.error}
+              WHERE id = ${res.row.id}::uuid;
             `;
             stats.failed++;
-            this.triggerBackoff(10000);
+
+            // Kích hoạt Backoff nếu lỗi 429, 5xx hoặc exception mạng
+            if (
+              res.statusCode === 429 ||
+              (res.statusCode && res.statusCode >= 500) ||
+              res.error?.startsWith('EXCEPTION:')
+            ) {
+              this.triggerBackoff(10000); // 10 giây
+            }
           }
         }
-
-        return stats;
       },
-      { timeout: 30000 },
+      { timeout: 5000 },
     );
+
+    return stats;
   }
 
   /**

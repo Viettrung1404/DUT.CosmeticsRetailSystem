@@ -15,13 +15,28 @@ export function CatalogImage({
   src,
   alt,
   className = "",
+  priority = false,
+  sizes = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 300px",
 }: {
   src?: string | null;
   alt: string;
   className?: string;
+  priority?: boolean;
+  sizes?: string;
 }) {
   return src && /^https?:\/\/|^\//.test(src) ? (
-    <Image className={className} src={src} alt={alt} width={600} height={600} unoptimized />
+    <Image
+      className={className}
+      src={src}
+      alt={alt}
+      width={600}
+      height={600}
+      unoptimized
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      priority={priority}
+      sizes={sizes}
+    />
   ) : (
     <div className={`catalog-image-placeholder ${className}`} aria-label={alt}>
       GLOWUP

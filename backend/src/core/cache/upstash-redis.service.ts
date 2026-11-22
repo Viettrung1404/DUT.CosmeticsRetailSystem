@@ -11,6 +11,8 @@ import { redisCommandTimeout } from '../config/runtime-config';
 @Injectable()
 export class UpstashRedisService implements ICacheService {
   private readonly logger = new Logger(UpstashRedisService.name);
+  private cachedEpoch: { value: string | null; expiresAt: number } | null = null;
+
   constructor(private readonly config: ConfigService) {}
   get configured() {
     return (
@@ -70,12 +72,26 @@ export class UpstashRedisService implements ICacheService {
       throw new ServiceUnavailableException('REDIS_UNAVAILABLE');
     }
   }
+  private async getEpoch(): Promise<string> {
+    const now = Date.now();
+    if (this.cachedEpoch && this.cachedEpoch.expiresAt > now) {
+      return this.cachedEpoch.value ?? '0';
+    }
+    try {
+      const epoch = await this.command<string | null>([
+        'GET',
+        `${this.prefix}cache:epoch`,
+      ]);
+      this.cachedEpoch = { value: epoch, expiresAt: now + 60000 };
+      return epoch ?? '0';
+    } catch {
+      return this.cachedEpoch?.value ?? '0';
+    }
+  }
+
   private async cacheKey(key: string) {
-    const epoch = await this.command<string | null>([
-      'GET',
-      `${this.prefix}cache:epoch`,
-    ]);
-    return `${this.prefix}cache:${epoch ?? '0'}:${key}`;
+    const epoch = await this.getEpoch();
+    return `${this.prefix}cache:${epoch}:${key}`;
   }
   async get<T>(key: string): Promise<T | null> {
     try {
@@ -107,7 +123,9 @@ export class UpstashRedisService implements ICacheService {
     await this.command(['DEL', await this.cacheKey(key)]);
   }
   async reset() {
-    await this.command(['SET', `${this.prefix}cache:epoch`, randomUUID()]);
+    const newEpoch = randomUUID();
+    await this.command(['SET', `${this.prefix}cache:epoch`, newEpoch]);
+    this.cachedEpoch = { value: newEpoch, expiresAt: Date.now() + 60000 };
   }
   async rateLimit(identity: string, limit: number, ttlMs: number) {
     const key =

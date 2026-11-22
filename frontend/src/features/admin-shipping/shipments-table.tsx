@@ -159,40 +159,40 @@ export function ShipmentsTable() {
     <div className="space-y-5">
       {/* Tab Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap">
           <button
             onClick={() => setTab("all")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               tab === "all"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <Truck className="w-4 h-4" />
+            <Truck className="w-4 h-4 shrink-0" />
             <span>Tất Cả Vận Đơn</span>
           </button>
 
           <button
             onClick={() => setTab("incident")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               tab === "incident"
                 ? "bg-rose-600 text-white shadow-sm"
                 : "bg-white text-rose-700 hover:bg-rose-50 border border-rose-200"
             }`}
           >
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>Sự Cố CREATION_UNKNOWN</span>
           </button>
 
           <button
             onClick={() => setTab("rto")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               tab === "rto"
                 ? "bg-amber-600 text-white shadow-sm"
                 : "bg-white text-amber-700 hover:bg-amber-50 border border-amber-200"
             }`}
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 shrink-0" />
             <span>Kiện Chuyển Hoàn (RTO)</span>
           </button>
         </div>

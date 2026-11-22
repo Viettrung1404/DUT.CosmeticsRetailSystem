@@ -130,6 +130,41 @@ export function AccountOverview({ name, email }: { name: string; email: string }
         ))}
       </div>
       {profile.isError && <p role="alert">Chưa tải được tổng quan tài khoản.</p>}
+      <section className="account-loyalty-widget">
+        <div className="account-loyalty-widget-header">
+          <div className="account-loyalty-tier-badge">
+            <Gem size={18} />
+            <span>Hạng {profile.data?.loyaltyTier?.name ?? "Thành viên GlowUp"}</span>
+          </div>
+          <Link href="/account/loyalty" className="account-loyalty-details-link">
+            Chi tiết quyền lợi →
+          </Link>
+        </div>
+        <div className="account-loyalty-widget-body">
+          <div className="account-loyalty-widget-balance">
+            <div className="account-loyalty-icon-box">
+              <Coins size={28} />
+            </div>
+            <div>
+              <small>Số dư điểm GlowUp Rewards</small>
+              <strong>
+                {(profile.data?.totalPoints ?? 0).toLocaleString("vi-VN")}{" "}
+                <span>xu</span>
+              </strong>
+              <p className="account-loyalty-cash-rate">
+                Tương đương{" "}
+                <strong>{formatPrice((profile.data?.totalPoints ?? 0) * 1000)}</strong> dùng giảm
+                trừ trực tiếp khi thanh toán đơn hàng.
+              </p>
+            </div>
+          </div>
+          <div className="account-loyalty-widget-actions">
+            <Link href="/account/loyalty/rewards" className="button account-loyalty-redeem-btn">
+              <Sparkles size={16} /> Đổi voucher ưu đãi
+            </Link>
+          </div>
+        </div>
+      </section>
       <section className="account-surface">
         <div className="account-surface-header">
           <h2>Đơn hàng gần đây</h2>

@@ -209,19 +209,19 @@ export function FulfillmentQueueTables() {
     <div className="space-y-5">
       {/* Tab Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap">
           <button
             onClick={() => {
               setActiveTab("picking");
               setPage(1);
             }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeTab === "picking"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <Boxes className="w-4 h-4" />
+            <Boxes className="w-4 h-4 shrink-0" />
             <span>1. Hàng Đợi Nhặt Hàng (Picking)</span>
           </button>
 
@@ -230,13 +230,13 @@ export function FulfillmentQueueTables() {
               setActiveTab("packing");
               setPage(1);
             }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeTab === "packing"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <Package className="w-4 h-4" />
+            <Package className="w-4 h-4 shrink-0" />
             <span>2. Hàng Đợi Đóng Gói (Packing)</span>
           </button>
 
@@ -245,13 +245,13 @@ export function FulfillmentQueueTables() {
               setActiveTab("handover");
               setPage(1);
             }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeTab === "handover"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <Truck className="w-4 h-4" />
+            <Truck className="w-4 h-4 shrink-0" />
             <span>3. Hàng Đợi Bàn Giao (Handover)</span>
           </button>
         </div>

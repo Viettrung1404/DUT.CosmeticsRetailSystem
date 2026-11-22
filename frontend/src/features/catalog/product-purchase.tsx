@@ -5,8 +5,16 @@ import { Check } from "lucide-react";
 import { z } from "zod";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
+import dynamic from "next/dynamic";
 import { formatPrice } from "./components";
-import { TryOnCamera } from "./try-on-camera";
+
+const TryOnCamera = dynamic(
+  () => import("./try-on-camera").then((mod) => mod.TryOnCamera),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { emptyCart, optimisticCartAdd, type Cart } from "./commerce-state";
@@ -98,6 +106,9 @@ export function ProductPurchase({
       setShowToast(true);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setShowToast(false), 2200);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("glowup:open-cart"));
+      }
     }
     addQueue.current = addQueue.current.then(async () => {
       try {
@@ -234,6 +245,30 @@ export function ProductPurchase({
           </div>,
           document.body,
         )}
+      <div className="pdp-sticky-bar" aria-label="Đặt hàng nhanh trên di động">
+        <div className="pdp-sticky-price">
+          <small>Giá sản phẩm</small>
+          <strong>{formatPrice(variant?.effectivePrice ?? variant?.price)}</strong>
+        </div>
+        <div className="pdp-sticky-buttons">
+          <button
+            type="button"
+            className="button pdp-sticky-add"
+            onClick={() => add()}
+            disabled={!available}
+          >
+            {available ? "Thêm giỏ" : "Hết hàng"}
+          </button>
+          <button
+            type="button"
+            className="button pdp-sticky-buy"
+            onClick={() => add(true)}
+            disabled={!available}
+          >
+            Mua ngay
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

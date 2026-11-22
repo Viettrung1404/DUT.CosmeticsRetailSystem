@@ -20,6 +20,7 @@ import {
   QrCode,
   RefreshCw,
   ShieldCheck,
+  ShoppingBag,
   Truck,
   Zap,
 } from "lucide-react";
@@ -74,7 +75,7 @@ export function CheckoutPage() {
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
       try {
-        return (await readBff("/api/auth/session", z.object({ user: userSchema }), signal)).user;
+        return (await readBff("/api/auth/session", z.object({ user: userSchema.nullable() }), signal)).user;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;
@@ -405,9 +406,26 @@ export function CheckoutPage() {
     );
   if (!items.length || invalidSelection)
     return (
-      <p>
-        Giỏ hàng chưa có sản phẩm hợp lệ được chọn. <Link href="/cart">Quay lại giỏ hàng</Link>
-      </p>
+      <div className="checkout-empty-state site-container">
+        <div className="checkout-empty-card">
+          <div className="checkout-empty-icon" aria-hidden="true">
+            <ShoppingBag size={44} strokeWidth={1.5} />
+          </div>
+          <h1>Chưa có sản phẩm nào được chọn để thanh toán</h1>
+          <p>
+            Giỏ hàng của bạn đang trống hoặc các sản phẩm chưa được chọn mua.
+            Vui lòng kiểm tra lại giỏ hàng hoặc tiếp tục khám phá các bộ sưu tập mỹ phẩm chính hãng tại GlowUp.
+          </p>
+          <div className="checkout-empty-actions">
+            <Link href="/cart" className="button checkout-empty-cart-btn">
+              <ArrowLeft size={16} /> Quay lại giỏ hàng
+            </Link>
+            <Link href="/products" className="button checkout-empty-shop-btn">
+              Khám phá sản phẩm <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </div>
     );
   return (
     <div className="checkout-page">

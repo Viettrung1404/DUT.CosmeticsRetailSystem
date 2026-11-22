@@ -369,6 +369,13 @@ export class CommerceCheckoutService {
     let finalTotalAmount = quote.totalAmount;
     let validatedQuote: ValidatedShippingQuote | undefined;
 
+    const resolvedStoreId =
+      input.storeId ||
+      (await this.stores.resolveStoreForOrder({
+        requestedStoreId: input.storeId,
+        items: selection.items,
+      }));
+
     if (input.quoteGroupId) {
       if (!input.shippingOptionId) {
         throw new BadRequestException(
@@ -379,6 +386,7 @@ export class CommerceCheckoutService {
         validatedQuote = await this.shippingQuoteService.validateQuote(
           input.quoteGroupId,
           input.shippingOptionId,
+          resolvedStoreId,
         );
         finalShippingFee = validatedQuote.estimatedFee;
         const discountAmount =
@@ -390,13 +398,7 @@ export class CommerceCheckoutService {
       }
     }
 
-    const storeId =
-      input.storeId ||
-      validatedQuote?.sourceLocationId ||
-      (await this.stores.resolveStoreForOrder({
-        requestedStoreId: input.storeId,
-        items: selection.items,
-      }));
+    const storeId = validatedQuote?.sourceLocationId || resolvedStoreId;
 
     validatePaymentAmount(paymentMethod, finalTotalAmount);
     const variantIds = selection.items.map((i) => i.variantId);
@@ -508,15 +510,26 @@ export class CommerceCheckoutService {
       },
     });
 
-    for (const orderItem of createdOrderItems) {
-      await tx.fulfillmentOrderItem.create({
-        data: {
+    if (tx.fulfillmentOrderItem?.createMany) {
+      await tx.fulfillmentOrderItem.createMany({
+        data: createdOrderItems.map((orderItem) => ({
           fulfillmentOrderId: fo.id,
           orderItemId: orderItem.id,
           productVariantId: orderItem.productVariantId,
           quantityRequested: orderItem.quantity,
-        },
+        })),
       });
+    } else {
+      for (const orderItem of createdOrderItems) {
+        await tx.fulfillmentOrderItem.create({
+          data: {
+            fulfillmentOrderId: fo.id,
+            orderItemId: orderItem.id,
+            productVariantId: orderItem.productVariantId,
+            quantityRequested: orderItem.quantity,
+          },
+        });
+      }
     }
     const promotionIds = [
       ...new Set([

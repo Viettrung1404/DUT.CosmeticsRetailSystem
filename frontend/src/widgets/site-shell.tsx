@@ -59,7 +59,7 @@ export function SiteHeader({
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
       try {
-        return (await readBff("/api/auth/session", z.object({ user: userSchema }), signal)).user;
+        return (await readBff("/api/auth/session", z.object({ user: userSchema.nullable() }), signal)).user;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;
@@ -79,6 +79,13 @@ export function SiteHeader({
       document.body.style.overflow = "";
     };
   }, [open]);
+  useEffect(() => {
+    const onOpenCart = () => {
+      cartDialog.current?.showModal();
+    };
+    window.addEventListener("glowup:open-cart", onOpenCart);
+    return () => window.removeEventListener("glowup:open-cart", onOpenCart);
+  }, []);
   const close = () => {
     setOpen(false);
     trigger.current?.focus();
@@ -155,11 +162,11 @@ export function SiteHeader({
                 <MoreHorizontal />
               </summary>
               <nav aria-label="Liên kết thêm">
-                <Link href="/products">Tất cả sản phẩm</Link>
-                <Link href="/flash-sale">Flash Sale</Link>
-                <Link href="/order-tracking">Tra cứu đơn hàng</Link>
-                <Link href="/account/notifications">Thông báo</Link>
-                <Link href="/help">Trung tâm hỗ trợ</Link>
+                <Link href="/products" prefetch={false}>Tất cả sản phẩm</Link>
+                <Link href="/flash-sale" prefetch={false}>Flash Sale</Link>
+                <Link href="/order-tracking" prefetch={false}>Tra cứu đơn hàng</Link>
+                <Link href="/account/notifications" prefetch={false}>Thông báo</Link>
+                <Link href="/help" prefetch={false}>Trung tâm hỗ trợ</Link>
               </nav>
             </details>
             <Link
@@ -212,12 +219,12 @@ export function SiteHeader({
                       className={`nav-dropdown${item.href === routes.brands ? " nav-dropdown-brands" : ""}`}
                     >
                       <div className="nav-dropdown-inner">
-                        <Link className="nav-dropdown-all" href={item.href}>
+                        <Link className="nav-dropdown-all" href={item.href} prefetch={false}>
                           Xem tất cả {item.label.toLowerCase()} <ChevronRight size={15} />
                         </Link>
                         <div className="nav-dropdown-links">
                           {item.links.map((link) => (
-                            <Link key={link.id} href={link.href}>
+                            <Link key={link.id} href={link.href} prefetch={false}>
                               {link.name}
                             </Link>
                           ))}
@@ -272,11 +279,11 @@ export function SiteHeader({
             item.links.length ? (
               <details className="drawer-category" key={item.href}>
                 <summary>{item.label}</summary>
-                <Link onClick={close} href={item.href}>
+                <Link onClick={close} href={item.href} prefetch={false}>
                   Xem tất cả {item.label.toLowerCase()}
                 </Link>
                 {item.links.map((link) => (
-                  <Link onClick={close} key={link.id} href={link.href}>
+                  <Link onClick={close} key={link.id} href={link.href} prefetch={false}>
                     {link.name}
                   </Link>
                 ))}
@@ -435,7 +442,7 @@ export function SiteFooter() {
           <div key={group.title}>
             <h2>{group.title}</h2>
             {group.links.map(([label, href]) => (
-              <Link key={label} href={href}>
+              <Link key={label} href={href} prefetch={false}>
                 {label}
               </Link>
             ))}

@@ -47,7 +47,8 @@ export function CatalogListingClient({
     },
     initialData: key === initialKey ? initialResult : undefined,
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
   });
   useEffect(() => {
     const onPopState = () => {
@@ -220,9 +221,12 @@ export function CatalogListingClient({
       >
         <div className="catalog-sort">
           <span>{data?.meta.itemCount ?? 0} sản phẩm phù hợp</span>
-          <label>
+          <label htmlFor="catalog-sort-select">
             Sắp xếp{" "}
             <select
+              id="catalog-sort-select"
+              name="sortBy"
+              aria-label="Sắp xếp sản phẩm"
               value={filters.sortBy || "newest"}
               onChange={(event) => update({ ...filters, sortBy: event.target.value })}
             >

@@ -117,52 +117,52 @@ export function RmaQueues() {
     <div className="space-y-5">
       {/* 4 Queues Navigation */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full flex-nowrap">
           <button
             onClick={() => setActiveQueue("cs-review")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeQueue === "cs-review"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <FileCheck className="w-4 h-4" />
+            <FileCheck className="w-4 h-4 shrink-0" />
             <span>1. CS Review Hồ Sơ</span>
           </button>
 
           <button
             onClick={() => setActiveQueue("store-dropoff")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeQueue === "store-dropoff"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <Building2 className="w-4 h-4" />
+            <Building2 className="w-4 h-4 shrink-0" />
             <span>2. Tiếp Nhận Showroom</span>
           </button>
 
           <button
             onClick={() => setActiveQueue("qc-inspection")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeQueue === "qc-inspection"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <ShieldCheck className="w-4 h-4" />
+            <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>3. Kiểm Định KCS (QC)</span>
           </button>
 
           <button
             onClick={() => setActiveQueue("settlement")}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
               activeQueue === "settlement"
                 ? "bg-[#C85A70] text-white shadow-sm"
                 : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
             }`}
           >
-            <DollarSign className="w-4 h-4" />
+            <DollarSign className="w-4 h-4 shrink-0" />
             <span>4. Quyết Toán Tài Chính</span>
           </button>
         </div>

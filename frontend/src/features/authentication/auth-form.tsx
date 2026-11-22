@@ -359,6 +359,7 @@ export function AuthForm({
               </>
             )}
             <button
+              type="submit"
               className="button full"
               disabled={!hydrated || isSubmitting || oauthBusy || cooldown > 0}
             >

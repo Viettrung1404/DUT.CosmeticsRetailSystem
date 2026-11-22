@@ -609,34 +609,50 @@ export class PrismaOrderRepository implements IOrderRepository {
   }
 
   async cancelExpiredPendingOrders(cutoffDate: Date): Promise<number> {
-    const expiredOrders = await this.prisma.order.findMany({
-      where: {
-        status: 'PENDING',
-        orderType: { in: ['ONLINE', 'STORE_PICKUP'] },
-        payments: { none: { paymentMethod: { in: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] } } },
-        createdAt: { lte: cutoffDate },
-      },
-      select: {
-        id: true,
-        customerId: true,
-      },
-    });
+    const lockRows = await this.prisma
+      .$queryRaw<{ acquired: boolean }[]>`
+        SELECT pg_try_advisory_lock(hashtext('cancel_expired_orders_job')) AS acquired
+      `
+      .catch(() => [{ acquired: true }]);
 
-    let cancelledCount = 0;
-    for (const order of expiredOrders) {
-      try {
-        await this.cancelOrderWithTransaction(
-          order.id,
-          order.customerId || undefined,
-          'Hệ thống tự động hủy do quá hạn 30 phút chưa xác nhận',
-        );
-        cancelledCount++;
-      } catch (err) {
-        // Continue canceling other orders
-      }
+    if (lockRows.length > 0 && !lockRows[0].acquired) {
+      return 0;
     }
 
-    return cancelledCount;
+    try {
+      const expiredOrders = await this.prisma.order.findMany({
+        where: {
+          status: 'PENDING',
+          orderType: { in: ['ONLINE', 'STORE_PICKUP'] },
+          payments: { none: { paymentMethod: { in: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] } } },
+          createdAt: { lte: cutoffDate },
+        },
+        select: {
+          id: true,
+          customerId: true,
+        },
+      });
+
+      let cancelledCount = 0;
+      for (const order of expiredOrders) {
+        try {
+          await this.cancelOrderWithTransaction(
+            order.id,
+            order.customerId || undefined,
+            'Hệ thống tự động hủy do quá hạn 30 phút chưa xác nhận',
+          );
+          cancelledCount++;
+        } catch (err) {
+          // Continue canceling other orders
+        }
+      }
+
+      return cancelledCount;
+    } finally {
+      await this.prisma
+        .$executeRaw`SELECT pg_advisory_unlock(hashtext('cancel_expired_orders_job'))`
+        .catch(() => {});
+    }
   }
 
   async getNextOrderSequence(date: Date): Promise<number> {

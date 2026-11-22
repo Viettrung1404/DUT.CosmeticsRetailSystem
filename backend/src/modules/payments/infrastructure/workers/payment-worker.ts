@@ -36,7 +36,7 @@ export class PaymentWorker implements OnModuleDestroy {
       .$executeRaw`UPDATE payments SET lease_until=clock_timestamp()+interval '15 seconds' WHERE id=${id}::uuid AND claim_token=${token}::uuid AND lease_until>clock_timestamp()`;
     return count === 1;
   }
-  @Interval(1000)
+  @Interval(Number(process.env.PAYMENT_POLL_INTERVAL_MS || 5000))
   async tick() {
     if (
       this.polling ||

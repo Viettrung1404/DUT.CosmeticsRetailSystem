@@ -572,6 +572,8 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     );
     const minExpiry = minExpiryForOnline(new Date());
     const note = `Xuất kho giao đơn ${order.order_number}`;
+    const allOrderItemBatches: { orderItemId: string; batchId: string; quantity: number }[] = [];
+    const allInventoryTransactions: any[] = [];
 
     for (const item of items) {
       const inv = inventories.find(
@@ -629,26 +631,38 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
             where: { id: a.batchId },
             data: { quantity: { decrement: a.quantity } },
           });
-          await tx.orderItemBatch.create({
-            data: {
-              orderItemId: item.id,
-              batchId: a.batchId,
-              quantity: a.quantity,
-            },
+          allOrderItemBatches.push({
+            orderItemId: item.id,
+            batchId: a.batchId,
+            quantity: a.quantity,
           });
-          await tx.inventoryTransaction.create({
-            data: {
-              storeId: order.store_id,
-              productVariantId: item.productVariantId,
-              batchId: a.batchId,
-              transactionType: 'OUT',
-              quantity: -a.quantity,
-              referenceType: 'ORDER',
-              referenceId: order.id,
-              note,
-              createdBy: changedBy,
-            },
+          allInventoryTransactions.push({
+            storeId: order.store_id,
+            productVariantId: item.productVariantId,
+            batchId: a.batchId,
+            transactionType: 'OUT',
+            quantity: -a.quantity,
+            referenceType: 'ORDER',
+            referenceId: order.id,
+            note,
+            createdBy: changedBy,
           });
+        }
+      }
+
+      if (tx.orderItemBatch?.createMany && allOrderItemBatches.length > 0) {
+        await tx.orderItemBatch.createMany({ data: allOrderItemBatches });
+      } else {
+        for (const oib of allOrderItemBatches) {
+          await tx.orderItemBatch.create({ data: oib });
+        }
+      }
+
+      if (tx.inventoryTransaction?.createMany && allInventoryTransactions.length > 0) {
+        await tx.inventoryTransaction.createMany({ data: allInventoryTransactions });
+      } else {
+        for (const it of allInventoryTransactions) {
+          await tx.inventoryTransaction.create({ data: it });
         }
       }
 

@@ -4589,3 +4589,74 @@ a.content-card:hover {
     transition: none !important;
   }
 }
+
+/* Mobile PDP Sticky Action Bar */
+@media (min-width: 769px) {
+  .pdp-sticky-bar {
+    display: none !important;
+  }
+}
+@media (max-width: 768px) {
+  .pdp-sticky-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-top: 1px solid #ebd9dc;
+    padding: 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    z-index: 100;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  }
+  .pdp-sticky-price {
+    display: flex;
+    flex-direction: column;
+    min-width: 90px;
+    line-height: 1.2;
+  }
+  .pdp-sticky-price small {
+    font-size: 11px;
+    color: #776d6d;
+  }
+  .pdp-sticky-price strong {
+    font-size: 16px;
+    color: #9d394f;
+    font-weight: 700;
+  }
+  .pdp-sticky-buttons {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+  }
+  .pdp-sticky-buttons .button {
+    flex: 1;
+    padding: 10px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    min-width: 0;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .pdp-sticky-add {
+    background: #fff !important;
+    color: #9d394f !important;
+    border: 1.5px solid #9d394f !important;
+  }
+  .pdp-sticky-buy {
+    background: #9d394f !important;
+    color: #fff !important;
+    border: 1.5px solid #9d394f !important;
+  }
+  .pdp-page {
+    padding-bottom: 74px !important;
+  }
+}

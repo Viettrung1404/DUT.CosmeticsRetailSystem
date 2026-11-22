@@ -23,17 +23,18 @@ export class CommercePricingService {
     lock = false,
   ) {
     const ids = input.items.map((item) => item.variantId);
+    const now = new Date();
     if (lock && input.customerId)
       await tx.$queryRaw`SELECT id FROM customers WHERE id=${input.customerId}::uuid FOR UPDATE`;
     if (lock && input.couponCode)
       await tx.$queryRaw`SELECT id FROM coupons WHERE code=${input.couponCode} FOR UPDATE`;
-    // Campaign locks precede quota, variant and inventory locks for all writers.
+    // Only lock active promotions with bounded usage limits to prevent global table contention,
+    // followed by quota, variant and inventory locks in consistent order.
     if (lock) {
-      await tx.$queryRaw`SELECT id FROM promotions ORDER BY id FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM promotions WHERE is_active=true AND start_date<=${now} AND end_date>${now} AND usage_limit IS NOT NULL ORDER BY id FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM promotion_variant_quotas WHERE product_variant_id=ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
       await tx.$queryRaw`SELECT v.id FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.id=ANY(${ids}::uuid[]) ORDER BY v.id FOR SHARE OF v,p`;
     }
-    const now = new Date();
     const [variants, customer, rows, coupon] = await Promise.all([
       tx.productVariant.findMany({
         where: {

@@ -52,7 +52,7 @@ export class ProductCustomerController {
   async getProducts(
     @Query() filter: ProductFilterDto,
     @Req() req?: { user?: { userId?: string } },
-  ) {
+  ): Promise<PageDto<ProductResponseDto>> {
     if (this.catalog) {
       const result = await this.catalog.list(filter, req?.user?.userId);
       return new PageDto(

@@ -115,6 +115,127 @@
   font-size: 12px;
   color: #776d6d;
 }
+
+/* Account Loyalty Widget */
+.account-loyalty-widget {
+  background: linear-gradient(135deg, #fff9fa 0%, #fff 60%, #fff4f6 100%);
+  border: 1px solid #ebd9dc;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(157, 57, 79, 0.04);
+}
+.account-loyalty-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f3e5e8;
+  padding-bottom: 12px;
+}
+.account-loyalty-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #c85a70;
+  color: #9d394f;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+.account-loyalty-details-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9d394f;
+}
+.account-loyalty-widget-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.account-loyalty-widget-balance {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.account-loyalty-icon-box {
+  width: 52px;
+  height: 52px;
+  background: #fff;
+  border: 1px solid #f0dde0;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c85a70;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(157, 57, 79, 0.06);
+}
+.account-loyalty-widget-balance small {
+  font-size: 12px;
+  color: #776d6d;
+  display: block;
+}
+.account-loyalty-widget-balance strong {
+  font-size: 24px;
+  color: #412e27;
+  font-weight: 700;
+}
+.account-loyalty-widget-balance strong span {
+  font-size: 15px;
+  color: #9d394f;
+  font-weight: 600;
+}
+.account-loyalty-cash-rate {
+  font-size: 13px;
+  color: #5c5053;
+  margin: 4px 0 0;
+}
+.account-loyalty-cash-rate strong {
+  color: #227a55;
+  font-size: 13px;
+}
+.account-loyalty-widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.account-loyalty-redeem-btn {
+  background: #9d394f !important;
+  color: #fff !important;
+  border: 1px solid #9d394f !important;
+  padding: 10px 18px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 9px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.account-loyalty-redeem-btn:hover {
+  background: #852b3e !important;
+}
+@media (max-width: 600px) {
+  .account-loyalty-widget {
+    padding: 18px;
+  }
+  .account-loyalty-widget-body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .account-loyalty-widget-actions {
+    width: 100%;
+  }
+  .account-loyalty-redeem-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
 .account-shortcuts {
   display: flex;
   flex-wrap: wrap;

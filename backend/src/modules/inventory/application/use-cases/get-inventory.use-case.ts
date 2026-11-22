@@ -15,6 +15,11 @@ export type GetInventoryInput = Omit<InventoryListFilter, 'storeIds'> & { storeI
 
 @Injectable()
 export class GetInventoryUseCase {
+  private readonly inventoryCache = new Map<
+    string,
+    { data: { items: InventoryListItem[]; total: number }; expiresAt: number }
+  >();
+
   constructor(
     @Inject(INVENTORY_REPOSITORY)
     private readonly repository: IInventoryRepository,
@@ -25,6 +30,12 @@ export class GetInventoryUseCase {
     userId: string,
     input: GetInventoryInput,
   ): Promise<{ items: InventoryListItem[]; total: number }> {
+    const cacheKey = `${userId}:${JSON.stringify(input)}`;
+    const cached = this.inventoryCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const { storeId, ...filter } = input;
     const scope = await this.getUserDataScope.execute(userId);
 
@@ -33,10 +44,18 @@ export class GetInventoryUseCase {
     }
 
     const search = filter.search?.trim() || undefined;
-    return this.repository.findMany({
+    const result = await this.repository.findMany({
       ...filter,
       search,
       storeIds: storeId ? [storeId] : toStoreIdsFilter(scope),
     });
+
+    this.inventoryCache.set(cacheKey, { data: result, expiresAt: Date.now() + 15000 });
+    if (this.inventoryCache.size > 200) {
+      const first = this.inventoryCache.keys().next().value;
+      if (first) this.inventoryCache.delete(first);
+    }
+
+    return result;
   }
 }

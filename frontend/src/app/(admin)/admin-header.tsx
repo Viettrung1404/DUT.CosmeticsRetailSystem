@@ -5,11 +5,16 @@ import {
   Building2,
   ChevronDown,
   LogOut,
+  Menu,
   User,
 } from "lucide-react";
 import { useAdminScope } from "@/shared/auth/admin-guard";
 
-export function AdminHeader() {
+export function AdminHeader({
+  onToggleSidebar,
+}: {
+  onToggleSidebar?: () => void;
+}) {
   const { activeStoreId, setActiveStoreId, stores, setStores, activeStore, user } =
     useAdminScope();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -53,19 +58,29 @@ export function AdminHeader() {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30">
-      {/* Left: Store Scope Selector */}
-      <div className="flex items-center gap-4">
+    <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+      {/* Left: Mobile Toggle & Store Scope Selector */}
+      <div className="flex items-center gap-2 sm:gap-4">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label="Mở menu quản trị"
+            className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 lg:hidden border border-slate-200 transition"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition"
+            className="flex items-center gap-2 sm:gap-2.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-800 transition"
           >
-            <Building2 className="w-4 h-4 text-[#C85A70]" />
-            <span className="max-w-[200px] truncate">
-              {activeStore ? activeStore.name : "Tất cả chi nhánh (Scope Tổng)"}
+            <Building2 className="w-4 h-4 text-[#C85A70] shrink-0" />
+            <span className="max-w-[130px] sm:max-w-[200px] truncate">
+              {activeStore ? activeStore.name : "Tất cả chi nhánh"}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           </button>
 
           {dropdownOpen && (
@@ -113,11 +128,11 @@ export function AdminHeader() {
       {/* Right: Actions & Profile */}
       <div className="flex items-center gap-3">
         {/* User Card */}
-        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
-          <div className="w-7 h-7 rounded-lg bg-[#C85A70]/10 text-[#C85A70] flex items-center justify-center font-bold text-xs">
+        <div className="flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
+          <div className="w-7 h-7 rounded-lg bg-[#C85A70]/10 text-[#C85A70] flex items-center justify-center font-bold text-xs shrink-0">
             <User className="w-3.5 h-3.5" />
           </div>
-          <div className="text-left">
+          <div className="text-left hidden sm:block">
             <p className="text-xs font-bold text-slate-900 leading-tight">
               {user?.fullName || user?.email || "Admin Operator"}
             </p>

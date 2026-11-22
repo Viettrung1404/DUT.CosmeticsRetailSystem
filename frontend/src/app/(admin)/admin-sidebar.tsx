@@ -14,6 +14,7 @@ import {
   ExternalLink,
   ShieldCheck,
   ChevronRight,
+  X,
 } from "lucide-react";
 import { useAdminScope } from "@/shared/auth/admin-guard";
 
@@ -64,23 +65,35 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname = usePathname();
   const { activeStore, user } = useAdminScope();
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800">
+    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800 shadow-xl lg:shadow-none">
       {/* Brand Header */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-800 gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#C85A70] flex items-center justify-center text-white font-black text-sm tracking-tighter">
-          GU
+      <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#C85A70] flex items-center justify-center text-white font-black text-sm tracking-tighter">
+            GU
+          </div>
+          <div>
+            <span className="font-bold text-white text-base tracking-wide">GlowUp Ops</span>
+            <span className="block text-[10px] text-rose-400 font-semibold uppercase tracking-wider">
+              Portal Quản Trị
+            </span>
+          </div>
         </div>
-        <div>
-          <span className="font-bold text-white text-base tracking-wide">GlowUp Ops</span>
-          <span className="block text-[10px] text-rose-400 font-semibold uppercase tracking-wider">
-            Portal Quản Trị
-          </span>
-        </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng menu quản trị"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Active Store Indicator */}
@@ -109,6 +122,7 @@ export function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
                 isActive
                   ? "bg-[#C85A70] text-white shadow-sm"

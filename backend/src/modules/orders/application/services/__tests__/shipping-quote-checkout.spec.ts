@@ -130,7 +130,10 @@ describe('BE-03: CommerceCheckoutService - Real Shipping Quotes Integration', ()
               ...data,
             })),
           },
-          fulfillmentOrderItem: { create: jest.fn().mockResolvedValue({}) },
+          fulfillmentOrderItem: {
+            create: jest.fn().mockResolvedValue({}),
+            createMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
           cart: {
             findFirst: jest.fn().mockResolvedValue({
               id: 'cart-123',

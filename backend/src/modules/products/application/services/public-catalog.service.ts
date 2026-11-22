@@ -20,6 +20,10 @@ interface PublicOffer {
 
 @Injectable()
 export class PublicCatalogService {
+  private readonly listCache = new Map<string, { data: any; expiresAt: number }>();
+  private readonly detailCache = new Map<string, { data: any; expiresAt: number }>();
+  private readonly relatedCache = new Map<string, { data: any; expiresAt: number }>();
+
   constructor(
     private readonly db: PrismaService,
     @Optional() private readonly es?: ElasticsearchProductService,
@@ -67,10 +71,17 @@ export class PublicCatalogService {
     });
     return Number(customer?.loyaltyTier?.discountPercentage ?? 0);
   }
-  async list(filter: ProductFilterDto, userId?: string, query?: string) {
+  async list(filter: ProductFilterDto, userId?: string, query?: string): Promise<{ items: ProductResponseDto[]; total: number }> {
     const page = filter.page ?? 1,
       limit = filter.limit ?? 20;
     const tier = await this.tier(userId);
+
+    const cacheKey = `${userId ? 'u:' + tier : 'g'}:${query ?? ''}:${page}:${limit}:${filter.sortBy ?? ''}:${filter.categoryId ?? ''}:${filter.categoryIds?.join(',') ?? ''}:${filter.brandId ?? ''}:${filter.brandIds?.join(',') ?? ''}:${filter.minPrice ?? ''}:${filter.maxPrice ?? ''}:${filter.rating ?? ''}:${filter.tag ?? ''}:${filter.tags?.join(',') ?? ''}`;
+    const cached = this.listCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     // ES contributes relevance hints; DB remains authoritative for membership, price and pagination.
     const hints = query && this.es ? await this.es.search(query, 0, 100) : null;
     const hintIds = hints?.ids ?? [];
@@ -87,7 +98,7 @@ export class PublicCatalogService {
                 ? Prisma.sql`COALESCE(array_position(${hintIds}::uuid[],id),2147483647),total_sold DESC`
                 : Prisma.sql`created_at DESC`;
     const rows = await this.db.$queryRaw<
-      { id: string; effective_price: Prisma.Decimal; total: bigint }[]
+      { id: string; category_id: string; effective_price: Prisma.Decimal; total: bigint }[]
     >(Prisma.sql`
       WITH RECURSIVE selected_categories AS (SELECT id FROM categories WHERE id=${filter.categoryId ?? null}::uuid OR id=ANY(${filter.categoryIds ?? []}::uuid[]) UNION ALL SELECT c.id FROM categories c JOIN selected_categories parent ON c.parent_id=parent.id),
       candidate_variants AS (
@@ -118,33 +129,31 @@ export class PublicCatalogService {
         WHERE NOT campaign.is_flash_sale OR quota.quota-quota.reserved_quantity-quota.consumed_quantity>=1
         GROUP BY candidate.variant_id
       ), priced AS (
-        SELECT candidate.id,candidate.created_at,candidate.avg_rating,candidate.total_sold,
+        SELECT candidate.id,candidate.category_id,candidate.created_at,candidate.avg_rating,candidate.total_sold,
           MIN(GREATEST(0,candidate.price-GREATEST(
             trunc(candidate.price*LEAST(100,GREATEST(0,${tier}::numeric))/100,2),
             COALESCE(campaign_discounts.discount,0)))) AS effective_price
         FROM candidate_variants candidate LEFT JOIN campaign_discounts USING (variant_id)
-        GROUP BY candidate.id,candidate.created_at,candidate.avg_rating,candidate.total_sold
+        GROUP BY candidate.id,candidate.category_id,candidate.created_at,candidate.avg_rating,candidate.total_sold
       ), filtered AS (SELECT * FROM priced WHERE (${filter.minPrice ?? null}::numeric IS NULL OR effective_price>=${filter.minPrice ?? null}) AND (${filter.maxPrice ?? null}::numeric IS NULL OR effective_price<=${filter.maxPrice ?? null}))
-      SELECT id,effective_price,count(*) OVER() AS total FROM filtered ORDER BY ${sort},id LIMIT ${limit} OFFSET ${(page - 1) * limit}`);
+      SELECT id,category_id,effective_price,count(*) OVER() AS total FROM filtered ORDER BY ${sort},id LIMIT ${limit} OFFSET ${(page - 1) * limit}`);
     const ids = rows.map((row) => row.id);
-    const raw = ids.length
-      ? await this.db.product.findMany({
-          where: {
-            id: { in: ids },
-            isActive: true,
-            category: { isActive: true },
-            OR: [{ brandId: null }, { brand: { isActive: true } }],
-          },
-          include: productIncludeConfig,
-        })
-      : [];
-    const prices = ids.length ? await this.variantPrices(ids, tier) : [];
-    const offers = ids.length
-      ? await this.offers(
-          ids,
-          raw.map((p) => p.categoryId),
-        )
-      : [];
+    const categoryIds = [...new Set(rows.map((row) => row.category_id))];
+    const [raw, prices, offers] = ids.length
+      ? await Promise.all([
+          this.db.product.findMany({
+            where: {
+              id: { in: ids },
+              isActive: true,
+              category: { isActive: true },
+              OR: [{ brandId: null }, { brand: { isActive: true } }],
+            },
+            include: productIncludeConfig,
+          }),
+          this.variantPrices(ids, tier),
+          this.offers(ids, categoryIds),
+        ])
+      : [[], [], []];
     let total = Number(rows[0]?.total ?? 0);
     // An out-of-range page still reports the correct total.
     if (!rows.length && page > 1)
@@ -155,13 +164,20 @@ export class PublicCatalogService {
           query,
         )
       ).total;
-    return {
+    const result = {
       items: rows.flatMap((row) => {
         const product = raw.find((p) => p.id === row.id);
         return product ? [this.present(product, prices, offers)] : [];
       }),
       total,
     };
+
+    this.listCache.set(cacheKey, { data: result, expiresAt: Date.now() + 45000 });
+    if (this.listCache.size > 500) {
+      const first = this.listCache.keys().next().value;
+      if (first) this.listCache.delete(first);
+    }
+    return result;
   }
   private offers(productIds: string[], categoryIds: string[]) {
     return this.db.$queryRaw<
@@ -215,6 +231,12 @@ export class PublicCatalogService {
     };
   }
   async detail(slug: string, userId?: string) {
+    if (!userId) {
+      const cached = this.detailCache.get(slug);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+      }
+    }
     const row = await this.db.product.findFirst({
       where: {
         slug,
@@ -225,11 +247,20 @@ export class PublicCatalogService {
       include: productIncludeConfig,
     });
     if (!row) throw new NotFoundException('PRODUCT_NOT_FOUND');
-    return this.present(
-      row,
-      await this.variantPrices([row.id], await this.tier(userId)),
-      await this.offers([row.id], [row.categoryId]),
-    );
+    const [tierRate, offers] = await Promise.all([
+      this.tier(userId),
+      this.offers([row.id], [row.categoryId]),
+    ]);
+    const prices = await this.variantPrices([row.id], tierRate);
+    const result = this.present(row, prices, offers);
+    if (!userId) {
+      this.detailCache.set(slug, { data: result, expiresAt: Date.now() + 60000 });
+      if (this.detailCache.size > 500) {
+        const first = this.detailCache.keys().next().value;
+        if (first) this.detailCache.delete(first);
+      }
+    }
+    return result;
   }
   async suggest(query: string, limit: number, userId?: string) {
     const result = await this.list(
@@ -256,6 +287,13 @@ export class PublicCatalogService {
     return { products, brands, keywords: tags.map(tag => tag.tagName) };
   }
   async related(productId: string, limit: number, userId?: string) {
+    const cacheKey = `${productId}:${limit}`;
+    if (!userId) {
+      const cached = this.relatedCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+      }
+    }
     const source = await this.db.product.findFirst({
       where: { id: productId, isActive: true },
       select: { categoryId: true, brandId: true },
@@ -280,14 +318,25 @@ export class PublicCatalogService {
       take: limit,
       include: productIncludeConfig,
     });
+    const [tierRate, offers] = await Promise.all([
+      this.tier(userId),
+      this.offers(
+        rows.map((row) => row.id),
+        rows.map((row) => row.categoryId),
+      ),
+    ]);
     const prices = await this.variantPrices(
       rows.map((r) => r.id),
-      await this.tier(userId),
+      tierRate,
     );
-    const offers = await this.offers(
-      rows.map((row) => row.id),
-      rows.map((row) => row.categoryId),
-    );
-    return rows.map((row) => this.present(row, prices, offers));
+    const result = rows.map((row) => this.present(row, prices, offers));
+    if (!userId) {
+      this.relatedCache.set(cacheKey, { data: result, expiresAt: Date.now() + 60000 });
+      if (this.relatedCache.size > 500) {
+        const first = this.relatedCache.keys().next().value;
+        if (first) this.relatedCache.delete(first);
+      }
+    }
+    return result;
   }
 }
