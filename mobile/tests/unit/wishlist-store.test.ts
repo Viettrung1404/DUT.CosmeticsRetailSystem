@@ -9,6 +9,12 @@ vi.mock('@/api/apiClient', () => ({
   },
 }));
 
+vi.mock('@/utils/secureStore', () => ({
+  getItemAsync: vi.fn(async () => 'fake-token'),
+  setItemAsync: vi.fn(async () => {}),
+  deleteItemAsync: vi.fn(async () => {}),
+}));
+
 import apiClient from '@/api/apiClient';
 import { useWishlistStore } from '@/store/useWishlistStore';
 

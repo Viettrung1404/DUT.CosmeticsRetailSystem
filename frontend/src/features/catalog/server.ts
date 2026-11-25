@@ -121,6 +121,7 @@ const promotionDetailSchema = promotionSchema.extend({
       slug: z.string(),
       imageUrl: z.string().nullable(),
       price: money,
+      originalPrice: money.optional(),
       remaining: z.number(),
     }),
   ),

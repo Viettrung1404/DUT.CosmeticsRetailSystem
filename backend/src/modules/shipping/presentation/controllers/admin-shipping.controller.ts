@@ -8,7 +8,10 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { OrderStateAggregator } from '@modules/oms/application/services/order-state-aggregator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { ShipmentOrchestratorService } from '../../application/services/shipment-orchestrator.service';
@@ -37,6 +40,8 @@ export class AdminShippingController {
     private readonly shipmentAttemptService: ShipmentAttemptService,
     private readonly returnToOriginService: ReturnToOriginService,
     private readonly prisma: PrismaService,
+    @Optional()
+    private readonly orderStateAggregator?: OrderStateAggregator,
   ) {}
 
   @Get()
@@ -217,6 +222,38 @@ export class AdminShippingController {
     @Body() dto: ReceiveRtoShipmentDto,
   ): Promise<ReceiveRtoResponseDto> {
     return this.returnToOriginService.receiveRtoShipment(id, dto);
+  }
+
+  @Post(':id/deliver')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Xác nhận kiện hàng đã giao thành công cho khách hàng (DELIVERED)',
+  })
+  async markDelivered(@Param('id', ParseUUIDPipe) id: string) {
+    const shipment = await this.prisma.shipment.findUnique({ where: { id } });
+    if (!shipment) throw new NotFoundException('Không tìm thấy vận đơn');
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.shipment.update({
+        where: { id },
+        data: { status: 'DELIVERED', deliveredAt: now },
+      });
+      await tx.shipmentEvent.create({
+        data: {
+          shipmentId: id,
+          carrierCode: shipment.carrierCode || 'MOCK',
+          eventId: `ADMIN-DELIVER-${Date.now()}`,
+          status: 'DELIVERED',
+          occurredAt: now,
+        },
+      });
+      if (this.orderStateAggregator) {
+        await this.orderStateAggregator.computeOrderStatus(shipment.orderId, tx, {
+          note: 'Xác nhận giao hàng thành công từ cổng quản trị',
+        });
+      }
+    });
+    return { success: true, status: 'DELIVERED' };
   }
 }
 

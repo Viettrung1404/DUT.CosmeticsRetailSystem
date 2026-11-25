@@ -20,7 +20,7 @@ import {
   extractCategoryTree,
   NormalizedProduct,
 } from '../../api/productApi';
-import { useCartStore } from '../../store/useCartStore';
+import AppHeader from '../../components/AppHeader';
 
 const { width: WINDOW_WIDTH } = Dimensions.get('window');
 
@@ -790,47 +790,22 @@ const concernStyles = StyleSheet.create({
 
 // ─── MAIN HomeScreen ──────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }: any) {
-  const { getTotalItemsCount, fetchCart } = useCartStore();
-  const cartCount = getTotalItemsCount();
-
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadHomeData();
-    fetchCart().catch(() => {});
   }, []);
 
   const loadHomeData = async () => {
     try {
       setLoading(true);
 
-      const [prodRes, catRes] = await Promise.allSettled([
-        productApi.getProducts({ page: 1, limit: 10 }),
-        productApi.getCategories(),
-      ]);
-
-      if (prodRes.status === 'fulfilled') {
-        const items = extractProductList(prodRes.value);
-        if (items.length > 0) {
-          setProducts(items);
-        }
-      }
-
-      if (catRes.status === 'fulfilled') {
-        const { flat } = extractCategoryTree(catRes.value);
-        if (flat.length > 0) {
-          const mappedCats: Category[] = flat.slice(0, 6).map((c) => ({
-            id: c.id,
-            name: c.name,
-            slug: c.slug,
-            imageUrl: c.imageUrl,
-            icon: getCatIcon(c.name),
-          }));
-          setCategories(mappedCats);
-        }
+      const prodRes = await productApi.getProducts({ page: 1, limit: 10 });
+      const items = extractProductList(prodRes);
+      if (items.length > 0) {
+        setProducts(items);
       }
     } catch {
       // Khi có lỗi kết nối
@@ -846,53 +821,37 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const goToCatalog = (categoryId?: string) =>
-    navigation.navigate('Danh mục', categoryId ? { categoryId } : undefined);
+    navigation.navigate('Catalog', categoryId ? { categoryId } : undefined);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* ── 1. Top Header: Logo, Search Bar, Store Icon, Cart Icon ── */}
-      <View style={styles.header}>
-        {/* Logo */}
-        <TouchableOpacity style={styles.logoBtn} onPress={() => loadHomeData()} activeOpacity={0.8}>
-          <Text style={styles.logoText}>GlowUp</Text>
-        </TouchableOpacity>
-
-        {/* Search Bar Input Button */}
-        <TouchableOpacity
-          style={styles.searchBar}
-          onPress={() => navigation.navigate('Search')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="search-outline" size={14} color={COLORS.textMuted} />
-          <Text style={styles.searchPlaceholder} numberOfLines={1}>
-            Tìm mỹ phẩm...
-          </Text>
-        </TouchableOpacity>
-
-        {/* Action Buttons: Store Locator + Cart (Chống co cụm bằng flexShrink 0) */}
-        <View style={styles.headerActions}>
+      {/* ── 1. Header đồng bộ chuẩn GlowUp (Logo + Search Bar + Cửa hàng) ── */}
+      <AppHeader
+        title="GlowUp"
+        subtitle="MỸ PHẨM CHÍNH HÃNG"
+        onLogoPress={() => loadHomeData()}
+        centerComponent={
+          <TouchableOpacity
+            style={styles.searchBar}
+            onPress={() => navigation.navigate('Search')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="search-outline" size={15} color={COLORS.textMuted} />
+            <Text style={styles.searchPlaceholder} numberOfLines={1}>
+              Tìm mỹ phẩm...
+            </Text>
+          </TouchableOpacity>
+        }
+        rightActions={
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => navigation.navigate('StoreLocator')}
             activeOpacity={0.7}
           >
-            <Ionicons name="storefront-outline" size={19} color={COLORS.textPrimary} />
+            <Ionicons name="storefront-outline" size={20} color={COLORS.textPrimary} />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Giỏ hàng' })}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="bag-handle-outline" size={19} color={COLORS.textPrimary} />
-            {cartCount > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeTxt}>{cartCount > 99 ? '99+' : cartCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
       {/* ── 2. Scrollable Body ── */}
       <ScrollView
@@ -912,12 +871,6 @@ export default function HomeScreen({ navigation }: any) {
 
         {/* Trust Badges */}
         <TrustBadges />
-
-        {/* Khám Phá Theo Danh Mục */}
-        <View style={styles.section}>
-          <SectionTitle eyebrow="DANH MỤC TUYỂN CHỌN" title="Khám Phá Theo Danh Mục" onSeeAll={goToCatalog} />
-          <CategoryCards categories={categories} onPress={(c) => goToCatalog(c.id)} />
-        </View>
 
         {/* Flash Deal Banner (DEAL ĐẸP CÓ HẠN) */}
         <View style={styles.section}>
@@ -950,19 +903,7 @@ export default function HomeScreen({ navigation }: any) {
           )}
         </View>
 
-        {/* Cảm Hứng Làm Đẹp (Editorial Cards) */}
-        <View style={styles.section}>
-          <SectionTitle eyebrow="CẢM HỨNG LÀM ĐẸP" title="Bộ Sưu Tập Nổi Bật" />
-          <EditorialCards onPress={goToCatalog} />
-        </View>
-
-        {/* Cá Nhân Hóa Chu Trình (Skin Concerns) */}
-        <View style={styles.section}>
-          <SectionTitle eyebrow="CÁ NHÂN HÓA CHU TRÌNH" title="Khám Phá Theo Nhu Cầu Da" />
-          <SkinConcerns onPress={goToCatalog} />
-        </View>
-
-        <View style={{ height: 28 }} />
+        <View style={{ height: 36 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -992,20 +933,18 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 17, fontWeight: '900', color: COLORS.primary, letterSpacing: -0.5 },
   searchBar: {
     flex: 1,
-    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-    borderRadius: 16,
-    paddingHorizontal: 8,
-    height: 32,
-    marginRight: 4,
+    backgroundColor: '#F8F5F5',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 36,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#ECE5E5',
   },
   searchPlaceholder: {
-    marginLeft: 4,
-    fontSize: 11,
+    marginLeft: 6,
+    fontSize: 12,
     color: COLORS.textMuted,
     flex: 1,
   },
@@ -1015,27 +954,15 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   actionBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FBF8F8',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-    marginLeft: 2,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
   },
-  cartBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    minWidth: 14,
-    height: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 2,
-  },
-  cartBadgeTxt: { color: '#fff', fontSize: 7, fontWeight: '800' },
 
   // Sections
   section: { marginBottom: SPACING.sm },

@@ -6,12 +6,14 @@ import {
   ForbiddenException,
   Inject,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '@core/decorators/public.decorator';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { IOutboxWriter, OUTBOX_WRITER } from '@modules/async-infrastructure';
+import { OrderStateAggregator } from '@modules/oms/application/services/order-state-aggregator';
 import {
   TriggerMockStatusDto,
   TriggerMockStatusResponseDto,
@@ -27,6 +29,8 @@ export class TestMockCarrierController {
     private readonly config: ConfigService,
     @Inject(OUTBOX_WRITER)
     private readonly outboxWriter: IOutboxWriter,
+    @Optional()
+    private readonly orderStateAggregator?: OrderStateAggregator,
   ) {}
 
   @Public()
@@ -121,6 +125,13 @@ export class TestMockCarrierController {
           reasonDetail: dto.reasonDetail || null,
         },
       });
+
+      // 4. Đồng bộ trạng thái đơn hàng cha
+      if (this.orderStateAggregator) {
+        await this.orderStateAggregator.computeOrderStatus(shipment.orderId, tx, {
+          note: `Mô phỏng 3PL cập nhật trạng thái vận đơn (${previousStatus} -> ${dto.status})`,
+        });
+      }
 
       return updatedShipment;
     });

@@ -387,50 +387,68 @@ export class AdminReturnController {
   }
 
   @Get(':id')
-  @RequireAnyPermission('RETURN_VIEW', 'RETURN_MANAGE', 'ADMIN')
+  @RequireAnyPermission(
+    'RETURN_VIEW',
+    'RETURN_MANAGE',
+    'ADMIN',
+    'STORE_STAFF',
+    'STORE_MGR',
+    'WAREHOUSE_STAFF',
+    'STAFF',
+    'INVENTORY_UPDATE',
+  )
   @ApiOperation({
     summary: 'Xem chi tiết một hồ sơ đổi trả RMA',
   })
   async getAdminReturnDetail(@Param('id') id: string) {
-    const returnOrder = await this.prisma.returnOrder.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        order: {
-          select: {
-            orderNumber: true,
-            totalAmount: true,
-            createdAt: true,
-          },
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const includeQuery = {
+      customer: true,
+      order: {
+        select: {
+          orderNumber: true,
+          totalAmount: true,
+          createdAt: true,
         },
-        items: {
-          include: {
-            variant: {
-              include: {
-                product: true,
-              },
+      },
+      items: {
+        include: {
+          variant: {
+            include: {
+              product: true,
             },
           },
         },
-        dropoffLocation: true,
-        receipts: {
-          include: {
-            receiver: { select: { fullName: true, email: true } },
-            location: { select: { name: true, code: true } },
-          },
-        },
-        shipments: true,
-        policyVersion: true,
-        inspections: {
-          include: {
-            inspector: { select: { fullName: true, email: true } },
-            items: true,
-          },
-        },
-        settlement: true,
-        refunds: true,
       },
-    });
+      dropoffLocation: true,
+      receipts: {
+        include: {
+          receiver: { select: { fullName: true, email: true } },
+          location: { select: { name: true, code: true } },
+        },
+      },
+      shipments: true,
+      policyVersion: true,
+      inspections: {
+        include: {
+          inspector: { select: { fullName: true, email: true } },
+          items: true,
+        },
+      },
+      settlement: true,
+      refunds: true,
+    };
+
+    const returnOrder = isUuid
+      ? await this.prisma.returnOrder.findUnique({
+          where: { id },
+          include: includeQuery,
+        })
+      : await this.prisma.returnOrder.findFirst({
+          where: { returnCode: id },
+          include: includeQuery,
+        });
 
     if (!returnOrder) {
       throw new NotFoundException(

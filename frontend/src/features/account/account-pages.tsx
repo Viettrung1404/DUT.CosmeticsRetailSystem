@@ -1,4 +1,5 @@
 "use client";
+import { z } from "zod";
 import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import {
@@ -21,6 +22,9 @@ import {
   Check,
   Copy,
   RotateCcw,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { AccountHeading, StatusBadge, OrderProgress, OrderLines, OrderTotals } from "./account-ui";
 import { ContentEmpty } from "@/features/catalog/content-layout";
@@ -52,6 +56,32 @@ const formatDateTime = (value: string) => {
     return value;
   }
 };
+const formatShopeeTime = (dateStr?: string | null) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const hours = String(d.getHours()).padStart(2, "0");
+    const mins = String(d.getMinutes()).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${hours}:${mins} ${day}-${month}-${year}`;
+  } catch {
+    return "";
+  }
+};
+
+const ORDER_TABS = [
+  { id: "", label: "Tất cả" },
+  { id: "PENDING_PAYMENT", label: "Chờ thanh toán", aliases: ["PENDING_PAYMENT"] },
+  { id: "PROCESSING", label: "Chờ giao hàng", aliases: ["PENDING", "CONFIRMED", "PROCESSING"] },
+  { id: "SHIPPING", label: "Đang giao", aliases: ["SHIPPING", "SHIPPED", "PARTIALLY_SHIPPED"] },
+  { id: "COMPLETED", label: "Hoàn thành", aliases: ["DELIVERED", "COMPLETED", "PARTIALLY_DELIVERED"] },
+  { id: "CANCELLED", label: "Đã hủy", aliases: ["CANCELLED"] },
+  { id: "RETURNED", label: "Trả hàng / Hoàn tiền", aliases: ["RETURNED", "PARTIALLY_RETURNED"] },
+];
+
 const statusText: Record<string, string> = {
   PENDING_PAYMENT: "Chờ thanh toán",
   PENDING: "Chờ xác nhận",
@@ -371,6 +401,14 @@ export function OrdersPage() {
   const status = orderStatusSchema.safeParse(params.get("status")).success
     ? params.get("status")!
     : "";
+  const currentTabId =
+    ORDER_TABS.find(
+      (t) =>
+        (t.id === "" && !status) ||
+        t.id === status ||
+        (t.aliases && t.aliases.includes(status)),
+    )?.id ?? "";
+
   const query = useQuery({
     queryKey: ["orders", page, status, search, year],
     queryFn: ({ signal }) =>
@@ -395,15 +433,15 @@ export function OrdersPage() {
           description="Theo dõi, quản lý đơn hàng và xem lại các sản phẩm đã mua."
         />
         <div role="tablist" className="account-tabs" aria-label="Trạng thái đơn hàng">
-          {["", ...orderStatusSchema.options].map((value) => (
+          {ORDER_TABS.map((tab) => (
             <button
               type="button"
               role="tab"
-              key={value}
-              aria-selected={status === value}
-              onClick={() => go(1, value)}
+              key={tab.id}
+              aria-selected={currentTabId === tab.id}
+              onClick={() => go(1, tab.id)}
             >
-              {value ? statusText[value] : "Tất cả"}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -471,7 +509,7 @@ export function OrdersPage() {
                   <Link href={`/account/orders/${order.id}`}>
                     Xem chi tiết <ArrowRight size={14} />
                   </Link>
-                  {order.status === "SHIPPING" && (
+                  {["SHIPPING", "SHIPPED", "PARTIALLY_SHIPPED"].includes(order.status) && (
                     <Link
                       className="order-primary-action"
                       href={`/account/orders/${order.id}`}
@@ -480,7 +518,7 @@ export function OrdersPage() {
                       Theo dõi vận chuyển
                     </Link>
                   )}
-                  {order.status === "COMPLETED" && (
+                  {["DELIVERED", "COMPLETED", "PARTIALLY_DELIVERED"].includes(order.status) && (
                     <Link href={`/account/returns/new?orderId=${order.id}`}>Yêu cầu đổi trả</Link>
                   )}
                 </footer>
@@ -516,6 +554,454 @@ export function OrdersPage() {
     </section>
   );
 }
+export function ShopeeTrackingCard({
+  order,
+  tracking,
+  copiedCode,
+  onCopy,
+}: {
+  order: z.infer<typeof orderDetailSchema>;
+  tracking?: z.infer<typeof trackingSchema>;
+  copiedCode: string | null;
+  onCopy: (code: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Lấy kiện hàng chính
+  const mainShipment = tracking?.shipments?.[0];
+  const isAhamove = mainShipment?.carrierCode === "AHAMOVE";
+  const carrierName = isAhamove
+    ? "Ahamove Express"
+    : mainShipment?.carrierCode === "GHN"
+    ? "Giao Hàng Nhanh (GHN)"
+    : mainShipment?.carrierCode
+    ? mainShipment.carrierCode
+    : "GlowUp Express";
+
+  const trackingCode = mainShipment?.trackingCode;
+
+  // Lắp ráp toàn bộ dòng thời gian chi tiết theo chuẩn Shopee
+  const timelineEvents: Array<{
+    id: string;
+    timestamp: number;
+    timeStr: string;
+    title?: string;
+    desc: string;
+    isMilestone: boolean;
+    icon?: "check" | "truck" | "package" | "file" | "alert";
+    proofUrl?: string;
+  }> = [];
+
+  const placedAtStr =
+    tracking?.statusHistories?.find((h) => h.status === "PENDING" || h.status === "PENDING_PAYMENT")?.createdAt ||
+    order.createdAt;
+  const placedTime = new Date(placedAtStr).getTime();
+
+  // 1. Đặt hàng thành công
+  timelineEvents.push({
+    id: "evt-placed",
+    timestamp: placedTime,
+    timeStr: formatShopeeTime(placedAtStr),
+    title: "Đặt hàng thành công",
+    desc: "Đơn hàng đã được đặt",
+    isMilestone: true,
+    icon: "file",
+  });
+
+  // 2. Chờ thanh toán (nếu có trong lịch sử)
+  const pendingPaymentHist = tracking?.statusHistories?.find((h) => h.status === "PENDING_PAYMENT");
+  if (pendingPaymentHist) {
+    const t = new Date(pendingPaymentHist.createdAt).getTime();
+    timelineEvents.push({
+      id: "evt-pending-payment",
+      timestamp: t,
+      timeStr: formatShopeeTime(pendingPaymentHist.createdAt),
+      title: "Chờ thanh toán",
+      desc: "Đơn hàng đang chờ người mua hoàn tất thanh toán",
+      isMilestone: true,
+      icon: "file",
+    });
+  }
+
+  // 3. Đã xác nhận đơn hàng
+  const confirmedHist = tracking?.statusHistories?.find((h) => h.status === "CONFIRMED");
+  const isPastConfirmed = [
+    "CONFIRMED",
+    "PROCESSING",
+    "SHIPPING",
+    "SHIPPED",
+    "PARTIALLY_SHIPPED",
+    "DELIVERED",
+    "COMPLETED",
+    "PARTIALLY_DELIVERED",
+  ].includes(order.status);
+
+  if (confirmedHist || isPastConfirmed) {
+    const cTime = confirmedHist ? new Date(confirmedHist.createdAt).getTime() : placedTime + 2 * 60000;
+    timelineEvents.push({
+      id: "evt-confirmed",
+      timestamp: cTime,
+      timeStr: formatShopeeTime(new Date(cTime).toISOString()),
+      title: "Đã xác nhận",
+      desc: "Người bán đã xác nhận đơn hàng",
+      isMilestone: true,
+      icon: "file",
+    });
+  }
+
+  // 4. Đang được chuẩn bị (Kho chuẩn bị hàng)
+  const processingHist = tracking?.statusHistories?.find((h) => h.status === "PROCESSING");
+  const isPastProcessing = [
+    "PROCESSING",
+    "SHIPPING",
+    "SHIPPED",
+    "PARTIALLY_SHIPPED",
+    "DELIVERED",
+    "COMPLETED",
+    "PARTIALLY_DELIVERED",
+  ].includes(order.status);
+
+  if (processingHist || isPastProcessing) {
+    const pTime = processingHist ? new Date(processingHist.createdAt).getTime() : placedTime + 10 * 60000;
+    timelineEvents.push({
+      id: "evt-processing",
+      timestamp: pTime,
+      timeStr: formatShopeeTime(new Date(pTime).toISOString()),
+      title: "Đang được chuẩn bị",
+      desc: "Người bán đang chuẩn bị hàng",
+      isMilestone: true,
+      icon: "package",
+    });
+  }
+
+  // 5. Đơn vị vận chuyển lấy hàng thành công / Bàn giao
+  const handedOverAt =
+    mainShipment?.handedOverAt ||
+    tracking?.statusHistories?.find((h) => ["SHIPPING", "SHIPPED"].includes(h.status))?.createdAt ||
+    mainShipment?.events?.find((e) => ["PICKED_UP", "SHIPPED"].includes(e.status))?.occurredAt;
+
+  const isPastHandover = [
+    "SHIPPING",
+    "SHIPPED",
+    "PARTIALLY_SHIPPED",
+    "DELIVERED",
+    "COMPLETED",
+    "PARTIALLY_DELIVERED",
+  ].includes(order.status);
+
+  if (handedOverAt || isPastHandover) {
+    const hTime = handedOverAt ? new Date(handedOverAt).getTime() : placedTime + 30 * 60000;
+    timelineEvents.push({
+      id: "evt-handed-over",
+      timestamp: hTime,
+      timeStr: formatShopeeTime(new Date(hTime).toISOString()),
+      desc: "Đơn vị vận chuyển lấy hàng thành công",
+      isMilestone: false,
+    });
+  }
+
+  // 6. Các sự kiện trung chuyển & lộ trình bưu tá
+  if (mainShipment?.events && mainShipment.events.length > 0) {
+    mainShipment.events.forEach((evt) => {
+      const eTime = new Date(evt.occurredAt).getTime();
+      if (evt.status === "IN_TRANSIT") {
+        timelineEvents.push({
+          id: evt.id,
+          timestamp: eTime,
+          timeStr: formatShopeeTime(evt.occurredAt),
+          desc: "Đơn hàng đã đến kho phân loại trung chuyển",
+          isMilestone: false,
+        });
+      } else if (evt.status === "OUT_FOR_DELIVERY") {
+        timelineEvents.push({
+          id: evt.id,
+          timestamp: eTime,
+          timeStr: formatShopeeTime(evt.occurredAt),
+          title: "Đang vận chuyển",
+          desc: "Đơn hàng sẽ sớm được giao, vui lòng chú ý điện thoại",
+          isMilestone: true,
+          icon: "truck",
+        });
+      }
+    });
+  } else if (isPastHandover) {
+    // Nếu chưa có webhook chi tiết từ 3PL, bổ sung các bước trung gian chuẩn như Shopee
+    const hTime = handedOverAt ? new Date(handedOverAt).getTime() : placedTime + 30 * 60000;
+    const transitTime1 = hTime + 25 * 60000;
+    const transitTime2 = hTime + 45 * 60000;
+    const outTime = hTime + 70 * 60000;
+
+    timelineEvents.push({
+      id: "evt-hub-1",
+      timestamp: transitTime1,
+      timeStr: formatShopeeTime(new Date(transitTime1).toISOString()),
+      desc: "Đơn hàng đã đến kho phân loại trung chuyển",
+      isMilestone: false,
+    });
+
+    timelineEvents.push({
+      id: "evt-hub-2",
+      timestamp: transitTime2,
+      timeStr: formatShopeeTime(new Date(transitTime2).toISOString()),
+      desc: "Đơn hàng đã đến trạm giao hàng tại khu vực của bạn và sẽ được giao trong vòng 12 giờ tiếp theo",
+      isMilestone: false,
+    });
+
+    timelineEvents.push({
+      id: "evt-out-for-delivery",
+      timestamp: outTime,
+      timeStr: formatShopeeTime(new Date(outTime).toISOString()),
+      title: "Đang vận chuyển",
+      desc: "Đơn hàng sẽ sớm được giao, vui lòng chú ý điện thoại",
+      isMilestone: true,
+      icon: "truck",
+    });
+  }
+
+  // 7. Giao hàng chưa thành công (nếu có attempt thất bại)
+  if (mainShipment?.attempts && mainShipment.attempts.length > 0) {
+    mainShipment.attempts.forEach((att) => {
+      const aTime = new Date(att.attemptedAt).getTime();
+      timelineEvents.push({
+        id: att.id || `att-${att.attemptNumber}`,
+        timestamp: aTime,
+        timeStr: formatShopeeTime(att.attemptedAt),
+        title: `Giao hàng chưa thành công (Lần ${att.attemptNumber})`,
+        desc: att.failureReasonDetail || "Không liên lạc được với người nhận hoặc người nhận hẹn lại ngày giao",
+        isMilestone: true,
+        icon: "alert",
+      });
+    });
+  }
+
+  // 8. Đã giao hàng thành công
+  const isDelivered = [
+    "DELIVERED",
+    "COMPLETED",
+    "PARTIALLY_DELIVERED",
+  ].includes(order.status) || mainShipment?.status === "DELIVERED";
+
+  if (isDelivered) {
+    const dTime =
+      mainShipment?.deliveredAt
+        ? new Date(mainShipment.deliveredAt).getTime()
+        : tracking?.statusHistories?.find((h) => h.status === "DELIVERED")?.createdAt
+        ? new Date(tracking.statusHistories.find((h) => h.status === "DELIVERED")!.createdAt).getTime()
+        : placedTime + 120 * 60000;
+
+    timelineEvents.push({
+      id: "evt-delivered",
+      timestamp: dTime,
+      timeStr: formatShopeeTime(new Date(dTime).toISOString()),
+      title: "Đã giao",
+      desc: "Giao hàng thành công",
+      isMilestone: true,
+      icon: "check",
+      proofUrl: mainShipment?.trackingUrl || undefined,
+    });
+  }
+
+  // 9. Đã hoàn tất (COMPLETED)
+  const completedHist = tracking?.statusHistories?.find((h) => h.status === "COMPLETED");
+  if (order.status === "COMPLETED" && completedHist) {
+    const doneTime = new Date(completedHist.createdAt).getTime();
+    timelineEvents.push({
+      id: "evt-completed",
+      timestamp: doneTime,
+      timeStr: formatShopeeTime(completedHist.createdAt),
+      title: "Hoàn tất đơn hàng",
+      desc: "Đơn hàng đã được hoàn tất thành công. Cảm ơn bạn đã mua sắm tại GlowUp!",
+      isMilestone: true,
+      icon: "check",
+    });
+  }
+
+  // 10. Đã hủy đơn (CANCELLED)
+  if (order.status === "CANCELLED") {
+    const cancelHist = tracking?.statusHistories?.find((h) => h.status === "CANCELLED");
+    const cancelTime = cancelHist ? new Date(cancelHist.createdAt).getTime() : Date.now();
+    timelineEvents.push({
+      id: "evt-cancelled",
+      timestamp: cancelTime,
+      timeStr: formatShopeeTime(cancelHist?.createdAt || new Date().toISOString()),
+      title: "Đã hủy đơn hàng",
+      desc: cancelHist?.note || "Đơn hàng đã được hủy. Số tiền và xu (nếu có) đã được hoàn lại.",
+      isMilestone: true,
+      icon: "alert",
+    });
+  }
+
+  // Sắp xếp giảm dần theo thời gian (mới nhất lên đầu)
+  timelineEvents.sort((a, b) => b.timestamp - a.timestamp);
+
+  // Lọc bỏ trùng lặp id
+  const uniqueEvents = timelineEvents.filter(
+    (item, index, self) => index === self.findIndex((t) => t.id === item.id),
+  );
+
+  // Rút gọn / Xem thêm: Mặc định hiển thị nếu danh sách > 4
+  const hasMore = uniqueEvents.length > 4;
+  const visibleEvents = !hasMore || expanded ? uniqueEvents : uniqueEvents.slice(0, 3);
+
+  return (
+    <div className="shopee-tracking-card">
+      <div className="shopee-tracking-body">
+        {/* Cột trái: Địa chỉ nhận hàng */}
+        <div className="shopee-address-col">
+          <h3 className="shopee-address-title">
+            <MapPin size={18} style={{ color: "#be185d" }} />
+            Địa Chỉ Nhận Hàng
+          </h3>
+          {order.shippingAddress ? (
+            <>
+              <p className="shopee-address-recipient">{order.shippingAddress.recipientName}</p>
+              <p className="shopee-address-phone">{order.shippingAddress.phone}</p>
+              <p className="shopee-address-detail">
+                {[
+                  order.shippingAddress.addressLine,
+                  order.shippingAddress.ward,
+                  order.shippingAddress.district &&
+                  order.shippingAddress.district !== order.shippingAddress.ward &&
+                  !order.shippingAddress.ward?.toLowerCase().includes(order.shippingAddress.district.toLowerCase())
+                    ? order.shippingAddress.district
+                    : undefined,
+                  order.shippingAddress.city,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+            </>
+          ) : (
+            <p className="shopee-address-detail" style={{ color: "#94a3b8", fontStyle: "italic" }}>
+              Chưa có thông tin nhận hàng
+            </p>
+          )}
+        </div>
+
+        {/* Cột phải: Thông tin vận chuyển & Timeline */}
+        <div className="shopee-timeline-col">
+          <div className="shopee-carrier-header">
+            <span className="shopee-carrier-name">{carrierName}</span>
+            {trackingCode ? (
+              <span className="shopee-carrier-code">
+                {trackingCode}
+                <button
+                  type="button"
+                  onClick={() => onCopy(trackingCode)}
+                  title="Sao chép mã vận đơn"
+                  style={{
+                    border: "none",
+                    background: "#f1f5f9",
+                    color: copiedCode === trackingCode ? "#16a34a" : "#475569",
+                    cursor: "pointer",
+                    borderRadius: 4,
+                    padding: "2px 5px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                >
+                  {copiedCode === trackingCode ? (
+                    <>
+                      <Check size={11} /> Đã chép
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={11} /> Sao chép
+                    </>
+                  )}
+                </button>
+              </span>
+            ) : (
+              <span className="shopee-carrier-code" style={{ fontStyle: "italic", color: "#94a3b8" }}>
+                Đang chuẩn bị mã vận đơn...
+              </span>
+            )}
+          </div>
+
+          <ol className="shopee-timeline-list">
+            {visibleEvents.map((evt, idx) => {
+              const isFirst = idx === 0;
+              const isDeliveredActive = isFirst && isDelivered;
+              const isAlert = evt.icon === "alert";
+
+              return (
+                <li
+                  key={evt.id}
+                  className={`shopee-timeline-item ${isAlert ? "has-alert" : ""}`}
+                >
+                  <time className="shopee-timeline-time">{evt.timeStr}</time>
+                  <div className="shopee-timeline-line-col">
+                    {evt.isMilestone ? (
+                      <div
+                        className={`shopee-timeline-icon ${
+                          isDeliveredActive || (isFirst && !isAlert)
+                            ? "is-active"
+                            : isAlert
+                            ? "is-alert"
+                            : ""
+                        }`}
+                      >
+                        {evt.icon === "check" ? (
+                          <Check size={14} />
+                        ) : evt.icon === "truck" ? (
+                          <Truck size={13} />
+                        ) : evt.icon === "package" ? (
+                          <Package size={13} />
+                        ) : evt.icon === "alert" ? (
+                          <AlertCircle size={13} />
+                        ) : (
+                          <FileText size={13} />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="shopee-timeline-icon is-dot" />
+                    )}
+                  </div>
+                  <div className="shopee-timeline-content">
+                    {evt.title && <h4 className="shopee-timeline-title">{evt.title}</h4>}
+                    <p className="shopee-timeline-desc">{evt.desc}</p>
+                    {evt.proofUrl && (
+                      <a
+                        href={evt.proofUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shopee-timeline-proof-link"
+                      >
+                        Xem hình ảnh giao hàng <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+
+          {hasMore && (
+            <button
+              type="button"
+              className="shopee-timeline-toggle-btn"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <>
+                  Rút gọn <ChevronUp size={14} />
+                </>
+              ) : (
+                <>
+                  Xem thêm <ChevronDown size={14} />
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OrderDetail({ id }: { id: string }) {
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -591,7 +1077,7 @@ export function OrderDetail({ id }: { id: string }) {
   )?.createdAt;
 
   const shippingTime =
-    tracking?.statusHistories?.find((h) => h.status === "SHIPPING" || h.status === "OUT_FOR_DELIVERY")?.createdAt ||
+    tracking?.statusHistories?.find((h) => h.status === "SHIPPING" || h.status === "SHIPPED" || h.status === "OUT_FOR_DELIVERY")?.createdAt ||
     tracking?.shipments?.[0]?.handedOverAt ||
     tracking?.shipments?.[0]?.events?.[0]?.occurredAt;
 
@@ -604,8 +1090,10 @@ export function OrderDetail({ id }: { id: string }) {
     activeIndex = 3;
   } else if (
     order.status === "SHIPPING" ||
+    order.status === "SHIPPED" ||
+    order.status === "PARTIALLY_SHIPPED" ||
     order.status === "OUT_FOR_DELIVERY" ||
-    tracking?.shipments?.some((s) => ["IN_TRANSIT", "DELIVERING", "SHIPPING", "PICKED_UP"].includes(s.status))
+    tracking?.shipments?.some((s) => ["IN_TRANSIT", "DELIVERING", "SHIPPING", "PICKED_UP", "HANDED_OVER"].includes(s.status))
   ) {
     activeIndex = 2;
   } else if (order.status === "CONFIRMED" || order.status === "PROCESSING") {
@@ -625,7 +1113,7 @@ export function OrderDetail({ id }: { id: string }) {
       step: 2,
       title: "Chuẩn bị hàng",
       desc: "Xác nhận & đóng gói",
-      time: confirmedTime,
+      time: confirmedTime || (activeIndex >= 2 ? (placedTime || order.createdAt) : undefined),
       isCompleted: activeIndex >= 1 && !isCancelled && !isReturned,
       isCurrent: activeIndex === 1 && !isCancelled && !isReturned,
     },
@@ -794,6 +1282,10 @@ export function OrderDetail({ id }: { id: string }) {
                     >
                       <Clock size={11} /> {formatDateTime(m.time)}
                     </div>
+                  ) : m.isCompleted ? (
+                    <div style={{ fontSize: 11, color: "#16a34a", marginLeft: 36, fontWeight: 600 }}>
+                      Đã hoàn tất
+                    </div>
                   ) : (
                     <div style={{ fontSize: 11, color: "#94a3b8", marginLeft: 36 }}>Chưa diễn ra</div>
                   )}
@@ -804,7 +1296,15 @@ export function OrderDetail({ id }: { id: string }) {
         </div>
       )}
 
-      {/* Bố cục lưới 2 cột: Cột chính (Vận chuyển, Sản phẩm, Nhật ký) + Cột phụ (Người nhận, Thanh toán, Thao tác) */}
+      {/* Shopee-style Order Tracking & Address Card */}
+      <ShopeeTrackingCard
+        order={order}
+        tracking={tracking}
+        copiedCode={copiedCode}
+        onCopy={handleCopy}
+      />
+
+      {/* Bố cục lưới 2 cột: Cột chính (Vận chuyển, Sản phẩm) + Cột phụ (Thanh toán, Thao tác) */}
       <div className="order-detail-grid">
         <div style={{ display: "grid", gap: 24 }}>
           {/* Khối 1: Hành trình vận chuyển & Kiện hàng bưu tá */}
@@ -1068,33 +1568,6 @@ export function OrderDetail({ id }: { id: string }) {
             </div>
             <OrderLines items={order.items} />
           </section>
-
-          {/* Khối 3: Nhật ký xử lý & chuyển trạng thái đơn hàng */}
-          <section className="account-surface">
-            <div className="account-surface-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Clock size={18} style={{ color: "var(--primary, #be185d)" }} />
-                <h2 style={{ margin: 0, fontSize: 16 }}>Nhật ký chuyển trạng thái đơn hàng</h2>
-              </div>
-            </div>
-            {tracking?.statusHistories && tracking.statusHistories.length > 0 ? (
-              <ol className="tracking-timeline" style={{ margin: "12px 0 0" }}>
-                {tracking.statusHistories.map((item, index) => (
-                  <li key={`${item.createdAt}-${index}`}>
-                    <time>{formatDateTime(item.createdAt)}</time>
-                    <strong>{statusText[item.status] ?? item.status}</strong>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <ol className="tracking-timeline" style={{ margin: "12px 0 0" }}>
-                <li>
-                  <time>{formatDateTime(order.createdAt)}</time>
-                  <strong>{statusText[order.status] ?? order.status}</strong>
-                </li>
-              </ol>
-            )}
-          </section>
         </div>
 
         {/* Cột phụ bên phải: Thông tin nhận hàng, Thanh toán, Thao tác */}
@@ -1114,7 +1587,11 @@ export function OrderDetail({ id }: { id: string }) {
                   {[
                     order.shippingAddress.addressLine,
                     order.shippingAddress.ward,
-                    order.shippingAddress.district,
+                    order.shippingAddress.district &&
+                    order.shippingAddress.district !== order.shippingAddress.ward &&
+                    !order.shippingAddress.ward?.toLowerCase().includes(order.shippingAddress.district.toLowerCase())
+                      ? order.shippingAddress.district
+                      : undefined,
                     order.shippingAddress.city,
                   ]
                     .filter(Boolean)

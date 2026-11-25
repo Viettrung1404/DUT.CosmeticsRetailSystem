@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { PublicCatalogService } from './application/services/public-catalog.service';
+import { SearchHistoryService } from './application/services/search-history.service';
 import { CatalogIndexWorker } from './infrastructure/search/catalog-index.worker';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { ProductCustomerController } from './presentation/controllers/product-customer.controller';
@@ -48,6 +49,7 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
   ],
   providers: [
     PublicCatalogService,
+    SearchHistoryService,
     CatalogIndexWorker,
     // Use Cases
     GetProductsUseCase,
@@ -98,6 +100,7 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     GetRelatedProductsUseCase,
     OpenSearchProductService,
     ElasticsearchProductService,
+    SearchHistoryService,
   ],
 })
 export class ProductsModule {}

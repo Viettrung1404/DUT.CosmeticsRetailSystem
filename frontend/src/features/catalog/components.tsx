@@ -45,6 +45,11 @@ export function CatalogImage({
 }
 export function ProductCard({ product }: { product: Product }) {
   const price = product.effectivePrice ?? product.salePrice ?? product.basePrice;
+  const originalPrice =
+    product.variants && product.variants.length > 0
+      ? Math.max(...product.variants.map((v) => Number(v.price) || 0), product.basePrice)
+      : product.basePrice;
+  const hasDiscount = originalPrice > price;
   return (
     <article className="catalog-card">
       <Link href={`/products/${product.slug}`} className="catalog-card-image">
@@ -52,9 +57,9 @@ export function ProductCard({ product }: { product: Product }) {
           src={product.primaryImage || product.images?.[0]?.imageUrl}
           alt={product.name}
         />
-        {product.basePrice > price && (
+        {hasDiscount && (
           <span className="catalog-discount">
-            -{Math.round((1 - price / product.basePrice) * 100)}%
+            -{Math.round((1 - price / originalPrice) * 100)}%
           </span>
         )}
       </Link>
@@ -78,7 +83,7 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
         <div className="catalog-prices">
           <strong>{formatPrice(price)}</strong>
-          {product.basePrice > price && <del>{formatPrice(product.basePrice)}</del>}
+          {hasDiscount && <del>{formatPrice(originalPrice)}</del>}
         </div>
       </div>
     </article>

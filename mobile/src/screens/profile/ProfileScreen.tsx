@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,68 @@ import {
   Image,
   Switch,
   Alert,
-  Linking} from 'react-native';
+  Linking,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/useAuthStore';
+import { loyaltyApi } from '../../api/loyaltyApi';
+import { authApi } from '../../api/authApi';
+import { isStaffUser } from '../../utils/staffOperationsHelper';
+import AppHeader from '../../components/AppHeader';
 
 export default function ProfileScreen({ navigation }: any) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, checkAuth } = useAuthStore();
   const [isFaceIdEnabled, setIsFaceIdEnabled] = useState(true);
   const [showBarcode, setShowBarcode] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loyaltyData, setLoyaltyData] = useState<any>(null);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+
+  const isStaff = isStaffUser(user);
+
+  // Tải dữ liệu loyalty khi đăng nhập
+  const loadProfileData = useCallback(async () => {
+    if (!user) {
+      setLoyaltyData(null);
+      return;
+    }
+
+    try {
+      setLoadingLoyalty(true);
+      const [loyaltyRes, profileRes] = await Promise.allSettled([
+        loyaltyApi.getLoyaltyProfile(),
+        authApi.getProfile(),
+      ]);
+
+      if (loyaltyRes.status === 'fulfilled') {
+        const data = loyaltyRes.value?.data || loyaltyRes.value;
+        setLoyaltyData(data);
+      } else if (profileRes.status === 'fulfilled') {
+        const data = profileRes.value?.data || profileRes.value;
+        setLoyaltyData(data);
+      }
+    } catch {
+      // Giữ fallback UI
+    } finally {
+      setLoadingLoyalty(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadProfileData();
+  }, [loadProfileData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    checkAuth().finally(() => {
+      loadProfileData();
+    });
+  };
 
   const handleToggleFaceId = (value: boolean) => {
     setIsFaceIdEnabled(value);
@@ -35,94 +87,139 @@ export default function ProfileScreen({ navigation }: any) {
       {
         text: 'Đăng xuất',
         style: 'destructive',
-        onPress: () => logout(),
+        onPress: async () => {
+          await logout();
+        },
       },
     ]);
   };
 
+  // Thông tin user hiển thị
+  const displayName = user?.fullName || user?.full_name || (user?.email ? user.email.split('@')[0] : 'Khách vãng lai');
+  const userEmail = user?.email || 'Chưa đăng nhập';
+  const tierName = loyaltyData?.tierName || loyaltyData?.loyaltyTier?.name || (isStaff ? 'STAFF / ADMIN' : 'Thành viên GlowUp');
+  const points = loyaltyData?.points ?? loyaltyData?.totalPoints ?? 0;
+  const pointsVnd = points * 100;
+  const memberCode = user?.id ? `GLW-${user.id.substring(0, 8).toUpperCase()}` : 'GLW-GUEST';
+
   return (
-    <SafeAreaView style={styles.safeContainer}>
-      {/* 1. Header Profile */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image
-            source={{
-              uri: 'https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs',
-            }}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <View>
-            <Text style={styles.headerBrandTitle}>GlowUp</Text>
-            <Text style={styles.headerBrandSub}>HỒ SƠ CÁ NHÂN</Text>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      {/* 1. Header Profile chuẩn GlowUp */}
+      <AppHeader
+        title="GlowUp"
+        subtitle="HỒ SƠ CÁ NHÂN"
+        rightActions={
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.circleBtn}
+              onPress={() => navigation.navigate('NotificationCenter')}
+            >
+              <Ionicons name="notifications-outline" size={20} color={theme.colors.textDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.circleBtn, { marginLeft: 8 }]}
+              onPress={() => navigation.navigate('StoreLocator')}
+            >
+              <Ionicons name="storefront-outline" size={18} color={theme.colors.textDark} />
+            </TouchableOpacity>
           </View>
-        </View>
+        }
+      />
 
-        <View style={styles.headerRightActions}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />
+        }
+      >
+        {/* 2. Thẻ Thông Tin User hoặc Welcome Khách vãng lai */}
+        {user ? (
           <TouchableOpacity
-            style={styles.circleBtn}
-            onPress={() => navigation.navigate('NotificationCenter')}
+            style={styles.userCard}
+            activeOpacity={0.88}
+            onPress={() => navigation.navigate('EditProfile')}
           >
-            <Ionicons name="notifications-outline" size={20} color={theme.colors.textDark} />
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>2</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.circleBtn, { marginLeft: 8 }]}
-            onPress={() => Alert.alert('Quét mã', 'Mở máy quét mã QR/Barcode tại cửa hàng.')}
-          >
-            <Ionicons name="qr-code-outline" size={20} color={theme.colors.textDark} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* 2. Thẻ Tóm Tắt Thông Tin User */}
-        <TouchableOpacity
-          style={styles.userCard}
-          activeOpacity={0.88}
-          onPress={() => navigation.navigate('EditProfile')}
-        >
-          <View style={styles.userRow}>
-            <View style={styles.avatarWrapper}>
-              <Image
-                source={{
-                  uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBdWYLHb_5ZepaU1sDBlcL_NqUksR_UT9jMk0SnQaUpVnDQ_CTdzs7tv_OXKX2W2UuSQxAeZH-D4fL2oMywHD-rq9xItHARbttxSzWzXPRgjLmw7-ONGtjt8lsZH0vFoOKPUxiPzArQYFBK404oqa4OVaxRMeRO6Efha-t56O1khCnknkkNGdQgZGqcSWFAzOpNJo6636D7i2YAoK8voHwdX6EX1fbmnzScux-5ovDKg3rqVSU2WZKvWA',
-                }}
-                style={styles.avatarImg}
-              />
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark" size={10} color="#FFF" />
+            <View style={styles.userRow}>
+              <View style={styles.avatarWrapper}>
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarInitials}>
+                    {displayName.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark" size={10} color="#FFF" />
+                </View>
               </View>
-            </View>
 
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <View style={styles.nameRow}>
-                <Text style={styles.userName}>
-                  {user?.full_name || 'Thảo Linh Nguyễn'}
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.userName} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                  <Ionicons name="pencil-outline" size={16} color={theme.colors.primary} />
+                </View>
+                <Text style={styles.userEmail} numberOfLines={1}>
+                  {userEmail}
                 </Text>
-                <Ionicons name="pencil-outline" size={16} color={theme.colors.primary} />
-              </View>
-              <Text style={styles.userEmail}>{user?.email || 'linh.thaonguyen@glowup.vn'}</Text>
-              <View style={styles.vipTag}>
-                <View style={styles.vipDot} />
-                <Text style={styles.vipTagText}>Diamond VIP Member</Text>
+                <View style={styles.vipTag}>
+                  <View style={styles.vipDot} />
+                  <Text style={styles.vipTagText}>{tierName}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.guestCard}>
+            <View style={styles.guestRow}>
+              <View style={styles.guestIconCircle}>
+                <Ionicons name="person-circle-outline" size={48} color={theme.colors.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.guestTitle}>Chào mừng quý khách ✨</Text>
+                <Text style={styles.guestSubtitle}>
+                  Đăng nhập để nhận ngay ưu đãi VIP, tích lũy GlowPoints và theo dõi đơn hàng dễ dàng.
+                </Text>
+              </View>
+            </View>
 
-        {/* 3. Luxury Diamond VIP Membership Card (Stitch Design) */}
-        <TouchableOpacity style={styles.vipCard} activeOpacity={0.92} onPress={() => navigation.navigate('Loyalty')}>
-          {/* Card Top */}
+            <View style={styles.guestBtnRow}>
+              <TouchableOpacity
+                style={styles.loginBtn}
+                onPress={() => navigation.navigate('AuthStack', { screen: 'Login' })}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="log-in-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.loginBtnText}>Đăng nhập</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.registerBtn}
+                onPress={() => navigation.navigate('AuthStack', { screen: 'Register' })}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.registerBtnText}>Tạo tài khoản</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* 3. Luxury VIP Membership Card */}
+        <TouchableOpacity
+          style={styles.vipCard}
+          activeOpacity={0.92}
+          onPress={() => (user ? navigation.navigate('Loyalty') : navigation.navigate('AuthStack', { screen: 'Login' }))}
+        >
           <View style={styles.vipCardTop}>
             <View>
               <View style={styles.rowAlign}>
                 <Ionicons name="star" size={16} color="#FFE082" />
                 <Text style={styles.vipClubTitle}>GLOWUP LUXURY CLUB</Text>
               </View>
-              <Text style={styles.vipMemberTier}>DIAMOND MEMBER</Text>
+              <Text style={styles.vipMemberTier}>
+                {user ? tierName.toUpperCase() : 'ĐẶC QUYỀN THÀNH VIÊN VIP'}
+              </Text>
             </View>
             <View style={styles.vipCrownBox}>
               <Ionicons name="ribbon" size={22} color="#FFE082" />
@@ -135,30 +232,35 @@ export default function ProfileScreen({ navigation }: any) {
               <View>
                 <Text style={styles.pointsSub}>Điểm tích lũy khả dụng</Text>
                 <View style={styles.rowAlign}>
-                  <Text style={styles.pointsNumber}>1.450</Text>
+                  <Text style={styles.pointsNumber}>
+                    {user ? points.toLocaleString('vi-VN') : '0'}
+                  </Text>
                   <Text style={styles.pointsUnit}>GlowPoints</Text>
                 </View>
               </View>
 
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.pointsSub}>Trị giá giảm giá</Text>
-                <Text style={styles.pointsVnd}>~ 145.000 đ</Text>
+                <Text style={styles.pointsVnd}>
+                  {user ? `~ ${pointsVnd.toLocaleString('vi-VN')} đ` : '~ 0 đ'}
+                </Text>
               </View>
             </View>
 
-            {/* Progress to Royal Crown */}
-            <View style={{ marginTop: 12 }}>
-              <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>
-                  Tiến độ thăng hạng <Text style={{ fontWeight: '700' }}>Royal Crown</Text>
-                </Text>
-                <Text style={styles.progressPercent}>72%</Text>
-              </View>
+            {/* Hint */}
+            <View style={{ marginTop: 10 }}>
               <View style={styles.vipProgressBarTrack}>
-                <View style={[styles.vipProgressBarFill, { width: '72%' }]} />
+                <View
+                  style={[
+                    styles.vipProgressBarFill,
+                    { width: user ? (points > 1000 ? '100%' : `${Math.min(100, (points / 1000) * 100)}%`) : '15%' },
+                  ]}
+                />
               </View>
               <Text style={styles.vipHintText}>
-                Chi tiêu thêm 550.000đ để thăng hạng Royal Crown & nhận hộp quà VIP.
+                {user
+                  ? 'Tích 1 điểm cho mỗi 10.000đ chi tiêu. Đổi mã voucher giảm tới 50%.'
+                  : 'Đăng nhập để liên kết thẻ thành viên và nhận 100 điểm thưởng khởi đầu.'}
               </Text>
             </View>
           </View>
@@ -167,7 +269,7 @@ export default function ProfileScreen({ navigation }: any) {
           <View style={styles.vipCardBottom}>
             <View>
               <Text style={styles.memberCodeLabel}>MÃ THẺ THÀNH VIÊN</Text>
-              <Text style={styles.memberCodeText}>GLW-8892-9401</Text>
+              <Text style={styles.memberCodeText}>{memberCode}</Text>
             </View>
 
             <TouchableOpacity
@@ -185,7 +287,7 @@ export default function ProfileScreen({ navigation }: any) {
           {showBarcode && (
             <View style={styles.barcodeDrawer}>
               <Text style={styles.barcodeHint}>
-                Đưa mã này cho thu ngân tại quầy GlowUp để tích điểm
+                Đưa mã này cho thu ngân tại Showroom GlowUp để tích điểm trực tiếp
               </Text>
               <View style={styles.simulatedBarcode}>
                 {[4, 2, 6, 2, 8, 3, 5, 2, 7, 3, 2, 6, 4, 3, 8, 2, 5].map((w, idx) => (
@@ -200,28 +302,26 @@ export default function ProfileScreen({ navigation }: any) {
                   />
                 ))}
               </View>
-              <Text style={styles.barcodeNumber}>8892 9401 2289 1102</Text>
+              <Text style={styles.barcodeNumber}>{memberCode}</Text>
             </View>
           )}
         </TouchableOpacity>
 
-        {/* 4. Quick Loyalty Grid Actions */}
+        {/* 4. Quick Grid Actions */}
         <View style={styles.quickGrid}>
           {/* Đổi Voucher */}
           <TouchableOpacity
             style={styles.gridCard}
-            onPress={() => Alert.alert('Kho Voucher', 'Bạn đang có 4 mã giảm giá sẵn sàng áp dụng.')}
+            onPress={() => (user ? navigation.navigate('Loyalty') : navigation.navigate('AuthStack', { screen: 'Login' }))}
           >
-            <View style={[styles.gridIconCircle, { backgroundColor: theme.colors.secondaryContainer }]}>
-              <Ionicons name="ticket-outline" size={20} color={theme.colors.textDark} />
+            <View style={[styles.gridIconCircle, { backgroundColor: '#FFF0F5' }]}>
+              <Ionicons name="ticket-outline" size={20} color={theme.colors.primary} />
             </View>
             <View style={styles.gridCardHeader}>
-              <Text style={styles.gridTitle}>Đổi Voucher</Text>
-              <View style={styles.countPill}>
-                <Text style={styles.countPillText}>4</Text>
-              </View>
+              <Text style={styles.gridTitle}>Kho Voucher</Text>
+              <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
             </View>
-            <Text style={styles.gridSub}>Ưu đãi quà tặng chờ đổi</Text>
+            <Text style={styles.gridSub}>Ưu đãi quà tặng & đổi điểm</Text>
           </TouchableOpacity>
 
           {/* Yêu thích */}
@@ -229,61 +329,129 @@ export default function ProfileScreen({ navigation }: any) {
             style={styles.gridCard}
             onPress={() => navigation.navigate('Wishlist')}
           >
-            <View style={[styles.gridIconCircle, { backgroundColor: theme.colors.primaryFixed }]}>
-              <Ionicons name="heart" size={20} color={theme.colors.primary} />
+            <View style={[styles.gridIconCircle, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="heart" size={20} color="#EF4444" />
             </View>
             <View style={styles.gridCardHeader}>
               <Text style={styles.gridTitle}>Yêu thích</Text>
-              <Text style={styles.gridStatPink}>12 món</Text>
+              <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
             </View>
-            <Text style={styles.gridSub}>Lưu trữ giỏ làm đẹp</Text>
+            <Text style={styles.gridSub}>Bộ sưu tập mỹ phẩm đã lưu</Text>
           </TouchableOpacity>
 
           {/* Sổ địa chỉ */}
           <TouchableOpacity
             style={styles.gridCard}
-            onPress={() => Alert.alert('Sổ địa chỉ', 'Địa chỉ mặc định: Landmark 81, Bình Thạnh, TP.HCM.')}
+            onPress={() => (user ? navigation.navigate('AddressList') : navigation.navigate('AuthStack', { screen: 'Login' }))}
           >
-            <View style={[styles.gridIconCircle, { backgroundColor: theme.colors.tertiaryFixed }]}>
-              <Ionicons name="location-outline" size={20} color={theme.colors.tertiary} />
+            <View style={[styles.gridIconCircle, { backgroundColor: '#F0FDF4' }]}>
+              <Ionicons name="location-outline" size={20} color="#16A34A" />
             </View>
             <View style={styles.gridCardHeader}>
               <Text style={styles.gridTitle}>Sổ địa chỉ</Text>
-              <Text style={styles.gridStatMuted}>2 nơi</Text>
+              <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
             </View>
-            <Text style={styles.gridSub}>Mặc định: TP.HCM</Text>
+            <Text style={styles.gridSub}>Quản lý địa chỉ giao hàng</Text>
           </TouchableOpacity>
 
-          {/* Đánh giá & Xu */}
+          {/* Showroom */}
           <TouchableOpacity
             style={styles.gridCard}
-            onPress={() => Alert.alert('Đánh giá', 'Đánh giá đơn hàng vừa nhận để nhận ngay +50 Xu.')}
+            onPress={() => navigation.navigate('StoreLocator')}
           >
-            <View style={[styles.gridIconCircle, { backgroundColor: theme.colors.surfaceContainer }]}>
-              <Ionicons name="star-outline" size={20} color={theme.colors.textDark} />
+            <View style={[styles.gridIconCircle, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="business-outline" size={20} color="#2563EB" />
             </View>
             <View style={styles.gridCardHeader}>
-              <Text style={styles.gridTitle}>Đánh giá & Xu</Text>
-              <View style={styles.coinBadge}>
-                <Text style={styles.coinBadgeText}>+50 Xu</Text>
-              </View>
+              <Text style={styles.gridTitle}>Showroom</Text>
+              <Ionicons name="chevron-forward" size={14} color="#9CA3AF" />
             </View>
-            <Text style={styles.gridSub}>1 đơn chờ nhận xét</Text>
+            <Text style={styles.gridSub}>Hệ thống cửa hàng toàn quốc</Text>
           </TouchableOpacity>
         </View>
 
         {/* 5. Nhóm Cài Đặt Tài Khoản & Bảo Mật */}
-        <Text style={styles.sectionHeaderLabel}>CÀI ĐẶT TÀI KHOẢN & BẢO MẬT</Text>
+        <Text style={styles.sectionHeaderLabel}>TÀI KHOẢN & BẢO MẬT</Text>
         <View style={styles.settingsGroupCard}>
+          {/* Đơn hàng của tôi */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => navigation.navigate('MainTabs', { screen: 'Đơn hàng' })}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="receipt-outline" size={18} color={theme.colors.textDark} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Lịch sử đơn hàng của tôi</Text>
+                <Text style={styles.settingsSub}>Xem tiến trình vận chuyển & hóa đơn mua sắm</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Thông tin cá nhân & Hồ sơ da */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => (user ? navigation.navigate('EditProfile') : navigation.navigate('AuthStack', { screen: 'Login' }))}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="person-outline" size={18} color={theme.colors.textDark} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Thông tin cá nhân & Hồ sơ da</Text>
+                <Text style={styles.settingsSub}>Cập nhật tên, số điện thoại & loại da</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Sổ địa chỉ */}
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => (user ? navigation.navigate('AddressList') : navigation.navigate('AuthStack', { screen: 'Login' }))}
+          >
+            <View style={styles.settingsRowLeft}>
+              <View style={styles.settingsIconBox}>
+                <Ionicons name="location-outline" size={18} color={theme.colors.textDark} />
+              </View>
+              <View>
+                <Text style={styles.settingsTitle}>Sổ địa chỉ nhận hàng</Text>
+                <Text style={styles.settingsSub}>Thiết lập địa chỉ giao hàng mặc định</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
+          {/* Đổi mật khẩu */}
+          {user && (
+            <TouchableOpacity
+              style={styles.settingsRow}
+              onPress={() => navigation.navigate('ChangePassword')}
+            >
+              <View style={styles.settingsRowLeft}>
+                <View style={styles.settingsIconBox}>
+                  <Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />
+                </View>
+                <View>
+                  <Text style={styles.settingsTitle}>Đổi mật khẩu tài khoản</Text>
+                  <Text style={styles.settingsSub}>Bảo vệ an toàn thông tin & điểm tích luỹ</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
           {/* Sinh trắc học FaceID */}
-          <View style={styles.settingsRow}>
+          <View style={[styles.settingsRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingsRowLeft}>
               <View style={styles.settingsIconBox}>
                 <Ionicons name="finger-print" size={18} color={theme.colors.primary} />
               </View>
               <View>
                 <Text style={styles.settingsTitle}>Đăng nhập FaceID / Vân tay</Text>
-                <Text style={styles.settingsSub}>Bảo mật giao dịch & mua sắm nhanh</Text>
+                <Text style={styles.settingsSub}>Kích hoạt xác thực sinh trắc học</Text>
               </View>
             </View>
             <Switch
@@ -293,80 +461,11 @@ export default function ProfileScreen({ navigation }: any) {
               thumbColor="#FFF"
             />
           </View>
-
-          {/* Đơn hàng của tôi */}
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => navigation.navigate('Đơn hàng')}
-          >
-            <View style={styles.settingsRowLeft}>
-              <View style={styles.settingsIconBox}>
-                <Ionicons name="receipt-outline" size={18} color={theme.colors.textDark} />
-              </View>
-              <View>
-                <Text style={styles.settingsTitle}>Lịch sử đơn hàng của tôi</Text>
-                <Text style={styles.settingsSub}>Xem tiến trình vận chuyển & hóa đơn</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Thông tin cá nhân */}
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => navigation.navigate('EditProfile')}
-          >
-            <View style={styles.settingsRowLeft}>
-              <View style={styles.settingsIconBox}>
-                <Ionicons name="person-outline" size={18} color={theme.colors.textDark} />
-              </View>
-              <View>
-                <Text style={styles.settingsTitle}>Thông tin cá nhân & Hồ sơ da</Text>
-                <Text style={styles.settingsSub}>Nhận gợi ý routine & quà Bloom Luxe</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Sổ địa chỉ */}
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => navigation.navigate('AddressList')}
-          >
-            <View style={styles.settingsRowLeft}>
-              <View style={styles.settingsIconBox}>
-                <Ionicons name="location-outline" size={18} color={theme.colors.textDark} />
-              </View>
-              <View>
-                <Text style={styles.settingsTitle}>Sổ địa chỉ nhận hàng</Text>
-                <Text style={styles.settingsSub}>Quản lý địa chỉ giao hàng mặc định</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* Đổi mật khẩu */}
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => navigation.navigate('ChangePassword')}
-          >
-            <View style={styles.settingsRowLeft}>
-              <View style={styles.settingsIconBox}>
-                <Ionicons name="lock-closed-outline" size={18} color={theme.colors.primary} />
-              </View>
-              <View>
-                <Text style={styles.settingsTitle}>Đổi mật khẩu tài khoản</Text>
-                <Text style={styles.settingsSub}>Bảo vệ an toàn thông tin & điểm tích luỹ</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
         </View>
 
-        {/* 6. Chăm Sóc Khách Hàng & Hệ Thống Showroom */}
-        <Text style={styles.sectionHeaderLabel}>TIỆN ÍCH & CHĂM SÓC KHÁCH HÀNG</Text>
+        {/* 6. Tiện ích & Hỗ trợ Khách hàng */}
+        <Text style={styles.sectionHeaderLabel}>TIỆN ÍCH & TRỢ GIÚP</Text>
         <View style={styles.settingsGroupCard}>
-          {/* Hệ thống Showroom */}
           <TouchableOpacity
             style={styles.settingsRow}
             onPress={() => navigation.navigate('StoreLocator')}
@@ -383,7 +482,6 @@ export default function ProfileScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
           </TouchableOpacity>
 
-          {/* Trung tâm trợ giúp & Chính sách */}
           <TouchableOpacity
             style={styles.settingsRow}
             onPress={() => navigation.navigate('HelpCenter')}
@@ -394,14 +492,14 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
               <View>
                 <Text style={styles.settingsTitle}>Trung tâm trợ giúp & Chính sách</Text>
-                <Text style={styles.settingsSub}>FAQ, đổi trả 7 ngày & bảo hành da</Text>
+                <Text style={styles.settingsSub}>FAQ, chính sách đổi trả & bảo hành</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.settingsRow}
+            style={[styles.settingsRow, { borderBottomWidth: 0 }]}
             onPress={() => Linking.openURL('tel:19008899')}
           >
             <View style={styles.settingsRowLeft}>
@@ -417,23 +515,30 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* 7. Vận Hành Nội Bộ & Kho Cửa Hàng (Store Operations) */}
-        <Text style={styles.sectionHeaderLabel}>VẬN HÀNH NỘI BỘ (DÀNH CHO NHÂN VIÊN)</Text>
+        {/* 7. Vận Hành Nội Bộ & Kho Cửa Hàng (Staff Mode) */}
+        <Text style={styles.sectionHeaderLabel}>VẬN HÀNH NỘI BỘ</Text>
         <View style={styles.settingsGroupCard}>
           <TouchableOpacity
-            style={styles.settingsRow}
+            style={[styles.settingsRow, { borderBottomWidth: 0 }]}
             onPress={() => navigation.navigate('StaffMode')}
           >
             <View style={styles.settingsRowLeft}>
               <View style={[styles.settingsIconBox, { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name="scan-circle-outline" size={18} color="#2563EB" />
+                <Ionicons name="scan-circle-outline" size={20} color="#2563EB" />
               </View>
-              <View>
-                <Text style={[styles.settingsTitle, { color: '#1D4ED8', fontWeight: '700' }]}>
-                  Chế độ Nhân viên Cửa hàng (Staff Mode)
-                </Text>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.settingsTitle, { color: '#1D4ED8', fontWeight: '700' }]}>
+                    Chế độ Nhân viên Cửa hàng (Staff Mode)
+                  </Text>
+                  {isStaff && (
+                    <View style={styles.activeStaffBadge}>
+                      <Text style={styles.activeStaffBadgeText}>Active</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.settingsSub}>
-                  Nhặt hàng (Picking), Bàn giao (Handover) & Tiếp nhận RMA
+                  Nhặt hàng (Picking), Bàn giao bưu tá & Tiếp nhận RMA
                 </Text>
               </View>
             </View>
@@ -441,15 +546,25 @@ export default function ProfileScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* 8. Nút Đăng Xuất */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={18} color={theme.colors.error} />
-          <Text style={styles.logoutText}>Đăng xuất tài khoản</Text>
-        </TouchableOpacity>
+        {/* 8. Nút Đăng Xuất hoặc Đăng Nhập */}
+        {user ? (
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={18} color={theme.colors.error} />
+            <Text style={styles.logoutText}>Đăng xuất tài khoản</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.guestLoginBarBtn}
+            onPress={() => navigation.navigate('AuthStack', { screen: 'Login' })}
+          >
+            <Ionicons name="log-in-outline" size={18} color={theme.colors.primary} />
+            <Text style={styles.guestLoginBarText}>Đăng nhập tài khoản GlowUp</Text>
+          </TouchableOpacity>
+        )}
 
         {/* App Version Info */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>GlowUp Cosmetics Mobile • Phiên bản 1.0.0 (Sprint 2)</Text>
+          <Text style={styles.versionText}>GlowUp Cosmetics Mobile • Phiên bản 1.0.0</Text>
           <Text style={styles.versionSlogan}>Trao trọn yêu thương cho làn da thuần khiết</Text>
         </View>
       </ScrollView>
@@ -460,36 +575,37 @@ export default function ProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: theme.colors.backgroundCanvas,
+    backgroundColor: '#FAF7F5',
   },
   header: {
-    height: 60,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
-    backgroundColor: 'rgba(255, 248, 246, 0.95)',
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSubtle,
+    borderBottomColor: '#EFEAE6',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerLogo: {
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     marginRight: 8,
   },
   headerBrandTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.textDark,
+    fontWeight: '800',
+    color: '#281811',
   },
   headerBrandSub: {
     fontSize: 9,
     fontWeight: '700',
-    color: theme.colors.textMuted,
+    color: '#8C7A70',
     letterSpacing: 1,
   },
   headerRightActions: {
@@ -500,29 +616,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: theme.colors.surfaceSubtle,
+    backgroundColor: '#F5EFEB',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: theme.colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    minWidth: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFF',
-  },
-  notifBadgeText: {
-    color: '#FFF',
-    fontSize: 9,
-    fontWeight: '700',
   },
   content: {
     flex: 1,
@@ -535,12 +631,11 @@ const styles = StyleSheet.create({
 
   /* User Info Card */
   userCard: {
-    backgroundColor: theme.colors.surfaceCard,
-    borderRadius: theme.rounded.xl,
-    padding: theme.spacing.md,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.borderSubtle,
-    ...theme.shadows.card,
+    borderColor: '#EFEAE6',
   },
   userRow: {
     flexDirection: 'row',
@@ -549,10 +644,18 @@ const styles = StyleSheet.create({
   avatarWrapper: {
     position: 'relative',
   },
-  avatarImg: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+  avatarPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
   verifiedBadge: {
     position: 'absolute',
@@ -561,135 +664,190 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#FFF',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
   },
   userName: {
     fontSize: 16,
     fontWeight: '700',
-    color: theme.colors.textDark,
+    color: '#1F2937',
+    flex: 1,
   },
   userEmail: {
     fontSize: 12,
-    color: theme.colors.textMuted,
+    color: '#6B7280',
     marginTop: 2,
   },
   vipTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    backgroundColor: '#FFF1F2',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 6,
   },
   vipDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: theme.colors.primary,
+    marginRight: 6,
   },
   vipTagText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: theme.colors.primary,
-    textTransform: 'uppercase',
   },
 
-  /* VIP Card Gradient */
+  /* Guest Card */
+  guestCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#EFEAE6',
+  },
+  guestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  guestIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFF0F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guestTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  guestSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 17,
+  },
+  guestBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  loginBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  registerBtn: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  registerBtnText: {
+    color: theme.colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  /* VIP Card */
   vipCard: {
-    backgroundColor: '#C85A70',
-    borderRadius: theme.rounded.xl,
-    padding: theme.spacing.md,
-    ...theme.shadows.elevated,
+    backgroundColor: '#281811',
+    borderRadius: 18,
+    padding: 16,
   },
   vipCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  rowAlign: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
   vipClubTitle: {
-    fontSize: 10,
-    fontWeight: '700',
     color: '#FFE082',
-    letterSpacing: 1,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginLeft: 4,
   },
   vipMemberTier: {
-    fontSize: 16,
-    fontWeight: '700',
     color: '#FFF',
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: '800',
     marginTop: 2,
+    letterSpacing: 0.5,
   },
   vipCrownBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 224, 130, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   pointsBox: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: theme.rounded.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
     padding: 12,
-    marginVertical: 12,
+    marginTop: 14,
   },
   pointsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   pointsSub: {
+    color: '#D1C7BD',
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 2,
   },
   pointsNumber: {
+    color: '#FFE082',
     fontSize: 22,
     fontWeight: '800',
-    color: '#FFF',
+    marginRight: 4,
   },
   pointsUnit: {
+    color: '#FFF',
     fontSize: 12,
-    color: '#FFE082',
-    fontWeight: '700',
-    marginLeft: 4,
-    marginTop: 6,
+    fontWeight: '600',
+    alignSelf: 'flex-end',
+    marginBottom: 3,
   },
   pointsVnd: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFE082',
-    marginTop: 4,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  progressLabel: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  progressPercent: {
-    fontSize: 11,
-    fontWeight: '700',
     color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   vipProgressBarTrack: {
     height: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 3,
-    marginVertical: 6,
     overflow: 'hidden',
+    marginBottom: 6,
   },
   vipProgressBarFill: {
     height: '100%',
@@ -697,63 +855,72 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   vipHintText: {
+    color: '#D1C7BD',
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontStyle: 'italic',
+    lineHeight: 14,
   },
   vipCardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
   },
   memberCodeLabel: {
+    color: '#A89B91',
     fontSize: 9,
-    color: 'rgba(255, 255, 255, 0.7)',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   memberCodeText: {
+    color: '#FFF',
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFF',
-    letterSpacing: 1.5,
+    fontFamily: 'monospace',
+    marginTop: 1,
   },
   barcodeToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     backgroundColor: '#FFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
   },
   barcodeToggleText: {
-    fontSize: 11,
+    color: '#281811',
+    fontSize: 10,
     fontWeight: '700',
-    color: theme.colors.primary,
+    marginLeft: 4,
   },
   barcodeDrawer: {
     backgroundColor: '#FFF',
-    borderRadius: theme.rounded.md,
+    borderRadius: 12,
     padding: 12,
-    marginTop: 10,
+    marginTop: 12,
     alignItems: 'center',
   },
   barcodeHint: {
     fontSize: 10,
-    color: theme.colors.textMuted,
+    color: '#6B7280',
+    textAlign: 'center',
     marginBottom: 8,
   },
   simulatedBarcode: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     height: 40,
+    marginVertical: 4,
   },
   barcodeNumber: {
     fontSize: 11,
+    fontWeight: '700',
+    color: '#111827',
     letterSpacing: 2,
-    color: theme.colors.textDark,
     marginTop: 4,
-    fontWeight: '600',
   },
 
   /* Quick Grid */
@@ -763,18 +930,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   gridCard: {
-    width: '48%',
-    backgroundColor: theme.colors.surfaceCard,
-    borderRadius: theme.rounded.xl,
+    width: '48.5%',
+    backgroundColor: '#FFF',
+    borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: theme.colors.borderSubtle,
-    ...theme.shadows.card,
+    borderColor: '#EFEAE6',
   },
   gridIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -787,126 +953,129 @@ const styles = StyleSheet.create({
   gridTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.textDark,
-  },
-  countPill: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  countPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  gridStatPink: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  gridStatMuted: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
+    color: '#1F2937',
   },
   gridSub: {
     fontSize: 10,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  coinBadge: {
-    backgroundColor: theme.colors.primaryFixed,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  coinBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: theme.colors.primaryDeep,
+    color: '#9CA3AF',
+    marginTop: 3,
   },
 
-  /* Settings Group */
+  /* Settings Section */
   sectionHeaderLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.textMuted,
-    letterSpacing: 0.8,
+    fontWeight: '800',
+    color: '#9CA3AF',
+    letterSpacing: 1,
     marginTop: 6,
     marginLeft: 4,
   },
   settingsGroupCard: {
-    backgroundColor: theme.colors.surfaceCard,
-    borderRadius: theme.rounded.xl,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.borderSubtle,
-    ...theme.shadows.card,
+    borderColor: '#EFEAE6',
     overflow: 'hidden',
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.borderSubtle,
+    borderBottomColor: '#F5EFEB',
   },
   settingsRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     flex: 1,
   },
   settingsIconBox: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: theme.colors.surfaceSubtle,
+    backgroundColor: '#FAF7F5',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 10,
   },
   settingsTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.textDark,
+    color: '#1F2937',
   },
   settingsSub: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
+    fontSize: 10,
+    color: '#9CA3AF',
     marginTop: 1,
   },
+  activeStaffBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  activeStaffBadgeText: {
+    color: '#16A34A',
+    fontSize: 9,
+    fontWeight: '700',
+  },
 
-  /* Logout */
+  /* Logout & Login buttons */
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.surfaceCard,
-    borderRadius: theme.rounded.lg,
-    paddingVertical: 14,
+    backgroundColor: '#FFF',
     borderWidth: 1,
-    borderColor: theme.colors.borderSubtle,
-    marginTop: 6,
+    borderColor: '#FEE2E2',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 4,
   },
   logoutText: {
+    color: theme.colors.error,
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.error,
+    marginLeft: 6,
   },
+  guestLoginBarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  guestLoginBarText: {
+    color: theme.colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+
   versionContainer: {
     alignItems: 'center',
-    marginTop: 8,
-    paddingBottom: 20,
+    paddingVertical: 14,
   },
   versionText: {
     fontSize: 11,
-    color: theme.colors.textMuted,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   versionSlogan: {
     fontSize: 10,
-    color: theme.colors.textMuted,
-    fontStyle: 'italic',
+    color: '#B5A89F',
     marginTop: 2,
+    fontStyle: 'italic',
+  },
+  rowAlign: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

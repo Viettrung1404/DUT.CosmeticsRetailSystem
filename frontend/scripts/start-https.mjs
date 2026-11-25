@@ -18,31 +18,50 @@ if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
 }
 
 // Khởi chạy Next.js production server ở cổng nội bộ
-const child = spawn(
-  process.execPath,
-  [nextBin, "start", "--port", String(INTERNAL_PORT)],
-  {
-    cwd: rootDir,
-    stdio: "inherit",
-    windowsHide: true,
-    env: {
-      ...process.env,
-      PORT: String(INTERNAL_PORT),
-      SITE_URL: `https://localhost:${HTTPS_PORT}`,
-    },
-  }
-);
+let child;
+let isShuttingDown = false;
 
-child.on("error", (err) => {
-  console.error("Không thể khởi động Next production server:", err);
-  process.exitCode = 1;
+function startNextChild() {
+  child = spawn(
+    process.execPath,
+    [nextBin, "start", "--port", String(INTERNAL_PORT)],
+    {
+      cwd: rootDir,
+      stdio: ["ignore", "inherit", "inherit"],
+      windowsHide: true,
+      env: {
+        ...process.env,
+        PORT: String(INTERNAL_PORT),
+        SITE_URL: `https://localhost:${HTTPS_PORT}`,
+      },
+    }
+  );
+
+  child.on("error", (err) => {
+    console.error("Không thể khởi động Next production server:", err);
+  });
+
+  child.on("exit", (code) => {
+    if (isShuttingDown) return;
+    if (code !== 0 && code !== null) {
+      console.warn(`Next.js production server đã thoát với mã: ${code}. Đang tự động khởi động lại sau 1s...`);
+    }
+    setTimeout(startNextChild, 1000);
+  });
+}
+
+startNextChild();
+
+process.on("SIGINT", () => {
+  isShuttingDown = true;
+  child?.kill();
+  process.exit(0);
 });
 
-child.on("exit", (code) => {
-  if (code !== 0 && code !== null) {
-    console.error(`Next.js production server đã thoát với mã: ${code}`);
-  }
-  process.exit(code ?? 1);
+process.on("SIGTERM", () => {
+  isShuttingDown = true;
+  child?.kill();
+  process.exit(0);
 });
 
 // Proxy HTTPS (port 3001) -> Next.js HTTP (port 3002)

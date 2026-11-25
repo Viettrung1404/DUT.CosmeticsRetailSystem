@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
-  Alert} from 'react-native';
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
+import apiClient from '../../api/apiClient';
 
 interface FaqItem {
   id: string;
@@ -18,39 +22,59 @@ interface FaqItem {
   answer: string;
 }
 
-const FAQ_LIST: FaqItem[] = [
-  {
-    id: 'faq-1',
-    category: 'Đổi trả',
-    question: 'Chính sách đổi trả 7 ngày của GlowUp như thế nào?',
-    answer:
-      'GlowUp hỗ trợ đổi mới hoặc hoàn tiền 100% trong vòng 7 ngày kể từ khi nhận hàng đối với sản phẩm còn nguyên tem niêm phong, hoặc sản phẩm bị lỗi từ nhà sản xuất, kích ứng da có xác nhận y tế.',
-  },
-  {
-    id: 'faq-2',
-    category: 'Giao vận',
-    question: 'Thời gian giao hàng dự kiến là bao lâu?',
-    answer:
-      'Đơn nội thành Hà Nội và TP.HCM: Giao nhanh trong 2-4 giờ (Express) hoặc 1-2 ngày làm việc (Standard). Các tỉnh thành khác: Từ 2-4 ngày làm việc.',
-  },
-  {
-    id: 'faq-3',
-    category: 'Chất lượng',
-    question: 'Mỹ phẩm tại GlowUp có chính hãng không?',
-    answer:
-      '100% mỹ phẩm tại GlowUp Cosmetics được nhập khẩu chính ngạch, có tem phụ tiếng Việt, hóa đơn VAT và bảo hiểm cam kết đền bù 200% nếu phát hiện hàng giả.',
-  },
-  {
-    id: 'faq-4',
-    category: 'Thành viên',
-    question: 'Điểm GlowPoint được tích luỹ và sử dụng ra sao?',
-    answer:
-      'Mỗi 100.000đ chi tiêu bạn sẽ nhận được 10 GlowPoint. Điểm thưởng có thể dùng để khấu trừ trực tiếp khi thanh toán hoặc đổi các voucher giảm giá độc quyền trong mục Khách hàng thân thiết.',
-  },
-];
+interface FaqGroup {
+  category: string;
+  items: FaqItem[];
+}
 
 export default function HelpCenterScreen({ navigation }: any) {
-  const [expandedId, setExpandedId] = useState<string | null>('faq-1');
+  const [faqGroups, setFaqGroups] = useState<FaqGroup[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tất cả');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const fetchFaqs = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/faqs');
+      const groups = res.data?.data || res.data || [];
+      const cleanedGroups: FaqGroup[] = groups.map((g: any) => ({
+        category: g.category,
+        items: (g.items || []).map((it: any) => ({
+          id: it.id,
+          category: g.category,
+          question: it.question,
+          answer: (it.answer || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim(),
+        })),
+      }));
+      setFaqGroups(cleanedGroups);
+      // Mặc định mở câu hỏi đầu tiên nếu có
+      if (cleanedGroups.length > 0 && cleanedGroups[0].items.length > 0) {
+        setExpandedId(cleanedGroups[0].items[0].id);
+      }
+    } catch (err: any) {
+      console.warn('Failed to load FAQs', err?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFaqs();
+  }, [fetchFaqs]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchFaqs();
+  };
+
+  const categories = ['Tất cả', ...faqGroups.map((g) => g.category)];
+
+  // Lọc items theo category được chọn
+  const filteredItems: FaqItem[] = faqGroups
+    .filter((g) => selectedCategory === 'Tất cả' || g.category === selectedCategory)
+    .flatMap((g) => g.items);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -83,6 +107,14 @@ export default function HelpCenterScreen({ navigation }: any) {
         style={styles.content}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
       >
         {/* Banner hỗ trợ */}
         <View style={styles.banner}>
@@ -113,40 +145,75 @@ export default function HelpCenterScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* Câu hỏi thường gặp FAQ */}
-        <Text style={styles.sectionTitle}>CÂU HỎI THƯỜNG GẶP (FAQ)</Text>
-        <View style={styles.faqList}>
-          {FAQ_LIST.map((faq) => {
-            const isExpanded = expandedId === faq.id;
-            return (
-              <View key={faq.id} style={styles.faqCard}>
-                <TouchableOpacity
-                  style={styles.faqHeader}
-                  activeOpacity={0.8}
-                  onPress={() => toggleExpand(faq.id)}
-                >
-                  <View style={styles.questionContainer}>
-                    <View style={styles.faqBadge}>
-                      <Text style={styles.faqBadgeText}>{faq.category}</Text>
-                    </View>
-                    <Text style={styles.questionText}>{faq.question}</Text>
-                  </View>
-                  <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={COLORS.textMuted}
-                  />
-                </TouchableOpacity>
+        {/* Danh mục câu hỏi */}
+        <Text style={styles.sectionTitle}>CHỦ ĐỀ HỖ TRỢ</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesRow}
+        >
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.categoryChip,
+                selectedCategory === cat && styles.categoryChipActive,
+              ]}
+              onPress={() => setSelectedCategory(cat)}
+            >
+              <Text
+                style={[
+                  styles.categoryChipText,
+                  selectedCategory === cat && styles.categoryChipTextActive,
+                ]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-                {isExpanded && (
-                  <View style={styles.answerContainer}>
-                    <Text style={styles.answerText}>{faq.answer}</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </View>
+        {/* Câu hỏi thường gặp FAQ */}
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>CÂU HỎI THƯỜNG GẶP (FAQ)</Text>
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Đang tải câu hỏi thường gặp...</Text>
+          </View>
+        ) : (
+          <View style={styles.faqList}>
+            {filteredItems.map((faq) => {
+              const isExpanded = expandedId === faq.id;
+              return (
+                <View key={faq.id} style={styles.faqCard}>
+                  <TouchableOpacity
+                    style={styles.faqHeader}
+                    activeOpacity={0.8}
+                    onPress={() => toggleExpand(faq.id)}
+                  >
+                    <View style={styles.questionContainer}>
+                      <View style={styles.faqBadge}>
+                        <Text style={styles.faqBadgeText}>{faq.category}</Text>
+                      </View>
+                      <Text style={styles.questionText}>{faq.question}</Text>
+                    </View>
+                    <Ionicons
+                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={20}
+                      color={COLORS.textMuted}
+                    />
+                  </TouchableOpacity>
+
+                  {isExpanded && (
+                    <View style={styles.answerContainer}>
+                      <Text style={styles.answerText}>{faq.answer}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Cam kết thương hiệu */}
         <View style={styles.policyCard}>
@@ -336,6 +403,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: COLORS.textBody,
+  },
+  categoriesRow: {
+    paddingBottom: 4,
+    gap: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  categoryChipActive: {
+    backgroundColor: COLORS.primarySurface,
+    borderColor: COLORS.primary,
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  categoryChipTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  loadingBox: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: COLORS.textMuted,
   },
 });
 

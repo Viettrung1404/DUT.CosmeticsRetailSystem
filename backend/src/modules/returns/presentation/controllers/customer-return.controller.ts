@@ -153,8 +153,9 @@ export class CustomerReturnController {
   async getReturnDetail(@Param('id') id: string, @Req() req: any) {
     const customerId = await this.resolveCustomerId(req);
 
-    const returnOrder = await this.prisma.returnOrder.findUnique({
-      where: { id },
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const returnOrder = await this.prisma.returnOrder.findFirst({
+      where: isUuid ? { id } : { returnCode: id },
       include: {
         items: {
           include: {

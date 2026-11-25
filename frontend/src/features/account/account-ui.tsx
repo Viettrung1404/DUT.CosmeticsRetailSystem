@@ -8,10 +8,14 @@ export const orderStatusText: Record<string, string> = {
   CONFIRMED: "Đã xác nhận",
   PROCESSING: "Đang chuẩn bị",
   SHIPPING: "Đang giao",
+  SHIPPED: "Đang giao hàng",
+  PARTIALLY_SHIPPED: "Đang giao một phần",
   DELIVERED: "Đã giao",
+  PARTIALLY_DELIVERED: "Đã giao một phần",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
   RETURNED: "Đã trả hàng",
+  PARTIALLY_RETURNED: "Trả hàng một phần",
 };
 export const returnStatusText: Record<string, string> = {
   DRAFT: "Bản nháp",
@@ -71,9 +75,9 @@ export function OrderProgress({ status }: { status: string }) {
     ? 0
     : ["CONFIRMED", "PROCESSING"].includes(status)
       ? 1
-      : status === "SHIPPING"
+      : ["SHIPPING", "SHIPPED", "PARTIALLY_SHIPPED"].includes(status)
         ? 2
-        : ["DELIVERED", "COMPLETED"].includes(status)
+        : ["DELIVERED", "COMPLETED", "PARTIALLY_DELIVERED"].includes(status)
           ? 3
           : -1;
   return (

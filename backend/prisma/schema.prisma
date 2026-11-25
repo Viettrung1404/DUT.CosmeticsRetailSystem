@@ -78,6 +78,7 @@ model User {
   refundsProcessed           Refund[]              @relation("RefundProcessor")
   returnHistoryChanges       ReturnStatusHistory[] @relation("ReturnHistoryActor")
   inventoryTransactions      InventoryTransaction[]
+  searchHistories            SearchHistory[]
   transfersRequested         InventoryTransfer[]   @relation("RequestedTransfers")
   transfersApproved          InventoryTransfer[]   @relation("ApprovedTransfers")
   transfersShipped           InventoryTransfer[]   @relation("ShippedTransfers")
@@ -2501,6 +2502,22 @@ model DomainStatusHistory {
   @@index([entityType, entityId, occurredAt(sort: Desc)], map: "idx_domain_status_audit")
   @@map("domain_status_histories")
 }
+
+model SearchHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  query        String   @db.VarChar(255)
+  resultsCount Int      @default(0) @map("results_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "idx_search_histories_user_id_created_at")
+  @@index([query], map: "idx_search_histories_query")
+  @@map("search_histories")
+}
+
 
 
 

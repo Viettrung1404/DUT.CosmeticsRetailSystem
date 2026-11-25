@@ -45,6 +45,20 @@ export function ShipmentsTable() {
   const [rtoCondition, setRtoCondition] = useState<"INTACT" | "DAMAGED">("INTACT");
   const [rtoNotes, setRtoNotes] = useState<string>("Bao bì còn nguyên vẹn khi hàng hoàn về kho.");
   const [submittingRto, setSubmittingRto] = useState<boolean>(false);
+  const [deliveringId, setDeliveringId] = useState<string | null>(null);
+
+  const handleDeliver = async (item: ShipmentItem) => {
+    if (!window.confirm(`Xác nhận kiện hàng ${item.shipmentCode} (${item.trackingCode || ""}) đã giao thành công cho khách hàng?`)) return;
+    setDeliveringId(item.id);
+    try {
+      await adminClient.post(`/admin/shipments/${item.id}/deliver`, {});
+      fetchShipments();
+    } catch (err: any) {
+      alert(`Lỗi xác nhận giao hàng: ${err?.message || "Không thể cập nhật"}`);
+    } finally {
+      setDeliveringId(null);
+    }
+  };
 
   const fetchShipments = useCallback(async () => {
     try {
@@ -321,6 +335,19 @@ export function ShipmentsTable() {
                       >
                         <History className="w-3.5 h-3.5" />
                       </button>
+
+                      {/* Nút xác nhận giao hàng DELIVERED */}
+                      {["HANDED_OVER", "IN_TRANSIT", "DELIVERING", "PICKED_UP", "CREATED"].includes(item.status) && (
+                        <button
+                          onClick={() => handleDeliver(item)}
+                          disabled={deliveringId === item.id}
+                          title="Xác nhận giao hàng thành công (DELIVERED)"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[11px] font-bold transition shadow-sm inline-flex items-center gap-1"
+                        >
+                          <PackageCheck className="w-3.5 h-3.5" />
+                          <span>{deliveringId === item.id ? "Đang lưu…" : "Giao thành công"}</span>
+                        </button>
+                      )}
 
                       {/* Nút đối soát phục hồi CREATION_UNKNOWN */}
                       {item.status === "CREATION_UNKNOWN" && (

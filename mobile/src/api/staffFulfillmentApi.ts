@@ -187,11 +187,19 @@ export const staffFulfillmentApi = {
 
   /**
    * Tra cứu chi tiết hồ sơ đổi trả RMA bằng ID hoặc Return Code
-   * GET /api/v1/returns/:id
+   * Ưu tiên endpoint Admin /api/v1/admin/returns/:id dành cho Nhân viên Showroom
    */
   async getReturnDetail(returnIdOrCode: string): Promise<any> {
-    const res = await apiClient.get(`/returns/${returnIdOrCode}`);
-    return res.data?.data || res.data;
+    try {
+      const res = await apiClient.get(`/admin/returns/${returnIdOrCode}`);
+      return res.data?.data || res.data;
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        const fallback = await apiClient.get(`/returns/${returnIdOrCode}`);
+        return fallback.data?.data || fallback.data;
+      }
+      throw err;
+    }
   },
 
   /**

@@ -6,6 +6,8 @@ import { useAuthStore } from '../store/useAuthStore';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import ProductDetailScreen from '../screens/product/ProductDetailScreen';
+import ProductReviewsScreen from '../screens/product/ProductReviewsScreen';
+import CatalogScreen from '../screens/product/CatalogScreen';
 import SearchScreen from '../screens/search/SearchScreen';
 import CheckoutScreen from '../screens/cart/CheckoutScreen';
 import OrderSuccessScreen from '../screens/cart/OrderSuccessScreen';
@@ -37,13 +39,14 @@ const linking: any = {
       MainTabs: {
         screens: {
           'Trang chủ': '',
-          'Danh mục': 'catalog',
           'Giỏ hàng': 'cart',
           'Đơn hàng': 'orders',
           'Cá nhân': 'profile',
         },
       },
+      Catalog: 'catalog',
       ProductDetail: 'product/:slug',
+      ProductReviews: 'product/:slug/reviews',
       Search: 'search',
       StoreLocator: 'stores',
       Checkout: 'checkout',
@@ -86,7 +89,9 @@ export default function AppNavigator() {
         <Stack.Screen name="MainTabs" component={MainTabs} />
 
         {/* 2. Mua sắm & Khám phá */}
+        <Stack.Screen name="Catalog" component={CatalogScreen} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="ProductReviews" component={ProductReviewsScreen} />
         <Stack.Screen name="Search" component={SearchScreen} />
         <Stack.Screen name="StoreLocator" component={StoreLocatorScreen} />
 

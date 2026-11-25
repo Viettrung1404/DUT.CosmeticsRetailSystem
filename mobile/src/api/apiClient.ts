@@ -8,18 +8,23 @@ declare const process: any;
 // 2. Nếu chạy trên Web (browser): tự động sử dụng hostname của trình duyệt (localhost hoặc LAN IP)
 // 3. Nếu chạy trên Mobile thật (Expo Go) / Emulator: sử dụng IP LAN máy tính
 export const getBaseUrl = (): string => {
+  // Khi chạy trên Web tại máy dev local (localhost / 127.0.0.1), kết nối trực tiếp đến backend local port 3000
+  if (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) {
+    return 'http://localhost:3000/api/v1';
+  }
+
   if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
-  // Tự động nhận diện khi chạy trên Web
+  // Tự động nhận diện khi chạy trên Web khác
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const hostname = window.location.hostname;
     return `http://${hostname}:3000/api/v1`;
   }
 
-  // Mặc định IP mạng LAN cho thiết bị di động (cùng mạng Wi-Fi với máy tính)
-  return 'http://192.168.1.3:3000/api/v1';
+  // Mặc định cho thiết bị di động
+  return 'http://localhost:3000/api/v1';
 };
 
 export const BASE_URL = getBaseUrl();
@@ -107,7 +112,10 @@ export const setupAxiosInterceptors = {
 const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+  },
 });
 
 apiClient.interceptors.request.use(setupAxiosInterceptors.request as any);

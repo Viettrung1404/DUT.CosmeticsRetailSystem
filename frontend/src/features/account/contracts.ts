@@ -30,10 +30,14 @@ export const orderStatusSchema = z.enum([
   "CONFIRMED",
   "PROCESSING",
   "SHIPPING",
+  "SHIPPED",
+  "PARTIALLY_SHIPPED",
   "DELIVERED",
+  "PARTIALLY_DELIVERED",
   "COMPLETED",
   "CANCELLED",
   "RETURNED",
+  "PARTIALLY_RETURNED",
 ]);
 export const orderDetailSchema = orderSchema.extend({
   createdAt: z.string(),
@@ -116,6 +120,12 @@ export const shipmentTrackingSchema = z.object({
 export const trackingSchema = z.object({
   id: z.uuid(),
   status: z.string(),
-  statusHistories: z.array(z.object({ status: z.string(), createdAt: z.string() })),
+  statusHistories: z.array(
+    z.object({
+      status: z.string(),
+      createdAt: z.string(),
+      note: z.string().nullable().optional(),
+    }),
+  ),
   shipments: z.array(shipmentTrackingSchema),
 });

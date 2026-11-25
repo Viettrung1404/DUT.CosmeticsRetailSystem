@@ -52,6 +52,71 @@ const availabilitySchema = z.array(
   }),
 );
 
+function FlashSaleCountdown() {
+  const [timeLeft, setTimeLeft] = useState<{ hours: string; minutes: string; seconds: string } | null>(null);
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      const diffMs = Math.max(0, nextHour.getTime() - now.getTime());
+
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      setTimeLeft({
+        hours: String(hours).padStart(2, "0"),
+        minutes: String(minutes).padStart(2, "0"),
+        seconds: String(seconds).padStart(2, "0"),
+      });
+    };
+
+    calculateTime();
+    const interval = setInterval(calculateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!timeLeft) {
+    return (
+      <div className="pdp-flash-banner">
+        <div className="pdp-flash-left">
+          <span className="pdp-flash-tag">
+            <Zap size={14} className="pdp-flash-icon" fill="currentColor" />
+            <span>FLASH SALE</span>
+          </span>
+          <span className="pdp-flash-sub">ĐANG DIỄN RA</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pdp-flash-banner">
+      <div className="pdp-flash-left">
+        <span className="pdp-flash-tag">
+          <Zap size={14} className="pdp-flash-icon" fill="currentColor" />
+          <span>FLASH SALE</span>
+        </span>
+        <span className="pdp-flash-sub">ĐANG DIỄN RA</span>
+      </div>
+      <div className="pdp-flash-right">
+        <Clock size={13} className="pdp-clock-icon" />
+        <span className="pdp-flash-timer-label">KẾT THÚC TRONG</span>
+        <div className="pdp-timer-digits">
+          <span className="pdp-timer-digit">{timeLeft.hours}</span>
+          <span className="pdp-timer-sep">:</span>
+          <span className="pdp-timer-digit">{timeLeft.minutes}</span>
+          <span className="pdp-timer-sep">:</span>
+          <span className="pdp-timer-digit">{timeLeft.seconds}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ProductPurchase({
   productId,
   slug,
@@ -354,6 +419,9 @@ export function ProductPurchase({
 
   return (
     <div className="pdp-purchase">
+      {/* Flash Sale Banner & Live Countdown Timer */}
+      {discountPercent > 0 && <FlashSaleCountdown />}
+
       {/* 1. Price Box */}
       <div className="pdp-price-box">
         <div className="pdp-price-left">

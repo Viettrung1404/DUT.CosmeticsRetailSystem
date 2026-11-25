@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { orderApi } from '../../api/orderApi';
+import AppHeader from '../../components/AppHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -330,39 +331,28 @@ export default function OrderScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
-      {/* 1. Header chính màn hình Đơn Hàng (Stitch Rose Berry Top Bar) */}
-      <View style={styles.topHeader}>
-        <View style={styles.brandRow}>
-          <Image
-            source={{
-              uri: 'https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs',
-            }}
-            style={styles.brandLogo}
-            resizeMode="contain"
-          />
-          <View>
-            <Text style={styles.headerBrandTitle}>GlowUp</Text>
-            <Text style={styles.headerBrandSubtitle}>ĐƠN HÀNG CỦA BẠN</Text>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      {/* 1. Header chính màn hình Đơn Hàng chuẩn GlowUp */}
+      <AppHeader
+        title="GlowUp"
+        subtitle="ĐƠN HÀNG CỦA BẠN"
+        rightActions={
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.circleActionBtn}
+              onPress={() => navigation?.navigate?.('Search')}
+            >
+              <Ionicons name="search-outline" size={19} color={theme.colors.textDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.circleActionBtn}
+              onPress={() => navigation?.navigate?.('NotificationCenter')}
+            >
+              <Ionicons name="notifications-outline" size={19} color={theme.colors.textDark} />
+            </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.headerRightActions}>
-          <TouchableOpacity
-            style={styles.circleActionBtn}
-            onPress={() => navigation?.navigate?.('Search')}
-          >
-            <Ionicons name="search" size={20} color={theme.colors.textDark} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.circleActionBtn}
-            onPress={() => Alert.alert('Thông báo', 'Bạn chưa có thông báo mới.')}
-          >
-            <Ionicons name="notifications-outline" size={20} color={theme.colors.textDark} />
-            <View style={styles.notifDot} />
-          </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
       {/* 2. Tabs Trạng Thái Đơn Hàng */}
       <View style={styles.tabBarContainer}>

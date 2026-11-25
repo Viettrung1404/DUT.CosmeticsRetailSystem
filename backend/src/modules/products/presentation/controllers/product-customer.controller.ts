@@ -3,6 +3,9 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  Post,
+  Delete,
+  Body,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
@@ -26,6 +29,7 @@ import { ProductSuggestionDto } from '../dtos/product-suggestion.dto';
 import { SearchProductsQueryDto } from '../dtos/search-products-query.dto';
 import { SuggestProductsQueryDto } from '../dtos/suggest-products-query.dto';
 import { PublicCatalogService } from '../../application/services/public-catalog.service';
+import { SearchHistoryService } from '../../application/services/search-history.service';
 
 @ApiTags('Customer - Products (Việt Trung)')
 @Controller('customer/products')
@@ -38,6 +42,7 @@ export class ProductCustomerController {
     private readonly suggestProductsUseCase: SuggestProductsUseCase,
     private readonly getRelatedProductsUseCase: GetRelatedProductsUseCase,
     @Optional() private readonly catalog?: PublicCatalogService,
+    @Optional() private readonly searchHistoryService?: SearchHistoryService,
   ) {}
 
   @Public()
@@ -84,18 +89,72 @@ export class ProductCustomerController {
     if (this.catalog) {
       const filter = Object.assign(new ProductFilterDto(), queryDto);
       const result = await this.catalog.list(filter, req?.user?.userId, queryDto.q);
+      if (this.searchHistoryService && queryDto.q) {
+        this.searchHistoryService.recordSearch(queryDto.q, req?.user?.userId, result.total).catch(() => {});
+      }
       return new PageDto(
         result.items,
         new PageMetaDto({ pageOptionsDto: filter, itemCount: result.total }),
       );
     }
     const { items, total } = await this.searchProductsUseCase.execute(queryDto.q, queryDto);
+    if (this.searchHistoryService && queryDto.q) {
+      this.searchHistoryService.recordSearch(queryDto.q, req?.user?.userId, total).catch(() => {});
+    }
     const data = items.map((product) => ProductResponseDto.fromDomain(product));
     const meta = new PageMetaDto({
       pageOptionsDto: queryDto,
       itemCount: total,
     });
     return new PageDto(data, meta);
+  }
+
+  @Public()
+  @Get('search-history')
+  @ApiOperation({ summary: 'Lấy lịch sử tìm kiếm gần đây và từ khóa thịnh hành' })
+  async getSearchHistory(@Req() req?: { user?: { userId?: string } }) {
+    const userId = req?.user?.userId;
+    const [history, trending] = await Promise.all([
+      this.searchHistoryService?.getRecentSearches(userId) ?? Promise.resolve([]),
+      this.searchHistoryService?.getTrendingSearches() ?? Promise.resolve([]),
+    ]);
+    return { history, trending };
+  }
+
+  @Public()
+  @Post('search-history')
+  @ApiOperation({ summary: 'Lưu từ khóa vào lịch sử tìm kiếm' })
+  async recordSearchHistory(
+    @Body() body: { query: string; resultsCount?: number },
+    @Req() req?: { user?: { userId?: string } },
+  ) {
+    if (this.searchHistoryService && body?.query) {
+      await this.searchHistoryService.recordSearch(
+        body.query,
+        req?.user?.userId,
+        body.resultsCount ?? 0,
+      );
+    }
+    return { success: true };
+  }
+
+  @Public()
+  @Delete('search-history')
+  @ApiOperation({ summary: 'Xóa lịch sử tìm kiếm của người dùng' })
+  async deleteSearchHistory(
+    @Query('query') query?: string,
+    @Query('id') id?: string,
+    @Req() req?: { user?: { userId?: string } },
+  ) {
+    const userId = req?.user?.userId;
+    if (!userId || !this.searchHistoryService) return { success: false };
+    const target = id || query;
+    if (target) {
+      await this.searchHistoryService.removeSearchItem(target, userId);
+    } else {
+      await this.searchHistoryService.clearAllHistory(userId);
+    }
+    return { success: true };
   }
 
   @Public()

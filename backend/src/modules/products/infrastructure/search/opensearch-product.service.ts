@@ -331,14 +331,51 @@ export class OpenSearchProductService implements OnModuleInit {
         filterClauses.push({ term: { tags: params.tag } });
       }
 
-      // 6. Text Query (Search)
+      // 6. Text Query (Search) - Tối ưu độ chuẩn xác theo phong cách search-hints
       const mustClauses: any[] = [];
       if (params.query && params.query.trim().length > 0) {
+        const q = params.query.trim();
         mustClauses.push({
-          multi_match: {
-            query: params.query.trim(),
-            fields: ['name^3', 'brandName^2', 'ingredients', 'categoryName', 'tags'],
-            fuzziness: 'AUTO',
+          bool: {
+            should: [
+              // 1. Khớp chính xác cụm từ (Exact phrase boost cao nhất)
+              {
+                multi_match: {
+                  query: q,
+                  fields: ['name^8', 'brandName^4', 'categoryName^3', 'tags^3'],
+                  type: 'phrase',
+                  boost: 5,
+                },
+              },
+              // 2. Khớp tiền tố cụm từ (Phrase prefix chuẩn xác như search-hints)
+              {
+                multi_match: {
+                  query: q,
+                  fields: ['name^5', 'brandName^3', 'tags^2', 'categoryName^2'],
+                  type: 'phrase_prefix',
+                  boost: 3,
+                },
+              },
+              // 3. Khớp các từ với toán tử AND (tất cả các từ phải xuất hiện)
+              {
+                multi_match: {
+                  query: q,
+                  fields: ['name^3', 'brandName^2', 'categoryName', 'tags'],
+                  operator: 'and',
+                  boost: 2,
+                },
+              },
+              // 4. Khớp linh hoạt với minimum_should_match
+              {
+                multi_match: {
+                  query: q,
+                  fields: ['name^2', 'brandName', 'tags', 'ingredients'],
+                  minimum_should_match: '75%',
+                  boost: 1,
+                },
+              },
+            ],
+            minimum_should_match: 1,
           },
         });
       }

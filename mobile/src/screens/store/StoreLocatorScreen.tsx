@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,14 @@ import {
   TouchableOpacity,
   Image,
   Linking,
-  Alert} from 'react-native';
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
+import apiClient from '../../api/apiClient';
 import {
   StoreItem,
   filterStores,
@@ -19,70 +23,68 @@ import {
   formatTelUrl,
 } from '../../utils/storeHelper';
 
-const INITIAL_STORES: StoreItem[] = [
-  {
-    id: 'st-1',
-    name: 'GlowUp Flagship Showroom Đồng Khởi',
-    address: '123 Đồng Khởi, Phường Bến Nghé, Quận 1',
-    city: 'TP. Hồ Chí Minh',
-    district: 'Quận 1',
-    phone: '028 3822 1234',
-    openingHours: '08:30 – 22:00 (Hàng ngày)',
-    lat: 10.7769,
-    lng: 106.7009,
-    imageUrl:
-      'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=500',
-  },
-  {
-    id: 'st-2',
-    name: 'GlowUp Boutique Tràng Tiền Plaza',
-    address: 'Tầng 1, Tràng Tiền Plaza, 24 Hai Bà Trưng, Hoàn Kiếm',
-    city: 'Hà Nội',
-    district: 'Hoàn Kiếm',
-    phone: '024 3936 1234',
-    openingHours: '09:00 – 21:30 (Hàng ngày)',
-    lat: 21.0253,
-    lng: 105.8544,
-    imageUrl:
-      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500',
-  },
-  {
-    id: 'st-3',
-    name: 'GlowUp Beauty Lounge Landmark 81',
-    address: 'Tầng L1, Tòa nhà Landmark 81, 720A Điện Biên Phủ, Bình Thạnh',
-    city: 'TP. Hồ Chí Minh',
-    district: 'Bình Thạnh',
-    phone: '028 3620 1234',
-    openingHours: '09:30 – 22:00 (Hàng ngày)',
-    lat: 10.795,
-    lng: 106.7219,
-    imageUrl:
-      'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=500',
-  },
-  {
-    id: 'st-4',
-    name: 'GlowUp Experience Center Bạch Đằng',
-    address: '186 Bạch Đằng, Phường Phước Ninh, Quận Hải Châu',
-    city: 'Đà Nẵng',
-    district: 'Hải Châu',
-    phone: '0236 388 1234',
-    openingHours: '08:30 – 21:30 (Hàng ngày)',
-    lat: 16.0678,
-    lng: 108.2208,
-    imageUrl:
-      'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=500',
-  },
+const DEFAULT_STORE_IMAGES = [
+  'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=500',
+  'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500',
+  'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=500',
+  'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=500',
 ];
 
-const CITY_CHIPS = ['Tất cả', 'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng'];
-
 export default function StoreLocatorScreen({ navigation }: any) {
+  const [stores, setStores] = useState<StoreItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('Tất cả');
 
+  const fetchStores = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/stores');
+      const rawList = res.data?.data || res.data || [];
+      const mapped: StoreItem[] = rawList.map((s: any, idx: number) => {
+        let openingHours = '08:00 – 22:00 (Hàng ngày)';
+        if (typeof s.openingHours === 'string') {
+          openingHours = s.openingHours;
+        } else if (s.openingHours?.mon_sun) {
+          openingHours = `${s.openingHours.mon_sun} (Hàng ngày)`;
+        }
+        return {
+          id: s.id,
+          name: s.name,
+          address: s.address,
+          city: s.city || 'Việt Nam',
+          district: s.district,
+          phone: s.phone || '1900 8899',
+          openingHours,
+          lat: s.latitude,
+          lng: s.longitude,
+          imageUrl: s.imageUrl || DEFAULT_STORE_IMAGES[idx % DEFAULT_STORE_IMAGES.length],
+        };
+      });
+      setStores(mapped);
+    } catch (err: any) {
+      console.warn('Failed to load stores from API', err?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStores();
+  }, [fetchStores]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchStores();
+  };
+
+  // Trích xuất danh sách thành phố duy nhất
+  const cityChips = ['Tất cả', ...Array.from(new Set(stores.map((s) => s.city).filter(Boolean)))];
+
   // Lọc theo thành phố trước, sau đó tìm theo từ khóa
   const displayedStores = filterStores(
-    INITIAL_STORES.filter((s) =>
+    stores.filter((s) =>
       selectedCity === 'Tất cả' ? true : s.city === selectedCity
     ),
     searchQuery
@@ -190,7 +192,7 @@ export default function StoreLocatorScreen({ navigation }: any) {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={CITY_CHIPS}
+          data={cityChips}
           keyExtractor={(item) => item}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -215,21 +217,36 @@ export default function StoreLocatorScreen({ navigation }: any) {
       </View>
 
       {/* Danh sách showroom */}
-      <FlatList
-        data={displayedStores}
-        keyExtractor={(item) => item.id}
-        renderItem={renderStoreCard}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="business-outline" size={60} color={COLORS.textMuted} />
-            <Text style={styles.emptyTitle}>Không tìm thấy showroom</Text>
-            <Text style={styles.emptySubtitle}>
-              Hãy thử tìm kiếm với từ khóa khác hoặc chọn thành phố khác.
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Đang tải danh sách showroom...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={displayedStores}
+          keyExtractor={(item) => item.id}
+          renderItem={renderStoreCard}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="business-outline" size={60} color={COLORS.textMuted} />
+              <Text style={styles.emptyTitle}>Không tìm thấy showroom</Text>
+              <Text style={styles.emptySubtitle}>
+                Hãy thử tìm kiếm với từ khóa khác hoặc chọn thành phố khác.
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -304,6 +321,18 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.textMuted,
   },
   card: {
     backgroundColor: COLORS.surface,

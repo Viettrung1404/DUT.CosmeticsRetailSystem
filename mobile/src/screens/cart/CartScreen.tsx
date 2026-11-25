@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useCartStore, CartItem } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import AppHeader from '../../components/AppHeader';
 
 export default function CartScreen({ navigation }: any) {
   const {
@@ -246,37 +247,23 @@ export default function CartScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
-      {/* 1. Header Giỏ Hàng theo chuẩn Stitch */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image
-            source={{
-              uri: 'https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs',
-            }}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <View>
-            <View style={styles.rowAlign}>
-              <Text style={styles.headerTitle}>Giỏ Hàng</Text>
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>({items.length} món)</Text>
-              </View>
-            </View>
-            <Text style={styles.headerSubtitle}>ROSE BERRY ELEGANCE</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.editModeBtn}
-          onPress={() => runCartAction(toggleSelectAll)}
-        >
-          <Text style={styles.editModeBtnText}>
-            {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      {/* 1. Header Giỏ Hàng theo chuẩn Stitch GlowUp */}
+      <AppHeader
+        title="Giỏ Hàng"
+        subtitle="ROSE BERRY ELEGANCE"
+        badge={items.length > 0 ? `(${items.length} món)` : undefined}
+        rightActions={
+          <TouchableOpacity
+            style={styles.editModeBtn}
+            onPress={() => runCartAction(toggleSelectAll)}
+          >
+            <Text style={styles.editModeBtnText}>
+              {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       <FlatList
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}

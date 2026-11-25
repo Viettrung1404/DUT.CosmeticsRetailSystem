@@ -12,6 +12,7 @@ import { PrismaService } from '@infrastructure/database/prisma.service';
 import { IOutboxWriter, OUTBOX_WRITER } from '@modules/async-infrastructure';
 import { CodManagementService } from '@modules/finance/application/services/cod-management.service';
 import { AuditLogService } from '@core/services/audit-log.service';
+import { OrderStateAggregator } from '@modules/oms/application/services/order-state-aggregator';
 import {
   CompletePackingDto,
   CompletePackingResponseDto,
@@ -31,6 +32,8 @@ export class PackingService {
     private readonly codManagementService?: CodManagementService,
     @Optional()
     private readonly auditLogService?: AuditLogService,
+    @Optional()
+    private readonly orderStateAggregator?: OrderStateAggregator,
   ) {}
 
   /**
@@ -326,6 +329,13 @@ export class PackingService {
           packedAt: now.toISOString(),
         },
       });
+
+      if (this.orderStateAggregator) {
+        await this.orderStateAggregator.computeOrderStatus(fo.orderId, tx, {
+          changedBy: packedById,
+          note: `Đóng gói hoàn tất ${createdPackages.length} kiện hàng cho ${fo.fulfillmentOrderNumber}`,
+        });
+      }
 
       return {
         shipment,

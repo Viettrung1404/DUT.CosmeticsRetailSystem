@@ -199,11 +199,28 @@ export class PublicCatalogService {
             return emptyResult;
           }
 
-          // High-speed listing directly from OpenSearch documents (eliminates multi-second 6-relation DB joins)
+          // Fetch real-time effective prices (Flash Sale & Promotions) for all active variants
+          const variantPrices = ids.length ? await this.variantPrices(ids, tier) : [];
+          const priceMap = new Map<string, number[]>();
+          for (const vp of variantPrices) {
+            const list = priceMap.get(vp.productId) || [];
+            list.push(Number(vp.price));
+            priceMap.set(vp.productId, list);
+          }
+
+          // High-speed listing directly from OpenSearch documents with promotion pricing
           const items = docs.map((doc) => {
             const basePrice = Number(doc.basePrice);
-            const price = Number(doc.salePrice ?? doc.minPrice ?? basePrice);
-            const effectivePrice = tier > 0 ? Math.round(price * (1 - tier / 100)) : price;
+            const varPrices = priceMap.get(doc.id);
+            const minEff = varPrices && varPrices.length ? Math.min(...varPrices) : null;
+            const maxEff = varPrices && varPrices.length ? Math.max(...varPrices) : null;
+
+            const effectivePrice =
+              minEff ??
+              (tier > 0
+                ? Math.round(Number(doc.salePrice ?? doc.minPrice ?? basePrice) * (1 - tier / 100))
+                : Number(doc.salePrice ?? doc.minPrice ?? basePrice));
+            const salePrice = effectivePrice < basePrice ? effectivePrice : (doc.salePrice ? Number(doc.salePrice) : null);
             return {
               id: doc.id,
               categoryId: doc.categoryId,
@@ -217,9 +234,9 @@ export class PublicCatalogService {
               description: null,
               shortDescription: null,
               basePrice,
-              salePrice: doc.salePrice ? Number(doc.salePrice) : null,
+              salePrice,
               effectivePrice,
-              effectivePriceMax: doc.maxPrice ? Number(doc.maxPrice) : effectivePrice,
+              effectivePriceMax: maxEff ?? (doc.maxPrice ? Number(doc.maxPrice) : effectivePrice),
               avgRating: Number(doc.avgRating ?? 0),
               totalReviews: Number(doc.totalReviews ?? (doc as any).total_reviews ?? 0),
               totalSold: doc.totalSold ?? 0,
@@ -364,8 +381,8 @@ export class PublicCatalogService {
   }
   private variantPrices(productIds: string[], tier: number) {
     return this.db.$queryRaw<
-      { id: string; price: Prisma.Decimal }[]
-    >`SELECT id,sprint5_variant_price(id,${tier}::numeric) AS price FROM product_variants WHERE product_id=ANY(${productIds}::uuid[]) AND is_active=true`;
+      { id: string; productId: string; price: Prisma.Decimal }[]
+    >`SELECT id, product_id AS "productId", sprint5_variant_price(id,${tier}::numeric) AS price FROM product_variants WHERE product_id=ANY(${productIds}::uuid[]) AND is_active=true`;
   }
   private present(
     raw: Parameters<typeof ProductMapper.toDomain>[0],
@@ -629,14 +646,29 @@ export class PublicCatalogService {
   }
   async searchHints(query: string, userId?: string) {
     const q = query.trim().slice(0, 100);
-    if (!q) return { products: [], brands: [], keywords: [] };
+    if (!q) return { products: [], brands: [], keywords: [], history: [] };
+
+    const fetchUserHistory = async () => {
+      if (!userId) return [];
+      try {
+        const rows = await this.db.$queryRaw<{ query: string }[]>`
+          SELECT query FROM search_histories
+          WHERE user_id = ${userId}::uuid AND query ILIKE ${'%' + q + '%'}
+          ORDER BY created_at DESC LIMIT 3
+        `;
+        return rows.map((r) => r.query);
+      } catch {
+        return [];
+      }
+    };
 
     // 1. Try OpenSearch fast path (~5-10ms)
     if (this.searchService?.isAvailable) {
       try {
         const osHints = await this.searchService.searchHints(q, 5);
         if (osHints && (osHints.products.length > 0 || osHints.brands.length > 0 || osHints.keywords.length > 0)) {
-          return osHints;
+          const history = await fetchUserHistory();
+          return { ...osHints, history };
         }
       } catch {
         // Fallback to PostgreSQL
@@ -645,12 +677,13 @@ export class PublicCatalogService {
 
     // 2. Fallback to PostgreSQL
     const activeProduct = { isActive: true, category: { isActive: true }, variants: { some: { isActive: true } } };
-    const [products, brands, tags] = await Promise.all([
+    const [products, brands, tags, history] = await Promise.all([
       this.suggest(q, 5, userId),
       this.db.brand.findMany({ where: { isActive: true, name: { contains: q, mode: 'insensitive' }, products: { some: activeProduct } }, select: { id: true, name: true, slug: true }, take: 4, orderBy: { name: 'asc' } }),
       this.db.productTag.groupBy({ by: ['tagName'], where: { tagName: { contains: q, mode: 'insensitive' }, product: activeProduct }, _count: { _all: true }, orderBy: { _count: { tagName: 'desc' } }, take: 5 }),
+      fetchUserHistory(),
     ]);
-    return { products, brands, keywords: tags.map(tag => tag.tagName) };
+    return { products, brands, keywords: tags.map(tag => tag.tagName), history };
   }
   async related(productId: string, limit: number, userId?: string) {
     const cacheKey = `${productId}:${limit}`;
@@ -667,8 +700,28 @@ export class PublicCatalogService {
       try {
         const osDocs = await this.searchService.getRelatedProducts(productId, limit);
         if (osDocs && osDocs.length > 0) {
+          const ids = osDocs.map((d) => d.id);
+          const tierRate = await this.tier(userId);
+          const variantPrices = ids.length ? await this.variantPrices(ids, tierRate) : [];
+          const priceMap = new Map<string, number[]>();
+          for (const vp of variantPrices) {
+            const list = priceMap.get(vp.productId) || [];
+            list.push(Number(vp.price));
+            priceMap.set(vp.productId, list);
+          }
+
           const result = osDocs.map((doc) => {
-            const price = doc.salePrice ?? doc.minPrice ?? doc.basePrice;
+            const basePrice = Number(doc.basePrice);
+            const varPrices = priceMap.get(doc.id);
+            const minEff = varPrices && varPrices.length ? Math.min(...varPrices) : null;
+            const maxEff = varPrices && varPrices.length ? Math.max(...varPrices) : null;
+
+            const effectivePrice =
+              minEff ??
+              (tierRate > 0
+                ? Math.round(Number(doc.salePrice ?? doc.minPrice ?? basePrice) * (1 - tierRate / 100))
+                : Number(doc.salePrice ?? doc.minPrice ?? basePrice));
+            const salePrice = effectivePrice < basePrice ? effectivePrice : (doc.salePrice ? Number(doc.salePrice) : null);
             return {
               id: doc.id,
               categoryId: doc.categoryId,
@@ -681,10 +734,10 @@ export class PublicCatalogService {
               sku: doc.sku,
               description: null,
               shortDescription: null,
-              basePrice: doc.basePrice,
-              salePrice: doc.salePrice ?? null,
-              effectivePrice: price,
-              effectivePriceMax: doc.maxPrice ?? price,
+              basePrice,
+              salePrice,
+              effectivePrice,
+              effectivePriceMax: maxEff ?? (doc.maxPrice ? Number(doc.maxPrice) : effectivePrice),
               avgRating: doc.avgRating ?? 0,
               totalReviews: Number(doc.totalReviews ?? (doc as any).total_reviews ?? 0),
               totalSold: doc.totalSold ?? 0,

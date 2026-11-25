@@ -63,31 +63,28 @@ export const extractProductList = (res: any): NormalizedProduct[] => {
 export const extractCategoryTree = (
   res: any
 ): { root: NormalizedCategory[]; flat: NormalizedCategory[] } => {
-  const rootData = res?.data || res;
+  const rootData = res?.data?.data || res?.data || res;
   const rawCats: any[] = Array.isArray(rootData) ? rootData : [];
 
-  const root: NormalizedCategory[] = rawCats.map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    slug: c.slug,
-    imageUrl: c.imageUrl,
-    children: Array.isArray(c.children)
-      ? c.children.map((ch: any) => ({
-          id: ch.id,
-          name: ch.name,
-          slug: ch.slug,
-          imageUrl: ch.imageUrl,
-        }))
-      : [],
-  }));
+  const mapCategory = (c: any): NormalizedCategory => ({
+    id: c.id || c._id || '',
+    name: c.name || '',
+    slug: c.slug || '',
+    imageUrl: c.imageUrl || c.image_url,
+    icon: c.icon,
+    children: Array.isArray(c.children) ? c.children.map(mapCategory) : [],
+  });
+
+  const root: NormalizedCategory[] = rawCats.map(mapCategory);
 
   const flat: NormalizedCategory[] = [];
-  root.forEach((parent) => {
-    flat.push(parent);
-    if (parent.children) {
-      parent.children.forEach((child) => flat.push(child));
+  const collectFlat = (cat: NormalizedCategory) => {
+    flat.push(cat);
+    if (cat.children && cat.children.length > 0) {
+      cat.children.forEach(collectFlat);
     }
-  });
+  };
+  root.forEach(collectFlat);
 
   return { root, flat };
 };
@@ -106,8 +103,54 @@ export const productApi = {
   },
 
   // 3. Tìm kiếm sản phẩm
-  searchProducts: async (query: string) => {
-    const response = await apiClient.get('/customer/products/search', { params: { q: query } });
+  searchProducts: async (
+    queryOrParams:
+      | string
+      | {
+          q: string;
+          page?: number;
+          limit?: number;
+          categoryId?: string;
+          brandId?: string;
+          brandIds?: string[];
+          minPrice?: number;
+          maxPrice?: number;
+          rating?: number;
+          sortBy?: string;
+        }
+  ) => {
+    const params = typeof queryOrParams === 'string' ? { q: queryOrParams } : queryOrParams;
+    const response = await apiClient.get('/customer/products/search', { params });
+    return response.data;
+  },
+
+  // 3.1. Gợi ý tìm kiếm nhanh (autocomplete hints)
+  getSearchHints: async (query: string) => {
+    const response = await apiClient.get('/customer/products/search-hints', { params: { q: query } });
+    return response.data;
+  },
+
+  // 3.2. Lịch sử tìm kiếm & xu hướng tìm kiếm
+  getSearchHistory: async () => {
+    const response = await apiClient.get('/customer/products/search-history');
+    return response.data;
+  },
+
+  // 3.3. Ghi nhận lịch sử tìm kiếm
+  recordSearchHistory: async (query: string, resultsCount?: number) => {
+    const response = await apiClient.post('/customer/products/search-history', { query, resultsCount });
+    return response.data;
+  },
+
+  // 3.4. Xóa lịch sử tìm kiếm
+  deleteSearchHistory: async (params?: { query?: string; id?: string }) => {
+    const response = await apiClient.delete('/customer/products/search-history', { params });
+    return response.data;
+  },
+
+  // 3.5. Lấy danh sách facets (brands, categories, tags)
+  getFacets: async (categoryId?: string) => {
+    const response = await apiClient.get('/customer/products/facets', { params: { categoryId } });
     return response.data;
   },
 
@@ -120,6 +163,15 @@ export const productApi = {
   // 5. Lấy danh sách Flash Sale cards
   getFlashSaleCards: async (limit: number = 5) => {
     const response = await apiClient.get('/promotions/flash-sale/cards', { params: { limit } });
+    return response.data;
+  },
+
+  // 6. Lấy đánh giá sản phẩm
+  getProductReviews: async (
+    productId: string,
+    params?: { page?: number; limit?: number; rating?: number; sort?: string }
+  ) => {
+    const response = await apiClient.get(`/customer/products/${productId}/reviews`, { params });
     return response.data;
   },
 };

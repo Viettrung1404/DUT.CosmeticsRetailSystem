@@ -394,7 +394,17 @@ export class PrismaOrderRepository implements IOrderRepository {
       };
     }
     if (status) {
-      where.status = status;
+      if (status === 'COMPLETED' || status === 'DELIVERED') {
+        where.status = { in: ['DELIVERED', 'COMPLETED', 'PARTIALLY_DELIVERED'] };
+      } else if (status === 'SHIPPING' || status === 'SHIPPED') {
+        where.status = { in: ['SHIPPING', 'SHIPPED', 'PARTIALLY_SHIPPED'] };
+      } else if (status === 'PROCESSING') {
+        where.status = { in: ['PENDING', 'CONFIRMED', 'PROCESSING'] };
+      } else if (status === 'RETURNED') {
+        where.status = { in: ['RETURNED', 'PARTIALLY_RETURNED'] };
+      } else {
+        where.status = status;
+      }
     }
 
     const [orders, total] = await Promise.all([

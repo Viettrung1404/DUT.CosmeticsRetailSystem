@@ -97,6 +97,7 @@ export class TrackingService {
           select: {
             status: true,
             createdAt: true,
+            note: true,
           },
         },
       },

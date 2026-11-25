@@ -215,6 +215,9 @@ export async function PromotionScreen({ id, page }: { id: string; page: number }
                     </Link>
                     <p className="catalog-prices">
                       <strong>{formatPrice(product.price)}</strong>
+                      {product.originalPrice && product.originalPrice > product.price && (
+                        <del>{formatPrice(product.originalPrice)}</del>
+                      )}
                     </p>
                     <small>
                       {product.remaining > 0

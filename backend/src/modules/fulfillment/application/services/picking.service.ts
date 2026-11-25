@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { AuditLogService } from '@core/services/audit-log.service';
+import { OrderStateAggregator } from '@modules/oms/application/services/order-state-aggregator';
 import {
   CompletePickingDto,
   PickListResponseDto,
@@ -22,6 +23,8 @@ export class PickingService {
     private readonly prisma: PrismaService,
     @Optional()
     private readonly auditLogService?: AuditLogService,
+    @Optional()
+    private readonly orderStateAggregator?: OrderStateAggregator,
   ) {}
 
   /**
@@ -165,6 +168,13 @@ export class PickingService {
           action: 'START_PICKING',
           actorType: 'ADMIN_USER',
           actorId: pickerId || null,
+        });
+      }
+
+      if (this.orderStateAggregator) {
+        await this.orderStateAggregator.computeOrderStatus(fo.orderId, tx, {
+          changedBy: pickerId,
+          note: `Bắt đầu nhặt hàng cho kiện ${fo.fulfillmentOrderNumber}`,
         });
       }
 
@@ -364,6 +374,13 @@ export class PickingService {
           data: {
             quantityFulfilled: foItem.quantityRequested,
           },
+        });
+      }
+
+      if (this.orderStateAggregator) {
+        await this.orderStateAggregator.computeOrderStatus(fo.orderId, tx, {
+          changedBy: pickerId,
+          note: `Hoàn tất nhặt hàng FEFO cho kiện ${fo.fulfillmentOrderNumber}`,
         });
       }
     });

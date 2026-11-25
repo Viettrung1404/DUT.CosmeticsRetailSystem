@@ -8,7 +8,6 @@ import { useCartStore } from '../store/useCartStore';
 
 // Import các màn hình chính
 import HomeScreen from '../screens/home/HomeScreen';
-import CatalogScreen from '../screens/product/CatalogScreen';
 import CartScreen from '../screens/cart/CartScreen';
 import OrderScreen from '../screens/order/OrderScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -43,8 +42,6 @@ export default function MainTabs() {
 
           if (route.name === 'Trang chủ') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Danh mục') {
-            iconName = focused ? 'grid' : 'grid-outline';
           } else if (route.name === 'Giỏ hàng') {
             iconName = focused ? 'bag' : 'bag-outline';
           } else if (route.name === 'Đơn hàng') {
@@ -58,7 +55,6 @@ export default function MainTabs() {
       })}
     >
       <Tab.Screen name="Trang chủ" component={HomeScreen} />
-      <Tab.Screen name="Danh mục" component={CatalogScreen} />
       <Tab.Screen
         name="Giỏ hàng"
         component={CartScreen}

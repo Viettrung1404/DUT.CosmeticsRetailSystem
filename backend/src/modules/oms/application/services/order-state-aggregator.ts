@@ -206,7 +206,7 @@ export class OrderStateAggregator {
         ['PICKING', 'PICKED', 'PACKING', 'PACKED'].includes(f.status),
       ).length;
 
-      if (inProgressCount > 0 && ['CONFIRMED', 'PENDING_PAYMENT'].includes(currentOrderStatus)) {
+      if (inProgressCount > 0 && ['CONFIRMED', 'PENDING', 'PENDING_PAYMENT'].includes(currentOrderStatus)) {
         return 'PROCESSING';
       }
     }
@@ -240,6 +240,14 @@ export class OrderStateAggregator {
         changedBy: changedBy || null,
       },
     });
+
+    // 2.1 Cập nhật thanh toán COD thành COMPLETED nếu đơn đã giao thành công / hoàn tất
+    if (['DELIVERED', 'COMPLETED'].includes(newStatus)) {
+      await client.payment.updateMany({
+        where: { orderId, paymentMethod: 'COD', status: 'PENDING' },
+        data: { status: 'COMPLETED', paidAt: new Date() },
+      });
+    }
 
     // 3. Xuất bản Transactional Outbox Event (ORDER_STATUS_CHANGED)
     if (this.outboxWriter) {

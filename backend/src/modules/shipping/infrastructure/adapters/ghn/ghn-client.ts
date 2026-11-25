@@ -229,7 +229,8 @@ export class GHNClient {
    */
   async resolveDistrictId(
     provinceName: string,
-    districtName: string,
+    districtName?: string,
+    wardName?: string,
   ): Promise<number | null> {
     const rawNumber = Number(districtName);
     if (!isNaN(rawNumber) && rawNumber > 0) {
@@ -237,22 +238,47 @@ export class GHNClient {
     }
 
     const provinces = await this.getProvinces();
-    const cleanProvince = provinceName.toLowerCase().trim();
+    const cleanProvince = (provinceName || '').toLowerCase().trim();
     const matchedProvince = provinces.find((p) =>
+      cleanProvince.includes(p.ProvinceName.toLowerCase()) ||
       p.ProvinceName.toLowerCase().includes(cleanProvince),
     );
 
     if (!matchedProvince) return null;
 
     const districts = await this.getDistricts(matchedProvince.ProvinceID);
-    const cleanDistrict = districtName.toLowerCase().trim();
-    const matchedDistrict = districts.find(
-      (d) =>
-        d.DistrictName.toLowerCase().includes(cleanDistrict) ||
-        cleanDistrict.includes(d.DistrictName.toLowerCase()),
-    );
+    if (!districts || districts.length === 0) return null;
 
-    return matchedDistrict ? matchedDistrict.DistrictID : null;
+    const cleanDistrict = (districtName || '').toLowerCase().trim();
+    if (cleanDistrict) {
+      const matchedDistrict = districts.find(
+        (d) =>
+          d.DistrictName.toLowerCase().includes(cleanDistrict) ||
+          cleanDistrict.includes(d.DistrictName.toLowerCase()),
+      );
+      if (matchedDistrict) return matchedDistrict.DistrictID;
+    }
+
+    // Nếu không khớp tên quận/huyện, thử tìm quận/huyện chứa phường/xã (wardName)
+    if (wardName) {
+      const cleanWard = wardName.toLowerCase().trim();
+      for (const d of districts) {
+        try {
+          const wards = await this.getWards(d.DistrictID);
+          const found = wards.find(
+            (w) =>
+              w.WardName.toLowerCase().includes(cleanWard) ||
+              cleanWard.includes(w.WardName.toLowerCase()),
+          );
+          if (found) {
+            return d.DistrictID;
+          }
+        } catch {}
+      }
+    }
+
+    // Fallback nếu không xác định được: trả về quận trung tâm đầu tiên của tỉnh
+    return districts[0]?.DistrictID ?? null;
   }
 
   /**

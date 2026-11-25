@@ -39,10 +39,19 @@ export default function StaffAccessDeniedScreen({ navigation, route }: Props) {
         <TouchableOpacity
           style={styles.primaryButton}
           activeOpacity={0.85}
+          onPress={() => navigation.navigate('AuthStack', { screen: 'Login' })}
+        >
+          <Ionicons name="log-in-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+          <Text style={styles.primaryButtonText}>Đăng Nhập Tài Khoản Nhân Viên</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.primaryButton, { backgroundColor: '#E5E7EB', marginTop: 10 }]}
+          activeOpacity={0.85}
           onPress={() => navigation.navigate('MainTabs')}
         >
-          <Ionicons name="arrow-back" size={20} color="#FFF" style={{ marginRight: 8 }} />
-          <Text style={styles.primaryButtonText}>Quay Về Màn Hình Chính</Text>
+          <Ionicons name="arrow-back" size={20} color="#374151" style={{ marginRight: 8 }} />
+          <Text style={[styles.primaryButtonText, { color: '#374151' }]}>Quay Về Màn Hình Chính</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

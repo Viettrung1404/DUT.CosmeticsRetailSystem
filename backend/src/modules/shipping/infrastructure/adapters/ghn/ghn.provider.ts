@@ -61,6 +61,7 @@ export class GHNProvider implements IShippingProvider {
       toDistrictId = await this.ghnClient.resolveDistrictId(
         req.recipient.province,
         req.recipient.district,
+        req.recipient.ward,
       );
     }
 

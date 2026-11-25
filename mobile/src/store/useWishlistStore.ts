@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import apiClient from '../api/apiClient';
+import * as SecureStore from '../utils/secureStore';
 
 export interface WishlistItem {
   id: string;
@@ -58,19 +59,55 @@ function genKey(prefix: string) {
   return prefix + '-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
 }
 
+const WISHLIST_STORAGE_KEY = 'glowup_local_wishlist';
+
+async function saveLocalWishlist(items: WishlistItem[]) {
+  try {
+    await SecureStore.setItemAsync(WISHLIST_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+async function loadLocalWishlist(): Promise<WishlistItem[]> {
+  try {
+    const raw = await SecureStore.getItemAsync(WISHLIST_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return [];
+}
+
 export const useWishlistStore = create<WishlistState>((set, get) => ({
   items: [],
   loading: false,
 
-  /** Tải danh sách wishlist từ GET /wishlists */
+  /** Tải danh sách wishlist từ server hoặc local storage */
   fetchWishlist: async () => {
+    // Nạp ngay từ local storage trước để phản hồi tức thì
+    const local = await loadLocalWishlist();
+    if (local.length > 0 && get().items.length === 0) {
+      set({ items: local });
+    }
+
+    const token = await SecureStore.getItemAsync('userToken');
+    if (!token) {
+      return;
+    }
+
     set({ loading: true });
     try {
       const res = await apiClient.get('/wishlists', { params: { page: 1, limit: 50 } }).catch(() =>
         apiClient.get('/customer/wishlists', { params: { page: 1, limit: 50 } })
       );
       const rawItems: any[] = res.data?.data?.items ?? res.data?.items ?? (Array.isArray(res.data) ? res.data : []);
-      set({ items: rawItems.map(mapApiItem) });
+      const mapped = rawItems.map(mapApiItem);
+      set({ items: mapped });
+      await saveLocalWishlist(mapped);
     } catch {
       // Giữ nguyên state nếu lỗi mạng
     } finally {
@@ -79,71 +116,106 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
   },
 
   /**
-   * Toggle yêu thích qua POST /wishlists/toggle
-   * - Optimistic update ngay lập tức
-   * - Rollback nếu API thất bại
-   * Returns true nếu đã thêm, false nếu đã bỏ
+   * Toggle yêu thích
+   * - Hỗ trợ cả khách vãng lai (lưu local) và thành viên đã đăng nhập (sync server)
+   * - Không rollback khi không có token hay lỗi mạng để trải nghiệm mượt mà
    */
   toggleWishlist: async (item) => {
     const { items } = get();
-    const exists = items.some((i) => i.productId === item.productId);
+    const exists = items.some(
+      (i) =>
+        (item.productId && i.productId === item.productId) ||
+        (item.slug && i.slug === item.slug) ||
+        i.id === item.productId
+    );
 
-    // Optimistic update
+    let updatedItems: WishlistItem[];
     if (exists) {
-      set({ items: items.filter((i) => i.productId !== item.productId) });
+      updatedItems = items.filter(
+        (i) =>
+          !(
+            (item.productId && i.productId === item.productId) ||
+            (item.slug && i.slug === item.slug) ||
+            i.id === item.productId
+          )
+      );
     } else {
-      const newItem: WishlistItem = { ...item, id: `wish-${Date.now()}`, addedDate: 'Vừa thêm' };
-      set({ items: [newItem, ...items] });
+      const newItem: WishlistItem = {
+        ...item,
+        id: item.productId ? `wish-${item.productId}` : `wish-${Date.now()}`,
+        addedDate: 'Vừa thêm',
+      };
+      updatedItems = [newItem, ...items];
     }
 
+    // Cập nhật state & local storage ngay lập tức
+    set({ items: updatedItems });
+    await saveLocalWishlist(updatedItems);
+
+    // Đồng bộ với server nếu người dùng đã đăng nhập và có productId hợp lệ
     try {
-      await apiClient
-        .post(
-          '/wishlists/toggle',
-          { productId: item.productId },
-          { headers: { 'Idempotency-Key': genKey('wl') } }
-        )
-        .catch(() =>
-          apiClient.post(
-            '/customer/wishlists/toggle',
+      const token = await SecureStore.getItemAsync('userToken');
+      if (token && item.productId) {
+        await apiClient
+          .post(
+            '/wishlists/toggle',
             { productId: item.productId },
             { headers: { 'Idempotency-Key': genKey('wl') } }
           )
-        );
+          .catch(() =>
+            apiClient.post(
+              '/customer/wishlists/toggle',
+              { productId: item.productId },
+              { headers: { 'Idempotency-Key': genKey('wl') } }
+            )
+          );
+      }
     } catch {
-      // Rollback optimistic update
-      set({ items });
-      throw new Error('Không thể cập nhật danh sách yêu thích. Vui lòng thử lại.');
+      // Bỏ qua lỗi server để không ảnh hưởng trải nghiệm người dùng
     }
 
     return !exists;
   },
 
-  isInWishlist: (productId: string) => {
-    return get().items.some((i) => i.productId === productId);
+  isInWishlist: (id: string) => {
+    if (!id) return false;
+    return get().items.some(
+      (i) => i.productId === id || i.slug === id || i.id === id
+    );
   },
 
-  /** Bỏ yêu thích qua toggle API */
+  /** Bỏ yêu thích qua toggle API & local storage */
   removeItem: async (productId: string) => {
     const { items } = get();
-    const target = items.find((i) => i.productId === productId);
-    if (!target) return;
+    const updated = items.filter(
+      (i) => i.productId !== productId && i.slug !== productId && i.id !== productId
+    );
+    set({ items: updated });
+    await saveLocalWishlist(updated);
 
-    // Optimistic
-    set({ items: items.filter((i) => i.productId !== productId) });
     try {
-      await apiClient.post(
-        '/customer/wishlists/toggle',
-        { productId },
-        { headers: { 'Idempotency-Key': genKey('wl') } },
-      );
+      const token = await SecureStore.getItemAsync('userToken');
+      if (token) {
+        await apiClient.post(
+          '/customer/wishlists/toggle',
+          { productId },
+          { headers: { 'Idempotency-Key': genKey('wl') } }
+        ).catch(() =>
+          apiClient.post(
+            '/wishlists/toggle',
+            { productId },
+            { headers: { 'Idempotency-Key': genKey('wl') } }
+          )
+        );
+      }
     } catch {
-      set({ items }); // rollback
+      // Ignore
     }
   },
 
   clearWishlist: () => {
     set({ items: [] });
+    void saveLocalWishlist([]);
   },
 
   getWishlistCount: () => {
