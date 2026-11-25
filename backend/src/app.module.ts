@@ -1,8 +1,9 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { DistributedThrottlerStorage } from '@core/cache/distributed-throttler.storage';
+import { TieredThrottlerGuard } from '@core/cache/tiered-throttler.guard';
 import { validateRuntimeConfig } from '@core/config/runtime-config';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
@@ -37,6 +38,7 @@ import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-i
 import { OmsModule } from '@modules/oms/oms.module';
 import { FulfillmentModule } from '@modules/fulfillment/fulfillment.module';
 import { ShippingModule } from '@modules/shipping/shipping.module';
+import { RecommendationsModule } from '@modules/recommendations/recommendations.module';
 import { CorrelationIdMiddleware } from '@core/middlewares/correlation-id.middleware';
 
 @Module({
@@ -87,9 +89,10 @@ import { CorrelationIdMiddleware } from '@core/middlewares/correlation-id.middle
     OmsModule,
     FulfillmentModule,
     ShippingModule,
+    RecommendationsModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: TieredThrottlerGuard },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

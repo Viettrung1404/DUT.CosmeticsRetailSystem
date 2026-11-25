@@ -250,10 +250,13 @@ model Product {
   avgRating        Decimal  @default(0) @map("avg_rating") @db.Decimal(3, 2)
   totalReviews     Int      @default(0) @map("total_reviews")
   totalSold        Int      @default(0) @map("total_sold")
-  metaTitle        String?  @map("meta_title") @db.VarChar(255)
-  metaDescription  String?  @map("meta_description") @db.Text
-  metaKeywords     String?  @map("meta_keywords") @db.VarChar(255)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  metaTitle          String?                       @map("meta_title") @db.VarChar(255)
+  metaDescription    String?                       @map("meta_description") @db.Text
+  metaKeywords       String?                       @map("meta_keywords") @db.VarChar(255)
+  embedding          Unsupported("halfvec(1024)")?
+  embeddingModel     String?                       @map("embedding_model") @db.VarChar(100)
+  embeddingUpdatedAt DateTime?                     @map("embedding_updated_at") @db.Timestamptz
+  createdAt          DateTime                      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   category    Category            @relation(fields: [categoryId], references: [id])
@@ -262,8 +265,10 @@ model Product {
   images      ProductImage[]
   ingredients ProductIngredient[]
   tags        ProductTag[]
-  wishlists   Wishlist[]
-  reviews     Review[]
+  wishlists               Wishlist[]
+  reviews                 Review[]
+  recommendationsAsSource ProductRecommendation[] @relation("RecSourceProduct")
+  recommendationsAsTarget ProductRecommendation[] @relation("RecTargetProduct")
 
   @@index([categoryId, brandId, isActive])
   @@index([brandId])
@@ -705,13 +710,14 @@ model Cart {
 }
 
 model CartItem {
-  id               String   @id @default(uuid()) @db.Uuid
-  cartId           String   @map("cart_id") @db.Uuid
-  productVariantId String   @map("product_variant_id") @db.Uuid
-  quantity         Int
-  unitPrice        Decimal  @map("unit_price") @db.Decimal(12, 2)
-  isSelected       Boolean  @default(true) @map("is_selected")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                String   @id @default(uuid()) @db.Uuid
+  cartId            String   @map("cart_id") @db.Uuid
+  productVariantId  String   @map("product_variant_id") @db.Uuid
+  quantity          Int
+  unitPrice         Decimal  @map("unit_price") @db.Decimal(12, 2)
+  isSelected        Boolean  @default(true) @map("is_selected")
+  attributionSource String?  @map("attribution_source") @db.VarChar(60)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [productVariantId], references: [id])
@@ -795,9 +801,10 @@ model OrderItem {
   unitPrice        Decimal  @map("unit_price") @db.Decimal(12, 2)
   unitCost         Decimal  @map("unit_cost") @db.Decimal(12, 2)
   discountAmount   Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  pointsDiscount   Decimal  @default(0) @map("points_discount") @db.Decimal(12, 2)
-  totalPrice       Decimal  @map("total_price") @db.Decimal(12, 2)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  pointsDiscount    Decimal  @default(0) @map("points_discount") @db.Decimal(12, 2)
+  totalPrice        Decimal  @map("total_price") @db.Decimal(12, 2)
+  attributionSource String?  @map("attribution_source") @db.VarChar(60)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   variant          ProductVariant    @relation(fields: [productVariantId], references: [id])
@@ -2516,6 +2523,105 @@ model SearchHistory {
   @@index([userId, createdAt(sort: Desc)], map: "idx_search_histories_user_id_created_at")
   @@index([query], map: "idx_search_histories_query")
   @@map("search_histories")
+}
+
+// =============================================================================
+// 13. PRODUCT RECOMMENDATION SYSTEM (v2.1)
+// =============================================================================
+
+enum BehaviorEventType {
+  VIEW_PRODUCT
+  SEARCH_QUERY
+  SEARCH_CLICK
+  ADD_TO_WISHLIST
+  ADD_TO_CART
+  TRY_ON_COLOR
+  PURCHASE
+}
+
+enum RecommendationType {
+  SIMILAR_CONTENT
+  BOUGHT_TOGETHER
+  ROUTINE_COMPLEMENT
+}
+
+enum RecommendationPlacement {
+  HOME
+  PRODUCT_SIMILAR
+  PRODUCT_BOUGHT_TOGETHER
+  CART_ROUTINE
+}
+
+// Không đặt FK trên bảng event log để đảm bảo ghi batch tốc độ cao và giữ toàn vẹn lịch sử
+model UserBehaviorEvent {
+  // Client tự sinh UUID v4 để createMany({ skipDuplicates: true }) đạt chuẩn Idempotency khi retry
+  id          String            @id @default(uuid()) @db.Uuid
+  customerId  String?           @map("customer_id") @db.Uuid
+  anonymousId String            @map("anonymous_id") @db.VarChar(64)
+  eventType   BehaviorEventType @map("event_type")
+  productId   String?           @map("product_id") @db.Uuid
+  variantId   String?           @map("variant_id") @db.Uuid
+  categoryId  String?           @map("category_id") @db.Uuid
+  brandId     String?           @map("brand_id") @db.Uuid
+  weight      Float             @default(1.0)
+  source      String?           @db.VarChar(60)
+  metadata    Json?             @db.JsonB
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([customerId, createdAt(sort: Desc)], map: "idx_ube_customer_created")
+  @@index([anonymousId, createdAt(sort: Desc)], map: "idx_ube_anonymous_created")
+  @@index([productId, eventType, createdAt(sort: Desc)], map: "idx_ube_product_event_created")
+  @@index([createdAt], map: "idx_ube_created_at")
+  @@map("user_behavior_events")
+}
+
+// Đặt FK + onDelete: Cascade tới bảng Product để không bao giờ tồn tại gợi ý trỏ vào SP đã xóa
+model ProductRecommendation {
+  id              String             @id @default(uuid()) @db.Uuid
+  sourceProductId String             @map("source_product_id") @db.Uuid
+  targetProductId String             @map("target_product_id") @db.Uuid
+  type            RecommendationType
+  score           Float
+  reason          String?            @db.VarChar(255)
+  batchVersion    String             @map("batch_version") @db.VarChar(64)
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  sourceProduct Product @relation("RecSourceProduct", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  targetProduct Product @relation("RecTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceProductId, targetProductId, type], map: "uq_product_rec_source_target_type")
+  @@index([sourceProductId, type, score(sort: Desc)], map: "idx_product_rec_lookup")
+  @@index([type, batchVersion], map: "idx_product_rec_batch_cleanup")
+  @@index([targetProductId], map: "idx_product_rec_target")
+  @@map("product_recommendations")
+}
+
+model UserAffinityProfile {
+  customerId    String   @id @map("customer_id") @db.Uuid
+  topCategories Json     @map("top_categories") @db.JsonB
+  topBrands     Json     @map("top_brands") @db.JsonB
+  preferredTags Json     @map("preferred_tags") @db.JsonB
+  avoidedTags   Json?    @map("avoided_tags") @db.JsonB
+  avgPriceRange Json?    @map("avg_price_range") @db.JsonB
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("user_affinity_profiles")
+}
+
+// Bảng tổng hợp nhẹ đo CTR / CVR / Revenue theo ngày (tách khỏi bảng event để tránh phình DB)
+model RecommendationDailyMetric {
+  id          String                  @id @default(uuid()) @db.Uuid
+  metricDate  DateTime                @map("metric_date") @db.Date
+  placement   RecommendationPlacement
+  impressions Int                     @default(0)
+  clicks      Int                     @default(0)
+  addToCarts  Int                     @default(0) @map("add_to_carts")
+  conversions Int                     @default(0)
+  revenue     Decimal                 @default(0) @db.Decimal(14, 2)
+  updatedAt   DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([metricDate, placement], map: "uq_rec_daily_metric_date_placement")
+  @@map("recommendation_daily_metrics")
 }
 
 

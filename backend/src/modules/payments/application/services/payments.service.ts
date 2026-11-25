@@ -8,6 +8,7 @@ import { Prisma, Payment } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { enqueueOrderEvent } from '@core/services/order-events';
+import { emitOrderPurchased } from '@core/services/recommendation-domain-events';
 import {
   Gateway,
   ONLINE_METHODS,
@@ -354,6 +355,7 @@ export class PaymentsService {
       (o.state === 'PAID' && o.amount !== Number(payment.amount))
     )
       throw new BadRequestException('Query response mismatch');
+    let confirmedPurchaseTrigger: 'PAYMENT_RECEIVED' | 'CONFIRMED' | null = null;
     await this.applyWithRetry(async (tx) => {
       await this.lock(tx, payment.orderId);
       const [current] = await tx.$queryRaw<
@@ -432,8 +434,11 @@ export class PaymentsService {
           SELECT ${randomUUID()}::uuid,${payment.orderId}::uuid,${payment.id}::uuid,${o.amount},'Thanh toán muộn hoặc thừa; chờ hoàn tiền thủ công','PENDING',${compensationKey},clock_timestamp() WHERE ${refund}
           AND NOT EXISTS (SELECT 1 FROM refunds r JOIN payments rp ON rp.id=r.payment_id WHERE r.payment_id=${payment.id}::uuid AND r.event_key=${`CANCEL:${payment.orderId}:${payment.id}`} AND rp.transaction_id=${o.transactionId})
           ON CONFLICT(compensation_key) DO NOTHING`;
-        if (confirmed)
-          await enqueueOrderEvent(tx, payment.orderId, o.gateway === 'SEPAY' ? 'PAYMENT_RECEIVED' : 'CONFIRMED');
+        if (confirmed) {
+          const trigger = o.gateway === 'SEPAY' ? 'PAYMENT_RECEIVED' : 'CONFIRMED';
+          confirmedPurchaseTrigger = trigger;
+          await enqueueOrderEvent(tx, payment.orderId, trigger);
+        }
         if (refund)
           await enqueueOrderEvent(
             tx,
@@ -454,6 +459,12 @@ export class PaymentsService {
           await cancelReservedOrder(tx, payment.orderId, 'Thanh toán SePay thất bại đã được xác minh');
       }
     });
+    if (confirmedPurchaseTrigger) {
+      emitOrderPurchased({
+        orderId: payment.orderId,
+        trigger: confirmedPurchaseTrigger,
+      });
+    }
   }
   async expire(): Promise<number> {
     const rows = await this.db.$queryRaw<

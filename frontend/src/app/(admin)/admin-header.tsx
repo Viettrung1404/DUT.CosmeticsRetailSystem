@@ -52,6 +52,8 @@ export function AdminHeader({
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+      const { getWebBehaviorTracker } = await import("@/shared/recommendations/web-tracker");
+      await getWebBehaviorTracker().resetAnonymousIdOnLogout().catch(() => {});
     } finally {
       window.location.href = "/login?returnTo=/admin";
     }

@@ -371,5 +371,100 @@ describe('EP09-T01: Outbox Relay Worker & Cloudflare Queue Client', () => {
       scheduler.clearBackoff();
       expect(scheduler.isBackoffActive()).toBe(false);
     });
+
+    it('triggers relay asynchronously via triggerRelayNow() and coalesces burst writes', async () => {
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([]),
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return cb(tx);
+      });
+
+      const relaySpy = jest.spyOn(scheduler, 'relayBatch');
+      scheduler.triggerRelayNow(10);
+      scheduler.triggerRelayNow(10);
+      scheduler.triggerRelayNow(10);
+
+      expect(relaySpy).not.toHaveBeenCalled();
+
+      await new Promise((resolve) => setTimeout(resolve, 40));
+
+      expect(relaySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('registers configurable fallback sweep cron (default 30m) instead of 3s polling', () => {
+      const addCronJob = jest.fn();
+      const addInterval = jest.fn();
+      const doesExist = jest.fn().mockReturnValue(false);
+      const deleteCronJob = jest.fn();
+      const deleteInterval = jest.fn();
+      const registry = {
+        addCronJob,
+        addInterval,
+        doesExist,
+        deleteCronJob,
+        deleteInterval,
+      } as any;
+
+      const defaultScheduler = new OutboxRelayScheduler(
+        mockPrisma,
+        mockConfigService,
+        mockQueueClient,
+        registry,
+      );
+      defaultScheduler.onModuleInit();
+
+      expect(addCronJob).toHaveBeenCalledTimes(1);
+      expect(addCronJob.mock.calls[0][0]).toBe('outbox-relay-fallback-sweep');
+      expect(addCronJob.mock.calls[0][1].cronTime.source).toBe('0 */30 * * * *');
+      defaultScheduler.onModuleDestroy();
+
+      // Custom 60-minute interval
+      const config60 = {
+        get: jest.fn((key: string, defaultVal?: string) => {
+          if (key === 'OUTBOX_RELAY_ENABLED') return 'true';
+          if (key === 'OUTBOX_RELAY_SWEEP_INTERVAL_MINUTES') return '60';
+          return defaultVal;
+        }),
+      } as any;
+      addCronJob.mockClear();
+      const hourlyScheduler = new OutboxRelayScheduler(
+        mockPrisma,
+        config60,
+        mockQueueClient,
+        registry,
+      );
+      hourlyScheduler.onModuleInit();
+      expect(addCronJob).toHaveBeenCalledTimes(1);
+      expect(addCronJob.mock.calls[0][1].cronTime.source).toBe('0 0 * * * *');
+      hourlyScheduler.onModuleDestroy();
+    });
+
+    it('does not register fallback sweep or trigger relay when OUTBOX_RELAY_ENABLED=false', async () => {
+      const addCronJob = jest.fn();
+      const registry = { addCronJob, doesExist: jest.fn().mockReturnValue(false) } as any;
+      const disabledConfig = {
+        get: jest.fn((key: string, defaultVal?: string) => {
+          if (key === 'OUTBOX_RELAY_ENABLED') return 'false';
+          return defaultVal;
+        }),
+      } as any;
+
+      const disabledScheduler = new OutboxRelayScheduler(
+        mockPrisma,
+        disabledConfig,
+        mockQueueClient,
+        registry,
+      );
+      disabledScheduler.onModuleInit();
+      expect(addCronJob).not.toHaveBeenCalled();
+
+      const relaySpy = jest.spyOn(disabledScheduler, 'relayBatch');
+      disabledScheduler.triggerRelayNow(5);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      expect(relaySpy).not.toHaveBeenCalled();
+      disabledScheduler.onModuleDestroy();
+    });
   });
 });

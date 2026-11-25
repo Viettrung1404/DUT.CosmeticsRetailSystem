@@ -11,6 +11,7 @@ import {
 import { CatalogImage, ProductGrid, SectionTitle } from "@/features/catalog/components";
 import { BrandCarousel, CategoryCarousel, DealCarousel } from "@/features/catalog/home-carousels";
 import { FlashCountdown, HomeMotion } from "@/features/catalog/home-motion";
+import { HomeRecommendationsSection } from "@/features/recommendations/recommendation-section";
 import {
   ArrowRight,
   BadgeCheck,
@@ -200,6 +201,7 @@ export default async function HomePage() {
         />
         <ProductGrid products={popular} />
       </section>
+      <HomeRecommendationsSection />
       <section className="home-editorials">
         <Link
           href="/categories/cham-soc-da"

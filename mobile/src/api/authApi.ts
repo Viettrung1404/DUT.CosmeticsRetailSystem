@@ -2,13 +2,13 @@ import apiClient from './apiClient';
 
 export const authApi = {
   // 1. Đăng nhập
-  login: async (credentials: { email: string; password: string }) => {
+  login: async (credentials: { email: string; password: string; anonymousId?: string }) => {
     const response = await apiClient.post('/auth/login', credentials);
     return response.data;
   },
 
   // 2. Đăng ký tài khoản
-  register: async (userData: { email: string; password: string; fullName: string; phone?: string }) => {
+  register: async (userData: { email: string; password: string; fullName: string; phone?: string; anonymousId?: string }) => {
     const response = await apiClient.post('/auth/register', userData);
     return response.data;
   },

@@ -10,6 +10,7 @@ export const cartSchema = z.object({
     z.object({
       id: z.string(),
       productVariantId: z.string(),
+      productId: z.string().optional(),
       productName: z.string().optional(),
       variantName: z.string().optional(),
       thumbnailUrl: z.string().optional(),

@@ -86,6 +86,9 @@ describe('useAuthStore (TDD)', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/auth/login', {
       email: 'customer@glowup.vn',
       password: 'Secret123@',
+      anonymousId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      ),
     });
 
     const state = useAuthStore.getState();
@@ -114,6 +117,9 @@ describe('useAuthStore (TDD)', () => {
     expect(state.user).toBeNull();
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('userToken');
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith('userRefreshToken');
+    expect(secureStoreMock['glowup_rec_anonymous_id']).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
   });
 });
 

@@ -46,7 +46,10 @@ import {
   VerifyEmailDto,
 } from '../dtos/auth.dto';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @ApiTags('Auth (Xác thực & Người dùng)')
+@UseDistributedThrottle()
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -93,6 +96,7 @@ export class AuthController {
       password: dto.password,
       ipAddress,
       deviceInfo,
+      anonymousId: dto.anonymousId,
     });
   }
 

@@ -34,6 +34,11 @@ import {
   PaymentMethodsDto,
 } from '../dtos/payment-response.dto';
 
+import {
+  UseDistributedThrottle,
+  UseInMemoryThrottle,
+} from '@core/cache/throttle-storage.decorator';
+
 const envelope = (model: Function) => ({
   allOf: [
     { $ref: getSchemaPath(ApiResponseDto) },
@@ -48,10 +53,12 @@ const envelope = (model: Function) => ({
   PaymentStatusDto,
   PaymentMethodsDto,
 )
+@UseDistributedThrottle()
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly service: PaymentsService) {}
   @Public()
+  @UseInMemoryThrottle()
   @Get('methods')
   @ApiOperation({
     summary: 'Available storefront payment methods; no merchant secrets',

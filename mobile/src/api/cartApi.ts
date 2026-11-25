@@ -8,10 +8,15 @@ export const cartApi = {
   },
 
   // Thêm sản phẩm/biến thể vào giỏ (FR-02.04)
-  addToCart: async (productVariantId: string, quantity: number = 1) => {
+  addToCart: async (
+    productVariantId: string,
+    quantity: number = 1,
+    attributionSource?: string,
+  ) => {
     const response = await apiClient.post('/cart/items', {
       productVariantId,
       quantity,
+      ...(attributionSource ? { attributionSource } : {}),
     });
     return response.data;
   },

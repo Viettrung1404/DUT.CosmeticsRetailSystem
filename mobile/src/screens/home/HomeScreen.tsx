@@ -21,6 +21,9 @@ import {
   NormalizedProduct,
 } from '../../api/productApi';
 import AppHeader from '../../components/AppHeader';
+import RecommendationSection from '../../components/RecommendationSection';
+import { recommendationApi } from '../../api/recommendationApi';
+import { getMobileBehaviorTracker } from '../../services/behaviorTracker';
 
 const { width: WINDOW_WIDTH } = Dimensions.get('window');
 
@@ -902,6 +905,25 @@ export default function HomeScreen({ navigation }: any) {
             />
           )}
         </View>
+
+        {/* Dành riêng cho bạn (In-session + Personalized + Cold Start Fallback) */}
+        <RecommendationSection
+          eyebrow="CÁ NHÂN HÓA"
+          title="Dành riêng cho bạn"
+          placement="HOME"
+          fetcher={async () => {
+            const recentIds = await getMobileBehaviorTracker().getRecentIds();
+            return recommendationApi.getHomeRecommendations(recentIds, 8);
+          }}
+          fetchDeps={[refreshing]}
+          onSelectProduct={(item) =>
+            navigation.navigate('ProductDetail', {
+              slug: item.slug || item.id,
+              productId: item.id,
+            })
+          }
+          showReasonBadge
+        />
 
         <View style={{ height: 36 }} />
       </ScrollView>

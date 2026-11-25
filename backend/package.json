@@ -155,7 +155,9 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!(htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|launder)/)"
-    ]
+    ],
+    "maxWorkers": 2,
+    "workerIdleMemoryLimit": "512MB"
   },
   "engines": {
     "node": ">=22.12.0"

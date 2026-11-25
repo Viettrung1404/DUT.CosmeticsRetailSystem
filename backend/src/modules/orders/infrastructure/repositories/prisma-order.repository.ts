@@ -10,6 +10,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { OrderPricingService } from '../../application/services/order-pricing.service';
 import { notifyCustomer } from '@core/services/customer-events';
+import { emitOrderPurchased } from '@core/services/recommendation-domain-events';
 import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
 import { transitionPromotionAllocations } from '@core/services/promotion-lifecycle';
 import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
@@ -38,7 +39,7 @@ export class PrismaOrderRepository implements IOrderRepository {
   ): Promise<OrderEntity> {
     validatePaymentAmount(data.paymentMethod, data.totalAmount);
     assertGatewayReady(data.paymentMethod);
-    return this.prisma.transaction(
+    const created = await this.prisma.transaction(
       async (tx) => {
         await tx.$queryRaw`SELECT id FROM customers WHERE id=${data.customerId}::uuid FOR UPDATE`;
         const customer = await tx.customer.findUniqueOrThrow({
@@ -308,6 +309,10 @@ export class PrismaOrderRepository implements IOrderRepository {
       },
       { timeout: 20000 },
     );
+    if (data.paymentMethod !== 'SEPAY') {
+      emitOrderPurchased({ orderId: created.id, trigger: 'ORDER_CREATED_COD' });
+    }
+    return created;
   }
 
   async findById(id: string): Promise<OrderEntity | null> {

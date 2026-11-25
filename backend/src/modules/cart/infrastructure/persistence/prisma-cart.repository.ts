@@ -33,6 +33,7 @@ type CartItemRaw = {
   isSelected?: boolean;
   createdAt: Date;
   variant?: {
+    productId?: string;
     sku: string;
     price: Prisma.Decimal | number;
     isActive: boolean;
@@ -84,6 +85,7 @@ export class PrismaCartRepository implements ICartRepository {
       id: raw.id,
       cartId: raw.cartId,
       productVariantId: raw.productVariantId,
+      productId: variant?.productId,
       quantity: raw.quantity,
       unitPrice: Number(raw.unitPrice),
       currentPrice: variant ? Number(variant.price) : Number(raw.unitPrice),
@@ -190,7 +192,7 @@ export class PrismaCartRepository implements ICartRepository {
 
   async addItem(
     cartId: string,
-    item: { productVariantId: string; quantity: number; unitPrice: number; isSelected?: boolean },
+    item: { productVariantId: string; quantity: number; unitPrice: number; isSelected?: boolean; attributionSource?: string | null },
   ): Promise<CartItemEntity> {
     const raw = await this.prisma.cartItem.upsert({
       where: {
@@ -205,10 +207,12 @@ export class PrismaCartRepository implements ICartRepository {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         isSelected: item.isSelected ?? true,
+        ...(item.attributionSource ? { attributionSource: item.attributionSource } : {}),
       },
       update: {
         quantity: { increment: item.quantity },
         unitPrice: item.unitPrice,
+        ...(item.attributionSource ? { attributionSource: item.attributionSource } : {}),
       },
     });
 

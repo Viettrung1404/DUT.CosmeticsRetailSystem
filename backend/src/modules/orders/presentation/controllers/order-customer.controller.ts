@@ -27,8 +27,11 @@ import { PreviewOrderDto } from '../dtos/preview-order.dto';
 import { CreateOrderDto } from '../dtos/create-order.dto';
 import { OrderQueryDto, CancelOrderDto } from '../dtos/order-query.dto';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @ApiTags('Orders')
 @ApiBearerAuth('JWT-auth')
+@UseDistributedThrottle()
 @Controller()
 export class CustomerOrderController {
   constructor(

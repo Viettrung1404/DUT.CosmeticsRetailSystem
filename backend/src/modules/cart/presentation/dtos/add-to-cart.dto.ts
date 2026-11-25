@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class AddToCartDto {
   @ApiProperty({ description: 'ID của biến thể sản phẩm (product_variant_id)' })
@@ -22,4 +22,10 @@ export class AddToCartDto {
   @IsUUID('all', { message: 'storeId phải là định dạng UUID' })
   @IsOptional()
   storeId?: string;
+
+  @ApiPropertyOptional({ description: 'Nguồn gợi ý (rec_home, rec_similar, rec_bought_together, rec_cart)' })
+  @IsString()
+  @MaxLength(60)
+  @IsOptional()
+  attributionSource?: string;
 }

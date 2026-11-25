@@ -30,6 +30,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { emptyCart, optimisticCartAdd, type Cart } from "./commerce-state";
 import { cartSchema } from "./cart";
 import { useHydrated } from "@/shared/lib/use-hydrated";
+import { getWebBehaviorTracker } from "@/shared/recommendations/web-tracker";
 
 interface Variant {
   id?: string;
@@ -242,6 +243,17 @@ export function ProductPurchase({
   }, []);
 
   useEffect(() => {
+    const tracker = getWebBehaviorTracker();
+    if (typeof window !== "undefined") {
+      void tracker.captureAttributionFromQuery(productId, window.location.search);
+    }
+    return tracker.startProductViewTimer({
+      productId,
+      variantId: variant?.id,
+    });
+  }, [productId, variant?.id]);
+
+  useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
@@ -278,7 +290,7 @@ export function ProductPurchase({
     return () => controller.abort();
   }, [productId, variant?.id]);
 
-  function add(buyNow = false) {
+  async function add(buyNow = false) {
     if (hasOptions && !variant) {
       const missing: string[] = [];
       if (hasTwoOptions) {
@@ -306,12 +318,16 @@ export function ProductPurchase({
     const variantId = variant.id;
     const units = quantity;
     setError("");
+    const attributionSource = await getWebBehaviorTracker()
+      .getAttribution(productId)
+      .catch(() => null);
 
     if (buyNow) {
       setBuyingNow(true);
       const buyNowData = {
         variantId,
         quantity: units,
+        ...(attributionSource ? { attributionSource } : {}),
         productName: productName || "",
         variantName:
           [variant.option1Value, variant.option2Value].filter(Boolean).join(" - ") ||
@@ -353,7 +369,11 @@ export function ProductPurchase({
           z.object({ totalQuantity: z.number() }),
           {
             method: "POST",
-            body: { productVariantId: variantId, quantity: units },
+            body: {
+              productVariantId: variantId,
+              quantity: units,
+              ...(attributionSource ? { attributionSource } : {}),
+            },
           },
         );
         pendingUnits.current -= units;

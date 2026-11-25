@@ -15,6 +15,8 @@ import { theme } from '../../constants/theme';
 import { useCartStore, CartItem } from '../../store/useCartStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import AppHeader from '../../components/AppHeader';
+import RecommendationSection from '../../components/RecommendationSection';
+import { recommendationApi } from '../../api/recommendationApi';
 
 export default function CartScreen({ navigation }: any) {
   const {
@@ -350,30 +352,51 @@ export default function CartScreen({ navigation }: any) {
           ) : undefined
         }
         ListFooterComponent={
-          items.length > 0 ? (
-            /* Thẻ Quà Tặng Kèm 0đ (Chuẩn Stitch) */
-            <View style={styles.giftCard}>
-              <Image
-                source={{
-                  uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNBPAkRSsQnnjpt3mvib6e28iR24XmNd0K7KXjlXzPOvHc-HvY-3dM0ZRCd7fHBseSs3BSHC6ELDXWczXLX1RjWsFOVpE-OeCy0BhWMa0e86MvWXowjCjxLgmXhATBhpTmxiUnGKY3r7fqPJVnreV4aazR31gZELFJDuy3ZjqQkeCxQvRDD13EOaNDOJqhvOF39zWrsYB-M2-ILxepkWKy6k3EtV9o8EkbWf6O2qh5TOLOjFWdi-ZdNQ',
-                }}
-                style={styles.giftImage}
-              />
-              <View style={styles.giftContent}>
-                <View style={styles.giftTag}>
-                  <Text style={styles.giftTagText}>QUÀ TẶNG 0Đ</Text>
-                </View>
-                <Text style={styles.giftName} numberOfLines={1}>
-                  Mặt nạ sinh học Collagen GlowUp Mask x1
-                </Text>
-                <Text style={styles.giftSub}>Tặng kèm cho đơn hàng từ 500k</Text>
-                <View style={styles.giftPriceRow}>
-                  <Text style={styles.giftFreePrice}>0 đ</Text>
-                  <Text style={styles.giftOriginalPrice}>65.000 đ</Text>
+          <View>
+            {items.length > 0 ? (
+              /* Thẻ Quà Tặng Kèm 0đ (Chuẩn Stitch) */
+              <View style={styles.giftCard}>
+                <Image
+                  source={{
+                    uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNBPAkRSsQnnjpt3mvib6e28iR24XmNd0K7KXjlXzPOvHc-HvY-3dM0ZRCd7fHBseSs3BSHC6ELDXWczXLX1RjWsFOVpE-OeCy0BhWMa0e86MvWXowjCjxLgmXhATBhpTmxiUnGKY3r7fqPJVnreV4aazR31gZELFJDuy3ZjqQkeCxQvRDD13EOaNDOJqhvOF39zWrsYB-M2-ILxepkWKy6k3EtV9o8EkbWf6O2qh5TOLOjFWdi-ZdNQ',
+                  }}
+                  style={styles.giftImage}
+                />
+                <View style={styles.giftContent}>
+                  <View style={styles.giftTag}>
+                    <Text style={styles.giftTagText}>QUÀ TẶNG 0Đ</Text>
+                  </View>
+                  <Text style={styles.giftName} numberOfLines={1}>
+                    Mặt nạ sinh học Collagen GlowUp Mask x1
+                  </Text>
+                  <Text style={styles.giftSub}>Tặng kèm cho đơn hàng từ 500k</Text>
+                  <View style={styles.giftPriceRow}>
+                    <Text style={styles.giftFreePrice}>0 đ</Text>
+                    <Text style={styles.giftOriginalPrice}>65.000 đ</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ) : undefined
+            ) : null}
+            <RecommendationSection
+              eyebrow="CHU TRÌNH LÀM ĐẸP"
+              title="Hoàn thiện chu trình của bạn"
+              placement="CART_ROUTINE"
+              fetcher={() => {
+                const cartProductIds = Array.from(
+                  new Set(items.map((i) => i.productId).filter(Boolean)),
+                );
+                return recommendationApi.getCartRecommendations(cartProductIds, 8);
+              }}
+              fetchDeps={[items.map((i) => i.productId).join(',')]}
+              onSelectProduct={(item) =>
+                navigation.navigate('ProductDetail', {
+                  slug: item.slug || item.id,
+                  productId: item.id,
+                })
+              }
+              showReasonBadge
+            />
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

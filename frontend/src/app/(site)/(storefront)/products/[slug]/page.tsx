@@ -3,13 +3,13 @@ import { metadataTitle } from "@/shared/config/metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/shared/api/errors";
-import { getProduct, getRelated, getReviews } from "@/features/catalog/server";
-import { ProductGrid, SectionTitle } from "@/features/catalog/components";
+import { getProduct, getReviews } from "@/features/catalog/server";
 import { ProductGallery } from "@/features/catalog/product-gallery";
 import { ProductPurchase } from "@/features/catalog/product-purchase";
 import { FavoriteButton } from "@/features/catalog/favorite-button";
 import { ProductTabs } from "@/features/catalog/product-tabs";
 import { ProductReviews } from "@/features/catalog/product-reviews";
+import { ProductDetailRecommendations } from "@/features/recommendations/recommendation-section";
 import { ReviewForm } from "@/features/post-purchase/review-form";
 import { cache, Suspense } from "react";
 
@@ -86,21 +86,6 @@ async function ReviewsContent({
         variantNames={variantNames}
       />
     );
-  }
-}
-
-async function RelatedContent({ productId }: { productId: string }) {
-  try {
-    const related = await getRelated(productId);
-    if (!related.length) return null;
-    return (
-      <section className="pdp-related">
-        <SectionTitle title="Sản phẩm thường được mua cùng" href="/products" />
-        <ProductGrid products={related} />
-      </section>
-    );
-  } catch {
-    return null;
   }
 }
 
@@ -217,9 +202,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </Suspense>
         }
       />
-      <Suspense fallback={null}>
-        <RelatedContent productId={product.id} />
-      </Suspense>
+      <ProductDetailRecommendations productId={product.id} />
     </main>
   );
 }

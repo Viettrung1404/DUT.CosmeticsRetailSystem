@@ -1,4 +1,9 @@
-import { Env, LogisticsWebhookMessage, MessageBatch } from './types';
+import {
+  Env,
+  LogisticsWebhookMessage,
+  MessageBatch,
+  RecommendationEventsQueueMessage,
+} from './types';
 
 /**
  * Cloudflare Queue Consumer Handler (EP09-T03)
@@ -40,8 +45,71 @@ export async function handleQueueBatch(
         // HTTP 4xx (Bad request, Invalid payload): Lỗi dữ liệu không thể phục hồi bằng retry -> ack
         msg.ack();
       }
-    } catch (err: any) {
+    } catch {
       // Timeout hoặc lỗi kết nối mạng -> retry
+      msg.retry();
+    }
+  }
+}
+
+/**
+ * Recommendation Events Queue Consumer:
+ * Gộp tối đa 15 messages từ nhiều user thành 1 HTTP POST duy nhất tới NestJS Internal Endpoint
+ * để giữ CPU Worker < 10ms và tiết kiệm tối đa Cloudflare Queue operations.
+ */
+export async function handleRecommendationEventsBatch(
+  batch: MessageBatch<RecommendationEventsQueueMessage>,
+  env: Env,
+): Promise<void> {
+  if (!batch.messages.length) {
+    return;
+  }
+
+  const internalBaseUrl = env.NESTJS_INTERNAL_URL || 'https://api.glowup.vn';
+  const internalUrl = `${internalBaseUrl}/api/v1/internal/recommendations/events/batch`;
+  const internalToken = env.INTERNAL_DISPATCH_SECRET || 'glowup-internal-auth-secret-key';
+
+  const batches = batch.messages.map((msg) => ({
+    anonymousId: msg.body.anonymousId,
+    customerId: msg.body.customerId ?? null,
+    ...(msg.body.userId ? { userId: msg.body.userId } : {}),
+    events: Array.isArray(msg.body.events) ? msg.body.events : [],
+    ...(Array.isArray(msg.body.impressions) && msg.body.impressions.length > 0
+      ? { impressions: msg.body.impressions }
+      : {}),
+  }));
+
+  try {
+    const response = await fetch(internalUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Token': internalToken,
+      },
+      body: JSON.stringify({ batches }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (response.ok) {
+      for (const msg of batch.messages) {
+        msg.ack();
+      }
+      return;
+    }
+
+    if (response.status >= 500 || response.status === 429) {
+      for (const msg of batch.messages) {
+        msg.retry();
+      }
+      return;
+    }
+
+    // HTTP 4xx (except 429): poison/invalid payload — ack to avoid infinite retries
+    for (const msg of batch.messages) {
+      msg.ack();
+    }
+  } catch {
+    for (const msg of batch.messages) {
       msg.retry();
     }
   }

@@ -20,7 +20,10 @@ import {
 import { GatewayAdapter } from '../../infrastructure/gateways/gateway-adapters';
 import { SepayAdapter } from '../../infrastructure/gateways/sepay-adapter';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @Public()
+@UseDistributedThrottle()
 @ApiTags('Payment callbacks')
 @Controller('payments')
 export class PaymentCallbacksController {

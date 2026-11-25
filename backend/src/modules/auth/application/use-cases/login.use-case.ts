@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Inject, Injectable, Optional, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import {
   USER_REPOSITORY,
   IUserRepository,
@@ -10,12 +10,14 @@ import {
 import { BcryptService } from '../../infrastructure/adapters/bcrypt.service';
 import { JwtTokenService } from '../../infrastructure/adapters/jwt.service';
 import { GetUserEffectivePermissionsUseCase } from '@modules/permissions/application/use-cases/get-user-effective-permissions.use-case';
+import { MergeAnonymousEventsUseCase } from '@modules/recommendations/application/use-cases/merge-anonymous-events.use-case';
 
 export interface LoginInput {
   email: string;
   password: string;
   deviceInfo?: string;
   ipAddress?: string;
+  anonymousId?: string;
 }
 
 export interface LoginOutput {
@@ -39,6 +41,8 @@ export class LoginUseCase {
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtTokenService,
     private readonly getPermissionsUseCase: GetUserEffectivePermissionsUseCase,
+    @Optional()
+    private readonly mergeAnonymousEvents?: MergeAnonymousEventsUseCase,
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
@@ -98,6 +102,14 @@ export class LoginUseCase {
 
     // 8. Update last_login_at
     await this.userRepo.updateLastLogin(user.id!);
+
+    // 9. Async non-blocking merge of recent anonymous behavior events
+    if (input.anonymousId) {
+      void this.mergeAnonymousEvents?.mergeForUserSafe(
+        user.id!,
+        input.anonymousId,
+      );
+    }
 
     return {
       accessToken,

@@ -16,11 +16,22 @@ export class HealthController {
     private readonly redis: UpstashRedisService,
     private readonly config: ConfigService,
   ) {}
+  /**
+   * Liveness probe: strictly process-only (never queries DB or Redis) so Neon PostgreSQL
+   * can auto-suspend during idle windows. External uptime monitors must target `/health/live`.
+   */
   @Get('live')
-  @ApiOkResponse({ description: 'Process is accepting HTTP requests' })
+  @ApiOkResponse({
+    description:
+      'Process is accepting HTTP requests without querying DB or Redis',
+  })
   live() {
     return { status: 'ok' };
   }
+  /**
+   * Readiness probe: verifies PostgreSQL (`SELECT 1`) and Upstash (`PING`).
+   * Reserve for deployment/startup readiness checks only — do not poll periodically.
+   */
   @Get('ready')
   @ApiOkResponse({
     description: 'Database and required rate-limit store are available',

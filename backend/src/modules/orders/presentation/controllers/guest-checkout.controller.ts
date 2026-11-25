@@ -17,7 +17,10 @@ import { PaymentsService } from '@modules/payments/application/services/payments
 import { CreateOrderDto } from '../dtos/create-order.dto';
 import { PreviewOrderDto } from '../dtos/preview-order.dto';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @Public()
+@UseDistributedThrottle()
 @ApiTags('Guest - Checkout')
 @ApiHeader({
   name: 'x-session-id',

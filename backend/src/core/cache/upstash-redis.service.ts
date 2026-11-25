@@ -12,6 +12,7 @@ import { redisCommandTimeout } from '../config/runtime-config';
 export class UpstashRedisService implements ICacheService {
   private readonly logger = new Logger(UpstashRedisService.name);
   private cachedEpoch: { value: string | null; expiresAt: number } | null = null;
+  private degradedUntil = 0;
 
   constructor(private readonly config: ConfigService) {}
   get configured() {
@@ -20,11 +21,22 @@ export class UpstashRedisService implements ICacheService {
       !!this.config.get('UPSTASH_REDIS_REST_TOKEN')
     );
   }
+  get degraded(): boolean {
+    return Date.now() < this.degradedUntil;
+  }
+  get keyPrefix(): string {
+    return this.prefix;
+  }
   private get prefix() {
     return this.config.get<string>(
       'REDIS_KEY_PREFIX',
       `glowup:${this.config.get('NODE_ENV', 'development')}:`,
     );
+  }
+  private getCacheCooldownMs(reason: string): number {
+    const raw = Number(this.config.get('UPSTASH_CACHE_COOLDOWN_MS', 30_000));
+    const baseMs = Number.isFinite(raw) && raw >= 0 ? raw : 30_000;
+    return reason === 'http_429' ? Math.max(baseMs, 60_000) : baseMs;
   }
   async command<T>(command: (string | number)[]): Promise<T> {
     const endpoint = new URL(
@@ -62,12 +74,15 @@ export class UpstashRedisService implements ICacheService {
         reason = 'command_error';
         throw new Error('REDIS_COMMAND_FAILED');
       }
+      this.degradedUntil = 0;
       return value.result;
     } catch {
+      const failureReason = signal.aborted ? 'timeout' : reason;
+      this.degradedUntil = Date.now() + this.getCacheCooldownMs(failureReason);
       // Do not log command arguments, keys, provider response bodies or credentials.
       this.logger.warn({
         event: 'redis_command_failed',
-        reason: signal.aborted ? 'timeout' : reason,
+        reason: failureReason,
       });
       throw new ServiceUnavailableException('REDIS_UNAVAILABLE');
     }

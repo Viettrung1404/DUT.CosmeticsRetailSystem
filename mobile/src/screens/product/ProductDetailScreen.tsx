@@ -20,6 +20,9 @@ import { COLORS, SPACING, ROUNDED } from '../../constants/theme';
 import { productApi } from '../../api/productApi';
 import { useCartStore } from '../../store/useCartStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
+import RecommendationSection from '../../components/RecommendationSection';
+import { recommendationApi } from '../../api/recommendationApi';
+import { getMobileBehaviorTracker } from '../../services/behaviorTracker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -165,6 +168,13 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   useEffect(() => {
     fetchDetail();
   }, [productIdentifier]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    return getMobileBehaviorTracker().startProductViewTimer({
+      productId: product.id,
+    });
+  }, [product?.id]);
 
   // Flash sale live countdown
   useEffect(() => {
@@ -1179,6 +1189,41 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             </View>
           </View>
         </View>
+
+        {product?.id ? (
+          <>
+            <RecommendationSection
+              eyebrow="GỢI Ý TƯƠNG ĐỒNG"
+              title="Sản phẩm tương tự"
+              placement="PRODUCT_SIMILAR"
+              fetcher={() => recommendationApi.getSimilarProducts(product.id, 8)}
+              fetchDeps={[product.id]}
+              onSelectProduct={(item) =>
+                navigation.push('ProductDetail', {
+                  slug: item.slug || item.id,
+                  productId: item.id,
+                })
+              }
+              showReasonBadge
+            />
+            <RecommendationSection
+              eyebrow="COMBO HOÀN HẢO"
+              title="Thường được mua cùng"
+              placement="PRODUCT_BOUGHT_TOGETHER"
+              fetcher={() =>
+                recommendationApi.getBoughtTogetherProducts(product.id, 6)
+              }
+              fetchDeps={[product.id]}
+              onSelectProduct={(item) =>
+                navigation.push('ProductDetail', {
+                  slug: item.slug || item.id,
+                  productId: item.id,
+                })
+              }
+              showReasonBadge
+            />
+          </>
+        ) : null}
       </ScrollView>
 
       {/* 11. Thanh Hành Động Cố Định Dưới Cùng (Không có Chat ngay) */}

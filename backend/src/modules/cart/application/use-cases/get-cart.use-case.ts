@@ -61,6 +61,7 @@ export class GetCartUseCase {
       const dto: CartItemResponseDto = {
         id: item.id,
         productVariantId: item.productVariantId,
+        productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         currentPrice: item.currentPrice,

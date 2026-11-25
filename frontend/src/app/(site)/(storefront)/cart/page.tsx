@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { CartContents } from "@/features/catalog/cart-contents";
-import { ProductGrid } from "@/features/catalog/components";
-import { getProducts } from "@/features/catalog/server";
+import { CartRecommendationsSection } from "@/features/recommendations/recommendation-section";
+
 export const metadata = { title: "Giỏ hàng", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
-export default async function CartPage() {
-  const products = await getProducts({ limit: 4 });
+
+export default function CartPage() {
   return (
     <main id="main-content" className="catalog-page site-container cart-screen">
       <nav className="catalog-breadcrumb">
@@ -14,10 +14,7 @@ export default async function CartPage() {
         <span>Giỏ hàng</span>
       </nav>
       <CartContents />
-      <section className="cart-recommendations">
-        <h2>Gợi ý sản phẩm dành cho bạn</h2>
-        <ProductGrid products={products.data} />
-      </section>
+      <CartRecommendationsSection />
     </main>
   );
 }

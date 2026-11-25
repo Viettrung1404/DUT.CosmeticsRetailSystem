@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { cartApi } from '../api/cartApi';
+import { getMobileBehaviorTracker } from '../services/behaviorTracker';
 
 export interface CartItem {
   id: string; // cart_item_id hoặc product_variant_id
@@ -13,6 +14,7 @@ export interface CartItem {
   imageUrl: string;
   stock: number;
   selected: boolean;
+  attributionSource?: string;
 }
 
 interface CartState {
@@ -90,7 +92,16 @@ export const useCartStore = create<CartState>((set, get) => ({
     // 2. Đồng bộ API nếu có variantId chuẩn UUID
     if (UUID_REGEX.test(newItem.variantId)) {
       try {
-        await cartApi.addToCart(newItem.variantId, quantity);
+        const attributionSource =
+          newItem.attributionSource ??
+          (newItem.productId
+            ? await getMobileBehaviorTracker().getAttribution(newItem.productId)
+            : null);
+        await cartApi.addToCart(
+          newItem.variantId,
+          quantity,
+          attributionSource ?? undefined,
+        );
         await get().fetchCart();
       } catch {
         // Backend offline -> giữ optimistic update

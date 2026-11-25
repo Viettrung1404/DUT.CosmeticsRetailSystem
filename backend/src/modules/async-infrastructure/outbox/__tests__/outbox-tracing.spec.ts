@@ -29,7 +29,7 @@ describe('OutboxWriterService Tracing (EP12-T01)', () => {
         },
       };
 
-      const result = await service.record(mockTx, event);
+      await service.record(mockTx, event);
 
       expect(mockTx.outboxEvent.create).toHaveBeenCalled();
       const createdData = mockTx.outboxEvent.create.mock.calls[0][0].data;
@@ -84,5 +84,30 @@ describe('OutboxWriterService Tracing (EP12-T01)', () => {
     expect(createdData.payload.metadata.correlationId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
+  });
+
+  it('should trigger OutboxRelayScheduler asynchronously after recording events', async () => {
+    const triggerRelayNow = jest.fn();
+    const eventDrivenWriter = new OutboxWriterService({
+      triggerRelayNow,
+    } as any);
+
+    await eventDrivenWriter.record(mockTx, {
+      aggregateType: 'ORDER',
+      aggregateId: 'ord-trigger-1',
+      eventType: 'ORDER_CREATED',
+      payload: { orderId: 'ord-trigger-1' },
+    });
+
+    await eventDrivenWriter.recordMany(mockTx, [
+      {
+        aggregateType: 'ORDER',
+        aggregateId: 'ord-trigger-2',
+        eventType: 'ORDER_PAID',
+        payload: { orderId: 'ord-trigger-2' },
+      },
+    ]);
+
+    expect(triggerRelayNow).toHaveBeenCalledTimes(2);
   });
 });

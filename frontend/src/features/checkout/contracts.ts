@@ -1,7 +1,13 @@
 import { z } from "zod";
 
 export const orderItemsSchema = z
-  .array(z.object({ variantId: z.uuid(), quantity: z.number().int().min(1).max(100) }))
+  .array(
+    z.object({
+      variantId: z.uuid(),
+      quantity: z.number().int().min(1).max(100),
+      attributionSource: z.string().trim().max(60).optional(),
+    }),
+  )
   .min(1)
   .max(100);
 export const previewInputSchema = z

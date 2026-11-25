@@ -1,4 +1,4 @@
-import { Inject, Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Optional, ConflictException, BadRequestException } from '@nestjs/common';
 import { UserEntity } from '../../domain/entities/user.entity';
 import {
   USER_REPOSITORY,
@@ -11,6 +11,7 @@ import {
 import { EMAIL_SERVICE, IEmailService } from '../ports/email.port';
 import { BcryptService } from '../../infrastructure/adapters/bcrypt.service';
 import { UNIT_OF_WORK, IUnitOfWork } from '@core/database/unit-of-work.interface';
+import { MergeAnonymousEventsUseCase } from '@modules/recommendations/application/use-cases/merge-anonymous-events.use-case';
 import * as crypto from 'crypto';
 
 export const DEFAULT_CUSTOMER_ROLE_ID = 6;
@@ -21,6 +22,7 @@ export interface RegisterInput {
   password: string;
   fullName: string;
   phone?: string;
+  anonymousId?: string;
 }
 
 export interface RegisterOutput {
@@ -39,6 +41,8 @@ export class RegisterUseCase {
     @Inject(EMAIL_SERVICE) private readonly emailService: IEmailService,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: IUnitOfWork,
     private readonly bcryptService: BcryptService,
+    @Optional()
+    private readonly mergeAnonymousEvents?: MergeAnonymousEventsUseCase,
   ) {}
 
   async execute(input: RegisterInput): Promise<RegisterOutput> {
@@ -109,6 +113,14 @@ export class RegisterUseCase {
 
     // 9. Send verification email after transaction successfully commits
     await this.emailService.sendVerificationEmail(input.email, input.fullName, rawToken);
+
+    // 10. Async non-blocking merge of recent anonymous behavior events
+    if (input.anonymousId) {
+      void this.mergeAnonymousEvents?.mergeForUserSafe(
+        userId,
+        input.anonymousId,
+      );
+    }
 
     return {
       userId,

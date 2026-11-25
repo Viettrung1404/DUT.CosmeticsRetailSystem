@@ -1,13 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, OutboxEvent } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { BaseDomainEvent } from './base-domain-event';
 import { IOutboxWriter } from './outbox-writer.interface';
 import { getCorrelationId } from '@core/logger/correlation-context';
+import { OutboxRelayScheduler } from './outbox-relay.scheduler';
 
 @Injectable()
 export class OutboxWriterService implements IOutboxWriter {
   private readonly logger = new Logger(OutboxWriterService.name);
+
+  constructor(
+    @Optional()
+    private readonly relayScheduler?: OutboxRelayScheduler,
+  ) {}
 
   /**
    * Làm giàu payload sự kiện miền với metadata chứa correlationId phục vụ truy vết phân tán (EP12-T01)
@@ -50,7 +56,7 @@ export class OutboxWriterService implements IOutboxWriter {
       : new Date();
     const payload = this.enrichPayloadWithMetadata(event.payload);
 
-    return tx.outboxEvent.create({
+    const created = await tx.outboxEvent.create({
       data: {
         id,
         aggregateType: event.aggregateType,
@@ -62,6 +68,9 @@ export class OutboxWriterService implements IOutboxWriter {
         createdAt,
       },
     });
+
+    this.relayScheduler?.triggerRelayNow();
+    return created;
   }
 
   /**
@@ -98,6 +107,8 @@ export class OutboxWriterService implements IOutboxWriter {
     await tx.outboxEvent.createMany({
       data,
     });
+
+    this.relayScheduler?.triggerRelayNow();
   }
 }
 

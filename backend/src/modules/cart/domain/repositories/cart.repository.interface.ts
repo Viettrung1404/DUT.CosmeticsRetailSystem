@@ -19,7 +19,7 @@ export interface ICartRepository {
   createCart(params: { customerId?: string; sessionId?: string; storeId?: string }): Promise<CartEntity>;
   findCartItem(cartId: string, productVariantId: string): Promise<CartItemEntity | null>;
   findCartItemById(itemId: string): Promise<CartItemEntity | null>;
-  addItem(cartId: string, item: { productVariantId: string; quantity: number; unitPrice: number; isSelected?: boolean }): Promise<CartItemEntity>;
+  addItem(cartId: string, item: { productVariantId: string; quantity: number; unitPrice: number; isSelected?: boolean; attributionSource?: string | null }): Promise<CartItemEntity>;
   updateItemQuantity(itemId: string, quantity: number): Promise<CartItemEntity>;
   updateItemSelection(itemId: string, isSelected: boolean): Promise<CartItemEntity>;
   updateItem(itemId: string, data: { quantity?: number; isSelected?: boolean }): Promise<CartItemEntity>;

@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { emitCartItemAdded } from '@core/services/recommendation-domain-events';
 import { CART_REPOSITORY, ICartRepository } from '../../domain/repositories/cart.repository.interface';
 import { CartItemEntity } from '../../domain/entities/cart-item.entity';
 
@@ -8,6 +9,7 @@ export interface AddToCartInput {
   storeId?: string;
   productVariantId: string;
   quantity: number;
+  attributionSource?: string;
 }
 
 @Injectable()
@@ -81,6 +83,18 @@ export class AddToCartUseCase {
       quantity: input.quantity,
       unitPrice: variantInfo.price,
       isSelected: true,
+      ...(input.attributionSource
+        ? { attributionSource: input.attributionSource }
+        : {}),
+    });
+
+    emitCartItemAdded({
+      customerId: input.customerId ?? null,
+      sessionId: input.sessionId ?? null,
+      productVariantId: input.productVariantId,
+      quantity: input.quantity,
+      price: variantInfo.price,
+      attributionSource: input.attributionSource ?? null,
     });
   }
 }

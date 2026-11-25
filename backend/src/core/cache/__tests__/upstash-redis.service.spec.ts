@@ -85,12 +85,20 @@ describe('Upstash cache and distributed rate limiting', () => {
   });
   it('distinguishes provider HTTP failures without exposing the provider body', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 429 });
-    await expect(service().command(['PING'])).rejects.toThrow(
+    const redis = service();
+    await expect(redis.command(['PING'])).rejects.toThrow(
       'REDIS_UNAVAILABLE',
     );
+    expect(redis.degraded).toBe(true);
     expect(Logger.prototype.warn).toHaveBeenCalledWith({
       event: 'redis_command_failed',
       reason: 'http_429',
     });
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ result: 'PONG' }) });
+    await expect(redis.command(['PING'])).resolves.toBe('PONG');
+    expect(redis.degraded).toBe(false);
   });
 });

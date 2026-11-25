@@ -50,6 +50,7 @@ const commandStorage = "glowup-checkout-command";
 interface BuyNowItem {
   variantId: string;
   quantity: number;
+  attributionSource?: string;
   productName: string;
   variantName: string;
   price: number;
@@ -165,7 +166,15 @@ export function CheckoutPage() {
 
   const items = useMemo(() => {
     if (isBuyNow && buyNowItem) {
-      return [{ variantId: buyNowItem.variantId, quantity: buyNowItem.quantity }];
+      return [
+        {
+          variantId: buyNowItem.variantId,
+          quantity: buyNowItem.quantity,
+          ...(buyNowItem.attributionSource
+            ? { attributionSource: buyNowItem.attributionSource }
+            : {}),
+        },
+      ];
     }
     return (
       cart.data?.items

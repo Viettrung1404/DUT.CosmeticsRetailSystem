@@ -28,6 +28,7 @@ import { reservePromotionBenefits } from "@core/services/promotion-lifecycle";
 import { formatOrderNumber } from "../utils/order-number.util";
 import { validatePaymentAmount } from "@modules/payments/domain/payment-policy";
 import { assertGatewayReady } from "@modules/payments/domain/gateway-readiness";
+import { emitOrderPurchased } from "@core/services/recommendation-domain-events";
 import { createVariantNameSnapshot } from "../utils/variant-name-snapshot.util";
 import { STORE_SHIPPING_POLICY } from "@modules/customer-experience/domain/pricing-engine";
 import {
@@ -91,7 +92,22 @@ export class CommerceCheckoutService {
         items: { where: { isSelected: true }, orderBy: { id: "asc" } },
       },
     });
+    const attributionByVariant = new Map<string, string | null>(
+      (cart?.items ?? []).map((item) => [
+        item.productVariantId,
+        item.attributionSource ?? null,
+      ]),
+    );
     if (input.items?.length) {
+      for (const line of input.items as Array<{
+        variantId: string;
+        quantity: number;
+        attributionSource?: string;
+      }>) {
+        if (line.attributionSource) {
+          attributionByVariant.set(line.variantId, line.attributionSource);
+        }
+      }
       const matchesCart =
         cart &&
         input.items.every((line) =>
@@ -101,7 +117,11 @@ export class CommerceCheckoutService {
               item.quantity === line.quantity,
           ),
         );
-      return { items: input.items, cartId: matchesCart ? cart.id : null };
+      return {
+        items: input.items,
+        cartId: matchesCart ? cart.id : null,
+        attributionByVariant,
+      };
     }
     if (!cart?.items.length) throw new BadRequestException("CART_EMPTY");
     return {
@@ -110,6 +130,7 @@ export class CommerceCheckoutService {
         quantity: i.quantity,
       })),
       cartId: cart.id,
+      attributionByVariant,
     };
   }
   async preview(input: CheckoutSelection) {
@@ -150,13 +171,17 @@ export class CommerceCheckoutService {
       select: { userId: true },
     });
     if (!owner.userId) throw new BadRequestException("CUSTOMER_REQUIRED");
-    return this.commands.execute(
+    const order = await this.commands.execute(
       owner.userId,
       "CHECKOUT",
       input.idempotencyKey ?? "",
       input,
       (tx, customerId) => this.commit(tx, input, customerId),
     );
+    if (paymentMethod !== "SEPAY") {
+      emitOrderPurchased({ orderId: order.id, trigger: "ORDER_CREATED_COD" });
+    }
+    return order;
   }
 
   async previewGuest(
@@ -193,7 +218,7 @@ export class CommerceCheckoutService {
       throw new BadRequestException("INVALID_PAYMENT_METHOD");
     if (method === "SEPAY") assertGatewayReady(method);
     const requestHash = checkoutRequestHash(input);
-    return this.db.transaction(
+    const order = await this.db.transaction(
       async (tx) => {
         const identity = `guest-checkout:${sessionHash}:${key}`;
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${identity},0))::text`;
@@ -233,6 +258,10 @@ export class CommerceCheckoutService {
       },
       { maxWait: 5000, timeout: 20000 },
     );
+    if (method !== "SEPAY") {
+      emitOrderPurchased({ orderId: order.id, trigger: "ORDER_CREATED_COD" });
+    }
+    return order;
   }
 
   async guestOrder(
@@ -633,6 +662,8 @@ export class CommerceCheckoutService {
           discountAmount:
             line.lineDiscount + line.couponDiscount + line.pointsValue,
           totalPrice: line.cashValue,
+          attributionSource:
+            selection.attributionByVariant.get(line.variantId) ?? null,
           pricingSnapshot: json({ version: 1, policy: "SPRINT5", ...line }),
         },
       });

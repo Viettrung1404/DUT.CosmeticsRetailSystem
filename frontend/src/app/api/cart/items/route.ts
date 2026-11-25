@@ -6,7 +6,11 @@ import { ApiError } from "@/shared/api/errors";
 import { cartSchema as cartDetailSchema } from "@/features/catalog/cart";
 export const runtime = "nodejs";
 const inputSchema = z
-  .object({ productVariantId: z.uuid(), quantity: z.number().int().min(1).max(100) })
+  .object({
+    productVariantId: z.uuid(),
+    quantity: z.number().int().min(1).max(100),
+    attributionSource: z.string().trim().max(60).optional(),
+  })
   .strict();
 const cartSchema = z.object({ id: z.string(), totalQuantity: z.number() });
 export async function GET() {

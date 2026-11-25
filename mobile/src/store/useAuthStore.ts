@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from '../utils/secureStore';
 import apiClient from '../api/apiClient';
+import { getMobileBehaviorTracker } from '../services/behaviorTracker';
 
 export interface User {
   id?: string;
@@ -43,7 +44,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   login: async (email, password) => {
-    const res = await apiClient.post('/auth/login', { email, password });
+    let anonymousId: string | undefined;
+    try {
+      anonymousId = await getMobileBehaviorTracker().getAnonymousId();
+    } catch {
+      // ignore tracker error during login
+    }
+    const res = await apiClient.post('/auth/login', {
+      email,
+      password,
+      ...(anonymousId ? { anonymousId } : {}),
+    });
     // Bóc tách envelope NestJS: res.data.data hoặc res.data
     const payload = res?.data?.data || res?.data || {};
     const accessToken = payload.accessToken || payload.access_token || '';
@@ -61,7 +72,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   register: async (payload) => {
-    const res = await apiClient.post('/auth/register', payload);
+    let anonymousId: string | undefined;
+    try {
+      anonymousId = await getMobileBehaviorTracker().getAnonymousId();
+    } catch {
+      // ignore tracker error during register
+    }
+    const res = await apiClient.post('/auth/register', {
+      ...payload,
+      ...(anonymousId ? { anonymousId } : {}),
+    });
     const data = res?.data?.data || res?.data || {};
     const accessToken = data.accessToken || data.access_token;
     const refreshToken = data.refreshToken || data.refresh_token;
@@ -89,6 +109,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } finally {
       await SecureStore.deleteItemAsync('userToken');
       await SecureStore.deleteItemAsync('userRefreshToken');
+      await getMobileBehaviorTracker().resetAnonymousIdOnLogout().catch(() => {});
       set({ user: null, token: null, refreshToken: null, isLoading: false });
     }
   },

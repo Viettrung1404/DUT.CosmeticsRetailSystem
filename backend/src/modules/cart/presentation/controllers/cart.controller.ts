@@ -80,6 +80,7 @@ export class CartController {
       productVariantId: dto.productVariantId,
       quantity: dto.quantity,
       storeId: dto.storeId,
+      attributionSource: dto.attributionSource,
     });
 
     // Single fetch for response
