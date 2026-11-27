@@ -10,6 +10,9 @@ export class CartItemResponseDto {
   @ApiPropertyOptional({ description: 'ID của sản phẩm cha' })
   productId?: string;
 
+  @ApiPropertyOptional({ description: 'Slug dẫn tới trang chi tiết sản phẩm' })
+  productSlug?: string;
+
   @ApiProperty({ description: 'Số lượng mua' })
   quantity: number;
 

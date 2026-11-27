@@ -7,6 +7,8 @@ import {
   HttpStatus,
   UseGuards,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { Public } from '@core/decorators/public.decorator';
@@ -32,6 +34,7 @@ export class InternalWebhookController {
 
   constructor(
     private readonly webhookInboxService: WebhookInboxService,
+    @Inject(forwardRef(() => WebhookProcessorService))
     private readonly webhookProcessorService: WebhookProcessorService,
   ) {}
 

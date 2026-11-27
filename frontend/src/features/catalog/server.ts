@@ -90,6 +90,7 @@ const storeSchema = z.object({
   openingHours: z.unknown().nullable(),
 });
 const promotionSchema = z.object({
+  slotStartHour: z.number().nullable().optional(),
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -180,18 +181,20 @@ const availabilitySchema = z.array(
     available: z.number(),
   }),
 );
-export const tryOnColorsSchema = z.array(
-  z.object({ variantId: z.string(), label: z.string(), colorHex: z.string().nullable() }),
-);
 const flashCardsSchema = z.array(
   z.object({
     promotionId: z.string(),
     promotionName: z.string(),
+    campaignStartDate: z.string().optional(),
+    campaignEndDate: z.string().optional(),
+    isFeatured: z.boolean().optional(),
     serverTime: z.string(),
     endDate: z.string(),
     conditional: z.boolean(),
     remaining: z.number(),
     variantId: z.string(),
+    stockQuantity: z.number(),
+    variantLabel: z.string().optional(),
     productId: z.string(),
     name: z.string(),
     slug: z.string(),
@@ -218,6 +221,7 @@ async function request<T>(path: string, schema: z.ZodType<T>, init?: RequestInit
     `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}${path}`,
     {
       headers: { Accept: "application/json", "X-Request-Id": crypto.randomUUID() },
+      cache: init?.next ? undefined : "no-store",
       ...init,
     },
     env.BACKEND_TIMEOUT_MS,
@@ -250,11 +254,11 @@ export function getProducts(filters: ProductFilters = {}) {
 }
 export const getProduct = (slug: string) =>
   request(`/customer/products/${encodeURIComponent(slug)}`, productSchema, {
-    next: { revalidate: 60, tags: [`product-${slug}`] },
+    cache: "no-store",
   });
 export const getRelated = (id: string) =>
   request(`/customer/products/${encodeURIComponent(id)}/related?limit=4`, z.array(productSchema), {
-    next: { revalidate: 120, tags: [`related-${id}`] },
+    cache: "no-store",
   });
 export const getCategories = () =>
   request("/categories/tree", z.array(categorySchema), {
@@ -306,9 +310,9 @@ export const getAvailability = (productId: string, variantId: string) =>
   request(
     `/customer/products/${encodeURIComponent(productId)}/availability?variantId=${encodeURIComponent(variantId)}`,
     availabilitySchema,
+    { cache: "no-store" },
   );
-export const getTryOnColors = (productId: string) =>
-  request(`/customer/products/${encodeURIComponent(productId)}/try-on`, tryOnColorsSchema);
+
 export const getSuggestions = (query: string) =>
   request(`/customer/products/suggest?q=${encodeURIComponent(query)}&limit=6`, suggestionsSchema);
 export const getSearchHints = (query: string) =>

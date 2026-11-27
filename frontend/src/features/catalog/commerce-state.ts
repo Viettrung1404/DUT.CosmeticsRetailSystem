@@ -23,6 +23,10 @@ export const emptyCart = (): Cart => ({
 export const cartQuery = () =>
   queryOptions({
     queryKey: ["cart"] as const,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     queryFn: ({ signal }) => readBff("/api/cart/items", cartSchema, signal),
   });
 

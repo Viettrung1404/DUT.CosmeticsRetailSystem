@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { CatalogImage, formatPrice, SectionTitle } from "@/features/catalog/components";
 import { FavoriteButton } from "@/features/catalog/favorite-button";
 import { cartQuery } from "@/features/catalog/commerce-state";
 import type { RecommendationPlacement } from "@/shared/recommendations/behavior-tracker";
-import { getWebBehaviorTracker } from "@/shared/recommendations/web-tracker";
+import { getRecentWebViews, getWebBehaviorTracker } from "@/shared/recommendations/web-tracker";
 
 export interface RecommendedItem {
   id: string;
@@ -30,6 +30,7 @@ export interface RecommendationSectionResponse {
   placement: RecommendationPlacement;
   attributionSource: string;
   items: RecommendedItem[];
+  pagination?: { page: number; totalPages: number };
 }
 
 interface RecommendationSectionProps {
@@ -41,6 +42,58 @@ interface RecommendationSectionProps {
   linkText?: string;
   showReasonBadge?: boolean;
   className?: string;
+  paging?: { page: number; onChange: (page: number) => void };
+}
+
+const HOME_PAGE_SIZE = 15;
+
+function RecommendationPagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}) {
+  const shown = Array.from({ length: totalPages }, (_, index) => index + 1).filter(
+    (number) =>
+      totalPages <= 8 || number <= 2 || number === totalPages || Math.abs(number - page) <= 2,
+  );
+
+  return (
+    <nav className="rec-pagination" aria-label="Phân trang gợi ý sản phẩm">
+      <button
+        type="button"
+        aria-label="Trang trước"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+      >
+        <ChevronLeft size={18} />
+      </button>
+      {shown.map((number, index) => (
+        <span className="rec-pagination-entry" key={number}>
+          {number - (shown[index - 1] ?? number) > 1 && <span aria-hidden="true">…</span>}
+          <button
+            type="button"
+            aria-label={`Trang ${number}`}
+            aria-current={number === page ? "page" : undefined}
+            onClick={() => onChange(number)}
+          >
+            {number}
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        aria-label="Trang sau"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+      >
+        <ChevronRight size={18} />
+      </button>
+    </nav>
+  );
 }
 
 export function RecommendationSection({
@@ -52,31 +105,27 @@ export function RecommendationSection({
   linkText,
   showReasonBadge = false,
   className = "home-section",
+  paging,
 }: RecommendationSectionProps) {
   const containerRef = useRef<HTMLElement | null>(null);
   const impressionTrackedRef = useRef(false);
 
-  const { data, isLoading } = useQuery<RecommendationSectionResponse | null>({
-    queryKey: ["recommendations", placement, endpointUrl],
-    enabled: Boolean(endpointUrl),
-    staleTime: 60_000,
-    retry: false,
-    queryFn: async ({ signal }) => {
-      try {
-        const res = await fetch(endpointUrl!, {
-          credentials: "same-origin",
-          signal,
-        });
-        if (!res.ok) return null;
-        const payload = (await res.json()) as RecommendationSectionResponse | null;
-        return payload && Array.isArray(payload.items) ? payload : null;
-      } catch {
-        return null;
-      }
-    },
-  });
+  const { data, isLoading, isPlaceholderData, isError, refetch } =
+    useQuery<RecommendationSectionResponse>({
+      queryKey: ["recommendations", placement, endpointUrl],
+      enabled: Boolean(endpointUrl),
+    staleTime: paging ? 0 : 60_000,
+    refetchOnWindowFocus: Boolean(paging),
+      retry: false,
+      placeholderData: paging ? keepPreviousData : undefined,
+      queryFn: async ({ signal }) => {
+        const res = await fetch(endpointUrl!, { credentials: "same-origin", signal });
+        if (!res.ok) throw new Error("Không tải được gợi ý sản phẩm.");
+        return res.json();
+      },
+    });
 
-  const loading = Boolean(endpointUrl) && isLoading;
+  const loading = paging ? endpointUrl === null || isLoading || isPlaceholderData : isLoading;
 
   useEffect(() => {
     impressionTrackedRef.current = false;
@@ -84,8 +133,9 @@ export function RecommendationSection({
 
   // Đo Viewable Impression thật: hiện >= 50% diện tích trong >= 1 giây, dedupe mỗi phiên hiển thị
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !data?.items?.length || impressionTrackedRef.current) {
+    const section = containerRef.current;
+    const el = placement === "HOME" ? section?.querySelector("article") : section;
+    if (!el || loading || !data?.items.length || impressionTrackedRef.current) {
       return;
     }
     if (typeof IntersectionObserver === "undefined") {
@@ -122,13 +172,20 @@ export function RecommendationSection({
       if (dwellTimer) clearTimeout(dwellTimer);
       observer.disconnect();
     };
-  }, [data?.items?.length, placement]);
+  }, [data?.items.length, endpointUrl, loading, placement]);
 
-  if (!loading && (!data || data.items.length === 0)) {
+  if (!paging && !loading && !data?.items.length) {
     return null;
   }
 
   const attributionSource = data?.attributionSource || "rec_home";
+  const pagination = data?.pagination;
+  const page = isPlaceholderData ? paging?.page : pagination?.page;
+  const handlePageChange = (nextPage: number) => {
+    if (!paging || nextPage === page) return;
+    paging.onChange(nextPage);
+    containerRef.current?.scrollIntoView({ block: "start" });
+  };
 
   const handleProductClick = (item: RecommendedItem) => {
     const tracker = getWebBehaviorTracker();
@@ -143,20 +200,31 @@ export function RecommendationSection({
   };
 
   return (
-    <section ref={containerRef} className={className}>
+    <section ref={containerRef} className={`${className}${paging ? " rec-home" : ""}`}>
       {eyebrow && <p className="home-section-eyebrow">{eyebrow}</p>}
       <SectionTitle title={title} href={href} linkText={linkText} />
-      {loading ? (
-        <div className="catalog-grid">
-          {Array.from({ length: 4 }).map((_, idx) => (
+      {isError && paging ? (
+        <div className="rec-feedback" role="status">
+          <p>Chưa tải được gợi ý sản phẩm.</p>
+          <button type="button" onClick={() => void refetch()}>
+            Thử lại
+          </button>
+          {paging.page > 1 && (
+            <button type="button" onClick={() => paging.onChange(1)}>
+              Về trang 1
+            </button>
+          )}
+        </div>
+      ) : loading ? (
+        <div className="catalog-grid" aria-busy="true" aria-label="Đang tải gợi ý sản phẩm">
+          {Array.from({ length: paging ? HOME_PAGE_SIZE : 4 }).map((_, idx) => (
             <div key={idx} className="catalog-card rec-skeleton-card" aria-hidden />
           ))}
         </div>
-      ) : (
+      ) : data?.items.length ? (
         <div className="catalog-grid">
-          {data!.items.map((item) => {
-            const displayPrice =
-              item.displayPrice ?? item.salePrice ?? item.basePrice;
+          {data.items.map((item) => {
+            const displayPrice = item.displayPrice ?? item.salePrice ?? item.basePrice;
             const hasDiscount = item.basePrice > displayPrice;
             const detailHref = `/products/${item.slug}?ref=${encodeURIComponent(attributionSource)}`;
 
@@ -216,28 +284,42 @@ export function RecommendationSection({
             );
           })}
         </div>
+      ) : (
+        <p className="catalog-empty">Chưa có sản phẩm gợi ý.</p>
+      )}
+      {paging && pagination && pagination.totalPages > 1 && page && (
+        <RecommendationPagination
+          page={page}
+          totalPages={pagination.totalPages}
+          onChange={handlePageChange}
+        />
       )}
     </section>
   );
 }
 
 export function HomeRecommendationsSection() {
-  const [recentIdsParam, setRecentIdsParam] = useState<string | null>(null);
+  const [recentViews, setRecentViews] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
-    void getWebBehaviorTracker()
-      .getRecentIds()
-      .then((ids) => {
-        setRecentIdsParam(ids.join(","));
-      });
+    let active = true;
+    queueMicrotask(() => {
+      if (active)
+        setRecentViews(
+          getRecentWebViews()
+            .map(({ productId, viewedAt, dwellMs }) => `${productId}:${viewedAt}:${dwellMs}`)
+            .join(","),
+        );
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const endpointUrl =
-    recentIdsParam === null
-      ? null
-      : recentIdsParam.length > 0
-        ? `/api/recommendations/home?recentIds=${encodeURIComponent(recentIdsParam)}&limit=8`
-        : "/api/recommendations/home?limit=8";
+  const params = new URLSearchParams({ limit: String(HOME_PAGE_SIZE), page: String(page) });
+  if (recentViews) params.set("recentViews", recentViews);
+  const endpointUrl = recentViews === null ? null : `/api/recommendations/home?${params}`;
 
   return (
     <RecommendationSection
@@ -248,6 +330,7 @@ export function HomeRecommendationsSection() {
       href="/products"
       linkText="Khám phá thêm"
       showReasonBadge
+      paging={{ page, onChange: setPage }}
     />
   );
 }
@@ -292,9 +375,7 @@ export function CartRecommendationsSection() {
   const productIdsQuery = useMemo(() => {
     const ids = Array.from(
       new Set(
-        (cart?.items ?? [])
-          .map((item) => item.productId)
-          .filter((id): id is string => Boolean(id)),
+        (cart?.items ?? []).map((item) => item.productId).filter((id): id is string => Boolean(id)),
       ),
     );
     return ids.join(",");

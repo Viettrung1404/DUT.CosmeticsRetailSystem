@@ -15,6 +15,14 @@ describe('StoreResolverService (TDD)', () => {
   });
 
   describe('When customer specifies a store (Click and Collect)', () => {
+    it('excludes safety stock, quarantine and damage from available units', async () => {
+      mockProvider.getStoreById.mockResolvedValue({ id: 'store-1', name: 'Demo', isActive: true });
+      mockProvider.getStoreInventories.mockResolvedValue([
+        { storeId: 'store-1', variantId: 'var-1', quantity: 10, reservedQuantity: 0, availableQuantity: 1 },
+      ]);
+      await expect(service.resolveStoreForOrder({ requestedStoreId: 'store-1', items: [{ variantId: 'var-1', quantity: 2 }] }))
+        .rejects.toThrow('không đủ tồn kho');
+    });
     it('should resolve the specified store if it has sufficient stock for all items', async () => {
       mockProvider.getStoreById.mockResolvedValue({
         id: 'store-1',

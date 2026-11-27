@@ -1,4 +1,4 @@
-import { RecommendationPlacement, RecommendationType } from '@prisma/client';
+import { Prisma, RecommendationPlacement, RecommendationType } from '@prisma/client';
 import { GetHomeRecommendationsUseCase } from '../get-home-recommendations.use-case';
 import { GetSimilarProductsUseCase } from '../get-similar-products.use-case';
 import { GetBoughtTogetherProductsUseCase } from '../get-bought-together-products.use-case';
@@ -59,6 +59,7 @@ describe('Phase 3 Recommendation Serving Use Cases', () => {
       };
 
       const repository: any = {
+        findHomeIntent: jest.fn().mockResolvedValue({ cartItems: [], events: [] }),
         findUserAffinityProfile: jest.fn().mockResolvedValue({
           customerId,
           topCategories: [{ categoryId: 'cat-1', score: 15 }],
@@ -360,7 +361,7 @@ describe('Phase 3 Recommendation Serving Use Cases', () => {
       );
 
       expect(queryRaw).toHaveBeenCalledTimes(1);
-      const sqlText = queryRaw.mock.calls[0][0].join(' ');
+      const sqlText = Prisma.sql(queryRaw.mock.calls[0][0], ...queryRaw.mock.calls[0].slice(1)).sql;
       expect(sqlText).toContain('p.is_active = true');
       expect(sqlText).toContain('available_quantity');
       expect(sqlText).toContain('inventory_lots');

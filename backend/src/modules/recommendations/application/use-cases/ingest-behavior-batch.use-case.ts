@@ -1,11 +1,7 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
-import { Prisma, RecommendationPlacement } from '@prisma/client';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { BehaviorWeightPolicy } from '../../domain/behavior-weight.policy';
-import {
-  DailyImpressionIncrement,
-  RecommendationRepository,
-} from '../../infrastructure/recommendation.repository';
-import { RecommendationMetricsService } from '../services/recommendation-metrics.service';
+import { RecommendationRepository } from '../../infrastructure/recommendation.repository';
 import {
   ClientBehaviorEventDto,
   IngestEventsBatchDto,
@@ -31,10 +27,7 @@ export interface IngestBehaviorBatchResult {
 
 @Injectable()
 export class IngestBehaviorBatchUseCase {
-  constructor(
-    private readonly repository: RecommendationRepository,
-    @Optional() private readonly metricsService?: RecommendationMetricsService,
-  ) {}
+  constructor(private readonly repository: RecommendationRepository) {}
 
   private sanitizeMetadata(
     metadata?: Record<string, unknown>,
@@ -95,23 +88,9 @@ export class IngestBehaviorBatchUseCase {
     const events = dto.events ?? [];
     const rows = this.buildRows(dto.anonymousId, verifiedCustomerId, events);
 
-    if (this.metricsService) {
-      if (dto.impressions?.length) {
-        this.metricsService.recordImpressions(
-          dto.impressions.map((imp) => ({
-            placement: imp.placement as RecommendationPlacement,
-            count: imp.count,
-          })),
-        );
-      }
-      if (rows.length) {
-        this.metricsService.recordClicksFromEvents(rows);
-      }
-    } else if (dto.impressions?.length) {
-      await this.repository.incrementDailyImpressions(dto.impressions);
-    }
-
-    const { count } = await this.repository.createBehaviorEventsBatch(rows);
+    const { count } = await this.repository.persistTrackedBehaviorBatch(rows, [
+      dto,
+    ]);
 
     return {
       received: rows.length,
@@ -127,6 +106,7 @@ export class IngestBehaviorBatchUseCase {
       : dto.anonymousId
         ? [
             {
+              batchId: dto.batchId,
               anonymousId: dto.anonymousId,
               customerId: dto.customerId ?? null,
               userId: dto.userId ?? null,
@@ -154,15 +134,14 @@ export class IngestBehaviorBatchUseCase {
         : null;
 
     const allRows: Prisma.UserBehaviorEventCreateManyInput[] = [];
-    const allImpressions: DailyImpressionIncrement[] = [];
 
     for (const env of envelopes) {
       const resolvedCustomerId = env.userId
         ? (resolvedCustomerMap?.get(env.userId) ?? null)
         : env.customerId
-          ? (resolvedCustomerMap
-              ? (resolvedCustomerMap.get(env.customerId) ?? null)
-              : env.customerId)
+          ? resolvedCustomerMap
+            ? (resolvedCustomerMap.get(env.customerId) ?? null)
+            : env.customerId
           : null;
 
       const rows = this.buildRows(
@@ -171,28 +150,12 @@ export class IngestBehaviorBatchUseCase {
         env.events ?? [],
       );
       allRows.push(...rows);
-      if (env.impressions?.length) {
-        for (const imp of env.impressions) {
-          allImpressions.push({
-            placement: imp.placement as RecommendationPlacement,
-            count: imp.count,
-          });
-        }
-      }
     }
 
-    if (this.metricsService) {
-      if (allImpressions.length) {
-        this.metricsService.recordImpressions(allImpressions);
-      }
-      if (allRows.length) {
-        this.metricsService.recordClicksFromEvents(allRows);
-      }
-    } else if (allImpressions.length) {
-      await this.repository.incrementDailyImpressions(allImpressions);
-    }
-
-    const { count } = await this.repository.createBehaviorEventsBatch(allRows);
+    const { count } = await this.repository.persistTrackedBehaviorBatch(
+      allRows,
+      envelopes,
+    );
 
     return {
       received: allRows.length,

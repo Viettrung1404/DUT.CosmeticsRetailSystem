@@ -10,7 +10,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { OrderPricingService } from '../../application/services/order-pricing.service';
 import { notifyCustomer } from '@core/services/customer-events';
-import { emitOrderPurchased } from '@core/services/recommendation-domain-events';
+import { emitOrderPurchased, enqueueRecommendationPurchase } from '@core/services/recommendation-domain-events';
 import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
 import { transitionPromotionAllocations } from '@core/services/promotion-lifecycle';
 import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
@@ -305,6 +305,9 @@ export class PrismaOrderRepository implements IOrderRepository {
           },
         });
 
+        if (data.paymentMethod !== 'SEPAY') {
+          await enqueueRecommendationPurchase(tx, { orderId: order.id, trigger: 'ORDER_CREATED_COD' });
+        }
         return this.mapToEntity(fullOrder!);
       },
       { timeout: 20000 },

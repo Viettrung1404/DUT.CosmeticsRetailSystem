@@ -165,6 +165,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </div>
           <ProductPurchase
             productId={product.id}
+            flashSaleEndDate={product.flashSaleEndDate}
+            serverTime={product.serverTime}
             slug={product.slug}
             productName={product.name}
             brandName={product.brandName}
@@ -175,7 +177,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             images={product.images}
             option1Name={product.option1Name}
             option2Name={product.option2Name}
-            canTryOn={/\bson\b|lip(?:stick| tint| gloss| mousse| lacquer)/i.test(product.name)}
           />
         </div>
       </div>

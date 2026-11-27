@@ -28,9 +28,9 @@ import { reservePromotionBenefits } from "@core/services/promotion-lifecycle";
 import { formatOrderNumber } from "../utils/order-number.util";
 import { validatePaymentAmount } from "@modules/payments/domain/payment-policy";
 import { assertGatewayReady } from "@modules/payments/domain/gateway-readiness";
-import { emitOrderPurchased } from "@core/services/recommendation-domain-events";
+import { emitOrderPurchased, enqueueRecommendationPurchase } from "@core/services/recommendation-domain-events";
 import { createVariantNameSnapshot } from "../utils/variant-name-snapshot.util";
-import { STORE_SHIPPING_POLICY } from "@modules/customer-experience/domain/pricing-engine";
+import { STORE_SHIPPING_POLICY, applyCarrierShippingBenefit } from "@modules/customer-experience/domain/pricing-engine";
 import {
   ShippingQuoteService,
   ValidatedShippingQuote,
@@ -565,7 +565,7 @@ export class CommerceCheckoutService {
           input.shippingOptionId,
           resolvedStoreId,
         );
-        finalShippingFee = validatedQuote.estimatedFee;
+        finalShippingFee = applyCarrierShippingBenefit(validatedQuote.estimatedFee, quote.shippingFee);
         const discountAmount =
           quote.lineDiscount + quote.couponDiscount + quote.pointsDiscount;
         finalTotalAmount = Math.max(
@@ -583,15 +583,14 @@ export class CommerceCheckoutService {
       {
         id: string;
         product_variant_id: string;
-        quantity: number;
-        reserved_quantity: number;
+        available_quantity: number;
       }[]
-    >`SELECT id,product_variant_id,quantity,reserved_quantity FROM inventory WHERE store_id=${storeId}::uuid AND product_variant_id=ANY(${variantIds}::uuid[]) ORDER BY id FOR UPDATE`;
+    >`SELECT id,product_variant_id,available_quantity FROM inventory WHERE store_id=${storeId}::uuid AND product_variant_id=ANY(${variantIds}::uuid[]) ORDER BY id FOR UPDATE`;
     for (const item of selection.items) {
       const row = inventory.find(
         (i) => i.product_variant_id === item.variantId,
       );
-      if (!row || row.quantity - row.reserved_quantity < item.quantity)
+      if (!row || (row.available_quantity ?? 0) < item.quantity)
         throw new ConflictException("INSUFFICIENT_STOCK");
       await tx.inventory.update({
         where: { id: row.id },
@@ -810,6 +809,9 @@ export class CommerceCheckoutService {
         totalPrice: true,
       },
     });
+    if (paymentMethod !== "SEPAY") {
+      await enqueueRecommendationPurchase(tx, { orderId: order.id, trigger: "ORDER_CREATED_COD" });
+    }
     const { pricingSnapshot: _privateSnapshot, ...publicOrder } = order;
     return new OrderEntity({
       ...publicOrder,

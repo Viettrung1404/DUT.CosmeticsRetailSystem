@@ -168,6 +168,9 @@ export function DealCarousel({ cards }: { cards: FlashCard[] }) {
     <article className="catalog-card" key={`${card.promotionId}-${card.variantId}`}>
       <Link href={`/products/${card.slug}`} className="catalog-card-image">
         <CatalogImage src={card.imageUrl} alt={card.name} />
+        {card.originalPrice > card.effectivePrice && <span className="catalog-discount">
+          -{Math.round((1 - card.effectivePrice / card.originalPrice) * 100)}%
+        </span>}
       </Link>
       <FavoriteButton
         productId={card.productId}
@@ -184,7 +187,7 @@ export function DealCarousel({ cards }: { cards: FlashCard[] }) {
           <strong>{formatPrice(card.effectivePrice)}</strong>
           {card.originalPrice > card.effectivePrice && <del>{formatPrice(card.originalPrice)}</del>}
         </p>
-        <small>Còn {card.remaining} sản phẩm</small>
+        <small>Còn {card.stockQuantity.toLocaleString("vi-VN")} sản phẩm</small>
         {card.conditional && (
           <p className="hint">Giá ưu đãi có điều kiện; xác nhận tại checkout.</p>
         )}

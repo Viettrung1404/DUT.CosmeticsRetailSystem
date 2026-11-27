@@ -1,3 +1,4 @@
+import { promotionSlotEnd } from '@core/utils/flash-sale.util';
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -7,6 +8,8 @@ import { ProductMapper } from '../../infrastructure/mappers/product.mapper';
 import { productIncludeConfig } from '../../infrastructure/persistence/prisma-product.repository';
 import { OpenSearchProductService } from '../../infrastructure/search/opensearch-product.service';
 interface PublicOffer {
+  isFlashSale?: boolean;
+  slotStartHour?: number | null;
   id: string;
   name: string;
   type: string;
@@ -21,9 +24,6 @@ interface PublicOffer {
 @Injectable()
 export class PublicCatalogService {
   private readonly logger = new Logger(PublicCatalogService.name);
-  private readonly listCache = new Map<string, { data: any; expiresAt: number }>();
-  private readonly detailCache = new Map<string, { data: any; expiresAt: number }>();
-  private readonly relatedCache = new Map<string, { data: any; expiresAt: number }>();
 
   constructor(
     private readonly db: PrismaService,
@@ -85,18 +85,10 @@ export class PublicCatalogService {
     if (!variant) throw new NotFoundException('VARIANT_NOT_FOUND');
     const stores = await this.db.store.findMany({
       where: { isActive: true, type: { in: ['STORE', 'WAREHOUSE'] } }, orderBy: [{ name: 'asc' }, { id: 'asc' }], take: 100,
-      select: { id: true, name: true, address: true, city: true, inventory: { where: { productVariantId: variantId }, select: { quantity: true, reservedQuantity: true } } },
+      select: { id: true, name: true, address: true, city: true, inventory: { where: { productVariantId: variantId }, select: { availableQuantity: true } } },
     });
-    return stores.map(store => ({ id: store.id, name: store.name, address: store.address, city: store.city, available: Math.max(0, (store.inventory[0]?.quantity ?? 0) - (store.inventory[0]?.reservedQuantity ?? 0)) }));
-  }
-  async tryOnColors(productId: string) {
-    const product = await this.db.product.findFirst({ where: { id: productId, isActive: true }, select: { id: true } });
-    if (!product) throw new NotFoundException('PRODUCT_NOT_FOUND');
-    const [column] = await this.db.$queryRaw<{ exists: boolean }[]>`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='product_variants' AND column_name='try_on_color_hex') AS "exists"`;
-    const variants = column?.exists
-      ? await this.db.$queryRaw<{ id: string; option1Value: string | null; option2Value: string | null; colorHex: string | null }[]>`SELECT id,option1_value AS "option1Value",option2_value AS "option2Value",try_on_color_hex AS "colorHex" FROM product_variants WHERE product_id=${productId}::uuid AND is_active=true ORDER BY created_at,id`
-      : await this.db.$queryRaw<{ id: string; option1Value: string | null; option2Value: string | null; colorHex: string | null }[]>`SELECT id,option1_value AS "option1Value",option2_value AS "option2Value",NULL::text AS "colorHex" FROM product_variants WHERE product_id=${productId}::uuid AND is_active=true ORDER BY created_at,id`;
-    return variants.map(variant => ({ variantId: variant.id, label: [variant.option1Value, variant.option2Value].filter(Boolean).join(' · '), colorHex: variant.colorHex }));
+    return stores.map(store => ({ id: store.id, name: store.name, address: store.address, city: store.city, available: Math.max(0, store.inventory[0]?.availableQuantity ?? 0) }))
+      .sort((a, b) => b.available - a.available || a.name.localeCompare(b.name, 'vi') || a.id.localeCompare(b.id));
   }
   private categoryHierarchyCache: { data: Map<string, string[]>; expiresAt: number } | null = null;
 
@@ -162,117 +154,8 @@ export class PublicCatalogService {
       limit = filter.limit ?? 20;
     const tier = await this.tier(userId);
 
-    const cacheKey = `${userId ? 'u:' + tier : 'g'}:${query ?? ''}:${page}:${limit}:${filter.sortBy ?? ''}:${filter.categoryId ?? ''}:${filter.categoryIds?.join(',') ?? ''}:${filter.brandId ?? ''}:${filter.brandIds?.join(',') ?? ''}:${filter.minPrice ?? ''}:${filter.maxPrice ?? ''}:${filter.rating ?? ''}:${filter.tag ?? ''}:${filter.tags?.join(',') ?? ''}`;
-    const cached = this.listCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.data;
-    }
-
-    // ===== 1. HYBRID PATH: OpenSearch handles Filtering, Sorting & Pagination =====
-    if (this.searchService?.isAvailable) {
-      try {
-        const resolvedCategoryIds = await this.resolveCategoryHierarchy(
-          filter.categoryId,
-          filter.categoryIds,
-        );
-        const searchResult = await this.searchService.filterProducts({
-          query: query?.trim() || undefined,
-          categoryId: filter.categoryId,
-          categoryIds: resolvedCategoryIds,
-          brandId: filter.brandId,
-          brandIds: filter.brandIds,
-          minPrice: filter.minPrice,
-          maxPrice: filter.maxPrice,
-          rating: filter.rating,
-          tag: filter.tag,
-          tags: filter.tags,
-          sortBy: filter.sortBy,
-          from: (page - 1) * limit,
-          size: limit,
-        });
-
-        if (searchResult !== null) {
-          const { ids, total, docs } = searchResult;
-          if (ids.length === 0) {
-            const emptyResult = { items: [], total };
-            this.listCache.set(cacheKey, { data: emptyResult, expiresAt: Date.now() + 45000 });
-            return emptyResult;
-          }
-
-          // Fetch real-time effective prices (Flash Sale & Promotions) for all active variants
-          const variantPrices = ids.length ? await this.variantPrices(ids, tier) : [];
-          const priceMap = new Map<string, number[]>();
-          for (const vp of variantPrices) {
-            const list = priceMap.get(vp.productId) || [];
-            list.push(Number(vp.price));
-            priceMap.set(vp.productId, list);
-          }
-
-          // High-speed listing directly from OpenSearch documents with promotion pricing
-          const items = docs.map((doc) => {
-            const basePrice = Number(doc.basePrice);
-            const varPrices = priceMap.get(doc.id);
-            const minEff = varPrices && varPrices.length ? Math.min(...varPrices) : null;
-            const maxEff = varPrices && varPrices.length ? Math.max(...varPrices) : null;
-
-            const effectivePrice =
-              minEff ??
-              (tier > 0
-                ? Math.round(Number(doc.salePrice ?? doc.minPrice ?? basePrice) * (1 - tier / 100))
-                : Number(doc.salePrice ?? doc.minPrice ?? basePrice));
-            const salePrice = effectivePrice < basePrice ? effectivePrice : (doc.salePrice ? Number(doc.salePrice) : null);
-            return {
-              id: doc.id,
-              categoryId: doc.categoryId,
-              brandId: doc.brandId ?? null,
-              brandName: doc.brandName ?? null,
-              categoryName: doc.categoryName || undefined,
-              primaryImage: doc.primaryImage ?? null,
-              name: doc.name,
-              slug: doc.slug,
-              sku: doc.sku,
-              description: null,
-              shortDescription: null,
-              basePrice,
-              salePrice,
-              effectivePrice,
-              effectivePriceMax: maxEff ?? (doc.maxPrice ? Number(doc.maxPrice) : effectivePrice),
-              avgRating: Number(doc.avgRating ?? 0),
-              totalReviews: Number(doc.totalReviews ?? (doc as any).total_reviews ?? 0),
-              totalSold: doc.totalSold ?? 0,
-              isActive: doc.isActive,
-              isFeatured: (doc as any).isFeatured ?? false,
-              option1Name: null,
-              option2Name: null,
-              option3Name: null,
-              variants: [],
-              images: doc.primaryImage
-                ? [{ imageUrl: doc.primaryImage, isPrimary: true, sortOrder: 0 }]
-                : [],
-              ingredients: [],
-              tags: doc.tags ?? [],
-              createdAt: doc.createdAt ? new Date(doc.createdAt) : undefined,
-              updatedAt: undefined,
-              promotions: [],
-              priceBasis: 'SINGLE_UNIT_WITHOUT_CART_CONDITIONS',
-              reservation: false,
-              isWishlisted: false,
-            };
-          });
-
-          const result = { items, total };
-          this.listCache.set(cacheKey, { data: result, expiresAt: Date.now() + 45000 });
-          if (this.listCache.size > 500) {
-            const first = this.listCache.keys().next().value;
-            if (first) this.listCache.delete(first);
-          }
-          return result;
-        }
-      } catch {
-        // Fallback to PostgreSQL path below if OpenSearch throws
-      }
-    }
-
+    // Search only contributes relevance hints. Prices, visibility, filtering and
+    // pagination always come from PostgreSQL, including edits made directly in DB.
     // ===== 2. FALLBACK PATH: PostgreSQL Raw SQL CTE =====
     // OpenSearch contributes relevance hints; DB remains authoritative for membership, price and pagination.
     const hints = query && this.searchService ? await this.searchService.search(query, 0, 100) : null;
@@ -305,27 +188,10 @@ export class PublicCatalogService {
         AND (${filter.tag ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name ILIKE ${'%' + (filter.tag ?? '') + '%'}))
         AND (cardinality(${filter.tags ?? []}::text[])=0 OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name=ANY(${filter.tags ?? []}::text[])))
         AND (${query ?? null}::text IS NULL OR p.name ILIKE ${'%' + (query ?? '') + '%'} OR p.description ILIKE ${'%' + (query ?? '') + '%'} OR b.name ILIKE ${'%' + (query ?? '') + '%'} OR p.id=ANY(${hintIds}::uuid[]) OR EXISTS(SELECT 1 FROM product_ingredients i WHERE i.product_id=p.id AND i.ingredient_name ILIKE ${'%' + (query ?? '') + '%'}))
-      ), active_campaigns AS MATERIALIZED (
-        SELECT id,type,value,max_discount_amount,applicable_products,applicable_categories,is_flash_sale
-        FROM promotions WHERE is_active AND start_date<=now() AND end_date>now()
-          AND min_order_amount=0 AND (usage_limit IS NULL OR used_count<usage_limit)
-          AND type IN ('PERCENTAGE','FIXED_AMOUNT')
-      ), campaign_discounts AS (
-        SELECT candidate.variant_id,MAX(LEAST(candidate.price,
-          CASE WHEN campaign.type='PERCENTAGE' THEN trunc(candidate.price*campaign.value/100,2) ELSE campaign.value END,
-          COALESCE(campaign.max_discount_amount,candidate.price))) AS discount
-        FROM candidate_variants candidate JOIN active_campaigns campaign ON (
-          (COALESCE(campaign.applicable_products,'[]'::jsonb)='[]'::jsonb AND COALESCE(campaign.applicable_categories,'[]'::jsonb)='[]'::jsonb)
-          OR campaign.applicable_products ? candidate.id::text OR campaign.applicable_categories ? candidate.category_id::text)
-        LEFT JOIN promotion_variant_quotas quota ON quota.promotion_id=campaign.id AND quota.product_variant_id=candidate.variant_id
-        WHERE NOT campaign.is_flash_sale OR quota.quota-quota.reserved_quantity-quota.consumed_quantity>=1
-        GROUP BY candidate.variant_id
       ), priced AS (
         SELECT candidate.id,candidate.category_id,candidate.created_at,candidate.avg_rating,candidate.total_sold,
-          MIN(GREATEST(0,candidate.price-GREATEST(
-            trunc(candidate.price*LEAST(100,GREATEST(0,${tier}::numeric))/100,2),
-            COALESCE(campaign_discounts.discount,0)))) AS effective_price
-        FROM candidate_variants candidate LEFT JOIN campaign_discounts USING (variant_id)
+          MIN(sprint5_variant_price(candidate.variant_id, ${tier}::numeric)) AS effective_price
+        FROM candidate_variants candidate
         GROUP BY candidate.id,candidate.category_id,candidate.created_at,candidate.avg_rating,candidate.total_sold
       ), filtered AS (SELECT * FROM priced WHERE (${filter.minPrice ?? null}::numeric IS NULL OR effective_price>=${filter.minPrice ?? null}) AND (${filter.maxPrice ?? null}::numeric IS NULL OR effective_price<=${filter.maxPrice ?? null}))
       SELECT id,category_id,effective_price,count(*) OVER() AS total FROM filtered ORDER BY ${sort},id LIMIT ${limit} OFFSET ${(page - 1) * limit}`);
@@ -364,18 +230,13 @@ export class PublicCatalogService {
       total,
     };
 
-    this.listCache.set(cacheKey, { data: result, expiresAt: Date.now() + 45000 });
-    if (this.listCache.size > 500) {
-      const first = this.listCache.keys().next().value;
-      if (first) this.listCache.delete(first);
-    }
     return result;
   }
   private offers(productIds: string[], categoryIds: string[]) {
     return this.db.$queryRaw<
       PublicOffer[]
-    >`SELECT id,name,type,min_order_amount AS "minOrderAmount",max_discount_amount AS "maxDiscountAmount",start_date AS "startDate",end_date AS "endDate",applicable_products AS "productIds",applicable_categories AS "categoryIds"
-      FROM promotions WHERE is_active AND start_date<=now() AND end_date>now() AND (usage_limit IS NULL OR used_count<usage_limit)
+    >`SELECT id,name,type,is_flash_sale AS "isFlashSale",slot_start_hour AS "slotStartHour",min_order_amount AS "minOrderAmount",max_discount_amount AS "maxDiscountAmount",start_date AS "startDate",end_date AS "endDate",applicable_products AS "productIds",applicable_categories AS "categoryIds"
+      FROM promotions WHERE is_active AND start_date<=now() AND end_date>now() AND glowup_slot_active(slot_start_hour) AND (usage_limit IS NULL OR used_count<usage_limit)
       AND ((COALESCE(applicable_products,'[]'::jsonb)='[]'::jsonb AND COALESCE(applicable_categories,'[]'::jsonb)='[]'::jsonb)
         OR applicable_products ?| ${productIds}::text[] OR applicable_categories ?| ${categoryIds}::text[]) ORDER BY id`;
   }
@@ -383,6 +244,21 @@ export class PublicCatalogService {
     return this.db.$queryRaw<
       { id: string; productId: string; price: Prisma.Decimal }[]
     >`SELECT id, product_id AS "productId", sprint5_variant_price(id,${tier}::numeric) AS price FROM product_variants WHERE product_id=ANY(${productIds}::uuid[]) AND is_active=true`;
+  }
+  async byIds(productIds: string[], userId?: string) {
+    const rows = await this.db.product.findMany({
+      where: { id: { in: productIds }, isActive: true, category: { isActive: true },
+        variants: { some: { isActive: true } },
+        OR: [{ brandId: null }, { brand: { isActive: true } }] },
+      include: productIncludeConfig,
+    });
+    const tier = await this.tier(userId);
+    const [prices, offers] = await Promise.all([
+      this.variantPrices(rows.map(row => row.id), tier),
+      this.offers(rows.map(row => row.id), rows.map(row => row.categoryId)),
+    ]);
+    const byId = new Map(rows.map(row => [row.id, this.present(row, prices, offers)]));
+    return productIds.flatMap(id => byId.has(id) ? [byId.get(id)!] : []);
   }
   private present(
     raw: Parameters<typeof ProductMapper.toDomain>[0],
@@ -413,6 +289,9 @@ export class PublicCatalogService {
       }));
     return {
       ...product,
+      serverTime: new Date().toISOString(),
+      flashSaleEndDate: offers.filter((offer) => offer.isFlashSale)
+        .map((offer) => promotionSlotEnd(new Date(offer.endDate), offer.slotStartHour).toISOString()).sort()[0] ?? null,
       salePrice: values.length ? Math.min(...values) : null,
       effectivePrice: values.length ? Math.min(...values) : null,
       effectivePriceMax: values.length ? Math.max(...values) : null,
@@ -423,13 +302,6 @@ export class PublicCatalogService {
     };
   }
   async detail(slug: string, userId?: string) {
-    if (!userId) {
-      const cached = this.detailCache.get(slug);
-      if (cached && cached.expiresAt > Date.now()) {
-        return cached.data;
-      }
-    }
-
     // ===== 1. OPTIMIZED CONSOLIDATED SQL QUERY (GIAI PHAP 3) =====
     // Consolidates product, category, brand, active variants with sprint5_variant_price,
     // images, ingredients, tags, and active promotions into 1 single round-trip to PostgreSQL.
@@ -497,13 +369,13 @@ export class PublicCatalogService {
               'id', promo.id, 'name', promo.name, 'type', promo.type,
               'minOrderAmount', promo.min_order_amount,
               'maxDiscountAmount', promo.max_discount_amount,
-              'startDate', promo.start_date, 'endDate', promo.end_date,
+              'startDate', promo.start_date, 'endDate', promo.end_date, 'slotStartHour', promo.slot_start_hour, 'isFlashSale', promo.is_flash_sale,
               'conditional', (promo.min_order_amount > 0 OR promo.type = 'FREE_SHIPPING')
             ) ORDER BY promo.id), '[]'::jsonb)
             FROM promotions promo
             WHERE promo.is_active = true 
               AND promo.start_date <= now() 
-              AND promo.end_date > now()
+              AND promo.end_date > now() AND glowup_slot_active(promo.slot_start_hour)
               AND (promo.usage_limit IS NULL OR promo.used_count < promo.usage_limit)
               AND (
                 (COALESCE(promo.applicable_products, '[]'::jsonb) = '[]'::jsonb AND COALESCE(promo.applicable_categories, '[]'::jsonb) = '[]'::jsonb)
@@ -573,21 +445,14 @@ export class PublicCatalogService {
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
         promotions: r.promotions || [],
+        serverTime: new Date().toISOString(),
+        flashSaleEndDate: (r.promotions || []).filter((offer: any) => offer.isFlashSale)
+          .map((offer: any) => promotionSlotEnd(new Date(offer.endDate), offer.slotStartHour).toISOString()).sort()[0] ?? null,
         priceBasis: 'SINGLE_UNIT_WITHOUT_CART_CONDITIONS',
         reservation: false,
         isWishlisted: false,
       };
 
-      if (!userId) {
-        this.detailCache.set(slug, {
-          data: result,
-          expiresAt: Date.now() + 60000,
-        });
-        if (this.detailCache.size > 500) {
-          const first = this.detailCache.keys().next().value;
-          if (first) this.detailCache.delete(first);
-        }
-      }
       return result;
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
@@ -613,24 +478,9 @@ export class PublicCatalogService {
     ]);
     const prices = await this.variantPrices([row.id], tierRate);
     const result = this.present(row, prices, offers);
-    if (!userId) {
-      this.detailCache.set(slug, { data: result, expiresAt: Date.now() + 60000 });
-      if (this.detailCache.size > 500) {
-        const first = this.detailCache.keys().next().value;
-        if (first) this.detailCache.delete(first);
-      }
-    }
     return result;
   }
   async suggest(query: string, limit: number, userId?: string) {
-    if (this.searchService?.isAvailable) {
-      try {
-        const osSuggest = await this.searchService.suggest(query, limit);
-        if (osSuggest && osSuggest.length > 0) return osSuggest;
-      } catch {
-        // Fallback to database
-      }
-    }
     const result = await this.list(
       Object.assign(new ProductFilterDto(), { page: 1, limit }),
       userId,
@@ -662,19 +512,6 @@ export class PublicCatalogService {
       }
     };
 
-    // 1. Try OpenSearch fast path (~5-10ms)
-    if (this.searchService?.isAvailable) {
-      try {
-        const osHints = await this.searchService.searchHints(q, 5);
-        if (osHints && (osHints.products.length > 0 || osHints.brands.length > 0 || osHints.keywords.length > 0)) {
-          const history = await fetchUserHistory();
-          return { ...osHints, history };
-        }
-      } catch {
-        // Fallback to PostgreSQL
-      }
-    }
-
     // 2. Fallback to PostgreSQL
     const activeProduct = { isActive: true, category: { isActive: true }, variants: { some: { isActive: true } } };
     const [products, brands, tags, history] = await Promise.all([
@@ -686,100 +523,6 @@ export class PublicCatalogService {
     return { products, brands, keywords: tags.map(tag => tag.tagName), history };
   }
   async related(productId: string, limit: number, userId?: string) {
-    const cacheKey = `${productId}:${limit}`;
-    if (!userId) {
-      const cached = this.relatedCache.get(cacheKey);
-      if (cached && cached.expiresAt > Date.now()) {
-        return cached.data;
-      }
-    }
-
-    // ===== 1. OPENSEARCH FAST PATH (GIAI PHAP 1) =====
-    // Uses OpenSearch More-Like-This & Category matching to return relevant products in ~80ms without hitting PostgreSQL.
-    if (this.searchService?.isAvailable) {
-      try {
-        const osDocs = await this.searchService.getRelatedProducts(productId, limit);
-        if (osDocs && osDocs.length > 0) {
-          const ids = osDocs.map((d) => d.id);
-          const tierRate = await this.tier(userId);
-          const variantPrices = ids.length ? await this.variantPrices(ids, tierRate) : [];
-          const priceMap = new Map<string, number[]>();
-          for (const vp of variantPrices) {
-            const list = priceMap.get(vp.productId) || [];
-            list.push(Number(vp.price));
-            priceMap.set(vp.productId, list);
-          }
-
-          const result = osDocs.map((doc) => {
-            const basePrice = Number(doc.basePrice);
-            const varPrices = priceMap.get(doc.id);
-            const minEff = varPrices && varPrices.length ? Math.min(...varPrices) : null;
-            const maxEff = varPrices && varPrices.length ? Math.max(...varPrices) : null;
-
-            const effectivePrice =
-              minEff ??
-              (tierRate > 0
-                ? Math.round(Number(doc.salePrice ?? doc.minPrice ?? basePrice) * (1 - tierRate / 100))
-                : Number(doc.salePrice ?? doc.minPrice ?? basePrice));
-            const salePrice = effectivePrice < basePrice ? effectivePrice : (doc.salePrice ? Number(doc.salePrice) : null);
-            return {
-              id: doc.id,
-              categoryId: doc.categoryId,
-              brandId: doc.brandId ?? null,
-              brandName: doc.brandName ?? null,
-              categoryName: doc.categoryName || undefined,
-              primaryImage: doc.primaryImage ?? null,
-              name: doc.name,
-              slug: doc.slug,
-              sku: doc.sku,
-              description: null,
-              shortDescription: null,
-              basePrice,
-              salePrice,
-              effectivePrice,
-              effectivePriceMax: maxEff ?? (doc.maxPrice ? Number(doc.maxPrice) : effectivePrice),
-              avgRating: doc.avgRating ?? 0,
-              totalReviews: Number(doc.totalReviews ?? (doc as any).total_reviews ?? 0),
-              totalSold: doc.totalSold ?? 0,
-              isActive: doc.isActive,
-              isFeatured: (doc as any).isFeatured ?? false,
-              option1Name: null,
-              option2Name: null,
-              option3Name: null,
-              variants: [],
-              images: doc.primaryImage
-                ? [{ imageUrl: doc.primaryImage, isPrimary: true, sortOrder: 0 }]
-                : [],
-              ingredients: [],
-              tags: doc.tags ?? [],
-              createdAt: doc.createdAt ? new Date(doc.createdAt) : undefined,
-              updatedAt: undefined,
-              promotions: [],
-              priceBasis: 'SINGLE_UNIT_WITHOUT_CART_CONDITIONS',
-              reservation: false,
-              isWishlisted: false,
-            };
-          });
-
-          if (!userId) {
-            this.relatedCache.set(cacheKey, {
-              data: result,
-              expiresAt: Date.now() + 60000,
-            });
-            if (this.relatedCache.size > 500) {
-              const first = this.relatedCache.keys().next().value;
-              if (first) this.relatedCache.delete(first);
-            }
-          }
-          return result;
-        }
-      } catch (err) {
-        this.logger.warn(
-          `OpenSearch related failed for ${productId}: ${(err as Error).message}. Falling back to PostgreSQL.`,
-        );
-      }
-    }
-
     // ===== 2. FALLBACK PATH: PostgreSQL =====
     const source = await this.db.product.findFirst({
       where: { id: productId, isActive: true },
@@ -817,13 +560,6 @@ export class PublicCatalogService {
       tierRate,
     );
     const result = rows.map((row) => this.present(row, prices, offers));
-    if (!userId) {
-      this.relatedCache.set(cacheKey, { data: result, expiresAt: Date.now() + 60000 });
-      if (this.relatedCache.size > 500) {
-        const first = this.relatedCache.keys().next().value;
-        if (first) this.relatedCache.delete(first);
-      }
-    }
     return result;
   }
 }

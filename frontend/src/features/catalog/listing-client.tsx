@@ -51,7 +51,9 @@ export function CatalogListingClient({
     },
     initialData: key === initialKey ? initialResult : undefined,
     placeholderData: keepPreviousData,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     gcTime: 5 * 60_000,
   });
 
@@ -434,18 +436,10 @@ export function CatalogListingClient({
             </div>
 
             <div className="brand-modal-footer">
-              <button
-                type="button"
-                className="btn-cancel"
-                onClick={() => setBrandModalOpen(false)}
-              >
+              <button type="button" className="btn-cancel" onClick={() => setBrandModalOpen(false)}>
                 Đóng
               </button>
-              <button
-                type="button"
-                className="btn-apply"
-                onClick={applyBrandModal}
-              >
+              <button type="button" className="btn-apply" onClick={applyBrandModal}>
                 Áp dụng {draftBrandIds.size > 0 ? `(${draftBrandIds.size})` : ""}
               </button>
             </div>

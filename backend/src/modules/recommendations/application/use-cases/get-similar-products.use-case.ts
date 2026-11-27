@@ -36,25 +36,32 @@ export class GetSimilarProductsUseCase {
     let candidates = await this.loadPrecomputed(cacheKey, input.productId);
     candidates = candidates.filter((c) => c.productId !== input.productId);
 
-    if (candidates.length < limit) {
+    let hydrated = await this.repository.filterAndHydrateEligibleProducts(
+      candidates,
+      RecommendationPlacement.PRODUCT_SIMILAR,
+    );
+
+    if (hydrated.length < limit) {
       const fallbacks =
         await this.repository.findSameCategoryPriceRangeFallbacks(
           input.productId,
           limit * 2,
         );
       const seen = new Set(candidates.map((c) => c.productId));
+      const newCandidates: RankedCandidate[] = [];
       for (const fb of fallbacks) {
         if (fb.productId !== input.productId && !seen.has(fb.productId)) {
           seen.add(fb.productId);
-          candidates.push(fb);
+          newCandidates.push(fb);
         }
       }
+      const fallbackItems =
+        await this.repository.filterAndHydrateEligibleProducts(
+          newCandidates,
+          RecommendationPlacement.PRODUCT_SIMILAR,
+        );
+      hydrated = [...hydrated, ...fallbackItems];
     }
-
-    const hydrated = await this.repository.filterAndHydrateEligibleProducts(
-      candidates.slice(0, limit * 2),
-      RecommendationPlacement.PRODUCT_SIMILAR,
-    );
 
     const finalItems = input.shadeHex
       ? this.applyShadeBoost(hydrated, input.shadeHex)

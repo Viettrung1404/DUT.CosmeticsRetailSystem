@@ -31,6 +31,7 @@ export interface ImpressionInput {
 }
 
 export interface BehaviorBatchPayload {
+  batchId?: string;
   anonymousId: string;
   events: QueuedBehaviorEvent[];
   impressions?: ImpressionInput[];
@@ -75,6 +76,7 @@ export interface BehaviorTrackerOptions {
 export const TRACKER_STORAGE_KEYS = {
   ANONYMOUS_ID: "glowup:rec:anonymousId",
   RECENT_IDS: "glowup:rec:recentIds",
+  RECENT_VIEWS: "glowup:rec:recentViews",
   ATTRIBUTION_MAP: "glowup:rec:attribution",
 } as const;
 
@@ -118,6 +120,7 @@ export class BehaviorTracker {
   private unsubscribeLifecycle: (() => void) | null = null;
   private cachedAnonymousId: string | null = null;
   private flushing = false;
+  private pendingBatch: BehaviorBatchPayload | null = null;
 
   constructor(options: BehaviorTrackerOptions) {
     this.storage = options.storage;
@@ -160,13 +163,16 @@ export class BehaviorTracker {
    * để tránh lẫn lịch sử khi dùng chung thiết bị.
    */
   async resetAnonymousIdOnLogout(): Promise<string> {
+    this.identityVersion += 1;
     await this.flush({ keepalive: true });
     this.clearFlushTimer();
     this.eventQueue = [];
+    this.pendingBatch = null;
     this.impressionMap.clear();
     this.viewDedupeMap.clear();
 
     await this.storage.removeItem(TRACKER_STORAGE_KEYS.RECENT_IDS);
+    await this.storage.removeItem(TRACKER_STORAGE_KEYS.RECENT_VIEWS);
     await this.storage.removeItem(TRACKER_STORAGE_KEYS.ATTRIBUTION_MAP);
 
     const nextId = this.generateUuid();
@@ -174,6 +180,12 @@ export class BehaviorTracker {
     await this.storage.setItem(TRACKER_STORAGE_KEYS.ANONYMOUS_ID, nextId);
     return nextId;
   }
+
+  getIdentityVersion(): number {
+    return this.identityVersion;
+  }
+
+  private identityVersion = 0;
 
   async getRecentIds(): Promise<string[]> {
     const raw = await this.storage.getItem(TRACKER_STORAGE_KEYS.RECENT_IDS);
@@ -288,7 +300,7 @@ export class BehaviorTracker {
       ...input,
       id: this.generateUuid(),
     };
-    this.eventQueue.push(queued);
+    if (this.eventQueue.length < 50) this.eventQueue.push(queued);
 
     if (this.eventQueue.length >= this.maxBatchSize) {
       await this.flush();
@@ -367,42 +379,40 @@ export class BehaviorTracker {
   }
 
   getPendingCount(): number {
-    return this.eventQueue.length;
+    return this.eventQueue.length + (this.pendingBatch?.events.length ?? 0);
   }
 
   async flush(options?: { keepalive?: boolean }): Promise<void> {
     this.clearFlushTimer();
     if (this.flushing) return;
-    if (this.eventQueue.length === 0 && this.impressionMap.size === 0) {
+    if (!this.pendingBatch && this.eventQueue.length === 0 && this.impressionMap.size === 0) {
       return;
     }
 
     this.flushing = true;
-    const eventsToSend = this.eventQueue.splice(0, this.eventQueue.length);
-    const impressionsToSend: ImpressionInput[] = Array.from(
-      this.impressionMap.entries(),
-    ).map(([placement, count]) => ({ placement, count }));
-    this.impressionMap.clear();
-
     try {
-      const anonymousId = await this.getAnonymousId();
-      const payload: BehaviorBatchPayload = {
-        anonymousId,
-        events: eventsToSend,
-        ...(impressionsToSend.length > 0 ? { impressions: impressionsToSend } : {}),
-      };
-      await this.transport.sendBatch(payload, options);
-    } catch {
-      // Best-effort re-queue bounded buffer on transient failure without throwing to UI
-      this.eventQueue = [...eventsToSend, ...this.eventQueue].slice(0, 50);
-      for (const imp of impressionsToSend) {
-        this.impressionMap.set(
-          imp.placement,
-          (this.impressionMap.get(imp.placement) ?? 0) + imp.count,
-        );
+      if (!this.pendingBatch) {
+        const anonymousId = await this.getAnonymousId();
+        const events = this.eventQueue.splice(0, 50);
+        const impressions = Array.from(this.impressionMap.entries())
+          .map(([placement, count]) => ({ placement, count }));
+        this.impressionMap.clear();
+        this.pendingBatch = {
+          batchId: this.generateUuid(),
+          anonymousId,
+          events,
+          ...(impressions.length ? { impressions } : {}),
+        };
       }
+      await this.transport.sendBatch(this.pendingBatch, options);
+      this.pendingBatch = null;
+    } catch {
+      // Keep exactly the same payload and ID for retry, including impressions-only batches.
     } finally {
       this.flushing = false;
+      if (this.pendingBatch || this.eventQueue.length || this.impressionMap.size) {
+        this.scheduleFlush();
+      }
     }
   }
 

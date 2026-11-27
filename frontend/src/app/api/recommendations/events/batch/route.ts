@@ -51,8 +51,10 @@ export async function POST(request: Request) {
         const errBody = await upstreamResponse.json().catch(() => ({ accepted: false }));
         return Response.json(errBody, { status: upstreamResponse.status });
       }
+      if (!upstreamResponse.ok) return json({ accepted: false }, 503);
     } catch {
-      // Graceful degradation: tracking failures never block browser UX
+      // The tracker retries in the background without blocking browser UX.
+      return json({ accepted: false }, 503);
     }
 
     return json({ accepted: true }, 202);

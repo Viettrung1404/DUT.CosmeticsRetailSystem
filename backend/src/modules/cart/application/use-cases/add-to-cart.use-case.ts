@@ -23,8 +23,8 @@ export class AddToCartUseCase {
     if (!input.customerId && !input.sessionId) {
       throw new BadRequestException('Phải cung cấp customerId hoặc sessionId');
     }
-    if (!input.quantity || input.quantity <= 0) {
-      throw new BadRequestException('Số lượng phải lớn hơn 0');
+    if (!Number.isSafeInteger(input.quantity) || input.quantity <= 0) {
+      throw new BadRequestException({ code: 'INVALID_QUANTITY', message: 'Số lượng phải lớn hơn 0 và là số nguyên' });
     }
 
     const variantInfo = await this.cartRepository.getVariantStockAndPrice(
@@ -41,9 +41,8 @@ export class AddToCartUseCase {
 
     // Fail-fast validation against available stock
     if (input.quantity > variantInfo.availableStock) {
-      throw new BadRequestException(
-        `Số lượng yêu cầu (${input.quantity}) vượt quá tồn kho khả dụng (${variantInfo.availableStock})`,
-      );
+      throw new BadRequestException({ code: 'STOCK_LIMIT_EXCEEDED',
+        message: `Số lượng yêu cầu (${input.quantity}) vượt quá tồn kho khả dụng (${variantInfo.availableStock})` });
     }
 
     let cart = await this.cartRepository.findCart({
@@ -74,7 +73,7 @@ export class AddToCartUseCase {
     try {
       cart.addItem(newItem, variantInfo.availableStock);
     } catch (err: any) {
-      throw new BadRequestException(err.message);
+      throw new BadRequestException({ code: err.message.includes('tồn kho') ? 'STOCK_LIMIT_EXCEEDED' : 'CART_QUANTITY_LIMIT', message: err.message });
     }
 
     // P1: Atomic Upsert to DB — protects against race conditions

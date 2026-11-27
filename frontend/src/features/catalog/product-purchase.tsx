@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  CircleAlert,
   Check,
   ChevronDown,
   ChevronRight,
@@ -15,22 +16,14 @@ import {
 import { z } from "zod";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
-import dynamic from "next/dynamic";
+import { FlashCountdown } from "./home-motion";
 import { formatPrice } from "./components";
-
-const TryOnCamera = dynamic(
-  () => import("./try-on-camera").then((mod) => mod.TryOnCamera),
-  {
-    ssr: false,
-    loading: () => null,
-  },
-);
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { emptyCart, optimisticCartAdd, type Cart } from "./commerce-state";
 import { cartSchema } from "./cart";
 import { useHydrated } from "@/shared/lib/use-hydrated";
-import { getWebBehaviorTracker } from "@/shared/recommendations/web-tracker";
+import { getWebBehaviorTracker, trackWebProductVisit } from "@/shared/recommendations/web-tracker";
 
 interface Variant {
   id?: string;
@@ -53,86 +46,23 @@ const availabilitySchema = z.array(
   }),
 );
 
-function FlashSaleCountdown() {
-  const [timeLeft, setTimeLeft] = useState<{ hours: string; minutes: string; seconds: string } | null>(null);
-
-  useEffect(() => {
-    const calculateTime = () => {
-      const now = new Date();
-      const nextHour = new Date(now);
-      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
-      const diffMs = Math.max(0, nextHour.getTime() - now.getTime());
-
-      const totalSeconds = Math.floor(diffMs / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-
-      setTimeLeft({
-        hours: String(hours).padStart(2, "0"),
-        minutes: String(minutes).padStart(2, "0"),
-        seconds: String(seconds).padStart(2, "0"),
-      });
-    };
-
-    calculateTime();
-    const interval = setInterval(calculateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!timeLeft) {
-    return (
-      <div className="pdp-flash-banner">
-        <div className="pdp-flash-left">
-          <span className="pdp-flash-tag">
-            <Zap size={14} className="pdp-flash-icon" fill="currentColor" />
-            <span>FLASH SALE</span>
-          </span>
-          <span className="pdp-flash-sub">ĐANG DIỄN RA</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="pdp-flash-banner">
-      <div className="pdp-flash-left">
-        <span className="pdp-flash-tag">
-          <Zap size={14} className="pdp-flash-icon" fill="currentColor" />
-          <span>FLASH SALE</span>
-        </span>
-        <span className="pdp-flash-sub">ĐANG DIỄN RA</span>
-      </div>
-      <div className="pdp-flash-right">
-        <Clock size={13} className="pdp-clock-icon" />
-        <span className="pdp-flash-timer-label">KẾT THÚC TRONG</span>
-        <div className="pdp-timer-digits">
-          <span className="pdp-timer-digit">{timeLeft.hours}</span>
-          <span className="pdp-timer-sep">:</span>
-          <span className="pdp-timer-digit">{timeLeft.minutes}</span>
-          <span className="pdp-timer-sep">:</span>
-          <span className="pdp-timer-digit">{timeLeft.seconds}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function ProductPurchase({
   productId,
+  flashSaleEndDate,
+  serverTime,
   slug,
   productName,
   brandName,
   basePrice,
-  salePrice,
   effectivePrice,
   variants,
   images = [],
   option1Name,
   option2Name,
-  canTryOn,
 }: {
   productId: string;
+  flashSaleEndDate?: string | null;
+  serverTime?: string;
   slug?: string;
   productName?: string;
   brandName?: string | null;
@@ -143,7 +73,6 @@ export function ProductPurchase({
   images?: Array<{ imageUrl: string; altText?: string | null; productVariantId?: string | null }>;
   option1Name?: string | null;
   option2Name?: string | null;
-  canTryOn?: boolean;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -168,7 +97,13 @@ export function ProductPurchase({
   const [selectedOpt2, setSelectedOpt2] = useState<string | null>(null);
   const [selectedFlatIndex, setSelectedFlatIndex] = useState<number | null>(null);
 
-  const [quantity, setQuantity] = useState(1);
+  const [quantityInput, setQuantityInput] = useState("1");
+  const [quantityTouched, setQuantityTouched] = useState(false);
+  const quantity = Number(quantityInput);
+  const setQuantity = (value: number) => {
+    setQuantityInput(String(value));
+    setQuantityTouched(false);
+  };
   const addQueue = useRef<Promise<void>>(Promise.resolve());
   const pendingUnits = useRef(0);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
@@ -177,6 +112,8 @@ export function ProductPurchase({
   const [showToast, setShowToast] = useState(false);
   const [stores, setStores] = useState<z.infer<typeof availabilitySchema>>([]);
   const [storeError, setStoreError] = useState(false);
+  const [storesLoading, setStoresLoading] = useState(false);
+  const [storeRetry, setStoreRetry] = useState(0);
   const [buyingNow, setBuyingNow] = useState(false);
   const isInitialMount = useRef(true);
 
@@ -194,9 +131,7 @@ export function ProductPurchase({
             v.option2Value === selectedOpt2 &&
             v.isActive !== false,
         ) ||
-        variants.find(
-          (v) => v.option1Value === selectedOpt1 && v.option2Value === selectedOpt2,
-        )
+        variants.find((v) => v.option1Value === selectedOpt1 && v.option2Value === selectedOpt2)
       );
     }
     if (hasSingleOption) {
@@ -205,10 +140,8 @@ export function ProductPurchase({
       return (
         variants.find(
           (v) =>
-            (v.option1Value === activeOpt || v.option2Value === activeOpt) &&
-            v.isActive !== false,
-        ) ||
-        variants.find((v) => v.option1Value === activeOpt || v.option2Value === activeOpt)
+            (v.option1Value === activeOpt || v.option2Value === activeOpt) && v.isActive !== false,
+        ) || variants.find((v) => v.option1Value === activeOpt || v.option2Value === activeOpt)
       );
     }
     if (hasFlatVariants) {
@@ -222,19 +155,28 @@ export function ProductPurchase({
     stores.length > 0 ? Math.max(...stores.map((s) => s.available), 0) : undefined;
   const maxStock =
     maxStoreStock !== undefined
-      ? (variant?.stockQuantity !== undefined
-          ? Math.min(variant.stockQuantity, maxStoreStock)
-          : maxStoreStock)
+      ? variant?.stockQuantity !== undefined
+        ? Math.min(variant.stockQuantity, maxStoreStock)
+        : maxStoreStock
       : (variant?.stockQuantity ?? 99);
 
-  const available =
-    !!variant?.id && variant.isActive !== false && maxStock > 0;
+  const available = !!variant?.id && variant.isActive !== false && maxStock > 0;
+
+  const maxQuantity = Math.min(99, maxStock);
+  const quantityError =
+    !quantityInput || !Number.isSafeInteger(quantity) || quantity < 1
+      ? "Vui lòng nhập số lượng là số nguyên từ 1 trở lên."
+      : quantity > maxStock
+        ? `Phân loại này chỉ còn ${maxStock.toLocaleString("vi-VN")} sản phẩm có thể mua. Vui lòng giảm số lượng.`
+        : quantity > 99
+          ? "Bạn có thể mua tối đa 99 sản phẩm mỗi phân loại trong một đơn hàng."
+          : "";
+  const purchaseError = error || (quantityTouched && available ? quantityError : "");
+  const viewedVariantId = useRef(variant?.id);
 
   useEffect(() => {
-    if (maxStock > 0 && quantity > maxStock) {
-      setQuantity(maxStock);
-    }
-  }, [maxStock, quantity]);
+    viewedVariantId.current = variant?.id;
+  }, [variant?.id]);
 
   useEffect(() => {
     return () => {
@@ -247,11 +189,8 @@ export function ProductPurchase({
     if (typeof window !== "undefined") {
       void tracker.captureAttributionFromQuery(productId, window.location.search);
     }
-    return tracker.startProductViewTimer({
-      productId,
-      variantId: variant?.id,
-    });
-  }, [productId, variant?.id]);
+    return trackWebProductVisit(productId, () => viewedVariantId.current);
+  }, [productId]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -270,10 +209,13 @@ export function ProductPurchase({
   }, [variant?.id, images]);
 
   useEffect(() => {
+    setStores([]);
+    setStoreError(false);
     if (!variant?.id) {
-      setStores([]);
+      setStoresLoading(false);
       return;
     }
+    setStoresLoading(true);
     const controller = new AbortController();
     readBff(
       `/api/catalog/availability?productId=${encodeURIComponent(productId)}&variantId=${encodeURIComponent(variant.id)}`,
@@ -286,9 +228,12 @@ export function ProductPurchase({
       })
       .catch(() => {
         if (!controller.signal.aborted) setStoreError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setStoresLoading(false);
       });
     return () => controller.abort();
-  }, [productId, variant?.id]);
+  }, [productId, variant?.id, storeRetry]);
 
   async function add(buyNow = false) {
     if (hasOptions && !variant) {
@@ -311,8 +256,9 @@ export function ProductPurchase({
       return;
     }
     if (!variant?.id || !available) return;
-    if (quantity > maxStock) {
-      setError(`Số lượng yêu cầu (${quantity}) vượt quá tồn kho khả dụng (${maxStock})`);
+    if (quantityError) {
+      setQuantityTouched(true);
+      setError(quantityError);
       return;
     }
     const variantId = variant.id;
@@ -358,9 +304,6 @@ export function ProductPurchase({
     queryClient.setQueryData<Cart>(["cart"], (current) =>
       optimisticCartAdd(current ?? emptyCart(), units),
     );
-    setShowToast(true);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setShowToast(false), 2200);
 
     addQueue.current = addQueue.current.then(async () => {
       try {
@@ -377,6 +320,9 @@ export function ProductPurchase({
           },
         );
         pendingUnits.current -= units;
+        setShowToast(true);
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setShowToast(false), 2200);
         queryClient.setQueryData<Cart>(["cart"], (current) => ({
           ...(current ?? emptyCart()),
           totalQuantity: result.totalQuantity + pendingUnits.current,
@@ -398,27 +344,25 @@ export function ProductPurchase({
   // Price calculations
   const variantPrices = variants
     .map((v) => v.effectivePrice ?? v.price)
-    .filter((p): p is number => typeof p === "number" && p > 0);
+    .filter((p): p is number => typeof p === "number" && p >= 0);
   const minVarPrice = variantPrices.length
     ? Math.min(...variantPrices)
-    : effectivePrice ?? basePrice ?? 0;
+    : (effectivePrice ?? basePrice ?? 0);
   const maxVarPrice = variantPrices.length
     ? Math.max(...variantPrices)
-    : effectivePrice ?? basePrice ?? 0;
+    : (effectivePrice ?? basePrice ?? 0);
   const isPriceRange = !variant && minVarPrice !== maxVarPrice;
 
   const currentPrice = variant
-    ? variant.effectivePrice ?? variant.price ?? basePrice ?? 0
+    ? (variant.effectivePrice ?? variant.price ?? basePrice ?? 0)
     : minVarPrice;
-  const rawOriginalPrice = variant
-    ? variant.price && variant.effectivePrice && variant.price > variant.effectivePrice
-      ? variant.price
-      : basePrice && basePrice > currentPrice
-        ? basePrice
-        : null
-    : salePrice && basePrice && basePrice > salePrice
-      ? basePrice
-      : null;
+  const pricedVariant =
+    variant ??
+    variants.find(
+      (item) => item.isActive !== false && (item.effectivePrice ?? item.price) === currentPrice,
+    );
+  const rawOriginalPrice =
+    pricedVariant && pricedVariant.price > currentPrice ? pricedVariant.price : null;
   const originalPrice = rawOriginalPrice;
   const discountPercent =
     originalPrice && originalPrice > currentPrice
@@ -440,7 +384,12 @@ export function ProductPurchase({
   return (
     <div className="pdp-purchase">
       {/* Flash Sale Banner & Live Countdown Timer */}
-      {discountPercent > 0 && <FlashSaleCountdown />}
+      {flashSaleEndDate && (
+        <div className="pdp-flash-banner">
+          <strong>Ưu đãi khung giờ</strong>
+          <FlashCountdown endDate={flashSaleEndDate} serverTime={serverTime} />
+        </div>
+      )}
 
       {/* 1. Price Box */}
       <div className="pdp-price-box">
@@ -458,9 +407,7 @@ export function ProductPurchase({
             GIÁ SAU VOUCHER
           </span>
         </div>
-        {discountPercent > 0 && (
-          <div className="pdp-discount-badge">-{discountPercent}% GIẢM</div>
-        )}
+        {discountPercent > 0 && <div className="pdp-discount-badge">-{discountPercent}% GIẢM</div>}
       </div>
 
       {/* 2. Vận Chuyển (Shipping Row) */}
@@ -560,9 +507,7 @@ export function ProductPurchase({
                       }
                     }}
                   >
-                    {pillImg && (
-                      <img src={pillImg} alt={val} className="pdp-variant-pill-thumb" />
-                    )}
+                    {pillImg && <img src={pillImg} alt={val} className="pdp-variant-pill-thumb" />}
                     <span>{val}</span>
                     {isSelected && (
                       <span className="pdp-variant-check" aria-hidden="true">
@@ -636,12 +581,12 @@ export function ProductPurchase({
       ) : hasSingleOption ? (
         <div className="pdp-spec-row pdp-variants-row">
           <div className="pdp-spec-label">
-            {option1Values.length > 0 ? (option1Name || "Phân loại") : (option2Name || "Dung Tích")}
+            {option1Values.length > 0 ? option1Name || "Phân loại" : option2Name || "Dung Tích"}
           </div>
           <div className="pdp-spec-value pdp-variants-list-wrap">
             <div className="pdp-variants-list">
               {(option1Values.length > 0 ? option1Values : option2Values).map((val, idx) => {
-                const isSelected = (selectedOpt1 === val) || (selectedOpt2 === val);
+                const isSelected = selectedOpt1 === val || selectedOpt2 === val;
                 const matchVar = variants.find(
                   (v) => v.option1Value === val || v.option2Value === val,
                 );
@@ -696,9 +641,7 @@ export function ProductPurchase({
                       }
                     }}
                   >
-                    {pillImg && (
-                      <img src={pillImg} alt={val} className="pdp-variant-pill-thumb" />
-                    )}
+                    {pillImg && <img src={pillImg} alt={val} className="pdp-variant-pill-thumb" />}
                     <span>{val}</span>
                     {isSelected && (
                       <span className="pdp-variant-check" aria-hidden="true">
@@ -785,7 +728,6 @@ export function ProductPurchase({
       ) : null}
 
       {/* 5. Try-On Camera */}
-      {canTryOn && <TryOnCamera key={variant?.id} productId={productId} variantId={variant?.id} />}
 
       {/* 6. Quantity Row */}
       <div className="pdp-spec-row pdp-quantity-row">
@@ -796,31 +738,62 @@ export function ProductPurchase({
               type="button"
               aria-label="Giảm số lượng"
               disabled={!available || quantity <= 1}
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              onClick={() => {
+                setError("");
+                setQuantity(Math.max(1, (quantity || 1) - 1));
+              }}
             >
               −
             </button>
-            <output>{quantity}</output>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              aria-label="Số lượng"
+              aria-invalid={quantityTouched && !!quantityError}
+              aria-describedby={purchaseError ? "pdp-purchase-error" : "pdp-stock-hint"}
+              value={quantityInput}
+              maxLength={6}
+              disabled={!available}
+              onChange={(event) => {
+                if (!/^\d*$/.test(event.target.value)) return;
+                setError("");
+                setQuantityInput(event.target.value);
+                setQuantityTouched(true);
+              }}
+              onBlur={() => setQuantityTouched(true)}
+            />
             <button
               type="button"
               aria-label="Tăng số lượng"
-              disabled={!available || quantity >= maxStock}
-              onClick={() => setQuantity(quantity + 1)}
+              disabled={!available || quantity >= maxQuantity}
+              onClick={() => {
+                setError("");
+                setQuantity(Math.min(maxQuantity, (quantity || 0) + 1));
+              }}
             >
               +
             </button>
           </div>
-          <span className="pdp-stock-text">
-            {variant ? (
-              available
+          <span className="pdp-stock-text" id="pdp-stock-hint">
+            {variant
+              ? available
                 ? `(Chỉ còn ${maxStock} sản phẩm trong kho)`
                 : "(Sản phẩm tạm hết hàng)"
-            ) : (
-              "(Vui lòng chọn phân loại hàng để xem tồn kho)"
-            )}
+              : "(Vui lòng chọn phân loại hàng để xem tồn kho)"}
           </span>
         </div>
       </div>
+
+      {purchaseError && (
+        <div role="alert" className="pdp-purchase-error" id="pdp-purchase-error">
+          <CircleAlert size={20} aria-hidden="true" />
+          <div>
+            <strong>Vui lòng kiểm tra lại</strong>
+            <p>{purchaseError}</p>
+          </div>
+        </div>
+      )}
 
       {/* 7. Action Buttons */}
       <div className="pdp-actions">
@@ -859,18 +832,20 @@ export function ProductPurchase({
         </div>
       </div>
 
-      {/* Error warning */}
-      {error && (
-        <p role="alert" className="cart-warning">
-          {error}
-        </p>
-      )}
-
       {/* Store Availability details */}
       <details className="store-availability">
         <summary>Kiểm tra tồn kho tại cửa hàng</summary>
-        {storeError ? (
-          <p>Chưa tải được tồn kho cửa hàng.</p>
+        {!variant ? (
+          <p>Vui lòng chọn đầy đủ phân loại sản phẩm ở trên để xem tồn kho từng cửa hàng.</p>
+        ) : storesLoading ? (
+          <p role="status">Đang tải tồn kho cửa hàng…</p>
+        ) : storeError ? (
+          <p role="alert">
+            Chưa tải được tồn kho cửa hàng.{" "}
+            <button type="button" onClick={() => setStoreRetry((count) => count + 1)}>
+              Thử lại
+            </button>
+          </p>
         ) : stores.length ? (
           <ul>
             {stores.map((store) => (
@@ -879,12 +854,16 @@ export function ProductPurchase({
                 <small>
                   {store.address}, {store.city}
                 </small>
-                <span>{store.available > 0 ? `Còn ${store.available}` : "Hết hàng"}</span>
+                <span>
+                  {store.available > 0
+                    ? `Còn ${store.available.toLocaleString("vi-VN")} sản phẩm`
+                    : "Hết hàng"}
+                </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p>Đang cập nhật tồn kho cửa hàng.</p>
+          <p>Chưa có cửa hàng cung cấp phân loại này.</p>
         )}
       </details>
 

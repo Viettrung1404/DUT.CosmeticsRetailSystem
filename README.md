@@ -4,6 +4,21 @@ Frontend Next.js chạy ở cổng **3001**, backend NestJS chạy ở cổng **
 
 Checkout hỗ trợ **COD và SePay VietQR**. Cấu hình và quy trình thử thanh toán nằm tại [hướng dẫn SePay](backend/docs/sepay-setup.md).
 
+## Chạy hệ thống
+
+Đây là quy trình mặc định khi yêu cầu **“chạy hệ thống”**. Sau khi cấu hình các file môi trường, chạy `npx prisma migrate deploy` trong `backend` nếu có migration mới và chạy `npm run build` trong cả `backend` và `frontend` khi mã nguồn thay đổi. Frontend HTTPS cần cặp chứng chỉ `localhost.pem` và `localhost-key.pem` trong `frontend/certificates`.
+
+Mở bốn terminal từ thư mục gốc và giữ chúng hoạt động:
+
+| Thư mục | Lệnh | Kiểm tra |
+| --- | --- | --- |
+| `backend` | `npm run start:prod` | Đợi [readiness](http://localhost:3000/api/v1/health/ready) trả 200 |
+| `backend` | `npm run tunnel:payment` | Chạy sau khi backend sẵn sàng. Khởi động lại backend nếu URL thanh toán trong `.env` thay đổi |
+| `frontend` | `npm run start:https` | Mở [web HTTPS](https://localhost:3001) |
+| `mobile` | `npx expo start` | Mở Metro ở cổng 8081 |
+
+Nếu một tiến trình đúng lệnh đang chạy và hoạt động, dùng lại tiến trình đó. Khi vừa build lại, khởi động lại đúng backend và frontend của dự án để nạp bản mới.
+
 ## Người khác pull code về có chạy được không?
 
 **Có, sau khi cấu hình môi trường riêng.** Git không chứa `backend/.env`, `frontend/.env.local`, mật khẩu demo, cấu hình đăng nhập ngrok hoặc database của người đang phát triển. Chỉ có mã nguồn và file `.env.example`. Các thay đổi local cũng phải được commit/push trước thì người khác mới pull được.
@@ -101,13 +116,7 @@ Thay các giá trị `DIEN_*` và `DOMAIN-DUOC-CAP` bằng cấu hình riêng. `
 
 ### Thứ tự chạy mỗi lần test
 
-| Terminal | Thư mục | Lệnh và thời điểm |
-| --- | --- | --- |
-| 1 — Backend | `backend` | `npm run start:dev`; đợi health/ready trả 200 |
-| 2 — Tunnel | `backend` | `npm run payment:tunnel`; đợi URL HTTPS được in ra |
-| 3 — Frontend HTTPS | `frontend` | `npm run dev:https` |
-
-Nếu helper vừa thay URL trong `.env`, khởi động lại **terminal backend** để nạp env mới; giữ nguyên terminal tunnel. Khi backend đang chạy, sửa `.env` không đảm bảo process tự nạp lại. Dừng đúng server bằng `Ctrl+C` ở terminal của nó; không tắt toàn bộ tiến trình Node trên máy. Không chạy đồng thời `npm run dev` và `npm run dev:https` ở cùng cổng 3001.
+Dùng quy trình [Chạy hệ thống](#chạy-hệ-thống) ở đầu README. Dừng từng tiến trình bằng `Ctrl+C` ở terminal tương ứng.
 
 Trong terminal kiểm tra ở `backend`:
 
@@ -122,13 +131,13 @@ Readiness phải trả 200 và API phương thức thanh toán phải có `data.
 
 ### Sau khi tắt máy hoặc đóng terminal
 
-Mỗi lần mở máy để thử thanh toán, chạy lại cả ba terminal theo bảng trên. `NGROK_DOMAIN` cố định giúp giữ nguyên URL: không cần nhập lại authtoken hay cấu hình lại webhook nếu domain không đổi. Tunnel chỉ truy cập được khi máy, backend và ngrok đang chạy. Khi backend được triển khai trên server có URL công khai thì không cần ngrok.
+Mỗi lần mở máy để thử thanh toán, dùng lại quy trình ở đầu README. `NGROK_DOMAIN` cố định giúp giữ nguyên URL: không cần nhập lại authtoken hay cấu hình lại webhook nếu domain không đổi. Tunnel chỉ truy cập được khi máy, backend và ngrok đang chạy. Khi backend được triển khai trên server có URL công khai thì không cần ngrok.
 
 ## 4. Sau những lần pull tiếp theo
 
 - Chạy lại `npm ci` ở package có lockfile thay đổi; sinh Prisma Client nếu schema thay đổi.
 - Đối chiếu các biến mới trong `.env.example`, bổ sung vào env riêng; không ghi đè env đã điền.
 - Nếu có migration mới, phối hợp với người quản lý database trước khi áp dụng trên DB chung.
-- Không cần cài/xác thực lại ngrok mỗi lần; giữ `NGROK_DOMAIN` đã được cấp và chạy lại `npm run payment:tunnel` khi cần.
+- Giữ `NGROK_DOMAIN` đã được cấp và chạy lại `npm run tunnel:payment` khi cần.
 
 Chi tiết theo package: [backend](backend/README.md), [frontend](frontend/README.md), [SePay Test mode và Live](backend/docs/sepay-setup.md).

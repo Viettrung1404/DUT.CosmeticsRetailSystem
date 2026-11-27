@@ -4,7 +4,7 @@ export const orderItemsSchema = z
   .array(
     z.object({
       variantId: z.uuid(),
-      quantity: z.number().int().min(1).max(100),
+      quantity: z.number().int().min(1).max(99),
       attributionSource: z.string().trim().max(60).optional(),
     }),
   )
@@ -89,6 +89,11 @@ export const previewSchema = z.object({
       productName: z.string(),
       quantity: z.number(),
       totalPrice: z.number(),
+      variantName: z.string().optional(),
+      originalPrice: z.number().optional(),
+      effectivePrice: z.number().optional(),
+      lineDiscount: z.number().optional(),
+      quotaQuantity: z.number().int().nonnegative().optional(),
     }),
   ),
 });

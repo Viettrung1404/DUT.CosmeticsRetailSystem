@@ -6,8 +6,7 @@ describe('OrderPurchaseEventListener', () => {
   let mockRepository: {
     findOrderForBehaviorTracking: jest.Mock;
     findVariantContext: jest.Mock;
-    createBehaviorEventsBatch: jest.Mock;
-    incrementDailyAttributionMetrics: jest.Mock;
+    persistTrackedBehaviorBatch: jest.Mock;
   };
   let listener: OrderPurchaseEventListener;
 
@@ -15,8 +14,7 @@ describe('OrderPurchaseEventListener', () => {
     mockRepository = {
       findOrderForBehaviorTracking: jest.fn(),
       findVariantContext: jest.fn(),
-      createBehaviorEventsBatch: jest.fn().mockResolvedValue({ count: 1 }),
-      incrementDailyAttributionMetrics: jest.fn().mockResolvedValue(undefined),
+      persistTrackedBehaviorBatch: jest.fn().mockResolvedValue({ count: 1 }),
     };
     listener = new OrderPurchaseEventListener(mockRepository as any);
   });
@@ -55,7 +53,7 @@ describe('OrderPurchaseEventListener', () => {
 
     await listener.handleOrderPurchased({ orderId, trigger: 'PAYMENT_RECEIVED' });
 
-    expect(mockRepository.createBehaviorEventsBatch).toHaveBeenCalledWith([
+    expect(mockRepository.persistTrackedBehaviorBatch).toHaveBeenCalledWith([
       expect.objectContaining({
         customerId,
         anonymousId: `customer:${customerId}`,
@@ -76,18 +74,12 @@ describe('OrderPurchaseEventListener', () => {
     ]);
 
     // Deterministic UUID allows safe deduplication on duplicate order/payment events
-    const createdRow = mockRepository.createBehaviorEventsBatch.mock.calls[0][0][0];
+    const createdRow = mockRepository.persistTrackedBehaviorBatch.mock.calls[0][0][0];
     expect(createdRow.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
 
-    expect(mockRepository.incrementDailyAttributionMetrics).toHaveBeenCalledWith([
-      {
-        placement: RecommendationPlacement.PRODUCT_SIMILAR,
-        conversions: 1,
-        revenue: 350000,
-      },
-    ]);
+
   });
 
   it('records ADD_TO_CART server-side normalized to parent productId', async () => {
@@ -112,7 +104,7 @@ describe('OrderPurchaseEventListener', () => {
       attributionSource: 'rec_home',
     });
 
-    expect(mockRepository.createBehaviorEventsBatch).toHaveBeenCalledWith([
+    expect(mockRepository.persistTrackedBehaviorBatch).toHaveBeenCalledWith([
       expect.objectContaining({
         customerId,
         anonymousId: `customer:${customerId}`,

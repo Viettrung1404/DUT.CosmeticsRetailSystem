@@ -11,8 +11,10 @@ describe('BE-03: CommerceCheckoutService - Real Shipping Quotes Integration', ()
   let mockDb: any;
   let mockPricing: any;
   let mockCommands: any;
+  let availableStock = 10;
   let mockStores: any;
   let mockShippingQuoteService: any;
+  let mockOutbox: { createMany: jest.Mock };
 
   const validQuoteVersion = 'a'.repeat(64);
   const inputOrder = {
@@ -31,6 +33,8 @@ describe('BE-03: CommerceCheckoutService - Real Shipping Quotes Integration', ()
   };
 
   beforeEach(() => {
+    availableStock = 10;
+    mockOutbox = { createMany: jest.fn().mockResolvedValue({ count: 1 }) };
     mockDb = {
       customer: {
         findUniqueOrThrow: jest.fn().mockResolvedValue({ userId: 'user-123' }),
@@ -95,9 +99,11 @@ describe('BE-03: CommerceCheckoutService - Real Shipping Quotes Integration', ()
                 product_variant_id: 'variant-1',
                 quantity: 10,
                 reserved_quantity: 0,
+                available_quantity: availableStock,
               },
             ];
           }),
+          outboxEvent: mockOutbox,
           inventory: { update: jest.fn().mockResolvedValue({}) },
           order: {
             create: jest.fn().mockImplementation(({ data }) => ({
@@ -181,6 +187,10 @@ describe('BE-03: CommerceCheckoutService - Real Shipping Quotes Integration', ()
     });
 
     const result = await service.create(inputOrder as any);
+    expect(mockOutbox.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      skipDuplicates: true,
+      data: [expect.objectContaining({ eventType: 'RECOMMENDATION_PURCHASE', aggregateId: 'ord-123' })],
+    }));
 
     expect(mockShippingQuoteService.validateQuote).toHaveBeenCalledWith(
       'quote-group-uuid',
@@ -212,12 +222,33 @@ describe('BE-03: CommerceCheckoutService - Real Shipping Quotes Integration', ()
     }
   });
 
+  it.each([[15000, 7000], [5000, 0], [0, 0]])(
+    'applies shipping benefits (%i policy fee) to the carrier quote', async (policyFee, charged) => {
+      const quote = await mockPricing.quote();
+      mockPricing.quote.mockResolvedValue({ ...quote, shippingFee: policyFee });
+      mockShippingQuoteService.validateQuote.mockResolvedValue({
+        quoteGroupId: 'quote-group-uuid', quoteId: 'quote-opt-1', carrierCode: 'GHN',
+        serviceCode: 'GHN_STANDARD', estimatedFee: 22000,
+      });
+      const order = await service.create(inputOrder as any);
+      expect(order.shippingFee).toBe(charged);
+      expect(order.totalAmount).toBe(500000 + charged);
+    },
+  );
+
   it('3. should throw BadRequestException if quoteGroupId is provided without shippingOptionId', async () => {
     const invalidInput = { ...inputOrder, shippingOptionId: undefined };
 
     await expect(service.create(invalidInput as any)).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('rejects an order when sellable inventory is lower than physical minus reserved stock', async () => {
+    availableStock = 1;
+    await expect(service.create({ ...inputOrder, quoteGroupId: undefined, shippingOptionId: undefined } as any))
+      .rejects.toThrow('INSUFFICIENT_STOCK');
+    expect(mockOutbox.createMany).not.toHaveBeenCalled();
   });
 
   it('4. should fall back to default pricing shipping fee when quoteGroupId is omitted (backward compatibility)', async () => {

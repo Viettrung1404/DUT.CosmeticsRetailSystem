@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Expand,
-  Heart,
   Maximize2,
   Minimize2,
   Play,
@@ -466,12 +465,7 @@ export function ProductGallery({
             showText={true}
             className="pdp-favorite-count-btn"
           />
-        ) : (
-          <div className="pdp-gallery-liked-static">
-            <Heart size={18} fill="#e63946" stroke="#e63946" />
-            <span>Đã thích (1,2k)</span>
-          </div>
-        )}
+        ) : null}
       </div>
 
       {/* Lightbox Dialog */}

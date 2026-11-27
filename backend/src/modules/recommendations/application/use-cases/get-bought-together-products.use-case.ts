@@ -34,24 +34,28 @@ export class GetBoughtTogetherProductsUseCase {
     let candidates = await this.loadPrecomputed(cacheKey, input.productId);
     candidates = candidates.filter((c) => c.productId !== input.productId);
 
-    if (candidates.length < limit) {
-      const routineFallbacks = await this.loadRoutineFallbacks(
-        input.productId,
-        limit * 2,
-      );
+    let hydrated = await this.repository.filterAndHydrateEligibleProducts(
+      candidates,
+      RecommendationPlacement.PRODUCT_BOUGHT_TOGETHER,
+    );
+
+    if (hydrated.length < limit) {
+      const routineFallbacks = await this.loadRoutineFallbacks(input.productId);
       const seen = new Set(candidates.map((c) => c.productId));
+      const newCandidates: RankedCandidate[] = [];
       for (const fb of routineFallbacks) {
         if (fb.productId !== input.productId && !seen.has(fb.productId)) {
           seen.add(fb.productId);
-          candidates.push(fb);
+          newCandidates.push(fb);
         }
       }
+      const fallbackItems =
+        await this.repository.filterAndHydrateEligibleProducts(
+          newCandidates,
+          RecommendationPlacement.PRODUCT_BOUGHT_TOGETHER,
+        );
+      hydrated = [...hydrated, ...fallbackItems];
     }
-
-    const hydrated = await this.repository.filterAndHydrateEligibleProducts(
-      candidates.slice(0, limit * 2),
-      RecommendationPlacement.PRODUCT_BOUGHT_TOGETHER,
-    );
 
     return {
       placement: RecommendationPlacement.PRODUCT_BOUGHT_TOGETHER,
@@ -97,7 +101,6 @@ export class GetBoughtTogetherProductsUseCase {
 
   private async loadRoutineFallbacks(
     productId: string,
-    limit: number,
   ): Promise<RankedCandidate[]> {
     const subject = await this.repository.findProductRoutineSubject(productId);
     if (!subject) {
@@ -121,7 +124,6 @@ export class GetBoughtTogetherProductsUseCase {
           reason: rule.reason,
         });
       }
-      if (matched.length >= limit) break;
     }
 
     return matched;

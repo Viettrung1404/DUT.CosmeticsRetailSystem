@@ -15,11 +15,8 @@ export function maximumCheckoutPoints(
   const step = policy.step || 1;
   const value = policy.value || 1;
   const maxRatio = policy.maxRatio ?? 1;
-  return (
-    Math.floor(
-      Math.min(policy.balance, Math.floor((base * maxRatio) / value)) / step,
-    ) * step
-  );
+  if (Math.min(policy.balance * value, base * maxRatio) < policy.minimumBalance) return 0;
+  return Math.floor(Math.min(policy.balance, Math.floor((base * maxRatio) / value)) / step) * step;
 }
 
 export function CheckoutBenefits({
@@ -263,9 +260,7 @@ export function CheckoutBenefits({
                 </div>
               </>
             )}
-            <p>
-              Dùng xu tương đương tiền thật (1 xu = 1đ). Khấu trừ tối đa 100% tiền hàng.
-            </p>
+            <p>Dùng xu tương đương tiền thật (1 xu = 1đ). Khấu trừ tối đa 100% tiền hàng.</p>
           </>
         )}
         {loadError && (

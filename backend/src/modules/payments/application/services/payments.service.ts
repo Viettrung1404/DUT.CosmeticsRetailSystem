@@ -8,7 +8,7 @@ import { Prisma, Payment } from '@prisma/client';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { enqueueOrderEvent } from '@core/services/order-events';
-import { emitOrderPurchased } from '@core/services/recommendation-domain-events';
+import { emitOrderPurchased, enqueueRecommendationPurchase } from '@core/services/recommendation-domain-events';
 import {
   Gateway,
   ONLINE_METHODS,
@@ -437,6 +437,7 @@ export class PaymentsService {
         if (confirmed) {
           const trigger = o.gateway === 'SEPAY' ? 'PAYMENT_RECEIVED' : 'CONFIRMED';
           confirmedPurchaseTrigger = trigger;
+          await enqueueRecommendationPurchase(tx, { orderId: payment.orderId, trigger });
           await enqueueOrderEvent(tx, payment.orderId, trigger);
         }
         if (refund)

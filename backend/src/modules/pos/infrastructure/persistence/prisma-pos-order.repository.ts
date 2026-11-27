@@ -2,7 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { startOfVnToday } from '@core/utils/expiry-policy.util';
-import { emitOrderPurchased } from '@core/services/recommendation-domain-events';
+import { emitOrderPurchased, enqueueRecommendationPurchase } from '@core/services/recommendation-domain-events';
 import { allocateFefo, FefoAllocation } from '@modules/orders/application/utils/fefo.util';
 import {
   calculateCommission,
@@ -490,6 +490,7 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
       },
     });
 
+    await enqueueRecommendationPurchase(tx, { orderId: order.id, trigger: 'POS_COMPLETED' });
     return {
       orderId: order.id,
       orderNumber,

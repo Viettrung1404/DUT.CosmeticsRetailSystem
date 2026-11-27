@@ -125,6 +125,7 @@ async function main(){
     ];
     const priorPromotionCount=await tx.promotion.count({where:{id:{in:promotions.map(p=>p.id)}}});
     await insert('promotion',promotions);
+    await tx.promotion.updateMany({where:{id:demoId('promotion','flash')},data:{endDate:FLASH_SALE_END}});
     await insert('promotionVariantQuota',selection.slice(6,9).map(p=>({id:demoId('quota',p.variants[0].id),promotionId:demoId('promotion','flash'),productVariantId:p.variants[0].id,quota:25})));
     const coupons=[
       {code:'DEMO-WELCOME10',discountType:'PERCENTAGE',discountValue:10,minOrderAmount:150000,maxDiscountAmount:50000,maxUses:100,maxUsesPerCustomer:1},

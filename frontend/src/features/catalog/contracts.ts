@@ -14,6 +14,8 @@ const variant = z.object({
 });
 
 export const productSchema = z.object({
+  flashSaleEndDate: z.string().nullable().optional(),
+  serverTime: z.string().optional(),
   id: z.string(),
   categoryId: z.string(),
   brandId: z.string().nullable().optional(),

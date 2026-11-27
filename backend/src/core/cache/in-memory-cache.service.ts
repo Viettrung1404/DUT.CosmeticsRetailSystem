@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ICacheService } from './cache.service.interface';
 
 interface CacheEntry<T> {
@@ -7,6 +7,7 @@ interface CacheEntry<T> {
 }
 
 const DEFAULT_MAX_ENTRIES = 5000;
+export const IN_MEMORY_CACHE_MAX_ENTRIES = 'IN_MEMORY_CACHE_MAX_ENTRIES';
 
 @Injectable()
 export class InMemoryCacheService implements ICacheService, OnModuleDestroy {
@@ -14,7 +15,11 @@ export class InMemoryCacheService implements ICacheService, OnModuleDestroy {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly maxEntries: number;
 
-  constructor(maxEntries = DEFAULT_MAX_ENTRIES) {
+  constructor(
+    @Optional()
+    @Inject(IN_MEMORY_CACHE_MAX_ENTRIES)
+    maxEntries: number = DEFAULT_MAX_ENTRIES,
+  ) {
     this.maxEntries = Math.max(10, maxEntries);
     // Dọn dẹp các cache keys đã hết hạn mỗi 60 giây
     this.cleanupInterval = setInterval(() => this.pruneExpired(), 60_000);

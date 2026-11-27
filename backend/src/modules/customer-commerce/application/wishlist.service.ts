@@ -8,6 +8,7 @@ import {
   OpenSearchProductService,
 } from '@modules/products/infrastructure/search/opensearch-product.service';
 import { CustomerCommands, lockCustomer } from '../infrastructure/commands';
+import { PublicCatalogService } from '@modules/products/application/services/public-catalog.service';
 
 @Injectable()
 export class WishlistService {
@@ -15,6 +16,7 @@ export class WishlistService {
     private readonly prisma: PrismaService,
     private readonly commands: CustomerCommands,
     @Optional() private readonly searchService?: OpenSearchProductService,
+    @Optional() private readonly catalog?: PublicCatalogService,
   ) {}
   change(userId: string, key: string, productId: string, desired?: boolean) {
     return this.commands.execute(
@@ -64,6 +66,12 @@ export class WishlistService {
     const productIds = rows.map((r) => r.productId);
     if (productIds.length === 0) {
       return { items: [], page, limit, total };
+    }
+
+    if (this.catalog) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { userId: true } });
+      const products = await this.catalog.byIds(productIds, customer?.userId ?? undefined);
+      return { items: products.map(product => ({ ...product, isWishlisted: true })), page, limit, total };
     }
 
     // 1. Try OpenSearch Multi-Get (mget) first for ultra-fast response

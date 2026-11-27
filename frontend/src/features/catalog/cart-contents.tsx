@@ -38,7 +38,10 @@ export function CartContents({
       .filter((item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded)
       .map((item) => ({ variantId: item.productVariantId, quantity: item.quantity })) ?? [];
   const quote = useQuery({
-    queryKey: ["cart-quote", selection],
+    queryKey: ["cart-quote", selection, data?.selectedSubtotal],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     enabled: !compact && selection.length > 0,
     queryFn: ({ signal }) =>
       requestBff("/api/checkout/preview", previewSchema, {
@@ -219,9 +222,32 @@ export function CartContents({
                     }
                   />
                 )}
-                <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                {item.productSlug ? (
+                  <Link
+                    href={`/products/${encodeURIComponent(item.productSlug)}`}
+                    className="cart-item-image"
+                    onClick={onNavigate}
+                  >
+                    <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                  </Link>
+                ) : (
+                  <span className="cart-item-image">
+                    <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                  </span>
+                )}
                 <div className="cart-item-copy">
-                  <h2>{item.productName || "Sản phẩm GlowUp"}</h2>
+                  <h2>
+                    {item.productSlug ? (
+                      <Link
+                        href={`/products/${encodeURIComponent(item.productSlug)}`}
+                        onClick={onNavigate}
+                      >
+                        {item.productName || "Sản phẩm GlowUp"}
+                      </Link>
+                    ) : (
+                      item.productName || "Sản phẩm GlowUp"
+                    )}
+                  </h2>
                   <p>{item.variantName}</p>
                   {compact && (
                     <label className="cart-select">
@@ -362,7 +388,7 @@ export function CartContents({
                 <ShoppingCart size={18} /> Không thể thanh toán chung
               </button>
             ) : eligible.length > 0 &&
-            eligible.length === data.items.filter((item) => item.isSelected).length ? (
+              eligible.length === data.items.filter((item) => item.isSelected).length ? (
               <Link href="/checkout" className="button" onClick={onNavigate}>
                 <ShoppingCart size={18} /> Tiến hành thanh toán ({eligible.length})
               </Link>

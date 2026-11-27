@@ -27,7 +27,6 @@ import { GetProductVariantsUseCase } from './application/use-cases/get-product-v
 import { CreateProductVariantUseCase } from './application/use-cases/create-product-variant.use-case';
 import { UpdateProductVariantUseCase } from './application/use-cases/update-product-variant.use-case';
 import { DeleteProductVariantUseCase } from './application/use-cases/delete-product-variant.use-case';
-import { UpdateVariantTryOnColorUseCase } from './application/use-cases/update-variant-try-on-color.use-case';
 import { PRODUCT_VARIANT_REPOSITORY } from './domain/repositories/product-variant.repository.interface';
 import { PrismaProductVariantRepository } from './infrastructure/persistence/prisma-product-variant.repository';
 import { PRODUCT_REPOSITORY } from './domain/repositories/product.repository.interface';
@@ -65,7 +64,6 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     CreateProductVariantUseCase,
     UpdateProductVariantUseCase,
     DeleteProductVariantUseCase,
-    UpdateVariantTryOnColorUseCase,
     ImportProductsUseCase,
     ListProductTagsUseCase,
 
@@ -90,6 +88,7 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     { provide: PRODUCT_TAG_REPOSITORY, useClass: PrismaProductTagRepository },
   ],
   exports: [
+    PublicCatalogService,
     PRODUCT_REPOSITORY,
     GetProductsUseCase,
     GetProductDetailUseCase,

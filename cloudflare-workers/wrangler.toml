@@ -6,7 +6,7 @@ compatibility_date = "2024-11-12"
 ENVIRONMENT = "production"
 GHN_WEBHOOK_SECRET = "ghn-webhook-secret-prod"
 AHAMOVE_WEBHOOK_SECRET = "ahamove-webhook-secret-prod"
-NESTJS_INTERNAL_URL = "https://api.glowup.vn"
+NESTJS_INTERNAL_URL = "https://senseless-marcia-benefic.ngrok-free.dev"
 INTERNAL_DISPATCH_SECRET = "glowup-internal-auth-secret-key"
 
 # Queue Producer Binding (EP09-T02)

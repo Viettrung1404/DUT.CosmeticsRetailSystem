@@ -3,13 +3,8 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
-  Optional,
 } from '@nestjs/common';
-import {
-  BehaviorEventType,
-  Prisma,
-  RecommendationPlacement,
-} from '@prisma/client';
+import { BehaviorEventType, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import {
   CartItemAddedEventPayload,
@@ -18,18 +13,7 @@ import {
   recommendationDomainEvents,
 } from '@core/services/recommendation-domain-events';
 import { BehaviorWeightPolicy } from '../../domain/behavior-weight.policy';
-import {
-  DailyAttributionIncrement,
-  RecommendationRepository,
-} from '../../infrastructure/recommendation.repository';
-import { RecommendationMetricsService } from '../services/recommendation-metrics.service';
-
-const ATTRIBUTION_TO_PLACEMENT: Record<string, RecommendationPlacement> = {
-  rec_home: RecommendationPlacement.HOME,
-  rec_similar: RecommendationPlacement.PRODUCT_SIMILAR,
-  rec_bought_together: RecommendationPlacement.PRODUCT_BOUGHT_TOGETHER,
-  rec_cart: RecommendationPlacement.CART_ROUTINE,
-};
+import { RecommendationRepository } from '../../infrastructure/recommendation.repository';
 
 function deterministicUuid(seed: string): string {
   const bytes = createHash('sha256').update(seed).digest();
@@ -56,6 +40,10 @@ export class OrderPurchaseEventListener
     });
   };
 
+  private readonly onDurablePurchaseHandler = (
+    payload: OrderPurchasedEventPayload,
+  ) => this.handleOrderPurchased(payload);
+
   private readonly onCartItemAddedHandler = (
     payload: CartItemAddedEventPayload,
   ) => {
@@ -66,12 +54,13 @@ export class OrderPurchaseEventListener
     });
   };
 
-  constructor(
-    private readonly repository: RecommendationRepository,
-    @Optional() private readonly metricsService?: RecommendationMetricsService,
-  ) {}
+  constructor(private readonly repository: RecommendationRepository) {}
 
   onModuleInit(): void {
+    recommendationDomainEvents.on(
+      RECOMMENDATION_EVENTS.PROCESS_PURCHASE,
+      this.onDurablePurchaseHandler,
+    );
     recommendationDomainEvents.on(
       RECOMMENDATION_EVENTS.ORDER_PURCHASED,
       this.onOrderPurchasedHandler,
@@ -84,6 +73,10 @@ export class OrderPurchaseEventListener
 
   onModuleDestroy(): void {
     recommendationDomainEvents.off(
+      RECOMMENDATION_EVENTS.PROCESS_PURCHASE,
+      this.onDurablePurchaseHandler,
+    );
+    recommendationDomainEvents.off(
       RECOMMENDATION_EVENTS.ORDER_PURCHASED,
       this.onOrderPurchasedHandler,
     );
@@ -93,7 +86,9 @@ export class OrderPurchaseEventListener
     );
   }
 
-  async handleOrderPurchased(payload: OrderPurchasedEventPayload): Promise<void> {
+  async handleOrderPurchased(
+    payload: OrderPurchasedEventPayload,
+  ): Promise<void> {
     const order = await this.repository.findOrderForBehaviorTracking(
       payload.orderId,
     );
@@ -106,7 +101,6 @@ export class OrderPurchaseEventListener
       : `order:${order.id}`;
 
     const rows: Prisma.UserBehaviorEventCreateManyInput[] = [];
-    const attributionMetrics: DailyAttributionIncrement[] = [];
 
     for (const item of order.items) {
       const productId = item.variant?.productId ?? null;
@@ -132,32 +126,9 @@ export class OrderPurchaseEventListener
           totalPrice: Number(item.totalPrice),
         },
       });
-
-      const placement = item.attributionSource
-        ? ATTRIBUTION_TO_PLACEMENT[item.attributionSource]
-        : undefined;
-      if (placement) {
-        attributionMetrics.push({
-          placement,
-          conversions: 1,
-          revenue: Number(item.totalPrice),
-        });
-      }
     }
 
-    let insertedCount = rows.length;
-    if (rows.length > 0) {
-      const result = await this.repository.createBehaviorEventsBatch(rows);
-      if (typeof result?.count === 'number') {
-        insertedCount = result.count;
-      }
-    }
-
-    if (insertedCount > 0 && attributionMetrics.length > 0) {
-      await this.repository.incrementDailyAttributionMetrics(
-        attributionMetrics,
-      );
-    }
+    await this.repository.persistTrackedBehaviorBatch(rows);
   }
 
   async handleCartItemAdded(payload: CartItemAddedEventPayload): Promise<void> {
@@ -174,7 +145,7 @@ export class OrderPurchaseEventListener
         ? `customer:${payload.customerId}`
         : `variant:${payload.productVariantId}`;
 
-    await this.repository.createBehaviorEventsBatch([
+    await this.repository.persistTrackedBehaviorBatch([
       {
         customerId: payload.customerId ?? null,
         anonymousId,
@@ -193,7 +164,5 @@ export class OrderPurchaseEventListener
         },
       },
     ]);
-
-    this.metricsService?.recordAddToCart(payload.attributionSource);
   }
 }

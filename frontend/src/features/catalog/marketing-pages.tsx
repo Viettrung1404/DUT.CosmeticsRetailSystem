@@ -108,7 +108,7 @@ export async function PromotionsScreen({ page }: { page: number }) {
                   <span>{campaign.isFlashSale ? "FLASH SALE" : "ĐANG DIỄN RA"}</span>
                   <div>
                     <h2>{campaign.name}</h2>
-                    {campaign.type === "PERCENTAGE" && <strong>{campaign.value}%</strong>}
+                    {campaign.slotStartHour != null ? <strong>Giá riêng từng biến thể</strong> : campaign.type === "PERCENTAGE" && <strong>{campaign.value}%</strong>}
                   </div>
                 </Link>
                 <div className="campaign-copy">
@@ -278,6 +278,10 @@ export async function FlashSaleScreen() {
                 <br />
                 GIÁ SỐC GIỜ VÀNG
               </h1>
+              {first?.campaignStartDate && first?.campaignEndDate && <p>
+                Chiến dịch {new Date(first.campaignStartDate).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} đến {new Date(Date.parse(first.campaignEndDate) - 1).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}.
+                Mỗi khung 2 giờ có 20 sản phẩm nổi bật. Tất cả sản phẩm khác vẫn có giá sale.
+              </p>}
               <p>
                 Săn ưu đãi cho những sản phẩm yêu thích. Số lượt ưu đãi và giá được xác nhận tại
                 bước thanh toán.

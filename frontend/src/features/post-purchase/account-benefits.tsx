@@ -65,6 +65,9 @@ export function WishlistPage() {
   const [error, setError] = useState("");
   const query = useQuery({
     queryKey: ["wishlist", page],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: ({ signal }) => readBff(`/api/wishlist?page=${page}`, wishlistSchema, signal),
   });
   const idsQuery = useQuery(wishlistIdsQuery());
@@ -96,9 +99,7 @@ export function WishlistPage() {
       <AccountHeading
         title="Sản phẩm yêu thích"
         description="Lưu giữ những sản phẩm bạn yêu thích và chọn mua khi sẵn sàng."
-        actions={
-          query.data ? <span className="order-status">{total} sản phẩm</span> : undefined
-        }
+        actions={query.data ? <span className="order-status">{total} sản phẩm</span> : undefined}
       />
       {query.isPending ? (
         <ContentLoading variant="cards" label="Đang tải sản phẩm yêu thích…" heading={false} />

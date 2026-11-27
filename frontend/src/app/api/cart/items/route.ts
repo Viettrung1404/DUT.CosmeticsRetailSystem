@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 const inputSchema = z
   .object({
     productVariantId: z.uuid(),
-    quantity: z.number().int().min(1).max(100),
+    quantity: z.number().int().min(1).max(99),
     attributionSource: z.string().trim().max(60).optional(),
   })
   .strict();

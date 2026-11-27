@@ -11,6 +11,10 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
+  processDurableRecommendationPurchase,
+  RECOMMENDATION_PURCHASE_OUTBOX_TYPE,
+} from '@core/services/recommendation-domain-events';
+import {
   ICloudflareQueueClient,
   CLOUDFLARE_QUEUE_CLIENT,
   QueueMessage,
@@ -329,6 +333,11 @@ export class OutboxRelayScheduler implements OnModuleInit, OnModuleDestroy {
       };
 
       try {
+        if (row.event_type === RECOMMENDATION_PURCHASE_OUTBOX_TYPE) {
+          await processDurableRecommendationPurchase(row.payload);
+          dispatchResults.push({ row, success: true });
+          continue;
+        }
         const sendResult = await this.queueClient.sendMessage(message);
         dispatchResults.push({
           row,

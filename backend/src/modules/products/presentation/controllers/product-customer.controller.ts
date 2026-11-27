@@ -193,14 +193,6 @@ export class ProductCustomerController {
   }
 
   @Public()
-  @Get(':id/try-on')
-  @ApiOperation({ summary: 'Mã màu son đã được duyệt cho thử màu camera, có thể null nếu chưa cấu hình' })
-  async tryOnColors(@Param('id', ParseUUIDPipe) id: string) {
-    if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
-    return this.catalog.tryOnColors(id);
-  }
-
-  @Public()
   @Get(':id/availability')
   @ApiOperation({ summary: 'Số lượng khả dụng theo cửa hàng cho một biến thể' })
   async availability(@Param('id', ParseUUIDPipe) id: string, @Query('variantId', ParseUUIDPipe) variantId: string) {

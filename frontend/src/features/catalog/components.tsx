@@ -45,10 +45,10 @@ export function CatalogImage({
 }
 export function ProductCard({ product }: { product: Product }) {
   const price = product.effectivePrice ?? product.salePrice ?? product.basePrice;
-  const originalPrice =
-    product.variants && product.variants.length > 0
-      ? Math.max(...product.variants.map((v) => Number(v.price) || 0), product.basePrice)
-      : product.basePrice;
+  const pricedVariant = product.variants.find(
+    (variant) => variant.isActive !== false && (variant.effectivePrice ?? variant.price) === price,
+  );
+  const originalPrice = pricedVariant?.price ?? product.basePrice;
   const hasDiscount = originalPrice > price;
   return (
     <article className="catalog-card">
@@ -78,7 +78,13 @@ export function ProductCard({ product }: { product: Product }) {
           ★ <span>{product.avgRating.toFixed(1)}</span>
           <small>({product.totalReviews})</small>
           {typeof product.totalSold === "number" && product.totalSold > 0 && (
-            <span className="catalog-sold"> · Đã bán {product.totalSold >= 1000 ? `${(product.totalSold / 1000).toFixed(1)}k` : product.totalSold}</span>
+            <span className="catalog-sold">
+              {" "}
+              · Đã bán{" "}
+              {product.totalSold >= 1000
+                ? `${(product.totalSold / 1000).toFixed(1)}k`
+                : product.totalSold}
+            </span>
           )}
         </div>
         <div className="catalog-prices">
@@ -107,6 +113,11 @@ export function FlashGrid({ cards }: { cards: FlashCard[] }) {
         <article className="catalog-card" key={`${card.promotionId}-${card.variantId}`}>
           <Link href={`/products/${card.slug}`} className="catalog-card-image">
             <CatalogImage src={card.imageUrl} alt={card.name} />
+            {card.originalPrice > card.effectivePrice && (
+              <span className="catalog-discount">
+                -{Math.round((1 - card.effectivePrice / card.originalPrice) * 100)}%
+              </span>
+            )}
           </Link>
           <FavoriteButton
             productId={card.productId}
@@ -125,7 +136,7 @@ export function FlashGrid({ cards }: { cards: FlashCard[] }) {
                 <del>{formatPrice(card.originalPrice)}</del>
               )}
             </p>
-            <small>Còn {card.remaining} sản phẩm</small>
+            <small>Còn {card.stockQuantity.toLocaleString("vi-VN")} sản phẩm</small>
             {card.conditional && (
               <p className="hint">Giá ưu đãi có điều kiện; xác nhận tại checkout.</p>
             )}

@@ -12,7 +12,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Banknote,
-  Check,
   Clock,
   CreditCard,
   Gift,
@@ -41,7 +40,8 @@ import { paymentMethodsSchema } from "./payment-methods";
 import { CheckoutAddress } from "./checkout-address";
 import { CheckoutBenefits, maximumCheckoutPoints } from "./checkout-benefits";
 import { blankDeliveryAddress } from "@/features/addresses/address-fields";
-import { isCurrentAddress } from "@/features/addresses/vietnam-divisions";
+import { PriceReview, type CheckoutQuote } from "./price-review";
+import { shippingFeeAfterBenefits } from "./shipping-benefit";
 
 type Address = z.infer<typeof shippingSchema>;
 const blank: Address = blankDeliveryAddress;
@@ -114,7 +114,9 @@ export function CheckoutPage() {
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
       try {
-        return (await readBff("/api/auth/session", z.object({ user: userSchema.nullable() }), signal)).user;
+        return (
+          await readBff("/api/auth/session", z.object({ user: userSchema.nullable() }), signal)
+        ).user;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;
@@ -124,6 +126,8 @@ export function CheckoutPage() {
   const cart = useQuery({
     enabled: !isBuyNow,
     queryKey: ["cart"],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: ({ signal }) => readBff("/api/cart/items", cartSchema, signal),
   });
   const addresses = useQuery({
@@ -154,10 +158,16 @@ export function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [priceReview, setPriceReview] = useState<{
+    quote: CheckoutQuote;
+    shippingFee: number;
+  } | null>(null);
   const previewSerial = useRef(0);
 
   // Real-time shipping quotes states
-  const [shippingQuotes, setShippingQuotes] = useState<z.infer<typeof shippingQuoteResponseSchema> | null>(null);
+  const [shippingQuotes, setShippingQuotes] = useState<z.infer<
+    typeof shippingQuoteResponseSchema
+  > | null>(null);
   const [selectedShippingOptionId, setSelectedShippingOptionId] = useState<string>("");
   const [shippingQuotesLoading, setShippingQuotesLoading] = useState(false);
   const [shippingQuotesError, setShippingQuotesError] = useState("");
@@ -236,21 +246,25 @@ export function CheckoutPage() {
     setShippingQuotesError("");
     setQuoteExpired(false);
     try {
-      const quotes = await requestBff("/api/checkout/shipping-quotes", shippingQuoteResponseSchema, {
-        method: "POST",
-        body: {
-          items,
-          shippingAddress: {
-            provinceCity: address.city,
-            district: effectiveDistrict,
-            ward: address.ward || undefined,
-            addressLine: address.addressLine || undefined,
-            latitude: address.latitude ?? undefined,
-            longitude: address.longitude ?? undefined,
+      const quotes = await requestBff(
+        "/api/checkout/shipping-quotes",
+        shippingQuoteResponseSchema,
+        {
+          method: "POST",
+          body: {
+            items,
+            shippingAddress: {
+              provinceCity: address.city,
+              district: effectiveDistrict,
+              ward: address.ward || undefined,
+              addressLine: address.addressLine || undefined,
+              latitude: address.latitude ?? undefined,
+              longitude: address.longitude ?? undefined,
+            },
           },
+          signal: controller.signal,
         },
-        signal: controller.signal,
-      });
+      );
       if (controller.signal.aborted) return;
       setShippingQuotes(quotes);
       const available = quotes.options.filter((o) => o.isAvailable);
@@ -262,7 +276,7 @@ export function CheckoutPage() {
         if (prev && available.some((o) => (o.id || o.serviceCode) === prev)) {
           return prev;
         }
-        return defaultOption ? (defaultOption.id || defaultOption.serviceCode) : "";
+        return defaultOption ? defaultOption.id || defaultOption.serviceCode : "";
       });
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -273,7 +287,18 @@ export function CheckoutPage() {
         setShippingQuotesLoading(false);
       }
     }
-  }, [hasShippingAddress, itemsKey, address.city, effectiveDistrict, address.ward, address.addressLine, address.latitude, address.longitude]);
+  }, [
+    hasShippingAddress,
+    items,
+    setSelectedShippingOptionId,
+    setQuoteExpired,
+    address.city,
+    effectiveDistrict,
+    address.ward,
+    address.addressLine,
+    address.latitude,
+    address.longitude,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -285,15 +310,10 @@ export function CheckoutPage() {
   const selectedShippingOption = useMemo(() => {
     if (!shippingQuotes) return null;
     return (
-      shippingQuotes.options.find(
-        (o) => (o.id || o.serviceCode) === selectedShippingOptionId,
-      ) ?? null
+      shippingQuotes.options.find((o) => (o.id || o.serviceCode) === selectedShippingOptionId) ??
+      null
     );
   }, [shippingQuotes, selectedShippingOptionId]);
-
-  const effectiveShippingFee = selectedShippingOption
-    ? selectedShippingOption.estimatedFee
-    : (quoteState?.value?.shippingFee ?? 0);
 
   const selectionKey = JSON.stringify({ items, couponCode: effectiveCoupon });
   const matchingQuote = quoteState?.selectionKey === selectionKey ? quoteState.value : null;
@@ -307,6 +327,16 @@ export function CheckoutPage() {
     previewRetry,
   });
   const quote = quoteState?.key === previewKey ? quoteState.value : null;
+
+  const effectiveShippingFee = selectedShippingOption
+    ? quote
+      ? shippingFeeAfterBenefits(
+          selectedShippingOption.estimatedFee,
+          quote.shippingFee,
+          quote.shippingPolicy?.fee,
+        )
+      : selectedShippingOption.estimatedFee
+    : (quote?.shippingFee ?? 0);
 
   const effectiveTotalAmount = quote
     ? Math.max(0, quote.totalAmount - (quote.shippingFee ?? 0) + effectiveShippingFee)
@@ -332,13 +362,33 @@ export function CheckoutPage() {
         if (serial === previewSerial.current)
           setQuote({ key: previewKey, selectionKey, value: result });
       } catch (e) {
-        if (serial === previewSerial.current) setError(apiErrorMessage(e));
+        if (serial === previewSerial.current) {
+          setQuote(null);
+          if (e instanceof ApiError && e.code.startsWith("COUPON_") && effectiveCoupon) {
+            setCouponCode("");
+            setUsePoints(0);
+            setError("Voucher không còn áp dụng được. Đã bỏ voucher để tính lại báo giá.");
+          } else if (e instanceof ApiError && e.code === "INSUFFICIENT_POINTS" && effectivePoints) {
+            setUsePoints(0);
+            void client.invalidateQueries({ queryKey: ["checkout-benefits"] });
+            setError("Số xu có thể dùng đã thay đổi. Vui lòng kiểm tra lại ưu đãi.");
+          } else setError(apiErrorMessage(e));
+        }
       } finally {
         if (serial === previewSerial.current) setQuoteBusy(false);
       }
     }, 150);
     return () => window.clearTimeout(timer);
-  }, [itemsKey, invalidSelection, effectiveCoupon, effectivePoints, previewKey, selectionKey]);
+  }, [
+    items,
+    itemsKey,
+    invalidSelection,
+    effectiveCoupon,
+    effectivePoints,
+    previewKey,
+    selectionKey,
+    client,
+  ]);
   async function applyCoupon(code: string) {
     setCouponBusy(true);
     try {
@@ -353,7 +403,7 @@ export function CheckoutPage() {
     }
   }
   async function submit() {
-    if (!quote || quoteBusy || busy || couponBusy) return;
+    if (!quote || quoteBusy || busy || couponBusy || priceReview) return;
     if (method === "SEPAY" && !sepayAvailable) {
       setError("SePay hiện chưa khả dụng. Vui lòng chọn thanh toán khi nhận hàng.");
       return;
@@ -363,12 +413,10 @@ export function CheckoutPage() {
       shipping.success &&
       (!session.data || selectedAddress) &&
       address.city &&
-      (address.district || address.ward || address.addressLine)
+      (address.district || address.ward || address.addressLine),
     );
     if (!shipping.success || !hasValidAddress) {
-      setError(
-        "Vui lòng kiểm tra tên, số điện thoại và địa chỉ giao hàng trước khi đặt hàng.",
-      );
+      setError("Vui lòng kiểm tra tên, số điện thoại và địa chỉ giao hàng trước khi đặt hàng.");
       return;
     }
     const payload = createOrderInputSchema.safeParse({
@@ -384,7 +432,7 @@ export function CheckoutPage() {
       idempotencyKey: crypto.randomUUID(),
       quoteGroupId: shippingQuotes?.quoteGroupId,
       shippingOptionId: selectedShippingOption
-        ? (selectedShippingOption.id || selectedShippingOption.serviceCode)
+        ? selectedShippingOption.id || selectedShippingOption.serviceCode
         : undefined,
     });
     if (!payload.success) {
@@ -455,7 +503,24 @@ export function CheckoutPage() {
       sessionStorage.removeItem(commandStorage);
       router.push(`/payment/return?paymentId=${payment.paymentId}`);
     } catch (e) {
-      if (
+      if (createdOrderId) {
+        setError(
+          "Đơn đã được tạo nhưng chưa mở được SePay. Hãy xem trạng thái đơn để tiếp tục thanh toán.",
+        );
+      } else if (
+        e instanceof ApiError &&
+        (e.code === "ORDER_PRICE_CHANGED" ||
+          e.code === "FLASH_SALE_EXHAUSTED" ||
+          e.code === "PROMOTION_EXHAUSTED" ||
+          e.code.startsWith("COUPON_") ||
+          e.code === "INSUFFICIENT_POINTS")
+      ) {
+        setPriceReview({ quote, shippingFee: effectiveShippingFee });
+        setQuote(null);
+        setPreviewRetry((value) => value + 1);
+        if (!isBuyNow) void cart.refetch();
+        void benefits.refetch();
+      } else if (
         e instanceof ApiError &&
         (e.status === 422 ||
           e.code === "SHIPPING_QUOTE_EXPIRED" ||
@@ -463,19 +528,21 @@ export function CheckoutPage() {
           e.message?.includes("hết hạn"))
       ) {
         setQuoteExpired(true);
-        setError("Báo giá vận chuyển đã hết hạn. Vui lòng bấm 'Làm mới báo giá' để cập nhật cước phí mới nhất.");
+        setError(
+          "Báo giá vận chuyển đã hết hạn. Vui lòng bấm 'Làm mới báo giá' để cập nhật cước phí mới nhất.",
+        );
       } else if (e instanceof ApiError && e.status === 409) {
         setQuote(null);
         if (!isBuyNow) cart.refetch();
         setPreviewRetry((value) => value + 1);
-        setError("Giá hoặc tồn kho đã thay đổi. Vui lòng xem lại báo giá trước khi đặt hàng.");
+        setError(
+          ["INSUFFICIENT_STOCK", "STOCK_LIMIT_EXCEEDED"].includes(e.code)
+            ? apiErrorMessage(e)
+            : "Giá hoặc tồn kho đã thay đổi. Vui lòng xem lại báo giá trước khi đặt hàng.",
+        );
       } else if (e instanceof ApiError && e.status >= 500 && !createdOrderId) {
         setError(
           "Chưa rõ đơn hàng đã được tạo hay chưa. Bạn có thể thử lại với cùng mã thao tác hoặc kiểm tra đơn hàng của tôi.",
-        );
-      } else if (createdOrderId) {
-        setError(
-          "Đơn đã được tạo nhưng chưa mở được SePay. Hãy xem trạng thái đơn để tiếp tục thanh toán.",
         );
       } else setError(apiErrorMessage(e));
     } finally {
@@ -508,8 +575,8 @@ export function CheckoutPage() {
           </div>
           <h1>Chưa có sản phẩm nào được chọn để thanh toán</h1>
           <p>
-            Giỏ hàng của bạn đang trống hoặc các sản phẩm chưa được chọn mua.
-            Vui lòng kiểm tra lại giỏ hàng hoặc tiếp tục khám phá các bộ sưu tập mỹ phẩm chính hãng tại GlowUp.
+            Giỏ hàng của bạn đang trống hoặc các sản phẩm chưa được chọn mua. Vui lòng kiểm tra lại
+            giỏ hàng hoặc tiếp tục khám phá các bộ sưu tập mỹ phẩm chính hãng tại GlowUp.
           </p>
           <div className="checkout-empty-actions">
             <Link href="/cart" className="button checkout-empty-cart-btn">
@@ -570,7 +637,8 @@ export function CheckoutPage() {
 
             {shippingQuotesLoading && (
               <p role="status" className="checkout-quote-updating">
-                <Clock size={16} style={{ display: "inline", marginRight: 6 }} /> Đang tính toán phí vận chuyển thực tế…
+                <Clock size={16} style={{ display: "inline", marginRight: 6 }} /> Đang tính toán phí
+                vận chuyển thực tế…
               </p>
             )}
 
@@ -589,29 +657,46 @@ export function CheckoutPage() {
 
             {!hasShippingAddress && (
               <p className="checkout-shipping-note">
-                Vui lòng chọn hoặc nhập đầy đủ địa chỉ giao hàng (Tỉnh/Thành, Quận/Huyện) để kiểm tra các phương thức vận chuyển khả dụng.
+                Vui lòng chọn hoặc nhập đầy đủ địa chỉ giao hàng (Tỉnh/Thành, Quận/Huyện) để kiểm
+                tra các phương thức vận chuyển khả dụng.
               </p>
             )}
 
             {quoteExpired && (
               <div className="checkout-shipping-expired-alert" role="alert">
-                <p>Báo giá vận chuyển đã hết hạn (sau 15 phút). Vui lòng cập nhật lại báo giá để tiếp tục đặt hàng.</p>
+                <p>
+                  Báo giá vận chuyển đã hết hạn (sau 15 phút). Vui lòng cập nhật lại báo giá để tiếp
+                  tục đặt hàng.
+                </p>
                 <button
                   type="button"
                   className="button secondary checkout-shipping-refresh-btn"
                   onClick={() => void fetchShippingQuotes()}
                 >
-                  <RefreshCw size={14} style={{ display: "inline", marginRight: 6 }} /> Làm mới báo giá
+                  <RefreshCw size={14} style={{ display: "inline", marginRight: 6 }} /> Làm mới báo
+                  giá
                 </button>
               </div>
             )}
 
             {shippingQuotes && shippingQuotes.options.length > 0 && (
-              <div className="checkout-shipping-options" role="radiogroup" aria-label="Phương thức vận chuyển">
+              <div
+                className="checkout-shipping-options"
+                role="radiogroup"
+                aria-label="Phương thức vận chuyển"
+              >
                 {shippingQuotes.options.map((option) => {
+                  const payableFee = quote
+                    ? shippingFeeAfterBenefits(
+                        option.estimatedFee,
+                        quote.shippingFee,
+                        quote.shippingPolicy?.fee,
+                      )
+                    : option.estimatedFee;
                   const optionKey = option.id || option.serviceCode;
                   const isSelected = selectedShippingOptionId === optionKey;
-                  const isExpress = option.serviceCode === "EXPRESS_2H" || option.carrierCode === "AHAMOVE";
+                  const isExpress =
+                    option.serviceCode === "EXPRESS_2H" || option.carrierCode === "AHAMOVE";
                   return (
                     <label
                       key={optionKey}
@@ -635,12 +720,19 @@ export function CheckoutPage() {
                       </span>
                       <div className="checkout-shipping-info">
                         <div className="checkout-shipping-heading">
-                          <strong>{option.serviceName || (isExpress ? "Giao hỏa tốc 2H" : "Giao hàng tiêu chuẩn")}</strong>
-                          <span className={`checkout-shipping-badge ${isExpress ? "is-express" : "is-standard"}`}>
+                          <strong>
+                            {option.serviceName ||
+                              (isExpress ? "Giao hỏa tốc 2H" : "Giao hàng tiêu chuẩn")}
+                          </strong>
+                          <span
+                            className={`checkout-shipping-badge ${isExpress ? "is-express" : "is-standard"}`}
+                          >
                             {option.carrierCode === "AHAMOVE" ? "Ahamove 2H" : "GHN Standard"}
                           </span>
                           {!option.isAvailable && (
-                            <span className="checkout-shipping-badge is-unavailable">Không khả dụng</span>
+                            <span className="checkout-shipping-badge is-unavailable">
+                              Không khả dụng
+                            </span>
                           )}
                         </div>
                         <p className="checkout-shipping-sub">
@@ -654,8 +746,10 @@ export function CheckoutPage() {
                           </p>
                         )}
                       </div>
-                      <strong className={`checkout-shipping-fee ${option.estimatedFee === 0 ? "is-free" : ""}`}>
-                        {option.estimatedFee === 0 ? "Miễn phí" : formatPrice(option.estimatedFee)}
+                      <strong
+                        className={`checkout-shipping-fee ${payableFee === 0 ? "is-free" : ""}`}
+                      >
+                        {payableFee === 0 ? "Miễn phí" : formatPrice(payableFee)}
                       </strong>
                     </label>
                   );
@@ -776,13 +870,23 @@ export function CheckoutPage() {
           <div className="checkout-product-list">
             {isBuyNow && buyNowItem ? (
               <article className="checkout-product" key={buyNowItem.variantId}>
-                <CatalogImage src={buyNowItem.imageUrl} alt={buyNowItem.productName || "Sản phẩm"} />
+                <CatalogImage
+                  src={buyNowItem.imageUrl}
+                  alt={buyNowItem.productName || "Sản phẩm"}
+                />
                 <div>
                   <strong>{buyNowItem.productName}</strong>
                   <small>
                     {buyNowItem.variantName} · SL: {buyNowItem.quantity}
                   </small>
-                  <span>{formatPrice(buyNowItem.price * buyNowItem.quantity)}</span>
+                  <span>
+                    {quote
+                      ? formatPrice(
+                          quote.items.find((line) => line.productVariantId === buyNowItem.variantId)
+                            ?.totalPrice ?? 0,
+                        )
+                      : "Đang cập nhật giá…"}
+                  </span>
                 </div>
               </article>
             ) : (
@@ -796,7 +900,15 @@ export function CheckoutPage() {
                       <small>
                         {item.variantName} · SL: {item.quantity}
                       </small>
-                      <span>{formatPrice(item.totalPrice)}</span>
+                      <span>
+                        {quote
+                          ? formatPrice(
+                              quote.items.find(
+                                (line) => line.productVariantId === item.productVariantId,
+                              )?.totalPrice ?? 0,
+                            )
+                          : "Đang cập nhật giá…"}
+                      </span>
                     </div>
                   </article>
                 ))
@@ -869,13 +981,16 @@ export function CheckoutPage() {
                 : address.recipientName?.trim() &&
                     address.phone?.trim() &&
                     address.city?.trim() &&
-                    (address.ward?.trim() || address.district?.trim() || address.addressLine?.trim()),
+                    (address.ward?.trim() ||
+                      address.district?.trim() ||
+                      address.addressLine?.trim()),
             );
             const isButtonDisabled =
               !quote ||
               quoteBusy ||
               couponBusy ||
               busy ||
+              !!priceReview ||
               shippingQuotesLoading ||
               quoteExpired ||
               !!orderId ||
@@ -903,7 +1018,10 @@ export function CheckoutPage() {
                   <ArrowRight size={18} />
                 </button>
                 {!isAddressValid && (
-                  <p className="cart-warning" style={{ margin: "8px 0 0", fontSize: "0.85rem", textAlign: "center" }}>
+                  <p
+                    className="cart-warning"
+                    style={{ margin: "8px 0 0", fontSize: "0.85rem", textAlign: "center" }}
+                  >
                     {session.data
                       ? "Vui lòng chọn hoặc thêm địa chỉ nhận hàng để tiếp tục đặt hàng."
                       : "Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ nhận hàng."}
@@ -911,14 +1029,17 @@ export function CheckoutPage() {
                 )}
                 {quoteExpired && (
                   <div className="checkout-error-panel" role="alert" style={{ marginTop: 8 }}>
-                    <p className="cart-warning">Báo giá vận chuyển đã hết hạn. Vui lòng làm mới để tiếp tục.</p>
+                    <p className="cart-warning">
+                      Báo giá vận chuyển đã hết hạn. Vui lòng làm mới để tiếp tục.
+                    </p>
                     <button
                       type="button"
                       className="button secondary"
                       style={{ width: "100%", marginTop: 6 }}
                       onClick={() => void fetchShippingQuotes()}
                     >
-                      <RefreshCw size={14} style={{ display: "inline", marginRight: 4 }} /> Làm mới báo giá
+                      <RefreshCw size={14} style={{ display: "inline", marginRight: 4 }} /> Làm mới
+                      báo giá
                     </button>
                   </div>
                 )}
@@ -934,7 +1055,10 @@ export function CheckoutPage() {
           {error && (
             <div className="checkout-error-panel" role="alert">
               <p className="cart-warning">{error}</p>
-              <Link href={isBuyNow && buyNowItem?.slug ? `/products/${buyNowItem.slug}` : "/cart"} className="checkout-back-cart-btn">
+              <Link
+                href={isBuyNow && buyNowItem?.slug ? `/products/${buyNowItem.slug}` : "/cart"}
+                className="checkout-back-cart-btn"
+              >
                 ← {isBuyNow ? "Quay lại trang sản phẩm" : "Quay lại giỏ hàng để chọn lại sản phẩm"}
               </Link>
             </div>
@@ -949,6 +1073,21 @@ export function CheckoutPage() {
           </div>
         </aside>
       </div>
+      {priceReview && (
+        <PriceReview
+          previous={priceReview.quote}
+          previousShippingFee={priceReview.shippingFee}
+          current={quote}
+          shippingFee={effectiveShippingFee}
+          pending={quoteBusy || (!quote && !error)}
+          error={error}
+          onClose={() => setPriceReview(null)}
+          onRetry={() => {
+            setError("");
+            setPreviewRetry((value) => value + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

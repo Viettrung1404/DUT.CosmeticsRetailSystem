@@ -64,6 +64,19 @@ export class RecommendationListResponseDto {
   items!: RecommendedProductItemDto[];
 }
 
+class HomeRecommendationPaginationDto {
+  @ApiProperty()
+  page!: number;
+
+  @ApiProperty()
+  totalPages!: number;
+}
+
+export class HomeRecommendationListResponseDto extends RecommendationListResponseDto {
+  @ApiPropertyOptional({ type: HomeRecommendationPaginationDto })
+  pagination?: HomeRecommendationPaginationDto;
+}
+
 export class SemanticSearchResponseDto extends RecommendationListResponseDto {
   @ApiProperty({ example: 'serum kiềm dầu cho da mụn nhạy cảm' })
   query!: string;

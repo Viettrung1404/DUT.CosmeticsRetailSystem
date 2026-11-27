@@ -1,0 +1,14 @@
+{
+  "at": "2026-11-26T10:06:10.857Z",
+  "originalQuoteVersion": "aae8e9ccb22280021a7bb9649c84e19ea4c6af0395c6a5fed049bde967ebe4ac",
+  "popup": "PASS",
+  "componentRefreshWithoutNavigation": "PASS",
+  "preserveAddress": "PASS",
+  "noAutomaticResubmit": "PASS",
+  "secondPriceChange": "PASS",
+  "failedRefreshAndRetry": "PASS",
+  "mobileOverflow": "PASS",
+  "browserErrors": [],
+  "directDatabasePromotionVisible": "PASS",
+  "adminPercentageChange": "PASS"
+}

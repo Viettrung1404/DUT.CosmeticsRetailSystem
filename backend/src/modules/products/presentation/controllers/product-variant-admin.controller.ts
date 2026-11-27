@@ -14,9 +14,6 @@ import { GetProductVariantsUseCase } from '../../application/use-cases/get-produ
 import { CreateProductVariantUseCase } from '../../application/use-cases/create-product-variant.use-case';
 import { UpdateProductVariantUseCase } from '../../application/use-cases/update-product-variant.use-case';
 import { DeleteProductVariantUseCase } from '../../application/use-cases/delete-product-variant.use-case';
-import { UpdateVariantTryOnColorUseCase } from '../../application/use-cases/update-variant-try-on-color.use-case';
-import { UpdateTryOnColorRequestDto } from '../dtos/update-try-on-color-request.dto';
-import { TryOnColorResponseDto } from '../dtos/try-on-color-response.dto';
 import {
   CreateProductVariantRequestDto,
   UpdateProductVariantRequestDto,
@@ -32,18 +29,7 @@ export class ProductVariantAdminController {
     private readonly createProductVariantUseCase: CreateProductVariantUseCase,
     private readonly updateProductVariantUseCase: UpdateProductVariantUseCase,
     private readonly deleteProductVariantUseCase: DeleteProductVariantUseCase,
-    private readonly updateVariantTryOnColor: UpdateVariantTryOnColorUseCase,
   ) {}
-
-  @Patch('variants/:id/try-on-color')
-  @RequirePermissions('PRODUCT_UPDATE')
-  @ApiOperation({ summary: 'Cập nhật mã màu thử son đã được duyệt cho biến thể' })
-  @ApiOkResponse({ type: TryOnColorResponseDto })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy biến thể sản phẩm' })
-  async updateTryOnColor(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateTryOnColorRequestDto) {
-    await this.updateVariantTryOnColor.execute(id, dto.colorHex);
-    return { id, tryOnColorHex: dto.colorHex };
-  }
 
   @Get('products/:productId/variants')
   @RequirePermissions('PRODUCT_VIEW')

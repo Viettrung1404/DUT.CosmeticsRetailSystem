@@ -2,6 +2,7 @@ import { BehaviorEventType, RecommendationPlacement } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { RecommendationMetricsService } from '../recommendation-metrics.service';
 import { IngestBehaviorBatchUseCase } from '../../use-cases/ingest-behavior-batch.use-case';
+import { createTrackingFixture } from '../../../../../../test/support/recommendation-tracking.fixture';
 import { OrderPurchaseEventListener } from '../../listeners/order-purchase-event.listener';
 
 describe('RecommendationMetricsService & Attribution E2E Flow', () => {
@@ -62,54 +63,9 @@ describe('RecommendationMetricsService & Attribution E2E Flow', () => {
   });
 
   it('tracks end-to-end Attribution funnel (Impression + Click -> AddToCart -> Order Conversion -> CTR/CVR/Revenue)', async () => {
-    const storedMetrics = new Map<
-      RecommendationPlacement,
-      {
-        placement: RecommendationPlacement;
-        impressions: number;
-        clicks: number;
-        addToCarts: number;
-        conversions: number;
-        revenue: number;
-      }
-    >();
-
-    const repo: any = {
-      createBehaviorEventsBatch: jest.fn(async (rows: any[]) => ({
-        count: rows.length,
-      })),
-      flushDailyMetricsCounters: jest.fn(async (increments: any[]) => {
-        for (const inc of increments) {
-          const prev = storedMetrics.get(inc.placement) ?? {
-            placement: inc.placement,
-            impressions: 0,
-            clicks: 0,
-            addToCarts: 0,
-            conversions: 0,
-            revenue: 0,
-          };
-          prev.impressions += inc.impressions;
-          prev.clicks += inc.clicks;
-          prev.addToCarts += inc.addToCarts;
-          storedMetrics.set(inc.placement, prev);
-        }
-        return increments.length;
-      }),
-      incrementDailyAttributionMetrics: jest.fn(async (metrics: any[]) => {
-        for (const m of metrics) {
-          const prev = storedMetrics.get(m.placement) ?? {
-            placement: m.placement,
-            impressions: 0,
-            clicks: 0,
-            addToCarts: 0,
-            conversions: 0,
-            revenue: 0,
-          };
-          prev.conversions += m.conversions;
-          prev.revenue += m.revenue;
-          storedMetrics.set(m.placement, prev);
-        }
-      }),
+    const fixture = createTrackingFixture();
+    const repo: any = fixture.repository;
+    Object.assign(repo, {
       findVariantContext: jest.fn().mockResolvedValue({
         id: 'var-1',
         productId: 'prod-1',
@@ -135,13 +91,13 @@ describe('RecommendationMetricsService & Attribution E2E Flow', () => {
         ],
       }),
       queryAdminDailyMetrics: jest.fn(async () =>
-        Array.from(storedMetrics.values()),
+        Array.from(fixture.state.metrics.values()),
       ),
-    };
+    });
 
     const metricsService = new RecommendationMetricsService(repo);
-    const ingestUseCase = new IngestBehaviorBatchUseCase(repo, metricsService);
-    const orderListener = new OrderPurchaseEventListener(repo, metricsService);
+    const ingestUseCase = new IngestBehaviorBatchUseCase(repo);
+    const orderListener = new OrderPurchaseEventListener(repo);
 
     // 1. Client views placement (10 impressions) and clicks 2 recommended items
     await ingestUseCase.executeClientBatch(
@@ -153,13 +109,13 @@ describe('RecommendationMetricsService & Attribution E2E Flow', () => {
         events: [
           {
             id: randomUUID(),
-            eventType: BehaviorEventType.VIEW_PRODUCT,
+            eventType: BehaviorEventType.SEARCH_CLICK,
             productId: randomUUID(),
             source: 'rec_similar',
           },
           {
             id: randomUUID(),
-            eventType: BehaviorEventType.VIEW_PRODUCT,
+            eventType: BehaviorEventType.SEARCH_CLICK,
             productId: randomUUID(),
             source: 'rec_similar',
           },

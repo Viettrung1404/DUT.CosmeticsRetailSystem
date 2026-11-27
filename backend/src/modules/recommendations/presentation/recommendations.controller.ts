@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Header,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -32,9 +34,12 @@ import {
   GetCartRecommendationsQueryDto,
   GetHomeRecommendationsQueryDto,
   GetSimilarProductsQueryDto,
+  parseRecentViews,
+  parseUuidListQuery,
   SemanticSearchQueryDto,
 } from './dtos/get-recommendations.query.dto';
 import {
+  HomeRecommendationListResponseDto,
   RecommendationListResponseDto,
   SemanticSearchResponseDto,
 } from './dtos/recommendation-response.dto';
@@ -82,21 +87,26 @@ export class RecommendationsController {
 
   @Public()
   @Get('home')
+  @Header('Cache-Control', 'private, no-store')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary:
       'Gợi ý trang chủ cá nhân hóa ("Dành riêng cho bạn") với In-session boost & Cold-start fallback',
   })
-  @ApiOkResponse({ type: RecommendationListResponseDto })
+  @ApiOkResponse({ type: HomeRecommendationListResponseDto })
   async getHome(
     @Query() query: GetHomeRecommendationsQueryDto,
     @Req() req?: { user?: { userId?: string } },
-  ): Promise<RecommendationListResponseDto> {
+    @Headers('x-session-id') guestSession?: string,
+  ): Promise<HomeRecommendationListResponseDto> {
     const customerId = await this.resolveOptionalCustomerId(req);
     return this.getHomeRecommendations.execute({
       customerId,
       recentIds: query.recentIds ?? [],
+      recentViews: parseRecentViews(query.recentViews),
+      guestCartSession: parseUuidListQuery(guestSession, 1)?.[0],
       limit: query.limit ?? 12,
+      page: query.page,
     });
   }
 

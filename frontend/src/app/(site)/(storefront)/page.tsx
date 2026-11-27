@@ -2,14 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { HeroCarousel } from "@/features/catalog/hero-carousel";
 import {
-  getBrands,
   getCategories,
   getFlashCards,
   getPosts,
   getProducts,
 } from "@/features/catalog/server";
 import { CatalogImage, ProductGrid, SectionTitle } from "@/features/catalog/components";
-import { BrandCarousel, CategoryCarousel, DealCarousel } from "@/features/catalog/home-carousels";
+import { CategoryCarousel, DealCarousel } from "@/features/catalog/home-carousels";
 import { FlashCountdown, HomeMotion } from "@/features/catalog/home-motion";
 import { HomeRecommendationsSection } from "@/features/recommendations/recommendation-section";
 import {
@@ -17,10 +16,6 @@ import {
   BadgeCheck,
   Sparkles,
   Truck,
-  Droplets,
-  Heart,
-  Sun,
-  Clock3,
 } from "lucide-react";
 
 export const metadata = {
@@ -28,17 +23,15 @@ export const metadata = {
   description: "Khám phá sản phẩm chăm sóc da và trang điểm tại GlowUp.",
 };
 export default async function HomePage() {
-  const [categories, bestsellers, brands, posts, flash] = await Promise.allSettled([
+  const [categories, bestsellers, posts, flash] = await Promise.allSettled([
     getCategories(),
     getProducts({ sortBy: "bestseller", limit: 5 }),
-    getBrands(16),
     getPosts(),
-    getFlashCards(),
+    getFlashCards(10),
   ]);
   const cats = categories.status === "fulfilled" ? categories.value : [];
   const popular = bestsellers.status === "fulfilled" ? bestsellers.value.data : [];
   const displayCategories = [...cats, ...cats.flatMap((category) => category.children)].slice(0, 6);
-  const brandList = brands.status === "fulfilled" ? brands.value : [];
   const articles = posts.status === "fulfilled" ? posts.value.items : [];
   const deals = flash.status === "fulfilled" ? flash.value : [];
   const dealEndDate = deals.map((deal) => deal.endDate).sort()[0];
@@ -227,39 +220,6 @@ export default async function HomePage() {
           <p>Tìm sắc son phù hợp với phong cách của bạn.</p>
           <small>Khám phá ngay →</small>
         </Link>
-      </section>
-      <section className="home-section home-brand-section">
-        <p className="home-section-eyebrow">ĐỐI TÁC THƯƠNG HIỆU</p>
-        <SectionTitle
-          title="Thương Hiệu Được Yêu Thích"
-          href="/brands"
-          linkText="Xem thương hiệu"
-        />
-        {brandList.length ? (
-          <BrandCarousel brands={brandList} />
-        ) : (
-          <p className="catalog-empty">Thương hiệu đang được cập nhật.</p>
-        )}
-      </section>
-      <section className="home-section home-concerns">
-        <p className="home-section-eyebrow">CÁ NHÂN HÓA CHU TRÌNH</p>
-        <SectionTitle title="Khám Phá Theo Nhu Cầu Da Của Bạn" />
-        <div>
-          {[
-            { icon: Droplets, title: "Dưỡng ẩm sâu", tag: "dưỡng ẩm" },
-            { icon: Sparkles, title: "Kiềm dầu & Lỗ chân lông", tag: "kiềm dầu" },
-            { icon: Heart, title: "Phục hồi nhạy cảm", tag: "phục hồi" },
-            { icon: Sun, title: "Làm sáng & Mờ thâm", tag: "làm sáng" },
-            { icon: Clock3, title: "Chống lão hóa", tag: "chống lão hóa" },
-          ].map((item) => (
-            <Link key={item.tag} href={`/products?tag=${encodeURIComponent(item.tag)}`}>
-              <span>
-                <item.icon size={21} />
-              </span>
-              <strong>{item.title}</strong>
-            </Link>
-          ))}
-        </div>
       </section>
       <section className="home-section home-blog">
         <p className="home-section-eyebrow">TẠP CHÍ LÀM ĐẸP</p>

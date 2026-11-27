@@ -1,0 +1,15 @@
+{
+  "checkedOn": "2026-11-26",
+  "browser": "Chromium (Playwright)",
+  "viewports": [1440, 768, 390],
+  "homeDistinctProducts": 10,
+  "flashSaleDistinctProducts": 20,
+  "horizontalOverflow": false,
+  "selectedVariantPrice": 255000,
+  "cardPrice": 255000,
+  "cartUnitPrice": 255000,
+  "checkoutPreviewUnitPrice": 255000,
+  "quantity": 3,
+  "testCartItemRemoved": true,
+  "ordersCreated": 0
+}

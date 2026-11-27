@@ -4,6 +4,7 @@ node_modules/
 .next-readiness/
 .next-build/
 .next-ui-review/
+.next-price-demo/
 certificates/
 out/
 coverage/

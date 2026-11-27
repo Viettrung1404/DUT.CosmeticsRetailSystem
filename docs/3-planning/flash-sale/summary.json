@@ -1,0 +1,21 @@
+{
+  "products": 350,
+  "variants": 1039,
+  "slots": 12,
+  "rows": 12468,
+  "references": {
+    "live": 1030,
+    "no-match": 2,
+    "historical-snapshot": 7
+  },
+  "bothPricesHavePreferredEnding": 11537,
+  "preferredEndingPercent": 92.53,
+  "normalDiscount": [
+    12.01,
+    61.9
+  ],
+  "featuredDiscount": [
+    24.71,
+    76.19
+  ]
+}

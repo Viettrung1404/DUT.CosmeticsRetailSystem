@@ -1667,6 +1667,10 @@ model SupplierPayment {
 // =============================================================================
 
 model PromotionVariantQuota {
+  salePrice         Decimal? @map("sale_price") @db.Decimal(12, 2)
+  featuredSalePrice Decimal? @map("featured_sale_price") @db.Decimal(12, 2)
+  productRank       Int?     @map("product_rank")
+
   id               String                @id @default(uuid()) @db.Uuid
   promotionId      String                @map("promotion_id") @db.Uuid
   productVariantId String                @map("product_variant_id") @db.Uuid
@@ -1757,6 +1761,10 @@ model BroadcastRecipient {
 }
 
 model Promotion {
+  slotStartHour        Int? @map("slot_start_hour")
+  rotationProductCount Int  @default(0) @map("rotation_product_count")
+  featuredProductCount Int  @default(20) @map("featured_product_count")
+
   isFlashSale          Boolean                 @default(false) @map("is_flash_sale")
   quotas               PromotionVariantQuota[]
   allocations          PromotionAllocation[]
@@ -2622,6 +2630,14 @@ model RecommendationDailyMetric {
 
   @@unique([metricDate, placement], map: "uq_rec_daily_metric_date_placement")
   @@map("recommendation_daily_metrics")
+}
+
+model RecommendationTrackingBatch {
+  batchId   String   @id @map("batch_id") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt], map: "idx_rec_tracking_batch_created")
+  @@map("recommendation_tracking_batches")
 }
 
 

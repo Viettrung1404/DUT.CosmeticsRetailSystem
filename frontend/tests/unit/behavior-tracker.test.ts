@@ -189,3 +189,30 @@ describe("Web BehaviorTracker (Adapter Pattern)", () => {
     tracker.destroy();
   });
 });
+
+
+describe('Tracking batch retry identity', () => {
+  it('reuses the whole failed impression batch and gives subsequent views a fresh ID', async () => {
+    const attempts: BehaviorBatchPayload[] = [];
+    let fail = true;
+    const tracker = new BehaviorTracker({ storage: createMemoryStorage(), transport: {
+      sendBatch: async (payload) => {
+        attempts.push(payload);
+        if (fail) throw new Error('temporary network failure');
+      },
+    } });
+    try {
+      tracker.trackImpression('HOME', 1);
+      await tracker.flush();
+      tracker.trackImpression('HOME', 1);
+      fail = false;
+      await tracker.flush();
+      await tracker.flush();
+      expect(attempts).toHaveLength(3);
+      expect(attempts[0]).toEqual(attempts[1]);
+      expect(attempts[0]!.batchId).toBeTruthy();
+      expect(attempts[2]!.batchId).not.toBe(attempts[0]!.batchId);
+      expect(attempts[2]!.impressions).toEqual([{ placement: 'HOME', count: 1 }]);
+    } finally { tracker.destroy(); }
+  });
+});

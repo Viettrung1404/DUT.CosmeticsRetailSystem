@@ -54,7 +54,7 @@ export function FavoriteButton({
           fill={selected ? "#e63946" : "none"}
           stroke={selected ? "#e63946" : "currentColor"}
         />
-        {showText && <span>{label || "Đã thích (1,2k)"}</span>}
+        {showText && <span>{label || (selected ? "Đã yêu thích" : "Thêm vào yêu thích")}</span>}
       </button>
       {error && (
         <span className="favorite-error" role="alert">

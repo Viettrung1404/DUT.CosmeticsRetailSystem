@@ -72,6 +72,7 @@ export interface RecommendationImpression {
 }
 
 export interface RecommendationEventsQueueMessage {
+  batchId?: string;
   id: string;
   anonymousId: string;
   customerId: string | null;

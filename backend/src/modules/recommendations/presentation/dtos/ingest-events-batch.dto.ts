@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import {
   CLIENT_ALLOWED_BEHAVIOR_EVENT_TYPES,
@@ -24,7 +25,10 @@ import {
 export type ClientBehaviorEventType = ClientAllowedBehaviorEventType;
 
 export class ClientBehaviorEventDto {
-  @ApiProperty({ format: 'uuid', description: 'Client-generated UUID v4 cho idempotency' })
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Client-generated UUID v4 cho idempotency',
+  })
   @IsUUID('4')
   id!: string;
 
@@ -81,6 +85,18 @@ export class PlacementImpressionDto {
  * Tuyệt đối không khai báo `customerId` để ValidationPipe (whitelist + forbidNonWhitelisted) chặn giả mạo.
  */
 export class IngestEventsBatchDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Stable ID reused when retrying a batch',
+  })
+  @ValidateIf(
+    (batch) =>
+      batch.batchId !== undefined ||
+      (Boolean(batch.impressions?.length) && !batch.events?.length),
+  )
+  @IsUUID('4')
+  batchId?: string;
+
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   anonymousId!: string;
@@ -102,6 +118,18 @@ export class IngestEventsBatchDto {
 }
 
 export class InternalBehaviorEnvelopeDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Stable ID reused when retrying a batch',
+  })
+  @ValidateIf(
+    (batch) =>
+      batch.batchId !== undefined ||
+      (Boolean(batch.impressions?.length) && !batch.events?.length),
+  )
+  @IsUUID('4')
+  batchId?: string;
+
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   anonymousId!: string;
@@ -111,7 +139,11 @@ export class InternalBehaviorEnvelopeDto {
   @IsUUID()
   customerId?: string | null;
 
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'userId trích từ NestJS JWT ở Cloudflare Worker Edge' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'userId trích từ NestJS JWT ở Cloudflare Worker Edge',
+  })
   @IsOptional()
   @IsUUID()
   userId?: string | null;
@@ -136,6 +168,14 @@ export class InternalBehaviorEnvelopeDto {
  * Payload nội bộ từ Cloudflare Worker Consumer (đã verify JWT ở Edge và gộp batch).
  */
 export class InternalIngestEventsBatchDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Stable ID reused when retrying a batch',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  batchId?: string;
+
   @ApiPropertyOptional({ type: [InternalBehaviorEnvelopeDto], maxItems: 15 })
   @IsOptional()
   @IsArray()
@@ -154,7 +194,11 @@ export class InternalIngestEventsBatchDto {
   @IsUUID()
   customerId?: string | null;
 
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, description: 'userId trích từ NestJS JWT ở Cloudflare Worker Edge' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'userId trích từ NestJS JWT ở Cloudflare Worker Edge',
+  })
   @IsOptional()
   @IsUUID()
   userId?: string | null;

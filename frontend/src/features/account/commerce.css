@@ -2281,7 +2281,7 @@
   grid-template-columns: 72px minmax(0, 1fr) 80px;
   gap: 12px;
 }
-.cart-compact .cart-item > img {
+.cart-compact .cart-item > .cart-item-image {
   display: block;
   width: 72px;
   height: 84px;
@@ -2295,6 +2295,12 @@
   grid-column: 2/4;
   grid-row: 1;
   padding-right: 24px;
+}
+.cart-compact .cart-item-image img,
+.cart-compact .cart-item-image .catalog-image-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
 }
 .cart-compact .cart-item-copy h2 {
   font-size: 13px;

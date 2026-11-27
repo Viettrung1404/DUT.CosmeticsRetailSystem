@@ -12,17 +12,26 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
   });
 
   let mockRepository: {
-    createBehaviorEventsBatch: jest.Mock;
-    incrementDailyImpressions: jest.Mock;
+    persistTrackedBehaviorBatch: jest.Mock;
   };
   let useCase: IngestBehaviorBatchUseCase;
 
   beforeEach(() => {
     mockRepository = {
-      createBehaviorEventsBatch: jest.fn().mockResolvedValue({ count: 1 }),
-      incrementDailyImpressions: jest.fn().mockResolvedValue(undefined),
+      persistTrackedBehaviorBatch: jest.fn().mockResolvedValue({ count: 1 }),
     };
     useCase = new IngestBehaviorBatchUseCase(mockRepository as any);
+  });
+
+  it('requires a stable batchId for impression-only batches but accepts event-only legacy clients', async () => {
+    const payload = { anonymousId: randomUUID(), events: [], impressions: [{ placement: 'HOME', count: 1 }] };
+    await expect(pipe.transform(payload, { type: 'body', metatype: IngestEventsBatchDto })).rejects.toThrow(BadRequestException);
+    await expect(pipe.transform({ ...payload, batchId: randomUUID() }, {
+      type: 'body', metatype: IngestEventsBatchDto,
+    })).resolves.toMatchObject(payload);
+    await expect(pipe.transform({ anonymousId: payload.anonymousId, events: [{ id: randomUUID(), eventType: 'VIEW_PRODUCT' }] }, {
+      type: 'body', metatype: IngestEventsBatchDto,
+    })).resolves.toHaveProperty('events');
   });
 
   it('rejects PURCHASE and ADD_TO_CART in client DTO validation', async () => {
@@ -106,7 +115,7 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
     const verifiedCustomerId = randomUUID();
     const spoofedCustomerId = randomUUID();
 
-    mockRepository.createBehaviorEventsBatch.mockResolvedValueOnce({ count: 1 });
+    mockRepository.persistTrackedBehaviorBatch.mockResolvedValueOnce({ count: 1 });
 
     const result = await useCase.executeClientBatch(
       {
@@ -131,7 +140,7 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
     );
 
     expect(result).toEqual({ received: 1, inserted: 1 });
-    expect(mockRepository.createBehaviorEventsBatch).toHaveBeenCalledWith([
+    expect(mockRepository.persistTrackedBehaviorBatch).toHaveBeenCalledWith([
       expect.objectContaining({
         id: eventId,
         anonymousId: anonId,
@@ -142,16 +151,13 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
         source: 'rec_home',
         metadata: { shadeHex: '#C84B5B' },
       }),
-    ]);
-    expect(mockRepository.incrementDailyImpressions).toHaveBeenCalledWith([
-      { placement: RecommendationPlacement.HOME, count: 4 },
-    ]);
+    ], [expect.objectContaining({ impressions: [{ placement: RecommendationPlacement.HOME, count: 4 }] })]);
   });
 
   it('handles duplicate UUID retries idempotently (inserted reflects skipDuplicates count) and rejects PURCHASE directly in useCase', async () => {
     const anonId = randomUUID();
     const dupId = randomUUID();
-    mockRepository.createBehaviorEventsBatch.mockResolvedValueOnce({ count: 0 });
+    mockRepository.persistTrackedBehaviorBatch.mockResolvedValueOnce({ count: 0 });
 
     const res = await useCase.executeClientBatch(
       {
@@ -182,7 +188,7 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
     const anon1 = randomUUID();
     const anon2 = randomUUID();
     const customer1 = randomUUID();
-    mockRepository.createBehaviorEventsBatch.mockResolvedValueOnce({ count: 2 });
+    mockRepository.persistTrackedBehaviorBatch.mockResolvedValueOnce({ count: 2 });
 
     const res = await useCase.executeInternalBatch({
       batches: [
@@ -213,7 +219,7 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
     });
 
     expect(res).toEqual({ received: 2, inserted: 2 });
-    expect(mockRepository.createBehaviorEventsBatch).toHaveBeenCalledWith([
+    expect(mockRepository.persistTrackedBehaviorBatch).toHaveBeenCalledWith([
       expect.objectContaining({
         anonymousId: anon1,
         customerId: customer1,
@@ -224,10 +230,7 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
         customerId: null,
         eventType: BehaviorEventType.SEARCH_CLICK,
       }),
-    ]);
-    expect(mockRepository.incrementDailyImpressions).toHaveBeenCalledWith([
-      { placement: RecommendationPlacement.HOME, count: 2 },
-    ]);
+    ], expect.arrayContaining([expect.objectContaining({ impressions: [{ placement: RecommendationPlacement.HOME, count: 2 }] })]));
   });
 
   it('resolves NestJS JWT userId from CF Worker Consumer to real customerId in DB', async () => {
@@ -261,11 +264,11 @@ describe('IngestBehaviorBatchUseCase & IngestEventsBatchDto', () => {
     });
 
     expect(resolveCustomerIdLookup).toHaveBeenCalledWith([jwtUserId]);
-    expect(mockRepository.createBehaviorEventsBatch).toHaveBeenCalledWith([
+    expect(mockRepository.persistTrackedBehaviorBatch).toHaveBeenCalledWith([
       expect.objectContaining({
         anonymousId: anon,
         customerId: realCustomerId,
       }),
-    ]);
+    ], expect.any(Array));
   });
 });

@@ -269,6 +269,7 @@ async function handleEventsBatchIngress(
 
   const queueMessage: RecommendationEventsQueueMessage = {
     id: crypto.randomUUID(),
+    batchId: body.batchId,
     anonymousId: body.anonymousId.trim(),
     customerId: jwtClaims.customerId ?? jwtClaims.userId ?? null,
     ...(jwtClaims.userId ? { userId: jwtClaims.userId } : {}),

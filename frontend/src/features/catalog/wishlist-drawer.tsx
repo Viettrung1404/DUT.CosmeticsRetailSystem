@@ -18,6 +18,9 @@ export function WishlistDrawer({ open, onNavigate }: { open: boolean; onNavigate
   const [error, setError] = useState("");
   const query = useQuery({
     queryKey: ["wishlist", "drawer"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: ({ signal }) => readBff("/api/wishlist?page=1&limit=24", wishlistSchema, signal),
     enabled: open,
   });

@@ -1,3 +1,4 @@
+import { promotionSlotEnd, isPromotionInSlot } from '@core/utils/flash-sale.util';
 import {
   BadRequestException,
   Body,
@@ -73,6 +74,7 @@ export class CouponValidationDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) usePoints?: number;
 }
 const publicCampaign = {
+  slotStartHour: true,
   id: true,
   name: true,
   description: true,
@@ -163,8 +165,26 @@ export class PromotionsService {
   }
   async flashCards(limit: number) {
     const now = new Date();
+    const selected = await this.db.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM (
+        SELECT DISTINCT ON (v.product_id) q.id::text AS id, v.product_id,
+          (1 - sprint5_variant_price(v.id,0) / NULLIF(v.price,0)) AS discount
+        FROM promotion_variant_quotas q JOIN promotions p ON p.id=q.promotion_id
+        JOIN product_variants v ON v.id=q.product_variant_id
+        JOIN products product ON product.id=v.product_id
+        WHERE p.is_active AND p.is_flash_sale AND p.start_date<=${now} AND p.end_date>${now}
+          AND glowup_slot_active(p.slot_start_hour,${now})
+          AND (p.usage_limit IS NULL OR p.used_count<p.usage_limit)
+          AND (p.slot_start_hour IS NULL OR glowup_featured(q.product_rank,p.rotation_product_count,p.featured_product_count,p.slot_start_hour,${now}))
+          AND q.quota-q.reserved_quantity-q.consumed_quantity>0
+          AND v.is_active AND product.is_active
+          AND EXISTS (SELECT 1 FROM inventory i WHERE i.product_variant_id=v.id AND i.available_quantity>0)
+        ORDER BY v.product_id, discount DESC, q.id
+      ) chosen ORDER BY discount DESC, product_id LIMIT ${limit}
+    `;
     const quotas = await this.db.promotionVariantQuota.findMany({
       where: {
+        id: { in: selected.map((row) => row.id) },
         promotion: {
           isActive: true,
           isFlashSale: true,
@@ -193,11 +213,20 @@ export class PromotionsService {
         reservedQuantity: true,
         consumedQuantity: true,
         promotion: {
-          select: { id: true, name: true, endDate: true, minOrderAmount: true },
+          select: { id: true, name: true, endDate: true, minOrderAmount: true, slotStartHour: true, startDate: true },
         },
         variant: {
           select: {
+            option1Value: true,
+            option2Value: true,
             price: true,
+            inventory: {
+              where: {
+                availableQuantity: { gt: 0 },
+                store: { isActive: true, type: { in: ['STORE', 'WAREHOUSE'] } },
+              },
+              select: { availableQuantity: true },
+            },
             product: {
               select: {
                 id: true,
@@ -217,7 +246,8 @@ export class PromotionsService {
       },
     });
     const active = quotas
-      .filter((q) => q.quota > q.reservedQuantity + q.consumedQuantity)
+      .filter((q) => q.quota > q.reservedQuantity + q.consumedQuantity && isPromotionInSlot(q.promotion.slotStartHour, now))
+      .sort((a,b) => selected.findIndex((r) => r.id === a.id) - selected.findIndex((r) => r.id === b.id))
       .slice(0, limit);
     const ids = active.map((q) => q.productVariantId);
     const prices = ids.length
@@ -226,22 +256,19 @@ export class PromotionsService {
         >`SELECT id,sprint5_variant_price(id,0::numeric)::float8 AS price FROM product_variants WHERE id=ANY(${ids}::uuid[])`
       : [];
     return active.map((q) => {
-      const endMs = new Date(q.promotion.endDate).getTime();
-      const endOfDay = new Date(now);
-      endOfDay.setHours(23, 59, 59, 999);
-      const effectiveEndDate =
-        endMs > endOfDay.getTime()
-          ? endOfDay.toISOString()
-          : q.promotion.endDate;
-
       return {
         serverTime: now.toISOString(),
         promotionId: q.promotion.id,
         promotionName: q.promotion.name,
-        endDate: effectiveEndDate,
+        endDate: promotionSlotEnd(q.promotion.endDate, q.promotion.slotStartHour, now),
+        campaignStartDate: q.promotion.startDate,
+        campaignEndDate: q.promotion.endDate,
+        isFeatured: q.promotion.slotStartHour != null,
         conditional: Number(q.promotion.minOrderAmount) > 0,
         remaining: q.quota - q.reservedQuantity - q.consumedQuantity,
+        stockQuantity: q.variant.inventory.reduce((total, item) => total + (item.availableQuantity ?? 0), 0),
         variantId: q.productVariantId,
+        variantLabel: [q.variant.option1Value, q.variant.option2Value].filter(Boolean).join(" / "),
         productId: q.variant.product.id,
         name: q.variant.product.name,
         slug: q.variant.product.slug,
@@ -257,6 +284,7 @@ export class PromotionsService {
   async active(query: PublicListDto, flash = false) {
     const now = new Date();
     const where = {
+      AND: [{ OR: [{ slotStartHour: null }, { slotStartHour: Math.floor(new Date(now.getTime() + 7 * 3600000).getUTCHours() / 2) * 2 }] }],
       isActive: true,
       startDate: { lte: now },
       endDate: { gt: now },
@@ -316,17 +344,9 @@ export class PromotionsService {
       : [];
     return {
       items: items.map((p) => {
-        const endMs = new Date(p.endDate).getTime();
-        const endOfDay = new Date(now);
-        endOfDay.setHours(23, 59, 59, 999);
-        const effectiveEndDate =
-          flash && endMs > endOfDay.getTime()
-            ? endOfDay.toISOString()
-            : p.endDate;
-
         return {
           ...p,
-          endDate: effectiveEndDate,
+          endDate: promotionSlotEnd(p.endDate, p.slotStartHour, now),
           variants: quotas
             .filter((q) => q.promotionId === p.id)
             .map((q) => ({
@@ -357,7 +377,7 @@ export class PromotionsService {
       },
       select: publicCampaign,
     });
-    if (!promotion) throw new NotFoundException("PROMOTION_NOT_FOUND");
+    if (!promotion || !isPromotionInSlot(promotion.slotStartHour, now)) throw new NotFoundException("PROMOTION_NOT_FOUND");
     const where = {
       promotionId: id,
       variant: {
@@ -401,8 +421,14 @@ export class PromotionsService {
       }),
       this.db.promotionVariantQuota.count({ where }),
     ]);
+    const variantIds = quotas.map((quota) => quota.productVariantId);
+    const effectivePrices = variantIds.length ? await this.db.$queryRaw<Array<{ id: string; price: number }>>`
+      SELECT id::text AS id, sprint5_variant_price(id,0)::float8 AS price
+      FROM product_variants WHERE id=ANY(${variantIds}::uuid[])
+    ` : [];
     return {
       ...promotion,
+      endDate: promotionSlotEnd(promotion.endDate, promotion.slotStartHour, now),
       serverTime: now.toISOString(),
       page,
       limit,
@@ -413,7 +439,8 @@ export class PromotionsService {
         name: q.variant.product.name,
         slug: q.variant.product.slug,
         imageUrl: publicUrl(q.variant.product.images[0]?.imageUrl ?? null),
-        price: Number(q.variant.price),
+        originalPrice: Number(q.variant.price),
+        price: effectivePrices.find((price) => price.id === q.productVariantId)?.price ?? Number(q.variant.price),
         remaining: Math.max(
           0,
           q.quota - q.reservedQuantity - q.consumedQuantity,

@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   BehaviorEventType,
   Prisma,
   RecommendationPlacement,
   RecommendationType,
 } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { ATTRIBUTION_SOURCE_TO_PLACEMENT } from '../domain/attribution-source';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import {
   extractNormalizedIngredientsFromText,
@@ -188,6 +189,119 @@ export class RecommendationRepository {
     });
   }
 
+  /** Event inserts, batch receipts and metrics commit together, including on retries. */
+  async persistTrackedBehaviorBatch(
+    data: Prisma.UserBehaviorEventCreateManyInput[],
+    batches: Array<{
+      batchId?: string;
+      anonymousId: string;
+      events: Array<{ id: string }>;
+      impressions?: DailyImpressionIncrement[];
+    }> = [],
+  ): Promise<{ count: number }> {
+    return this.prisma.$transaction(async (tx) => {
+      const counters = new Map<
+        RecommendationPlacement,
+        {
+          impressions: number;
+          clicks: number;
+          addToCarts: number;
+          conversions: number;
+          revenue: number;
+        }
+      >();
+      const counterFor = (placement: RecommendationPlacement) => {
+        let counter = counters.get(placement);
+        if (!counter) {
+          counter = {
+            impressions: 0,
+            clicks: 0,
+            addToCarts: 0,
+            conversions: 0,
+            revenue: 0,
+          };
+          counters.set(placement, counter);
+        }
+        return counter;
+      };
+
+      for (const batch of batches) {
+        if (!batch.impressions?.length) continue;
+        if (!batch.batchId && !batch.events.length) {
+          throw new BadRequestException(
+            'batchId is required for impression-only batches',
+          );
+        }
+        // Legacy event batches can use their stable event IDs as the receipt key.
+        const key = createHash('sha256')
+          .update(
+            JSON.stringify([
+              batch.anonymousId,
+              batch.batchId ?? batch.events.map((event) => event.id).sort(),
+              batch.batchId ? null : batch.impressions,
+            ]),
+          )
+          .digest('hex');
+        const claimed = await tx.$queryRaw<Array<{ batch_id: string }>>`
+          INSERT INTO recommendation_tracking_batches (batch_id)
+          VALUES (${key}) ON CONFLICT DO NOTHING RETURNING batch_id
+        `;
+        if (claimed.length) {
+          for (const impression of batch.impressions) {
+            counterFor(impression.placement).impressions += impression.count;
+          }
+        }
+      }
+
+      const inserted = data.length
+        ? await tx.userBehaviorEvent.createManyAndReturn({
+            data,
+            skipDuplicates: true,
+            select: { eventType: true, source: true, metadata: true },
+          })
+        : [];
+      for (const event of inserted) {
+        const placement = event.source
+          ? ATTRIBUTION_SOURCE_TO_PLACEMENT[event.source]
+          : undefined;
+        if (!placement) continue;
+        if (
+          event.eventType !== BehaviorEventType.SEARCH_CLICK &&
+          event.eventType !== BehaviorEventType.ADD_TO_CART &&
+          event.eventType !== BehaviorEventType.PURCHASE
+        )
+          continue;
+        const counter = counterFor(placement);
+        if (event.eventType === BehaviorEventType.SEARCH_CLICK)
+          counter.clicks++;
+        if (event.eventType === BehaviorEventType.ADD_TO_CART)
+          counter.addToCarts++;
+        if (event.eventType === BehaviorEventType.PURCHASE) {
+          counter.conversions++;
+          const metadata = event.metadata as { totalPrice?: number } | null;
+          counter.revenue += Number(metadata?.totalPrice ?? 0);
+        }
+      }
+      for (const [placement, counter] of counters) {
+        await tx.$executeRaw`
+          INSERT INTO recommendation_daily_metrics
+            (id, metric_date, placement, impressions, clicks, add_to_carts, conversions, revenue, updated_at)
+          VALUES (${randomUUID()}::uuid, CURRENT_DATE, ${placement}::"RecommendationPlacement",
+            ${counter.impressions}, ${counter.clicks}, ${counter.addToCarts},
+            ${counter.conversions}, ${counter.revenue}, NOW())
+          ON CONFLICT (metric_date, placement) DO UPDATE SET
+            impressions = recommendation_daily_metrics.impressions + EXCLUDED.impressions,
+            clicks = recommendation_daily_metrics.clicks + EXCLUDED.clicks,
+            add_to_carts = recommendation_daily_metrics.add_to_carts + EXCLUDED.add_to_carts,
+            conversions = recommendation_daily_metrics.conversions + EXCLUDED.conversions,
+            revenue = recommendation_daily_metrics.revenue + EXCLUDED.revenue,
+            updated_at = NOW()
+        `;
+      }
+      return { count: inserted.length };
+    });
+  }
+
   async mergeAnonymousEventsToCustomer(
     customerId: string,
     anonymousId: string,
@@ -321,7 +435,10 @@ export class RecommendationRepository {
       { conversions: number; revenue: number }
     >();
     for (const m of metrics) {
-      const prev = aggregated.get(m.placement) ?? { conversions: 0, revenue: 0 };
+      const prev = aggregated.get(m.placement) ?? {
+        conversions: 0,
+        revenue: 0,
+      };
       aggregated.set(m.placement, {
         conversions: prev.conversions + m.conversions,
         revenue: prev.revenue + m.revenue,
@@ -554,7 +671,9 @@ export class RecommendationRepository {
     }));
   }
 
-  async findActiveProductRoutineCatalog(): Promise<ProductRoutineCatalogItem[]> {
+  async findActiveProductRoutineCatalog(): Promise<
+    ProductRoutineCatalogItem[]
+  > {
     const products = await this.prisma.product.findMany({
       where: { isActive: true },
       select: {
@@ -588,17 +707,17 @@ export class RecommendationRepository {
         SELECT ube.customer_id
         FROM user_behavior_events ube
         WHERE ube.customer_id IS NOT NULL
-          AND ube.created_at >= NOW() - MAKE_INTERVAL(hours => ${hours})
+          AND ube.created_at >= NOW() - MAKE_INTERVAL(hours => ${hours}::int)
         UNION
         SELECT c.id AS customer_id
         FROM search_histories sh
         INNER JOIN customers c ON c.user_id = sh.user_id
         WHERE sh.user_id IS NOT NULL
-          AND sh.created_at >= NOW() - MAKE_INTERVAL(hours => ${hours})
+          AND sh.created_at >= NOW() - MAKE_INTERVAL(hours => ${hours}::int)
         UNION
         SELECT ct.customer_id
         FROM customer_tags ct
-        WHERE ct.created_at >= NOW() - MAKE_INTERVAL(hours => ${hours})
+        WHERE ct.created_at >= NOW() - MAKE_INTERVAL(hours => ${hours}::int)
       ) recent_customers
     `;
 
@@ -868,8 +987,8 @@ export class RecommendationRepository {
         WITH doomed AS (
           SELECT id
           FROM user_behavior_events
-          WHERE created_at < NOW() - MAKE_INTERVAL(days => ${retentionDays})
-          LIMIT ${batchSize}
+          WHERE created_at < NOW() - MAKE_INTERVAL(days => ${retentionDays}::int)
+          LIMIT ${batchSize}::int
         )
         DELETE FROM user_behavior_events
         WHERE id IN (SELECT id FROM doomed)
@@ -882,6 +1001,10 @@ export class RecommendationRepository {
       }
     }
 
+    await this.prisma.$executeRaw`
+      DELETE FROM recommendation_tracking_batches
+      WHERE created_at < NOW() - MAKE_INTERVAL(days => ${retentionDays}::int)
+    `;
     return totalDeleted;
   }
 
@@ -935,7 +1058,9 @@ export class RecommendationRepository {
         p.name,
         p.slug,
         p.base_price::double precision AS base_price,
-        p.sale_price::double precision AS sale_price,
+        (SELECT MIN(sprint5_variant_price(priced_variant.id,0))::double precision
+          FROM product_variants priced_variant
+          WHERE priced_variant.product_id=p.id AND priced_variant.is_active=true) AS sale_price,
         p.avg_rating::double precision AS avg_rating,
         p.total_sold,
         b.id::text AS brand_id,
@@ -958,20 +1083,7 @@ export class RecommendationRepository {
       FROM products p
       LEFT JOIN brands b ON b.id = p.brand_id
       WHERE p.id = ANY(${uniqueIds}::uuid[])
-        AND p.is_active = true
-        AND EXISTS (
-          SELECT 1
-          FROM product_variants pv
-          INNER JOIN inventory inv ON inv.product_variant_id = pv.id
-          INNER JOIN inventory_lots lot
-            ON lot.product_variant_id = pv.id
-           AND lot.location_id = inv.store_id
-          WHERE pv.product_id = p.id
-            AND pv.is_active = true
-            AND COALESCE(inv.available_quantity, 0) > 0
-            AND (lot.quantity_on_hand - lot.quantity_reserved) > 0
-            AND lot.expiry_date >= (CURRENT_DATE + (pv.min_shelf_life_days * INTERVAL '1 day'))
-        )
+        AND ${this.eligibleProductCondition()}
     `;
 
     const hydratedById = new Map<string, HydratedRecommendedProduct>();
@@ -1041,6 +1153,72 @@ export class RecommendationRepository {
     }));
   }
 
+  private eligibleProductCondition(): Prisma.Sql {
+    return Prisma.sql`p.is_active = true
+        AND EXISTS (
+          SELECT 1
+          FROM product_variants pv
+          INNER JOIN inventory inv ON inv.product_variant_id = pv.id
+          WHERE pv.product_id = p.id
+            AND pv.is_active = true
+            AND COALESCE(inv.available_quantity, 0) > 0
+            AND (
+              NOT EXISTS (
+                SELECT 1
+                FROM inventory_lots l0
+                WHERE l0.product_variant_id = pv.id
+                  AND l0.location_id = inv.store_id
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM inventory_lots lot
+                WHERE lot.product_variant_id = pv.id
+                  AND lot.location_id = inv.store_id
+                  AND (lot.quantity_on_hand - lot.quantity_reserved) > 0
+                  AND lot.expiry_date >= (CURRENT_DATE + (pv.min_shelf_life_days * INTERVAL '1 day'))
+              )
+            )
+        )`;
+  }
+
+  async filterCandidatesByAvoidedTags(
+    candidates: readonly RankedCandidate[],
+    avoidedTags: readonly string[],
+  ): Promise<RankedCandidate[]> {
+    if (!candidates.length || !avoidedTags.length) return [...candidates];
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: candidates.map((c) => c.productId) } },
+      select: {
+        id: true,
+        howToUse: true,
+        specifications: true,
+        ingredients: { select: { ingredientName: true } },
+        tags: { select: { tagName: true } },
+      },
+    });
+    const avoided = new Set(avoidedTags.map(stripVietnameseDiacritics));
+    const allowed = new Set(
+      products
+        .filter((product) => {
+          const keys = [
+            ...normalizeIngredientNames(
+              product.ingredients.map((i) => i.ingredientName),
+            ),
+            ...extractNormalizedIngredientsFromText(product.howToUse),
+            ...extractNormalizedIngredientsFromText(
+              JSON.stringify(product.specifications),
+            ),
+            ...product.tags.map((tag) =>
+              stripVietnameseDiacritics(tag.tagName),
+            ),
+          ];
+          return !keys.some((key) => avoided.has(key));
+        })
+        .map((product) => product.id),
+    );
+    return candidates.filter((candidate) => allowed.has(candidate.productId));
+  }
+
   async findSameCategoryPriceRangeFallbacks(
     sourceProductId: string,
     limit = 16,
@@ -1061,20 +1239,15 @@ export class RecommendationRepository {
     const minPrice = price * 0.7;
     const maxPrice = price * 1.3;
 
-    const fallbacks = await this.prisma.product.findMany({
-      where: {
-        id: { not: sourceProductId },
-        categoryId: source.categoryId,
-        isActive: true,
-        basePrice: {
-          gte: minPrice,
-          lte: maxPrice,
-        },
-      },
-      orderBy: [{ totalSold: 'desc' }, { avgRating: 'desc' }],
-      take: limit,
-      select: { id: true },
-    });
+    const fallbacks = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT p.id::text AS id FROM products p
+      WHERE p.id <> ${sourceProductId}::uuid
+        AND p.category_id = ${source.categoryId}::uuid
+        AND COALESCE(p.sale_price, p.base_price) BETWEEN ${minPrice} AND ${maxPrice}
+        AND ${this.eligibleProductCondition()}
+      ORDER BY p.total_sold DESC, p.avg_rating DESC, p.id
+      LIMIT ${limit}
+    `;
 
     return fallbacks.map((p, index) => ({
       productId: p.id,
@@ -1087,21 +1260,33 @@ export class RecommendationRepository {
     limit = 20,
     excludeIds: readonly string[] = [],
   ): Promise<RankedCandidate[]> {
-    const products = await this.prisma.product.findMany({
-      where: {
-        isActive: true,
-        ...(excludeIds.length ? { id: { notIn: [...excludeIds] } } : {}),
-      },
-      orderBy: [{ totalSold: 'desc' }, { avgRating: 'desc' }],
-      take: limit,
-      select: { id: true },
-    });
+    const products = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT p.id::text AS id FROM products p
+      WHERE ${this.eligibleProductCondition()}
+        AND NOT (p.id = ANY(${[...excludeIds]}::uuid[]))
+      ORDER BY p.total_sold DESC, p.avg_rating DESC, p.id
+      LIMIT ${limit}
+    `;
 
     return products.map((p, index) => ({
       productId: p.id,
       score: Number((0.5 - index * 0.01).toFixed(4)),
       reason: 'Sản phẩm bán chạy được yêu thích',
     }));
+  }
+
+  async findEligibleHomeCandidates(
+    candidates: readonly RankedCandidate[],
+  ): Promise<RankedCandidate[]> {
+    if (!candidates.length) return [];
+    const ids = candidates.map(({ productId }) => productId);
+    const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT p.id::text AS id FROM products p
+      WHERE p.id = ANY(${ids}::uuid[])
+        AND ${this.eligibleProductCondition()}
+    `;
+    const eligibleIds = new Set(rows.map(({ id }) => id));
+    return candidates.filter(({ productId }) => eligibleIds.has(productId));
   }
 
   async findUserAffinityProfile(
@@ -1117,7 +1302,10 @@ export class RecommendationRepository {
     return {
       customerId: profile.customerId,
       topCategories: Array.isArray(profile.topCategories)
-        ? (profile.topCategories as Array<{ categoryId: string; score: number }>)
+        ? (profile.topCategories as Array<{
+            categoryId: string;
+            score: number;
+          }>)
         : [],
       topBrands: Array.isArray(profile.topBrands)
         ? (profile.topBrands as Array<{ brandId: string; score: number }>)
@@ -1135,6 +1323,50 @@ export class RecommendationRepository {
     };
   }
 
+  async findHomeIntent(
+    customerId: string | null,
+    guestCartSession: string | undefined,
+    since: Date,
+  ) {
+    const identity = customerId
+      ? { customerId }
+      : { customerId: null, sessionId: guestCartSession };
+    const [cartItems, events] = await Promise.all([
+      customerId || guestCartSession
+        ? this.prisma.cartItem.findMany({
+            where: { cart: identity, quantity: { gt: 0 }, variant: { isActive: true } },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            take: 100,
+            select: {
+              createdAt: true,
+              productVariantId: true,
+              variant: { select: { productId: true } },
+            },
+          })
+        : [],
+      customerId || guestCartSession
+        ? this.prisma.userBehaviorEvent.findMany({
+            where: {
+              ...(customerId
+                ? { customerId }
+                : { customerId: null, anonymousId: guestCartSession }),
+              eventType: {
+                in: customerId
+                  ? [BehaviorEventType.ADD_TO_CART, BehaviorEventType.VIEW_PRODUCT, BehaviorEventType.SEARCH_CLICK]
+                  : [BehaviorEventType.ADD_TO_CART],
+              },
+              productId: { not: null },
+              createdAt: { gte: since },
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+            take: 200,
+            select: { productId: true, variantId: true, eventType: true, createdAt: true, metadata: true },
+          })
+        : [],
+    ]);
+    return { cartItems, events };
+  }
+
   /**
    * Trả về danh sách productId khách đã mua trong withinDays ngày gần nhất (mặc định 14 ngày).
    */
@@ -1149,7 +1381,7 @@ export class RecommendationRepository {
       INNER JOIN product_variants pv ON pv.id = oi.product_variant_id
       WHERE o.customer_id = ${customerId}::uuid
         AND o.status <> 'CANCELLED'
-        AND o.created_at >= NOW() - MAKE_INTERVAL(days => ${withinDays})
+        AND o.created_at >= NOW() - MAKE_INTERVAL(days => ${withinDays}::int)
     `;
 
     return rows.map((r) => r.product_id);
@@ -1321,7 +1553,9 @@ export class RecommendationRepository {
       categoryName: p.category?.name ?? '',
       normalizedIngredients: Array.from(
         new Set([
-          ...normalizeIngredientNames(p.ingredients.map((i) => i.ingredientName)),
+          ...normalizeIngredientNames(
+            p.ingredients.map((i) => i.ingredientName),
+          ),
           ...extractNormalizedIngredientsFromText(p.howToUse),
         ]),
       ),
@@ -1362,7 +1596,9 @@ export class RecommendationRepository {
       categoryName: p.category?.name ?? '',
       normalizedIngredients: Array.from(
         new Set([
-          ...normalizeIngredientNames(p.ingredients.map((i) => i.ingredientName)),
+          ...normalizeIngredientNames(
+            p.ingredients.map((i) => i.ingredientName),
+          ),
           ...extractNormalizedIngredientsFromText(p.howToUse),
         ]),
       ),

@@ -1,27 +1,40 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { RecommendationPlacement } from '@prisma/client';
+import { Injectable, Logger } from "@nestjs/common";
+import { RecommendationPlacement } from "@prisma/client";
 import {
   HydratedRecommendedProduct,
   RankedCandidate,
   RecommendationRepository,
-} from '../../infrastructure/recommendation.repository';
-import { RecommendationCacheService } from '../../infrastructure/recommendation-cache.service';
-import { InSessionPersonalizerService } from '../services/in-session-personalizer.service';
+} from "../../infrastructure/recommendation.repository";
+import { RecommendationCacheService } from "../../infrastructure/recommendation-cache.service";
+import {
+  HOME_INTENT_WINDOW_MS,
+  HOME_MAX_PAGES,
+  rankHomeIntent,
+  RecentProductView,
+} from "../../domain/home-intent";
+import { InSessionPersonalizerService } from "../services/in-session-personalizer.service";
 import {
   TRENDING_7D_CACHE_KEY,
   TrendingCachePayload,
-} from './refresh-trending-cache.use-case';
+} from "./refresh-trending-cache.use-case";
 
 export interface GetHomeRecommendationsInput {
   customerId: string | null;
   recentIds: string[];
+  recentViews?: RecentProductView[];
+  guestCartSession?: string;
   limit?: number;
+  page?: number;
 }
 
 export interface RecommendationServingResult {
   placement: RecommendationPlacement;
   attributionSource: string;
   items: HydratedRecommendedProduct[];
+}
+
+interface HomeRecommendationsResult extends RecommendationServingResult {
+  pagination?: { page: number; totalPages: number };
 }
 
 const HOME_AFFINITY_L1_TTL_MS = 60_000;
@@ -39,20 +52,41 @@ export class GetHomeRecommendationsUseCase {
 
   async execute(
     input: GetHomeRecommendationsInput,
-  ): Promise<RecommendationServingResult> {
+  ): Promise<HomeRecommendationsResult> {
     const limit = Math.min(Math.max(input.limit ?? 12, 1), 30);
-    const excludeSet = new Set<string>(input.recentIds);
+    const poolSize = input.page === undefined ? limit : limit * HOME_MAX_PAGES;
+    const now = Date.now();
+    const recentViews = (input.recentViews ?? []).filter(
+      (view) =>
+        now - view.viewedAt < HOME_INTENT_WINDOW_MS &&
+        view.viewedAt <= now + 60_000,
+    );
+    const recentIds = [
+      ...new Set([
+        ...recentViews.map((view) => view.productId),
+        ...input.recentIds,
+      ]),
+    ];
+    const excludeSet = new Set<string>();
 
-    const [inSessionCandidates, trendingCandidates, affinityResult] =
+    const [inSessionCandidates, trendingCandidates, affinityResult, intent] =
       await Promise.all([
-        this.personalizer.getInSessionCandidates(input.recentIds, limit * 2),
-        this.loadTrendingCandidates(limit * 2),
+        this.personalizer.getInSessionCandidates(recentIds, limit * 2),
+        this.loadTrendingCandidates(Math.min(poolSize * 2, 50)),
         input.customerId
           ? this.loadAffinityAndRecentPurchases(input.customerId, limit * 2)
           : Promise.resolve({
               affinityCandidates: [] as RankedCandidate[],
               recentPurchasedIds: [] as string[],
+              avoidedTags: [] as string[],
             }),
+        input.customerId || input.guestCartSession
+          ? this.repository.findHomeIntent(
+              input.customerId,
+              input.guestCartSession,
+              new Date(now - HOME_INTENT_WINDOW_MS),
+            )
+          : { cartItems: [], events: [] },
       ]);
 
     for (const boughtId of affinityResult.recentPurchasedIds) {
@@ -61,68 +95,104 @@ export class GetHomeRecommendationsUseCase {
 
     const blended = new Map<string, RankedCandidate>();
 
-    // 1. UserAffinityProfile (60%)
-    this.mergeWeightedCandidates(
-      blended,
-      affinityResult.affinityCandidates,
-      0.6,
-      excludeSet,
-      'Dành riêng theo sở thích của bạn',
-    );
-
-    // 2. Real-time In-Session Boost (recentIds)
     this.mergeWeightedCandidates(
       blended,
       inSessionCandidates,
-      0.4,
+      0.48,
       excludeSet,
-      'Phù hợp với sản phẩm bạn vừa xem',
+      "Phù hợp với sản phẩm bạn vừa xem",
     );
 
-    // 3. Trending 7 ngày / Diversity (20%)
+    this.mergeWeightedCandidates(
+      blended,
+      affinityResult.affinityCandidates,
+      0.16,
+      excludeSet,
+      "Dành riêng theo sở thích của bạn",
+    );
+
     this.mergeWeightedCandidates(
       blended,
       trendingCandidates,
-      0.2,
+      0.1,
       excludeSet,
-      'Đang được yêu thích tuần này',
+      "Đang được yêu thích tuần này",
     );
 
-    let rankedPool = Array.from(blended.values()).sort(
-      (a, b) => b.score - a.score,
-    );
-
-    // 4. Cold Start fallback cuối cùng: Best Sellers
-    if (rankedPool.length < limit) {
-      const existingIds = new Set([
-        ...excludeSet,
-        ...rankedPool.map((c) => c.productId),
-      ]);
-      const bestSellers = await this.repository.findBestSellerProductCandidates(
-        limit * 2,
-        Array.from(existingIds),
-      );
-      this.mergeWeightedCandidates(
-        blended,
-        bestSellers,
-        0.15,
-        excludeSet,
-        'Sản phẩm bán chạy hàng đầu',
-      );
-      rankedPool = Array.from(blended.values()).sort(
-        (a, b) => b.score - a.score,
-      );
+    for (const candidate of rankHomeIntent(
+      intent,
+      recentViews,
+      input.recentIds,
+      now,
+    )) {
+      if (
+        !excludeSet.has(candidate.productId) &&
+        candidate.score > (blended.get(candidate.productId)?.score ?? 0)
+      ) {
+        blended.set(candidate.productId, candidate);
+      }
     }
 
-    const hydrated = await this.repository.filterAndHydrateEligibleProducts(
-      rankedPool.slice(0, limit * 2),
-      RecommendationPlacement.HOME,
-    );
+    const rankAndFilter = async () => {
+      const pool = Array.from(blended.values()).sort(
+        (a, b) => b.score - a.score || a.productId.localeCompare(b.productId),
+      );
+      return affinityResult.avoidedTags.length
+        ? this.repository.filterCandidatesByAvoidedTags(
+            pool,
+            affinityResult.avoidedTags,
+          )
+        : pool;
+    };
+    const addBestSellers = async () => {
+      const bestSellers = await this.repository.findBestSellerProductCandidates(
+        affinityResult.avoidedTags.length ? poolSize * 4 : poolSize,
+        [...excludeSet, ...blended.keys()],
+      );
+      bestSellers.forEach((item, index) => {
+        blended.set(item.productId, {
+          ...item,
+          score: 0.004 / (1 + index * 0.02),
+        });
+      });
+    };
+    const hydrate = (candidates: readonly RankedCandidate[]) =>
+      this.repository.filterAndHydrateEligibleProducts(
+        candidates,
+        RecommendationPlacement.HOME,
+      );
+
+    let items: HydratedRecommendedProduct[];
+    let pagination: HomeRecommendationsResult["pagination"];
+    if (input.page === undefined) {
+      items = await hydrate(await rankAndFilter());
+      if (items.length < poolSize) {
+        await addBestSellers();
+        items = await hydrate(await rankAndFilter());
+      }
+      items = items.slice(0, limit);
+    } else {
+      let eligible = await this.repository.findEligibleHomeCandidates(
+        await rankAndFilter(),
+      );
+      if (eligible.length < poolSize) {
+        await addBestSellers();
+        eligible = await this.repository.findEligibleHomeCandidates(
+          await rankAndFilter(),
+        );
+      }
+      const totalPages = Math.ceil(Math.min(eligible.length, poolSize) / limit);
+      const page = Math.min(input.page, Math.max(1, totalPages));
+      const offset = (page - 1) * limit;
+      pagination = { page, totalPages };
+      items = await hydrate(eligible.slice(offset, offset + limit));
+    }
 
     return {
       placement: RecommendationPlacement.HOME,
-      attributionSource: 'rec_home',
-      items: hydrated.slice(0, limit).map((item) => {
+      attributionSource: "rec_home",
+      ...(pagination ? { pagination } : {}),
+      items: items.map((item) => {
         const { tryOnColorHexes: _omit, ...clean } = item;
         return clean;
       }),
@@ -169,6 +239,7 @@ export class GetHomeRecommendationsUseCase {
   ): Promise<{
     affinityCandidates: RankedCandidate[];
     recentPurchasedIds: string[];
+    avoidedTags: string[];
   }> {
     const [profile, recentPurchasedIds] = await Promise.all([
       this.safeCacheRemember(
@@ -180,13 +251,17 @@ export class GetHomeRecommendationsUseCase {
     ]);
 
     if (!profile) {
-      return { affinityCandidates: [], recentPurchasedIds };
+      return { affinityCandidates: [], recentPurchasedIds, avoidedTags: [] };
     }
 
     const affinityCandidates =
       await this.repository.findAffinityMatchedCandidates(profile, limit);
 
-    return { affinityCandidates, recentPurchasedIds };
+    return {
+      affinityCandidates,
+      recentPurchasedIds,
+      avoidedTags: profile.avoidedTags ?? [],
+    };
   }
 
   private async loadTrendingCandidates(
@@ -200,20 +275,19 @@ export class GetHomeRecommendationsUseCase {
       );
     } catch (error: any) {
       this.logger.warn({
-        event: 'home_trending_cache_fallback',
-        error: error?.message ?? 'unknown',
+        event: "home_trending_cache_fallback",
+        error: error?.message ?? "unknown",
       });
     }
 
-    const rows =
-      payload?.items?.length
-        ? payload.items.slice(0, limit)
-        : await this.repository.queryTrendingProductsLast7Days(limit);
+    const rows = payload?.items?.length
+      ? payload.items.slice(0, limit)
+      : await this.repository.queryTrendingProductsLast7Days(limit);
 
     return rows.map((row) => ({
       productId: row.productId,
       score: row.score,
-      reason: 'Đang thịnh hành trong 7 ngày qua',
+      reason: "Đang thịnh hành trong 7 ngày qua",
     }));
   }
 
@@ -226,9 +300,9 @@ export class GetHomeRecommendationsUseCase {
       return await this.cache.remember(key, loader, options);
     } catch (error: any) {
       this.logger.warn({
-        event: 'home_cache_fallback',
+        event: "home_cache_fallback",
         key,
-        error: error?.message ?? 'unknown',
+        error: error?.message ?? "unknown",
       });
       return loader();
     }

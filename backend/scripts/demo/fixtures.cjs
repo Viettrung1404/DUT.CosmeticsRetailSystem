@@ -3,11 +3,7 @@ const demoId=(kind,key)=>id(`demo-v1:${kind}:${key}`);
 const ANCHOR=new Date('2026-10-27T03:00:00Z');
 const ACTIVE_START=new Date('2026-10-01T00:00:00Z');
 const ACTIVE_END=new Date('2027-10-27T00:00:00Z');
-const FLASH_SALE_END=(()=>{
-  const d=new Date();
-  d.setHours(23,59,59,999);
-  return d;
-})();
+const FLASH_SALE_END=new Date('2030-12-31T16:59:59.999Z');
 
 const SETTINGS=[
   {key:'loyalty_config',group:'loyalty',value:{point_rate:0.01,point_value_vnd:1}},
