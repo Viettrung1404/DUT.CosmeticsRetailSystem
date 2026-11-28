@@ -1,53 +1,74 @@
 import { getServerEnv } from "@/shared/config/env";
+import { fetchWithTimeout } from "@/shared/api/transport";
+import { normalizeApiError, ApiError } from "@/shared/api/errors";
+import { failure, privateHeaders } from "@/shared/auth/http";
+import { authRuntime, sessionId } from "@/shared/auth/server";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+async function relay(method: string, query?: string | null, body?: unknown, token?: string) {
   const env = getServerEnv();
+  const params = query ? `?query=${encodeURIComponent(query)}` : "";
+  const response = await fetchWithTimeout(
+    `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}/customer/products/search-history${params}`,
+    {
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    },
+    env.BACKEND_TIMEOUT_MS,
+  );
+  const data: unknown = await response.json().catch(() => undefined);
+  if (!response.ok) throw normalizeApiError(response, data);
+  if (data === undefined) throw new ApiError(502, "INVALID_RESPONSE");
+  return data;
+}
+
+async function relayWithOptionalSession(method: string, query?: string | null, body?: unknown) {
+  let id: string | undefined;
   try {
-    const res = await fetch(`${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}/customer/products/search-history`, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 0 },
-    });
-    const data = await res.json();
-    return Response.json(data);
+    id = await sessionId();
   } catch {
-    return Response.json({ data: { history: [], trending: [] } });
+    id = undefined;
+  }
+  if (id) {
+    try {
+      const data = await authRuntime().broker.read(id, (token) =>
+        relay(method, query, body, token),
+      );
+      return Response.json(data, { headers: privateHeaders });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+    }
+  }
+  const data = await relay(method, query, body);
+  return Response.json(data, { headers: privateHeaders });
+}
+
+export async function GET() {
+  try {
+    return await relayWithOptionalSession("GET");
+  } catch (error) {
+    return failure(error);
   }
 }
 
 export async function POST(request: Request) {
-  const env = getServerEnv();
   try {
-    const body = await request.json();
-    const res = await fetch(`${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}/customer/products/search-history`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return Response.json(data);
-  } catch {
-    return Response.json({ success: true });
+    return await relayWithOptionalSession("POST", undefined, await request.json());
+  } catch (error) {
+    return failure(error);
   }
 }
 
 export async function DELETE(request: Request) {
-  const env = getServerEnv();
-  const url = new URL(request.url);
-  const query = url.searchParams.get("query");
-  const targetUrl = query
-    ? `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}/customer/products/search-history?query=${encodeURIComponent(query)}`
-    : `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}/customer/products/search-history`;
-
   try {
-    const res = await fetch(targetUrl, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
-    });
-    const data = await res.json();
-    return Response.json(data);
-  } catch {
-    return Response.json({ success: true });
+    return await relayWithOptionalSession("DELETE", new URL(request.url).searchParams.get("query"));
+  } catch (error) {
+    return failure(error);
   }
 }

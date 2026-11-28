@@ -51,7 +51,7 @@ export function BrandDirectory({ brands }: { brands: Brand[] }) {
       {shown.length ? (
         <div className="brand-directory-grid">
           {shown.map((brand) => (
-            <Link href={`/brands/${brand.slug}`} key={brand.id}>
+            <Link prefetch={false} href={`/brands/${brand.slug}`} key={brand.id}>
               {brand.logoUrl ? (
                 <CatalogImage src={brand.logoUrl} alt={brand.name} />
               ) : (

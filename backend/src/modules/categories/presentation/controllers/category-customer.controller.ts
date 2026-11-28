@@ -2,6 +2,7 @@ import { Controller, Get, Header, Inject, Optional } from '@nestjs/common';
 import { VersionedPublicCacheService } from '@core/cache/versioned-public-cache.service';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '@core/decorators/public.decorator';
+import { PublicReadThrottle } from '@core/cache/public-read-throttle.decorator';
 import { CACHE_SERVICE, ICacheService } from '@core/cache/cache.service.interface';
 import { GetCategoryTreeUseCase } from '../../application/use-cases/get-category-tree.use-case';
 import { CategoryTreeResponseDto } from '../dtos/category-tree-response.dto';
@@ -22,6 +23,7 @@ export class CategoryCustomerController {
 
   @Public()
   @Get('tree')
+  @PublicReadThrottle('reference')
   @Header('Cache-Control', 'public, no-cache')
   @ApiOperation({
     summary: 'Lấy cây danh mục sản phẩm đa cấp phục vụ menu điều hướng Web/Mobile',

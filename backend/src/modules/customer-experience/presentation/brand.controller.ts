@@ -14,6 +14,7 @@ import {
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Public } from '@core/decorators/public.decorator';
+import { PublicReadThrottle } from '@core/cache/public-read-throttle.decorator';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { publicUrl } from '../domain/public-content';
 
@@ -34,6 +35,7 @@ export class BrandController {
 
   @Public()
   @Get()
+  @PublicReadThrottle('reference')
   @ApiOperation({
     summary: 'Danh sách thương hiệu đang hiển thị trên cửa hàng',
   })
@@ -61,6 +63,7 @@ export class BrandController {
 
   @Public()
   @Get(':slug')
+  @PublicReadThrottle('reference')
   @ApiOperation({ summary: 'Chi tiết thương hiệu đang hiển thị' })
   async detail(@Param('slug') slug: string) {
     const row = await this.db.brand.findFirst({

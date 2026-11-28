@@ -3,10 +3,7 @@ import { notFound } from "next/navigation";
 import {
   ArrowRight,
   CalendarDays,
-  Gift,
   ShoppingBag,
-  Zap,
-  Info,
   MapPin,
   Phone,
   Clock3,
@@ -28,11 +25,12 @@ import {
   getStore,
   getFaqs,
 } from "./server";
-import { CatalogImage, FlashGrid, ProductGrid, formatPrice } from "./components";
+import { CatalogImage, ProductGrid, formatPrice } from "./components";
 import { FavoriteButton } from "./favorite-button";
-import { FlashCountdown } from "./home-motion";
 import { BrandDirectory } from "./brand-directory";
 import { FaqList } from "./faq-list";
+import { FlashSaleBody, FlashSaleHero } from "./flash-sale-view";
+import { PromotionsHub, type PromotionsTab } from "./promotions-hub";
 import { StoreLocator } from "./store-locator";
 import {
   ContentBadge,
@@ -55,93 +53,24 @@ export async function publicDetail<T>(load: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function PromotionsScreen({ page }: { page: number }) {
-  const campaigns = await getPromotions(page);
+export async function PromotionsScreen({
+  page,
+  initialTab = "campaigns",
+}: {
+  page: number;
+  initialTab?: PromotionsTab;
+}) {
+  const [campaigns, flashCards] = await Promise.all([
+    getPromotions(page),
+    getFlashCards(20).catch(() => []),
+  ]);
   return (
-    <main id="main-content" className="content-page">
-      <section className="content-hero">
-        <div className="content-container">
-          <ContentBreadcrumb current="Khuyến mãi" />
-          <div className="content-hero-row">
-            <div>
-              <ContentBadge>GLOWUP EXCLUSIVE OFFERS</ContentBadge>
-              <h1>ƯU ĐÃI DÀNH RIÊNG CHO BẠN</h1>
-              <p>Khám phá các chương trình làm đẹp và ưu đãi đang diễn ra tại GlowUp Beauty.</p>
-            </div>
-            <div className="content-metric">
-              <span className="content-icon">
-                <Gift />
-              </span>
-              <div>
-                <strong>{campaigns.total.toString().padStart(2, "0")} ƯU ĐÃI</strong>
-                <small>Đang áp dụng hôm nay</small>
-              </div>
-            </div>
-          </div>
-          <nav
-            className="content-pills"
-            aria-label="Chương trình khuyến mãi"
-            style={{ marginTop: 32 }}
-          >
-            <Link href="/promotions" aria-current="page">
-              Đang diễn ra <small>{campaigns.total}</small>
-            </Link>
-            <Link href="/flash-sale">
-              <Zap size={15} /> Flash Sale
-            </Link>
-          </nav>
-        </div>
-      </section>
-      <section className="content-container content-section">
-        <div className="content-section-heading">
-          <h2>Chiến dịch nổi bật</h2>
-        </div>
-        {campaigns.items.length ? (
-          <div className="campaign-grid">
-            {campaigns.items.map((campaign, index) => (
-              <article key={campaign.id} className="campaign-tile">
-                <Link className="campaign-art" href={`/promotions/${campaign.id}`}>
-                  <CatalogImage
-                    src={`/images/stitch/content/campaign-${(index % 4) + 1}.webp`}
-                    alt=""
-                  />
-                  <span>{campaign.isFlashSale ? "FLASH SALE" : "ĐANG DIỄN RA"}</span>
-                  <div>
-                    <h2>{campaign.name}</h2>
-                    {campaign.slotStartHour != null ? <strong>Giá riêng từng biến thể</strong> : campaign.type === "PERCENTAGE" && <strong>{campaign.value}%</strong>}
-                  </div>
-                </Link>
-                <div className="campaign-copy">
-                  <p>
-                    {campaign.description ||
-                      "Xem chi tiết sản phẩm và điều kiện áp dụng của chương trình."}
-                  </p>
-                  <div>
-                    <span>
-                      <CalendarDays size={14} style={{ display: "inline", marginRight: 5 }} />
-                      {contentDate(campaign.startDate)} – {contentDate(campaign.endDate)}
-                    </span>
-                    <Link href={`/promotions/${campaign.id}`}>
-                      Khám phá ngay <ArrowRight size={15} />
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <ContentEmpty title="Chưa có chương trình đang diễn ra">
-            Các ưu đãi mới sẽ được cập nhật tại đây.
-          </ContentEmpty>
-        )}
-        <ContentPagination
-          page={page}
-          total={campaigns.total}
-          limit={campaigns.limit}
-          base="/promotions"
-        />
-      </section>
-    </main>
+    <PromotionsHub
+      campaigns={campaigns}
+      flashCards={flashCards}
+      page={page}
+      initialTab={initialTab}
+    />
   );
 }
 
@@ -261,70 +190,15 @@ export async function PromotionScreen({ id, page }: { id: string; page: number }
 
 export async function FlashSaleScreen() {
   const cards = await getFlashCards(20);
-  const first = cards[0];
-  const endDate = cards.map((card) => card.endDate).sort()[0];
   return (
     <main id="main-content" className="content-page">
       <section className="content-hero">
         <div className="content-container">
           <ContentBreadcrumb current="Flash Sale" />
-          <div className="flash-hero-layout">
-            <div>
-              <ContentBadge>
-                <Zap size={14} /> DEAL GIỚI HẠN · ƯU ĐÃI MỖI NGÀY
-              </ContentBadge>
-              <h1>
-                FLASH SALE CỰC XINH
-                <br />
-                GIÁ SỐC GIỜ VÀNG
-              </h1>
-              {first?.campaignStartDate && first?.campaignEndDate && <p>
-                Chiến dịch {new Date(first.campaignStartDate).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} đến {new Date(Date.parse(first.campaignEndDate) - 1).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}.
-                Mỗi khung 2 giờ có 20 sản phẩm nổi bật. Tất cả sản phẩm khác vẫn có giá sale.
-              </p>}
-              <p>
-                Săn ưu đãi cho những sản phẩm yêu thích. Số lượt ưu đãi và giá được xác nhận tại
-                bước thanh toán.
-              </p>
-            </div>
-            <div className="flash-clock-panel">
-              <p>Ưu đãi hiện tại kết thúc sau</p>
-              {first && endDate ? (
-                <FlashCountdown endDate={endDate} serverTime={first.serverTime} />
-              ) : (
-                <span className="muted">Chờ chương trình tiếp theo</span>
-              )}
-            </div>
-          </div>
+          <FlashSaleHero cards={cards} />
         </div>
       </section>
-      <div className="flash-active-bar">
-        <div className="content-container">
-          <ContentBadge>
-            <Zap size={15} /> Đang diễn ra
-          </ContentBadge>
-          <span>{cards.length} lựa chọn đang có ưu đãi</span>
-        </div>
-      </div>
-      <section className="content-container content-section campaign-products">
-        <FlashGrid cards={cards} />
-      </section>
-      <section className="content-container">
-        <div className="campaign-rules">
-          <h2>
-            <Info size={20} style={{ display: "inline", marginRight: 8 }} />
-            Quy định mua hàng Flash Sale tại GlowUp Beauty
-          </h2>
-          <p>
-            Ưu đãi có số lượt giới hạn. Thêm sản phẩm vào giỏ hàng không giữ giá hoặc giữ lượt ưu
-            đãi; hệ thống xác nhận lại khi đặt hàng.
-          </p>
-          <p>
-            Với sản phẩm có điều kiện áp dụng, xem chi tiết và tổng tiền tại bước thanh toán trước
-            khi xác nhận.
-          </p>
-        </div>
-      </section>
+      <FlashSaleBody cards={cards} />
     </main>
   );
 }

@@ -1,18 +1,60 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Search, Clock, TrendingUp, X } from "lucide-react";
 import { readBff } from "@/shared/api/browser";
+import { apiErrorMessage } from "@/shared/api/errors";
 import { formatPrice } from "./components";
 import { searchHintsSchema, type SearchHints } from "./search-hints";
 
 const empty: SearchHints = { keywords: [], brands: [], products: [] };
-const hintsCache = new Map<string, SearchHints>();
 const STORAGE_KEY = "glowup_web_search_history";
+const HINTS_CACHE_TTL_MS = 30_000;
+const hintsCache = new Map<string, { data: SearchHints; expiresAt: number }>();
+
+function getCachedHints(query: string): SearchHints | null {
+  const entry = hintsCache.get(query.toLowerCase());
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    hintsCache.delete(query.toLowerCase());
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedHints(query: string, data: SearchHints) {
+  if (hintsCache.size >= 50) {
+    const oldest = hintsCache.keys().next().value;
+    if (oldest) hintsCache.delete(oldest);
+  }
+  hintsCache.set(query.toLowerCase(), { data, expiresAt: Date.now() + HINTS_CACHE_TTL_MS });
+}
+
+const HISTORY_LABEL_MAX_CHARS = 45;
+
+function truncateHistoryLabel(label: string, maxChars = HISTORY_LABEL_MAX_CHARS) {
+  return label.length > maxChars ? `${label.slice(0, maxChars).trimEnd()}…` : label;
+}
+
+function historyQueries(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item: unknown) => {
+    if (typeof item === "string") {
+      const clean = item.trim();
+      return clean ? [clean] : [];
+    }
+    if (item && typeof item === "object" && "query" in item && typeof item.query === "string") {
+      const clean = item.query.trim();
+      return clean ? [clean] : [];
+    }
+    return [];
+  });
+}
 
 export function SearchBox() {
   const router = useRouter();
+  const pathname = usePathname();
   const [value, setValue] = useState("");
   const [hints, setHints] = useState<SearchHints>(empty);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -26,27 +68,29 @@ export function SearchBox() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [hintError, setHintError] = useState("");
   const query = value.trim();
 
   // 1. Tải lịch sử tìm kiếm từ localStorage & API
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setRecentSearches(parsed);
-        }
-      }
-    } catch {}
+    const controller = new AbortController();
+    void Promise.resolve().then(() => {
+      if (controller.signal.aborted) return;
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        const queries = stored ? historyQueries(JSON.parse(stored)) : [];
+        if (queries.length) setRecentSearches(queries.slice(0, 8));
+      } catch {}
+    });
 
     // Lấy thêm từ backend nếu có
-    fetch("/api/catalog/search-history")
+    fetch("/api/catalog/search-history", { signal: controller.signal })
       .then((r) => r.json())
       .then((res) => {
+        if (controller.signal.aborted) return;
         const history = res?.data?.history;
         if (Array.isArray(history) && history.length > 0) {
-          const queries: string[] = history.map((item: any) => item.query || item).filter(Boolean);
+          const queries = historyQueries(history);
           setRecentSearches((prev) => {
             const merged = Array.from(new Set([...queries, ...prev])).slice(0, 8);
             try {
@@ -57,20 +101,24 @@ export function SearchBox() {
         }
         const trending = res?.data?.trending;
         if (Array.isArray(trending) && trending.length > 0) {
-          const tQueries: string[] = trending.map((item: any) => item.query || item).filter(Boolean);
+          const tQueries = historyQueries(trending);
           if (tQueries.length > 0) {
             setTrendingSearches(tQueries.slice(0, 6));
           }
         }
       })
       .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const saveQueryToHistory = (q: string) => {
     const clean = q.trim();
     if (!clean) return;
     setRecentSearches((prev) => {
-      const updated = [clean, ...prev.filter((item) => item.toLowerCase() !== clean.toLowerCase())].slice(0, 8);
+      const updated = [
+        clean,
+        ...prev.filter((item) => item.toLowerCase() !== clean.toLowerCase()),
+      ].slice(0, 8);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch {}
@@ -113,26 +161,31 @@ export function SearchBox() {
   // Lọc lịch sử tìm kiếm nếu người dùng đang gõ
   const matchingHistory = useMemo(() => {
     if (!query) return recentSearches;
-    return recentSearches.filter((item) =>
-      item.toLowerCase().includes(query.toLowerCase())
-    );
+    return recentSearches.filter((item) => item.toLowerCase().includes(query.toLowerCase()));
   }, [query, recentSearches]);
 
   useEffect(() => {
-    if (query.length < 1) {
-      setHints(empty);
-      setLoading(false);
-      return;
-    }
+    if (pathname !== "/search") return;
+    const params = new URLSearchParams(window.location.search);
+    const urlQuery = params.get("q")?.trim() ?? "";
+    if (!urlQuery) return;
+    const timer = window.setTimeout(() => {
+      setValue((prev) => (prev.trim() === urlQuery ? prev : urlQuery));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
 
-    if (hintsCache.has(query)) {
-      setHints(hintsCache.get(query)!);
-      setLoading(false);
-      setOpen(true);
-      return;
+  useEffect(() => {
+    if (query.length < 2) return;
+    const cached = getCachedHints(query);
+    if (cached) {
+      const timer = window.setTimeout(() => {
+        setHints(cached);
+        setLoading(false);
+        setHintError("");
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-
-    setLoading(true);
     const controller = new AbortController();
     const timer = setTimeout(() => {
       readBff(
@@ -142,16 +195,17 @@ export function SearchBox() {
       )
         .then((result) => {
           if (!controller.signal.aborted) {
-            hintsCache.set(query, result);
+            setCachedHints(query, result);
             setHints(result);
             setLoading(false);
             setOpen(true);
             setActive(-1);
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (!controller.signal.aborted) {
             setLoading(false);
+            setHintError(apiErrorMessage(error));
           }
         });
     }, 150);
@@ -198,7 +252,7 @@ export function SearchBox() {
         ...hints.keywords.filter(
           (k) =>
             k.toLocaleLowerCase("vi").trim() !== query.toLocaleLowerCase("vi") &&
-            !matchingHistory.includes(k)
+            !matchingHistory.includes(k),
         ),
       ].slice(0, 5);
 
@@ -244,12 +298,14 @@ export function SearchBox() {
     const isTrending = kind === "trending";
 
     if (isHistory) {
+      const displayLabel = truncateHistoryLabel(label);
       return (
         <div key={`${kind}-${href}`} className="search-history-row">
           <Link
             id={`search-suggestion-${current}`}
             role="option"
             aria-selected={active === current}
+            title={label}
             href={href}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
@@ -258,7 +314,7 @@ export function SearchBox() {
             }}
           >
             <Clock size={14} color="#9d394f" />
-            <span>{label}</span>
+            <span>{displayLabel}</span>
           </Link>
           <button
             type="button"
@@ -279,6 +335,7 @@ export function SearchBox() {
         <Link
           key={`${kind}-${href}`}
           id={`search-suggestion-${current}`}
+          className="search-trending-link"
           role="option"
           aria-selected={active === current}
           href={href}
@@ -324,11 +381,12 @@ export function SearchBox() {
       action="/search"
       role="search"
       className="header-search search-suggest"
-      onSubmit={() => {
-        if (query) {
-          saveQueryToHistory(query);
-          setOpen(false);
-        }
+      onSubmit={(event) => {
+        if (!query) return;
+        event.preventDefault();
+        saveQueryToHistory(query);
+        setOpen(false);
+        router.push(`/search?q=${encodeURIComponent(query)}`);
       }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
@@ -375,16 +433,18 @@ export function SearchBox() {
           setActive(-1);
           setOpen(true);
           const q = next.trim();
-          if (q.length >= 1) {
-            if (hintsCache.has(q)) {
-              setHints(hintsCache.get(q)!);
+          setHintError("");
+          if (q.length < 2) {
+            setHints(empty);
+            setLoading(false);
+          } else {
+            const cached = getCachedHints(q);
+            if (cached) {
+              setHints(cached);
               setLoading(false);
             } else {
               setLoading(true);
             }
-          } else {
-            setLoading(false);
-            setHints(empty);
           }
         }}
       />
@@ -404,6 +464,11 @@ export function SearchBox() {
       {shouldShowDropdown && (
         <div id="search-suggestions" role="listbox" className="search-suggestions">
           {loading && <p className="search-hints-status">Đang tìm gợi ý…</p>}
+          {hintError && (
+            <p role="status" className="search-hints-status">
+              {hintError}
+            </p>
+          )}
 
           {/* Nhóm lịch sử tìm kiếm (hiện khi mới bấm vào hoặc khi gõ có chứa từ trong lịch sử) */}
           {matchingHistory.length > 0 && (
@@ -426,16 +491,18 @@ export function SearchBox() {
           )}
 
           {/* Nhóm xu hướng tìm kiếm (hiện khi chưa gõ gì và không có lịch sử) */}
-          {!query && matchingHistory.length === 0 && options.some((item) => item.kind === "trending") && (
-            <div role="group" aria-label="Xu hướng tìm kiếm">
-              <div className="search-history-header">
-                <strong>Xu hướng tìm kiếm</strong>
+          {!query &&
+            matchingHistory.length === 0 &&
+            options.some((item) => item.kind === "trending") && (
+              <div role="group" aria-label="Xu hướng tìm kiếm">
+                <div className="search-history-header">
+                  <strong>Xu hướng tìm kiếm</strong>
+                </div>
+                {options
+                  .filter((item) => item.kind === "trending")
+                  .map((item) => option(item.kind, item.label, item.href))}
               </div>
-              {options
-                .filter((item) => item.kind === "trending")
-                .map((item) => option(item.kind, item.label, item.href))}
-            </div>
-          )}
+            )}
 
           {/* Nhóm từ khóa gợi ý */}
           {query.length >= 1 && options.some((item) => item.kind === "keyword") && (

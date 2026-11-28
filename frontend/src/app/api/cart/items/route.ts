@@ -22,7 +22,10 @@ export async function GET() {
         ),
       );
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      const isGuestFallback =
+        error instanceof ApiError &&
+        (error.status === 401 || (error.status === 403 && error.code === "CUSTOMER_REQUIRED"));
+      if (!isGuestFallback) throw error;
       const guest = await guestCartSession();
       if (!guest)
         return json({
@@ -56,7 +59,10 @@ export async function POST(request: Request) {
         (token) => upstream("/auth/me", z.unknown(), undefined, token),
       );
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      const isGuestFallback =
+        error instanceof ApiError &&
+        (error.status === 401 || (error.status === 403 && error.code === "CUSTOMER_REQUIRED"));
+      if (!isGuestFallback) throw error;
       const guest = await guestCartSession(true);
       result = await upstream("/cart/items", cartSchema, { ...input, sessionId: guest });
     }

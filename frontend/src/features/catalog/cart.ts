@@ -1,4 +1,10 @@
 import { z } from "zod";
+const optionalText = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? undefined)
+  .optional();
+
 export const cartSchema = z.object({
   id: z.string(),
   totalQuantity: z.number(),
@@ -10,11 +16,11 @@ export const cartSchema = z.object({
     z.object({
       id: z.string(),
       productVariantId: z.string(),
-      productId: z.string().optional(),
-      productSlug: z.string().optional(),
-      productName: z.string().optional(),
-      variantName: z.string().optional(),
-      thumbnailUrl: z.string().optional(),
+      productId: optionalText,
+      productSlug: optionalText,
+      productName: optionalText,
+      variantName: optionalText,
+      thumbnailUrl: optionalText,
       quantity: z.number(),
       currentPrice: z.number(),
       totalPrice: z.number(),
@@ -29,10 +35,10 @@ export const cartSchema = z.object({
       z.object({
         id: z.string(),
         productVariantId: z.string(),
-        productSlug: z.string().optional(),
-        productName: z.string().optional(),
-        variantName: z.string().optional(),
-        thumbnailUrl: z.string().optional(),
+        productSlug: optionalText,
+        productName: optionalText,
+        variantName: optionalText,
+        thumbnailUrl: optionalText,
         quantity: z.number(),
         currentPrice: z.number(),
         totalPrice: z.number(),

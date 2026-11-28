@@ -1,6 +1,6 @@
 "use client";
 import { ContentLoading } from "@/shared/ui/content-loading";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { z } from "zod";
 import { Check, ChevronRight, Coins, Gift, TicketPercent, X } from "lucide-react";
 import { checkoutBenefitsSchema, previewSchema } from "./contracts";
@@ -31,6 +31,7 @@ export function CheckoutBenefits({
   onPointsChange,
   onApply,
   disabled,
+  pointsDisabled,
 }: {
   data?: z.infer<typeof checkoutBenefitsSchema>;
   pending: boolean;
@@ -43,12 +44,16 @@ export function CheckoutBenefits({
   onPointsChange: (points: number) => void;
   onApply: (code: string) => Promise<void>;
   disabled: boolean;
+  pointsDisabled?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
   const locked = disabled || applying;
+  const pointsLocked = (pointsDisabled ?? disabled) || applying;
+  const coinProgress =
+    maximumPoints > 0 ? Math.min(100, Math.max(0, (pointsUsed / maximumPoints) * 100)) : 0;
   async function apply(code: string) {
     setError("");
     setApplying(true);
@@ -206,7 +211,11 @@ export function CheckoutBenefits({
               {pending
                 ? "Đang tải số dư…"
                 : data
-                  ? `Bạn có ${data.points.balance.toLocaleString("vi-VN")} xu`
+                  ? `Bạn có ${data.points.balance.toLocaleString("vi-VN")} xu${
+                      maximumPoints > 0
+                        ? ` · Tối đa ${maximumPoints.toLocaleString("vi-VN")} xu/đơn`
+                        : ""
+                    }`
                   : "Chưa tải được số dư xu"}
             </small>
           </div>
@@ -216,7 +225,7 @@ export function CheckoutBenefits({
             role="switch"
             aria-label="Sử dụng xu GlowUp"
             aria-checked={pointsUsed > 0}
-            disabled={!maximumPoints || locked}
+            disabled={!maximumPoints || pointsLocked}
             onClick={() => onPointsChange(pointsUsed ? 0 : maximumPoints)}
           >
             <span />
@@ -226,33 +235,73 @@ export function CheckoutBenefits({
           <>
             <div className="checkout-coins-value">
               <span>
-                {pointsUsed
-                  ? `Dùng ${pointsUsed.toLocaleString("vi-VN")} xu`
-                  : "Dùng xu để giảm tiền hàng"}
+                {pointsUsed > 0 ? (
+                  <>
+                    Đang chọn: <strong>{pointsUsed.toLocaleString("vi-VN")} xu</strong>
+                  </>
+                ) : maximumPoints > 0 ? (
+                  "Kéo thanh trượt để chọn số xu muốn dùng"
+                ) : (
+                  "Chưa đủ điều kiện dùng xu cho đơn này"
+                )}
               </span>
-              <strong>
-                {pointsUsed
+              <strong className={pointsUsed > 0 ? "is-active" : "is-hint"}>
+                {pointsUsed > 0
                   ? `−${formatPrice(pointsUsed * data.points.value)}`
-                  : `1 xu = ${formatPrice(data.points.value)}`}
+                  : maximumPoints > 0
+                    ? `Tối đa −${formatPrice(maximumPoints * data.points.value)}`
+                    : `1 xu = ${formatPrice(data.points.value)}`}
               </strong>
             </div>
             {maximumPoints > 0 && (
               <>
-                <input
-                  type="range"
-                  aria-label="Số xu muốn sử dụng"
-                  min={0}
-                  max={maximumPoints}
-                  step={data.points.step}
-                  value={pointsUsed}
-                  disabled={locked}
-                  onChange={(event) => onPointsChange(Number(event.target.value))}
-                />
+                <div className="checkout-coins-slider-wrap">
+                  <input
+                    type="range"
+                    className="checkout-coins-slider"
+                    aria-label="Số xu muốn sử dụng"
+                    min={0}
+                    max={maximumPoints}
+                    step={data.points.step}
+                    value={pointsUsed}
+                    disabled={pointsLocked}
+                    style={{ "--coin-progress": `${coinProgress}%` } as CSSProperties}
+                    onChange={(event) => onPointsChange(Number(event.target.value))}
+                  />
+                  <label className="checkout-coins-number">
+                    <input
+                      type="number"
+                      aria-label="Nhập số xu muốn sử dụng"
+                      min={0}
+                      max={maximumPoints}
+                      step={data.points.step}
+                      value={pointsUsed}
+                      disabled={pointsLocked}
+                      onChange={(event) => {
+                        const raw = Number(event.target.value);
+                        if (!Number.isFinite(raw)) {
+                          onPointsChange(0);
+                          return;
+                        }
+                        const clamped = Math.min(maximumPoints, Math.max(0, Math.floor(raw)));
+                        const step = data.points.step || 1;
+                        onPointsChange(Math.floor(clamped / step) * step);
+                      }}
+                    />
+                    <span>xu</span>
+                  </label>
+                </div>
                 <div className="checkout-coins-range">
-                  <span>0 xu</span>
                   <button
                     type="button"
-                    disabled={locked}
+                    disabled={pointsLocked || pointsUsed === 0}
+                    onClick={() => onPointsChange(0)}
+                  >
+                    0 xu
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pointsLocked || pointsUsed === maximumPoints}
                     onClick={() => onPointsChange(maximumPoints)}
                   >
                     Dùng tối đa {maximumPoints.toLocaleString("vi-VN")} xu

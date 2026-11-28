@@ -366,9 +366,15 @@
 }
 .catalog-card-image {
   display: block;
-  position: relative;
   background: #fefafc;
   aspect-ratio: 1;
+}
+.catalog-card-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: pointer;
 }
 .catalog-card-image img,
 .catalog-card-image .catalog-image-placeholder {
@@ -3693,6 +3699,7 @@ a.content-card:hover {
 }
 .search-suggestions [role="group"] {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   padding: 5px 0 8px;
   border-bottom: 1px solid #f1e8ea;
 }
@@ -3743,15 +3750,28 @@ a.content-card:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-right: 8px;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 10px;
 }
 .search-history-row a {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.search-history-row a svg {
+  flex-shrink: 0;
+}
+.search-suggestions a.search-trending-link {
+  justify-content: flex-start;
   gap: 8px;
 }
 .search-history-delete {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: #a49194;

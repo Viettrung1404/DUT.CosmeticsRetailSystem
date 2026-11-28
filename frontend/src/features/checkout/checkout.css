@@ -156,10 +156,8 @@
 .checkout-text-action:disabled {
   opacity: 0.45;
 }
-.checkout-address-cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.checkout-address-single {
+  display: block;
 }
 .checkout-address-card {
   min-width: 0;
@@ -168,6 +166,9 @@
   border-radius: 12px;
   background: #fefafc;
   padding-bottom: 36px;
+}
+.checkout-address-card.is-single {
+  padding-bottom: 0;
 }
 .checkout-address-card.is-selected {
   background: #fff5f4;
@@ -178,7 +179,12 @@
   padding: 16px;
   cursor: pointer;
 }
-.checkout-address-card input {
+.checkout-address-card.is-single > label {
+  cursor: default;
+  padding-bottom: 12px;
+}
+.checkout-address-card input,
+.checkout-picker-card input {
   accent-color: #9d394f;
   position: absolute;
   top: 18px;
@@ -189,8 +195,9 @@
 .checkout-address-person {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 5px 8px;
-  padding-right: 18px;
+  padding-right: 24px;
   font-size: 13px;
 }
 .checkout-address-person span {
@@ -199,19 +206,25 @@
 }
 .checkout-address-default {
   display: inline-block;
-  margin-top: 8px;
   background: #fce4e9;
-  color: #9d394f;
-  padding: 3px 7px;
+  color: #9d394f !important;
+  padding: 2px 7px;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 10px !important;
   font-weight: 700;
 }
-.checkout-address-card label > p {
+.checkout-address-card label > p,
+.checkout-picker-card label > p {
   font-size: 12px;
   line-height: 1.8;
-  margin-block: 12px;
+  margin-block: 10px;
   overflow-wrap: anywhere;
+}
+.checkout-address-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
 .checkout-address-label,
 .checkout-address-selected {
@@ -219,21 +232,79 @@
   gap: 4px;
   align-items: center;
   color: #776d6d;
-  font-size: 10px;
+  font-size: 11px;
 }
 .checkout-address-selected {
   color: #227a55;
-  margin-left: 10px;
+}
+.checkout-address-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px 16px 14px;
+  border-top: 1px dashed #f0d8de;
 }
 .checkout-address-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9d394f;
+  cursor: pointer;
+}
+.checkout-picker-card .checkout-address-edit {
   position: absolute;
   bottom: 12px;
   right: 14px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
+}
+.checkout-address-change {
+  padding: 6px 14px;
+  border: 1px solid #9d394f;
+  border-radius: 8px;
+  background: #fff;
   color: #9d394f;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.checkout-address-change:hover {
+  background: #fce4e9;
+}
+.checkout-address-picker-list {
+  display: grid;
+  gap: 12px;
+  max-height: min(55dvh, 440px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.checkout-picker-card {
+  min-width: 0;
+  position: relative;
+  border: 1px solid #efe5e7;
+  border-radius: 12px;
+  background: #fefafc;
+  padding-bottom: 34px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.checkout-picker-card:hover {
+  border-color: #d69aa8;
+}
+.checkout-picker-card.is-selected {
+  background: #fff5f4;
+  border: 2px solid #9d394f;
+}
+.checkout-picker-card > label {
+  display: block;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.checkout-picker-actions {
+  justify-content: space-between;
+  align-items: center;
 }
 .checkout-address-legacy {
   padding: 0 16px 10px;
@@ -579,8 +650,14 @@
 .checkout-page .checkout-coins input[type="range"] {
   padding: 0;
   border: 0;
-  margin: 10px 0 0;
+  margin: 0;
+}
+.checkout-page .checkout-coins-number input {
+  padding: 0;
+  border: 0;
+  margin: 0;
   background: transparent;
+  height: auto;
 }
 .checkout-shipping-option p,
 .checkout-shipping-note {
@@ -846,27 +923,106 @@
 .checkout-coins-value {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  font-size: 11px;
-  margin-block: 16px 8px;
+  font-size: 12px;
+  margin-block: 14px 10px;
 }
-.checkout-coins-value strong {
+.checkout-coins-value strong.is-active {
   color: #227a55;
+  font-size: 13px;
 }
-.checkout-coins input[type="range"] {
-  width: 100%;
-  accent-color: #9d394f;
+.checkout-coins-value strong.is-hint {
+  color: #8c7546;
+  font-weight: 600;
+}
+.checkout-coins-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.checkout-coins-slider {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  border-radius: 999px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(
+    to right,
+    #9d394f 0%,
+    #9d394f var(--coin-progress, 0%),
+    #eadbe0 var(--coin-progress, 0%),
+    #eadbe0 100%
+  );
+  cursor: pointer;
+}
+.checkout-coins-slider:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.checkout-coins-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #9d394f;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px #412e2733;
+  cursor: grab;
+}
+.checkout-coins-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+.checkout-coins-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #9d394f;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px #412e2733;
+  cursor: grab;
+}
+.checkout-coins-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid #e4d5da;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  color: #776d6d;
+  flex-shrink: 0;
+}
+.checkout-coins-number input {
+  width: 72px;
+  border: 0;
+  background: transparent;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: #412e27;
+  outline: 0;
 }
 .checkout-coins-range {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: #947b49;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .checkout-coins-range button {
   color: #9d394f;
   font-weight: 600;
+  cursor: pointer;
+}
+.checkout-coins-range button:disabled {
+  color: #947b49;
+  opacity: 0.65;
+  cursor: default;
 }
 .checkout-coins > p {
   color: #947b49;

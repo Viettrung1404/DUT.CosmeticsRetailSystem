@@ -1,4 +1,5 @@
 "use client";
+import { pollingDelay } from "@/shared/api/retry";
 import { z } from "zod";
 import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
@@ -1012,14 +1013,14 @@ export function OrderDetail({ id }: { id: string }) {
     queryKey: ["order-detail", id],
     queryFn: ({ signal }) => readBff(`/api/account/orders/${id}`, orderDetailSchema, signal),
     refetchInterval: (query) =>
-      ["PENDING_PAYMENT", "PENDING"].includes(query.state.data?.status ?? "") ? 5000 : false,
+      ["PENDING_PAYMENT", "PENDING"].includes(query.state.data?.status ?? "") ? pollingDelay(query.state.error, 5000) : false,
   });
 
   const trackingQuery = useQuery({
     queryKey: ["tracking", id],
     queryFn: ({ signal }) => readBff(`/api/account/orders/${id}/tracking`, trackingSchema, signal),
     refetchInterval: (query) =>
-      ["SHIPPING", "OUT_FOR_DELIVERY", "PROCESSING"].includes(query.state.data?.status ?? "") ? 15000 : false,
+      ["SHIPPING", "OUT_FOR_DELIVERY", "PROCESSING"].includes(query.state.data?.status ?? "") ? pollingDelay(query.state.error, 15000) : false,
   });
 
   const handleCopy = (code: string) => {

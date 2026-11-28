@@ -1,4 +1,4 @@
-import { Throttle } from '@nestjs/throttler';
+import { PublicReadThrottle } from '@core/cache/public-read-throttle.decorator';
 import {
   Controller,
   DefaultValuePipe,
@@ -47,6 +47,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get()
+  @PublicReadThrottle('catalog')
   @ApiOperation({
     summary: 'Lấy danh sách sản phẩm hiển thị trên Web/Mobile (phân trang, lọc, sắp xếp)',
   })
@@ -77,7 +78,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get('search')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @PublicReadThrottle('search')
   @ApiOperation({
     summary: 'Tìm kiếm sản phẩm theo từ khóa (OpenSearch + fallback DB)',
   })
@@ -159,6 +160,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get('facets')
+  @PublicReadThrottle('catalog')
   @ApiOperation({ summary: 'Số lượng sản phẩm đang bán theo danh mục, thương hiệu và tag' })
   async facets(@Query('categoryId') categoryId?: string) {
     return this.catalog?.facets(categoryId) ?? { categories: [], brands: [], tags: [] };
@@ -166,7 +168,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get('suggest')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @PublicReadThrottle('search')
   @ApiOperation({
     summary: 'Gợi ý tìm kiếm nhanh / autocomplete (tối đa 20 kết quả)',
   })
@@ -185,7 +187,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get('search-hints')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @PublicReadThrottle('search')
   @ApiOperation({ summary: 'Gợi ý từ khóa, thương hiệu và sản phẩm cho ô tìm kiếm' })
   async searchHints(@Query() queryDto: SuggestProductsQueryDto, @Req() req?: { user?: { userId?: string } }) {
     if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
@@ -194,6 +196,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':id/availability')
+  @PublicReadThrottle('catalog')
   @ApiOperation({ summary: 'Số lượng khả dụng theo cửa hàng cho một biến thể' })
   async availability(@Param('id', ParseUUIDPipe) id: string, @Query('variantId', ParseUUIDPipe) variantId: string) {
     if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
@@ -202,6 +205,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':slug')
+  @PublicReadThrottle('catalog')
   @ApiOperation({
     summary: 'Xem chi tiết sản phẩm theo slug (URL thân thiện SEO)',
   })
@@ -214,6 +218,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':id/related')
+  @PublicReadThrottle('catalog')
   @ApiOperation({
     summary: 'Lấy danh sách sản phẩm liên quan (cùng danh mục hoặc thương hiệu)',
   })

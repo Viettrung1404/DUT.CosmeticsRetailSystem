@@ -231,6 +231,7 @@
   padding: 11px 18px;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
 }
 .content-pills [aria-current],
 .content-pills [aria-pressed="true"] {

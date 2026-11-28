@@ -1,6 +1,7 @@
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { readBff } from "@/shared/api/browser";
+import { ApiError } from "@/shared/api/errors";
 import { cartSchema } from "./cart";
 import { wishlistSchema } from "@/features/post-purchase/contracts";
 
@@ -23,10 +24,15 @@ export const emptyCart = (): Cart => ({
 export const cartQuery = () =>
   queryOptions({
     queryKey: ["cart"] as const,
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 5_000,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    retry: (failureCount, error) => {
+      if (failureCount >= 2) return false;
+      return error instanceof ApiError && [502, 503, 504].includes(error.status);
+    },
+    retryDelay: (attempt) => Math.min(1000, 400 * (attempt + 1)),
     queryFn: ({ signal }) => readBff("/api/cart/items", cartSchema, signal),
   });
 

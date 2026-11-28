@@ -1,5 +1,5 @@
 import { getSuggestions } from "@/features/catalog/server";
-import { ApiError } from "@/shared/api/errors";
+import { failure } from "@/shared/auth/http";
 export const runtime = "nodejs";
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q")?.trim() || "";
@@ -8,12 +8,6 @@ export async function GET(request: Request) {
   try {
     return Response.json(await getSuggestions(query), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return Response.json(
-      { code: error instanceof ApiError ? error.code : "SERVICE_UNAVAILABLE" },
-      {
-        status: error instanceof ApiError ? error.status : 503,
-        headers: { "Cache-Control": "no-store" },
-      },
-    );
+    return failure(error);
   }
 }

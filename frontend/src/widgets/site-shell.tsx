@@ -213,6 +213,7 @@ export function SiteHeader({
               {navigation.map((item) => (
                 <div className="nav-group" key={item.href}>
                   <Link
+                    prefetch={false}
                     href={item.href}
                     aria-current={activeNavigation(item) ? "page" : undefined}
                     className={`nav-pill pill-${item.tone}`}

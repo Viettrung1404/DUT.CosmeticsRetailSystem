@@ -24,6 +24,24 @@ interface PublicOffer {
 @Injectable()
 export class PublicCatalogService {
   private readonly logger = new Logger(PublicCatalogService.name);
+  private loggedSearchMode = false;
+  private readonly hintsCache = new Map<
+    string,
+    {
+      data: {
+        products: Array<{
+          id: string;
+          name: string;
+          slug: string;
+          imageUrl: string | null;
+          price: number;
+        }>;
+        brands: Array<{ id: string; name: string; slug: string }>;
+        keywords: string[];
+      };
+      expiresAt: number;
+    }
+  >();
 
   constructor(
     private readonly db: PrismaService,
@@ -158,8 +176,19 @@ export class PublicCatalogService {
     // pagination always come from PostgreSQL, including edits made directly in DB.
     // ===== 2. FALLBACK PATH: PostgreSQL Raw SQL CTE =====
     // OpenSearch contributes relevance hints; DB remains authoritative for membership, price and pagination.
-    const hints = query && this.searchService ? await this.searchService.search(query, 0, 100) : null;
+    const hints =
+      query && this.searchService?.isAvailable
+        ? await this.searchService.search(query, 0, 100)
+        : null;
     const hintIds = hints?.ids ?? [];
+    if (query && !this.loggedSearchMode) {
+      this.loggedSearchMode = true;
+      this.logger.log(
+        this.searchService?.isAvailable
+          ? `[Search] Active engine: OpenSearch (${hintIds.length} candidate hits for "${query}")`
+          : '[Search] Active engine: PostgreSQL fallback (OpenSearch unavailable)',
+      );
+    }
     const sort =
       filter.sortBy === 'price_asc'
         ? Prisma.sql`effective_price ASC`
@@ -170,14 +199,21 @@ export class PublicCatalogService {
             : filter.sortBy === 'bestseller'
               ? Prisma.sql`total_sold DESC`
               : query
-                ? Prisma.sql`COALESCE(array_position(${hintIds}::uuid[],id),2147483647),total_sold DESC`
+                ? Prisma.sql`COALESCE(array_position(${hintIds}::uuid[],id),2147483647),relevance_rank ASC,total_sold DESC`
                 : Prisma.sql`created_at DESC`;
     const rows = await this.db.$queryRaw<
       { id: string; category_id: string; effective_price: Prisma.Decimal; total: bigint }[]
     >(Prisma.sql`
       WITH RECURSIVE selected_categories AS (SELECT id FROM categories WHERE id=${filter.categoryId ?? null}::uuid OR id=ANY(${filter.categoryIds ?? []}::uuid[]) UNION ALL SELECT c.id FROM categories c JOIN selected_categories parent ON c.parent_id=parent.id),
       candidate_variants AS (
-        SELECT p.id,p.created_at,p.avg_rating,p.total_sold,p.category_id,v.id AS variant_id,v.price
+        SELECT p.id,p.created_at,p.avg_rating,p.total_sold,p.category_id,v.id AS variant_id,v.price,
+          CASE
+            WHEN ${query ?? null}::text IS NULL THEN 0
+            WHEN p.name ILIKE ${(query ?? '') + '%'} THEN 0
+            WHEN p.name ILIKE ${'%' + (query ?? '') + '%'} THEN 1
+            WHEN b.name ILIKE ${'%' + (query ?? '') + '%'} OR c.name ILIKE ${'%' + (query ?? '') + '%'} THEN 2
+            ELSE 3
+          END AS relevance_rank
         FROM products p JOIN categories c ON c.id=p.category_id
         LEFT JOIN brands b ON b.id=p.brand_id
         JOIN product_variants v ON v.product_id=p.id AND v.is_active=true
@@ -187,9 +223,10 @@ export class PublicCatalogService {
         AND (${filter.rating ?? null}::numeric IS NULL OR p.avg_rating>=${filter.rating ?? null})
         AND (${filter.tag ?? null}::text IS NULL OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name ILIKE ${'%' + (filter.tag ?? '') + '%'}))
         AND (cardinality(${filter.tags ?? []}::text[])=0 OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name=ANY(${filter.tags ?? []}::text[])))
-        AND (${query ?? null}::text IS NULL OR p.name ILIKE ${'%' + (query ?? '') + '%'} OR p.description ILIKE ${'%' + (query ?? '') + '%'} OR b.name ILIKE ${'%' + (query ?? '') + '%'} OR p.id=ANY(${hintIds}::uuid[]) OR EXISTS(SELECT 1 FROM product_ingredients i WHERE i.product_id=p.id AND i.ingredient_name ILIKE ${'%' + (query ?? '') + '%'}))
+        AND (${query ?? null}::text IS NULL OR p.name ILIKE ${'%' + (query ?? '') + '%'} OR b.name ILIKE ${'%' + (query ?? '') + '%'} OR c.name ILIKE ${'%' + (query ?? '') + '%'} OR p.id=ANY(${hintIds}::uuid[]) OR EXISTS(SELECT 1 FROM product_tags t WHERE t.product_id=p.id AND t.tag_name ILIKE ${'%' + (query ?? '') + '%'}) OR EXISTS(SELECT 1 FROM product_ingredients i WHERE i.product_id=p.id AND i.ingredient_name ILIKE ${'%' + (query ?? '') + '%'}))
       ), priced AS (
         SELECT candidate.id,candidate.category_id,candidate.created_at,candidate.avg_rating,candidate.total_sold,
+          MIN(candidate.relevance_rank) AS relevance_rank,
           MIN(sprint5_variant_price(candidate.variant_id, ${tier}::numeric)) AS effective_price
         FROM candidate_variants candidate
         GROUP BY candidate.id,candidate.category_id,candidate.created_at,candidate.avg_rating,candidate.total_sold
@@ -480,20 +517,70 @@ export class PublicCatalogService {
     const result = this.present(row, prices, offers);
     return result;
   }
-  async suggest(query: string, limit: number, userId?: string) {
-    const result = await this.list(
-      Object.assign(new ProductFilterDto(), { page: 1, limit }),
-      userId,
-      query,
-    );
-    return result.items.map((p) => ({
-      id: p.id!,
+  private async suggestLight(query: string, limit: number) {
+    const q = query.trim();
+    if (!q) return [];
+    const rows = await this.db.$queryRaw<
+      { id: string; name: string; slug: string; imageUrl: string | null; price: number }[]
+    >(Prisma.sql`
+      SELECT
+        p.id,
+        p.name,
+        p.slug,
+        (
+          SELECT img.image_url
+          FROM product_images img
+          WHERE img.product_id = p.id
+          ORDER BY img.is_primary DESC, img.sort_order ASC
+          LIMIT 1
+        ) AS "imageUrl",
+        COALESCE(
+          p.sale_price,
+          (SELECT MIN(v.price) FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true),
+          p.base_price
+        )::float8 AS price
+      FROM products p
+      JOIN categories c ON c.id = p.category_id AND c.is_active = true
+      LEFT JOIN brands b ON b.id = p.brand_id
+      WHERE p.is_active = true
+        AND (p.brand_id IS NULL OR b.is_active = true)
+        AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true)
+        AND (
+          p.name ILIKE ${'%' + q + '%'}
+          OR b.name ILIKE ${'%' + q + '%'}
+          OR c.name ILIKE ${'%' + q + '%'}
+          OR EXISTS (SELECT 1 FROM product_tags t WHERE t.product_id = p.id AND t.tag_name ILIKE ${'%' + q + '%'})
+        )
+      ORDER BY
+        CASE
+          WHEN p.name ILIKE ${q + '%'} THEN 0
+          WHEN p.name ILIKE ${'%' + q + '%'} THEN 1
+          WHEN b.name ILIKE ${'%' + q + '%'} OR c.name ILIKE ${'%' + q + '%'} THEN 2
+          ELSE 3
+        END ASC,
+        p.total_sold DESC,
+        p.id ASC
+      LIMIT ${limit}
+    `);
+    return rows.map((p) => ({
+      id: p.id,
       name: p.name,
       slug: p.slug,
-      imageUrl: p.primaryImage ?? null,
-      price: p.effectivePrice!,
+      imageUrl: p.imageUrl ?? null,
+      price: Number(p.price ?? 0),
     }));
   }
+
+  async suggest(query: string, limit: number, _userId?: string) {
+    const q = query.trim();
+    if (!q) return [];
+    if (this.searchService?.isAvailable) {
+      const osItems = await this.searchService.suggest(q, limit);
+      if (osItems && osItems.length > 0) return osItems;
+    }
+    return this.suggestLight(q, limit);
+  }
+
   async searchHints(query: string, userId?: string) {
     const q = query.trim().slice(0, 100);
     if (!q) return { products: [], brands: [], keywords: [], history: [] };
@@ -512,15 +599,56 @@ export class PublicCatalogService {
       }
     };
 
-    // 2. Fallback to PostgreSQL
+    const cacheKey = q.toLowerCase();
+    const cached = this.hintsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      const history = await fetchUserHistory();
+      return { ...cached.data, history };
+    }
+
+    const saveCache = (data: {
+      products: Array<{ id: string; name: string; slug: string; imageUrl: string | null; price: number }>;
+      brands: Array<{ id: string; name: string; slug: string }>;
+      keywords: string[];
+    }) => {
+      if (this.hintsCache.size >= 300) {
+        const oldestKey = this.hintsCache.keys().next().value;
+        if (oldestKey) this.hintsCache.delete(oldestKey);
+      }
+      this.hintsCache.set(cacheKey, { data, expiresAt: Date.now() + 30_000 });
+    };
+
+    // 1. Fast path via OpenSearch (single round-trip for products, brands, and tags)
+    if (this.searchService?.isAvailable) {
+      const [osHints, history] = await Promise.all([
+        this.searchService.searchHints(q, 5),
+        fetchUserHistory(),
+      ]);
+      if (osHints && (osHints.products.length > 0 || osHints.brands.length > 0 || osHints.keywords.length > 0)) {
+        const payload = {
+          products: osHints.products.map((p) => ({
+            ...p,
+            imageUrl: p.imageUrl ?? null,
+          })),
+          brands: osHints.brands,
+          keywords: osHints.keywords,
+        };
+        saveCache(payload);
+        return { ...payload, history };
+      }
+    }
+
+    // 2. Lightweight PostgreSQL fallback (no description ILIKE, no promotions/pricing CTE)
     const activeProduct = { isActive: true, category: { isActive: true }, variants: { some: { isActive: true } } };
     const [products, brands, tags, history] = await Promise.all([
-      this.suggest(q, 5, userId),
+      this.suggestLight(q, 5),
       this.db.brand.findMany({ where: { isActive: true, name: { contains: q, mode: 'insensitive' }, products: { some: activeProduct } }, select: { id: true, name: true, slug: true }, take: 4, orderBy: { name: 'asc' } }),
       this.db.productTag.groupBy({ by: ['tagName'], where: { tagName: { contains: q, mode: 'insensitive' }, product: activeProduct }, _count: { _all: true }, orderBy: { _count: { tagName: 'desc' } }, take: 5 }),
       fetchUserHistory(),
     ]);
-    return { products, brands, keywords: tags.map(tag => tag.tagName), history };
+    const payload = { products, brands, keywords: tags.map((tag) => tag.tagName) };
+    saveCache(payload);
+    return { ...payload, history };
   }
   async related(productId: string, limit: number, userId?: string) {
     // ===== 2. FALLBACK PATH: PostgreSQL =====

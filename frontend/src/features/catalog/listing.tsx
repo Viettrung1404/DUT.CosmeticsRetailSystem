@@ -39,6 +39,7 @@ export async function ProductListing({
         </div>
       </div>
       <CatalogListingClient
+        key={base === "/search" ? `search:${filters.q ?? ""}` : base}
         base={base}
         categoryId={category?.id}
         categories={categories}

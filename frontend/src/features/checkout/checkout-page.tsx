@@ -833,6 +833,7 @@ export function CheckoutPage() {
                 onPointsChange={setUsePoints}
                 onApply={applyCoupon}
                 disabled={busy || couponBusy || quoteBusy || !quote}
+                pointsDisabled={busy || couponBusy || !matchingQuote}
               />
             ) : (
               <div className="checkout-benefits-guest">

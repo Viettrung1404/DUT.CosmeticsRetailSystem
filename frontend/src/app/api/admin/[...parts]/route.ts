@@ -3,10 +3,14 @@ import { getServerEnv } from "@/shared/config/env";
 import { authRuntime, sessionId } from "@/shared/auth/server";
 import { ApiError } from "@/shared/api/errors";
 import { ALLOWED_STAFF_ROLES } from "@/shared/auth/roles";
+import { revalidateTag } from "next/cache";
 
 export const runtime = "nodejs";
 
-async function handleProxy(request: NextRequest, { params }: { params: Promise<{ parts: string[] }> }) {
+async function handleProxy(
+  request: NextRequest,
+  { params }: { params: Promise<{ parts: string[] }> },
+) {
   try {
     const { parts } = await params;
     const targetSubPath = parts.join("/");
@@ -18,7 +22,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     } catch {
       return NextResponse.json(
         { message: "Phiên đăng nhập đã hết hạn hoặc không tồn tại (401 Unauthorized)." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -28,16 +32,25 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
     if (!session || !session.accessToken) {
       return NextResponse.json(
         { message: "Phiên làm việc không có token hợp lệ." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     // 2. Kiểm tra RBAC (Customer không được gọi Admin API)
-    const userRole = (session.user?.roleName || (session.user as { role?: string })?.role || "").toUpperCase();
-    if (userRole === "CUSTOMER" || (userRole && !ALLOWED_STAFF_ROLES.includes(userRole as (typeof ALLOWED_STAFF_ROLES)[number]))) {
+    const userRole = (
+      session.user?.roleName ||
+      (session.user as { role?: string })?.role ||
+      ""
+    ).toUpperCase();
+    if (
+      userRole === "CUSTOMER" ||
+      (userRole && !ALLOWED_STAFF_ROLES.includes(userRole as (typeof ALLOWED_STAFF_ROLES)[number]))
+    ) {
       return NextResponse.json(
-        { message: "Tài khoản của bạn không có quyền truy cập chức năng quản trị (403 Forbidden)." },
-        { status: 403 }
+        {
+          message: "Tài khoản của bạn không có quyền truy cập chức năng quản trị (403 Forbidden).",
+        },
+        { status: 403 },
       );
     }
 
@@ -92,21 +105,30 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
         responseData = { raw: responseText };
       }
 
+      if (upstreamRes.ok && !["GET", "HEAD"].includes(request.method)) {
+        revalidateTag("catalog-reference", { expire: 0 });
+      }
       return NextResponse.json(responseData, {
         status: upstreamRes.status,
+        headers: {
+          "Cache-Control": "private, no-store",
+          ...(upstreamRes.headers.has("retry-after")
+            ? { "Retry-After": upstreamRes.headers.get("retry-after")! }
+            : {}),
+        },
       });
     } finally {
       clearTimeout(timeout);
     }
   } catch (error: unknown) {
     if (error instanceof ApiError) {
-      return NextResponse.json({ message: error.message, code: error.code }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status },
+      );
     }
     const message = error instanceof Error ? error.message : "Lỗi giao tiếp với Backend Gateway.";
-    return NextResponse.json(
-      { message },
-      { status: 500 }
-    );
+    return NextResponse.json({ message }, { status: 500 });
   }
 }
 

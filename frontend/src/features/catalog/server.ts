@@ -1,5 +1,8 @@
 import "server-only";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { z } from "zod";
+import { ApiError } from "@/shared/api/errors";
 import { getServerEnv } from "@/shared/config/env";
 import { readApiResponse } from "@/shared/api/response";
 import { fetchWithTimeout } from "@/shared/api/transport";
@@ -109,6 +112,7 @@ const promotionPageSchema = z.object({
   limit: z.number(),
   serverTime: z.string(),
 });
+export type PromotionPage = z.infer<typeof promotionPageSchema>;
 const promotionDetailSchema = promotionSchema.extend({
   serverTime: z.string(),
   page: z.number(),
@@ -215,18 +219,60 @@ export const suggestionsSchema = z.array(
 );
 export type FlashCard = z.infer<typeof flashCardsSchema>[number];
 
-async function request<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
-  const env = getServerEnv();
+async function load(path: string, origin: string, timeout: number, policy: string) {
+  const init: RequestInit = JSON.parse(policy);
   const response = await fetchWithTimeout(
-    `${env.BACKEND_API_BASE_URL.replace(/\/$/, "")}${path}`,
+    `${origin}${path}`,
     {
-      headers: { Accept: "application/json", "X-Request-Id": crypto.randomUUID() },
-      cache: init?.next ? undefined : "no-store",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
       ...init,
     },
-    env.BACKEND_TIMEOUT_MS,
+    timeout,
   );
-  return (await readApiResponse(response, schema)).data;
+  return (await readApiResponse(response, z.unknown())).data;
+}
+
+// Only these anonymous reference DTOs may survive a render. Never add commerce or user data.
+const referenceSchema = (path: string) =>
+  path === "/categories/tree"
+    ? z.array(categorySchema)
+    : /^\/brands\?limit=\d+$/.test(path)
+      ? brandSchema
+      : undefined;
+const loadReference = unstable_cache(
+  async (path: string, origin: string, timeout: number) => {
+    const schema = referenceSchema(path);
+    if (!schema) throw new Error("Invalid public reference cache path");
+    const data = await load(path, origin, timeout, "{}");
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) throw new ApiError(502, "INVALID_RESPONSE");
+    return parsed.data;
+  },
+  ["catalog-reference-v1"],
+  { revalidate: 60, tags: ["catalog-reference"] },
+);
+
+// Primitive keys dedup metadata, layout and pages even with custom timeout signals.
+// React scopes this memo to the current render; price/stock/offers stay fresh across requests.
+const loadForRender = cache(
+  async (path: string, origin: string, timeout: number, policy: string) =>
+    referenceSchema(path)
+      ? loadReference(path, origin, timeout)
+      : load(path, origin, timeout, policy),
+);
+
+async function request<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+  const env = getServerEnv();
+  const data = await loadForRender(
+    path,
+    env.BACKEND_API_BASE_URL.replace(/\/$/, ""),
+    env.BACKEND_TIMEOUT_MS,
+    JSON.stringify(init ?? {}),
+  );
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) throw new ApiError(502, "INVALID_RESPONSE");
+  return parsed.data;
 }
 export interface ProductFilters {
   q?: string;
@@ -250,6 +296,7 @@ export function getProducts(filters: ProductFilters = {}) {
     if (value !== undefined && value !== "") params.set(key, String(value));
   });
   if (q) params.set("q", q);
+  params.sort();
   return request(`/customer/products${q ? "/search" : ""}?${params}`, productPageSchema);
 }
 export const getProduct = (slug: string) =>
@@ -260,10 +307,7 @@ export const getRelated = (id: string) =>
   request(`/customer/products/${encodeURIComponent(id)}/related?limit=4`, z.array(productSchema), {
     cache: "no-store",
   });
-export const getCategories = () =>
-  request("/categories/tree", z.array(categorySchema), {
-    next: { revalidate: 300, tags: ["categories"] },
-  });
+export const getCategories = () => request("/categories/tree", z.array(categorySchema));
 export const getBanners = (position: string) =>
   request(`/banners?position=${encodeURIComponent(position)}`, bannerSchema);
 export const getPosts = () => request("/blog/posts?page=1&limit=3", postSchema);
@@ -291,7 +335,7 @@ export const getReviews = (id: string, page = 1) =>
   request(
     `/customer/products/${encodeURIComponent(id)}/reviews?page=${page}&limit=5`,
     reviewsSchema,
-    { next: { revalidate: 30, tags: [`reviews-${id}`] } },
+    { cache: "no-store" },
   );
 export const getFlashCards = (limit = 5) =>
   request(
@@ -303,7 +347,7 @@ export const getFacets = (categoryId?: string) =>
     `/customer/products/facets${categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : ""}`,
     facetsSchema,
     {
-      next: { revalidate: 60, tags: [categoryId ? `facets-${categoryId}` : "facets"] },
+      cache: "no-store",
     },
   );
 export const getAvailability = (productId: string, variantId: string) =>

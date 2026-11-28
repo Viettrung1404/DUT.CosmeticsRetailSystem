@@ -105,12 +105,16 @@ export function CartContents({
         heading={!compact}
       />
     );
-  if (isError)
+  if (isError && !data)
     return (
       <div className="catalog-empty">
-        Không tải được giỏ hàng. <button onClick={() => refetch()}>Thử lại</button>
+        Không tải được giỏ hàng.{" "}
+        <button type="button" onClick={() => void refetch()}>
+          Thử lại
+        </button>
       </div>
     );
+  if (!data) return null;
   const items = [
     ...data.items,
     ...data.unavailableItems.filter(
@@ -430,9 +434,14 @@ export function CartContents({
             </aside>
           )}
         </div>
-        {error && (
+        {(error || isError) && (
           <p role="alert" className="cart-warning">
-            {error}
+            {error || "Chưa đồng bộ được giỏ hàng mới nhất."}{" "}
+            {isError && (
+              <button type="button" onClick={() => void refetch()}>
+                Thử lại
+              </button>
+            )}
           </p>
         )}
       </div>

@@ -59,17 +59,29 @@ export class OpenSearchProductService implements OnModuleInit {
   private client: Client | null = null;
   private isConnected = false;
   private readonly indexName = 'products';
+  private readonly nodeUrl: string;
 
   constructor(private readonly configService: ConfigService) {
     const node =
       this.configService.get<string>('OPENSEARCH_NODE') ||
       this.configService.get<string>('ELASTICSEARCH_NODE', 'http://localhost:9200');
+    this.nodeUrl = node;
 
     try {
       this.client = new Client({ node });
     } catch (error) {
-      this.logger.warn(`Could not initialize OpenSearch client: ${(error as Error).message}`);
+      this.logger.warn(
+        `[OpenSearch] Could not initialize client (${this.nodeUrl}): ${(error as Error).message}`,
+      );
     }
+  }
+
+  getStatus() {
+    return {
+      available: this.isAvailable,
+      node: this.nodeUrl,
+      index: this.indexName,
+    };
   }
 
   async onModuleInit() {
@@ -87,11 +99,19 @@ export class OpenSearchProductService implements OnModuleInit {
   }
 
   async initIndex(): Promise<void> {
-    if (!this.client) return;
+    if (!this.client) {
+      this.logger.warn(
+        `[OpenSearch] UNAVAILABLE (${this.nodeUrl}) — client not initialized. Falling back to PostgreSQL search.`,
+      );
+      return;
+    }
     try {
       const ping = await this.client.ping();
       if (!ping || (ping.statusCode && ping.statusCode !== 200)) {
-        this.logger.warn('OpenSearch ping failed. Fallback to PostgreSQL search will be used.');
+        this.isConnected = false;
+        this.logger.warn(
+          `[OpenSearch] UNAVAILABLE (${this.nodeUrl}, ping status=${ping?.statusCode ?? 'unknown'}). Falling back to PostgreSQL search.`,
+        );
         return;
       }
       this.isConnected = true;
@@ -155,12 +175,25 @@ export class OpenSearchProductService implements OnModuleInit {
             },
           },
         });
-        this.logger.log(`Created OpenSearch index: ${this.indexName} with Vietnamese analyzer`);
+        this.logger.log(
+          `[OpenSearch] AVAILABLE & CONNECTED (${this.nodeUrl}, created index="${this.indexName}", docs=0)`,
+        );
+      } else {
+        let docCount = 0;
+        try {
+          const countRes: any = await this.client.count({ index: this.indexName });
+          docCount = Number(countRes?.body?.count ?? countRes?.count ?? 0);
+        } catch {
+          /* count is informational only */
+        }
+        this.logger.log(
+          `[OpenSearch] AVAILABLE & CONNECTED (${this.nodeUrl}, index="${this.indexName}", docs=${docCount})`,
+        );
       }
     } catch (error) {
       this.isConnected = false;
       this.logger.warn(
-        `OpenSearch is currently unreachable (${(error as Error).message}). Database fallback active.`,
+        `[OpenSearch] UNAVAILABLE (${this.nodeUrl}, ${(error as Error).message}). Falling back to PostgreSQL search.`,
       );
     }
   }
@@ -331,7 +364,7 @@ export class OpenSearchProductService implements OnModuleInit {
         filterClauses.push({ term: { tags: params.tag } });
       }
 
-      // 6. Text Query (Search) - Tối ưu độ chuẩn xác theo phong cách search-hints
+      // 6. Text Query (Search) - Ưu tiên khớp cụm từ & tên sản phẩm chuẩn xác
       const mustClauses: any[] = [];
       if (params.query && params.query.trim().length > 0) {
         const q = params.query.trim();
@@ -342,36 +375,45 @@ export class OpenSearchProductService implements OnModuleInit {
               {
                 multi_match: {
                   query: q,
-                  fields: ['name^8', 'brandName^4', 'categoryName^3', 'tags^3'],
+                  fields: ['name^10', 'brandName^4', 'categoryName^3', 'tags^3'],
                   type: 'phrase',
-                  boost: 5,
+                  boost: 6,
                 },
               },
-              // 2. Khớp tiền tố cụm từ (Phrase prefix chuẩn xác như search-hints)
+              // 2. Khớp tiền tố cụm từ
               {
                 multi_match: {
                   query: q,
-                  fields: ['name^5', 'brandName^3', 'tags^2', 'categoryName^2'],
+                  fields: ['name^6', 'brandName^3', 'categoryName^2', 'tags^2'],
                   type: 'phrase_prefix',
-                  boost: 3,
+                  boost: 4,
                 },
               },
-              // 3. Khớp các từ với toán tử AND (tất cả các từ phải xuất hiện)
+              // 3. Khớp đủ toàn bộ từ khóa trên tên/thương hiệu/danh mục/tag
               {
                 multi_match: {
                   query: q,
-                  fields: ['name^3', 'brandName^2', 'categoryName', 'tags'],
+                  fields: ['name^4', 'brandName^2', 'categoryName^2', 'tags'],
                   operator: 'and',
                   boost: 2,
                 },
               },
-              // 4. Khớp linh hoạt với minimum_should_match
+              // 4. Khớp linh hoạt cho truy vấn dài (<= 3 từ bắt buộc đủ từ; >= 4 từ cho phép 75%), không lẫn thành phần
               {
                 multi_match: {
                   query: q,
-                  fields: ['name^2', 'brandName', 'tags', 'ingredients'],
-                  minimum_should_match: '75%',
+                  fields: ['name^3', 'brandName^2', 'categoryName', 'tags'],
+                  minimum_should_match: '3<75%',
                   boost: 1,
+                },
+              },
+              // 5. Khớp chính xác tên thành phần (trọng số thấp hơn tên sản phẩm)
+              {
+                match_phrase: {
+                  ingredients: {
+                    query: q,
+                    boost: 0.4,
+                  },
                 },
               },
             ],
@@ -524,7 +566,8 @@ export class OpenSearchProductService implements OnModuleInit {
     query: string,
     limit = 8,
   ): Promise<Array<{ id: string; name: string; slug: string; imageUrl?: string | null; price: number }> | null> {
-    if (!this.isConnected || !this.client) return null;
+    if (!this.isConnected || !this.client || !query.trim()) return null;
+    const q = query.trim();
     try {
       const response = await (this.client.search as any)({
         index: this.indexName,
@@ -534,16 +577,44 @@ export class OpenSearchProductService implements OnModuleInit {
             bool: {
               must: [
                 {
-                  multi_match: {
-                    query,
-                    fields: ['name^3', 'brandName^2'],
-                    type: 'phrase_prefix',
+                  bool: {
+                    should: [
+                      {
+                        multi_match: {
+                          query: q,
+                          fields: ['name^10', 'brandName^4', 'tags^3'],
+                          type: 'phrase',
+                          boost: 6,
+                        },
+                      },
+                      {
+                        multi_match: {
+                          query: q,
+                          fields: ['name^6', 'brandName^3', 'categoryName^2', 'tags^2'],
+                          type: 'phrase_prefix',
+                          boost: 4,
+                        },
+                      },
+                      {
+                        multi_match: {
+                          query: q,
+                          fields: ['name^4', 'brandName^2', 'categoryName', 'tags'],
+                          operator: 'and',
+                          boost: 2,
+                        },
+                      },
+                    ],
+                    minimum_should_match: 1,
                   },
                 },
               ],
-              filter: [{ term: { isActive: true } }],
+              filter: [
+                { term: { isActive: true } },
+                { term: { hasActiveVariants: true } },
+              ],
             },
           },
+          sort: [{ _score: 'desc' }, { totalSold: 'desc' }, { id: 'asc' }],
         },
       });
 
@@ -554,8 +625,8 @@ export class OpenSearchProductService implements OnModuleInit {
           id: doc.id,
           name: doc.name,
           slug: doc.slug,
-          imageUrl: doc.primaryImage,
-          price: doc.salePrice ?? doc.basePrice,
+          imageUrl: doc.primaryImage ?? null,
+          price: Number(doc.salePrice ?? doc.minPrice ?? doc.basePrice),
         };
       });
     } catch (error) {
@@ -572,7 +643,8 @@ export class OpenSearchProductService implements OnModuleInit {
     brands: Array<{ id: string; name: string; slug: string }>;
     keywords: string[];
   } | null> {
-    if (!this.isConnected || !this.client || !query.trim()) return null;
+    const q = query.trim();
+    if (!this.isConnected || !this.client || !q) return null;
     try {
       const response = await (this.client.search as any)({
         index: this.indexName,
@@ -582,16 +654,44 @@ export class OpenSearchProductService implements OnModuleInit {
             bool: {
               must: [
                 {
-                  multi_match: {
-                    query: query.trim(),
-                    fields: ['name^3', 'brandName^2', 'tags'],
-                    type: 'phrase_prefix',
+                  bool: {
+                    should: [
+                      {
+                        multi_match: {
+                          query: q,
+                          fields: ['name^10', 'brandName^4', 'tags^3'],
+                          type: 'phrase',
+                          boost: 6,
+                        },
+                      },
+                      {
+                        multi_match: {
+                          query: q,
+                          fields: ['name^6', 'brandName^3', 'categoryName^2', 'tags^2'],
+                          type: 'phrase_prefix',
+                          boost: 4,
+                        },
+                      },
+                      {
+                        multi_match: {
+                          query: q,
+                          fields: ['name^4', 'brandName^2', 'categoryName', 'tags'],
+                          operator: 'and',
+                          boost: 2,
+                        },
+                      },
+                    ],
+                    minimum_should_match: 1,
                   },
                 },
               ],
-              filter: [{ term: { isActive: true } }],
+              filter: [
+                { term: { isActive: true } },
+                { term: { hasActiveVariants: true } },
+              ],
             },
           },
+          sort: [{ _score: 'desc' }, { totalSold: 'desc' }, { id: 'asc' }],
           aggs: {
             matching_brands: {
               terms: { field: 'brandId', size: 4 },
@@ -601,7 +701,7 @@ export class OpenSearchProductService implements OnModuleInit {
               },
             },
             matching_tags: {
-              terms: { field: 'tags', size: 5 },
+              terms: { field: 'tags', size: 12 },
             },
           },
         },
@@ -615,9 +715,17 @@ export class OpenSearchProductService implements OnModuleInit {
           name: doc.name,
           slug: doc.slug,
           imageUrl: doc.primaryImage ?? null,
-          price: Number(doc.salePrice ?? doc.basePrice ?? doc.minPrice),
+          price: Number(doc.salePrice ?? doc.minPrice ?? doc.basePrice),
         };
       });
+
+      const fold = (s: string) =>
+        s
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/đ/gi, 'd')
+          .toLowerCase();
+      const foldedQ = fold(q);
 
       const aggs = (response.body as any)?.aggregations;
       const brands = (aggs?.matching_brands?.buckets ?? [])
@@ -626,11 +734,12 @@ export class OpenSearchProductService implements OnModuleInit {
           name: (b.name?.buckets?.[0]?.key as string) ?? '',
           slug: (b.slug?.buckets?.[0]?.key as string) ?? '',
         }))
-        .filter((b: any) => b.name.length > 0 && b.id);
+        .filter((b: any) => b.name.length > 0 && b.id && fold(b.name).includes(foldedQ));
 
       const keywords = (aggs?.matching_tags?.buckets ?? [])
         .map((b: any) => b.key as string)
-        .filter(Boolean);
+        .filter((tag: string) => tag && fold(tag).includes(foldedQ))
+        .slice(0, 5);
 
       return { products, brands, keywords };
     } catch (error) {

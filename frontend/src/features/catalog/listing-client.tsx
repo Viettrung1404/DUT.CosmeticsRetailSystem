@@ -4,6 +4,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { readBff } from "@/shared/api/browser";
+import { apiErrorMessage } from "@/shared/api/errors";
+import { catalogRetry, catalogRetryDelay } from "@/shared/api/retry";
 import { productPageSchema, type ProductPage } from "./contracts";
 import { ProductGrid } from "./components";
 import { filtersFromSearch, filtersToSearch, type ProductFilters } from "./filters";
@@ -52,9 +54,12 @@ export function CatalogListingClient({
     initialData: key === initialKey ? initialResult : undefined,
     placeholderData: keepPreviousData,
     staleTime: 0,
-    refetchOnMount: "always",
+    // The server just loaded this snapshot; filters and focus still fetch fresh commerce data.
+    refetchOnMount: false,
     refetchOnWindowFocus: true,
     gcTime: 5 * 60_000,
+    retry: catalogRetry,
+    retryDelay: catalogRetryDelay,
   });
 
   useEffect(() => {
@@ -134,9 +139,9 @@ export function CatalogListingClient({
     setDraftBrandIds(new Set());
   }
 
-  const brands = new Set(filters.brandIds);
+  const brands = useMemo(() => new Set(filters.brandIds), [filters.brandIds]);
   const data = result.data;
-  const brandList = facets?.brands.filter((item) => item.count > 0) || [];
+  const brandList = useMemo(() => facets?.brands.filter((item) => item.count > 0) || [], [facets]);
 
   const displayedBrands = useMemo(() => {
     const top10 = brandList.slice(0, 10);
@@ -160,7 +165,7 @@ export function CatalogListingClient({
           <div className="filter-group">
             <h3>Danh mục</h3>
             {categories.map((item) => (
-              <Link key={item.id} href={`/categories/${item.slug}`}>
+              <Link prefetch={false} key={item.id} href={`/categories/${item.slug}`}>
                 {item.name}
                 {facets?.categories.find((facet) => facet.id === item.id)?.count !== undefined
                   ? ` (${facets.categories.find((facet) => facet.id === item.id)?.count})`
@@ -307,7 +312,7 @@ export function CatalogListingClient({
           )}
           {result.isError ? (
             <div className="catalog-empty">
-              Không tải được sản phẩm.{" "}
+              {apiErrorMessage(result.error)}{" "}
               <button type="button" onClick={() => result.refetch()}>
                 Thử lại
               </button>

@@ -3,6 +3,7 @@ import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { readBff } from "@/shared/api/browser";
+import { pollingDelay } from "@/shared/api/retry";
 import { formatPrice } from "@/features/catalog/components";
 import { paymentStatusSchema } from "./contracts";
 import { ContinueSepayPayment } from "./continue-sepay-payment";
@@ -27,7 +28,7 @@ export function OrderResult({ id }: { id: string }) {
       const value = query.state.data;
       return value && ["COMPLETED", "FAILED", "CANCELLED"].includes(value.paymentStatus)
         ? false
-        : 10000;
+        : pollingDelay(query.state.error, 10000);
     },
   });
   if (order.isPending) return <ContentLoading variant="detail" label="Đang tải đơn hàng…" />;
