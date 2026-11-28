@@ -1,8 +1,8 @@
 "use client";
 import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { cartSchema } from "@/features/catalog/cart";
@@ -12,13 +12,16 @@ import {
   ArrowLeft,
   ArrowRight,
   Banknote,
-  Check,
+  Clock,
   CreditCard,
   Gift,
   LockKeyhole,
   QrCode,
+  RefreshCw,
   ShieldCheck,
+  ShoppingBag,
   Truck,
+  Zap,
 } from "lucide-react";
 import { addressesSchema } from "@/features/addresses/contracts";
 import { readBff, requestBff } from "@/shared/api/browser";
@@ -31,19 +34,75 @@ import {
   previewSchema,
   shippingSchema,
   checkoutBenefitsSchema,
+  shippingQuoteResponseSchema,
 } from "./contracts";
 import { paymentMethodsSchema } from "./payment-methods";
 import { CheckoutAddress } from "./checkout-address";
 import { CheckoutBenefits, maximumCheckoutPoints } from "./checkout-benefits";
 import { blankDeliveryAddress } from "@/features/addresses/address-fields";
-import { isCurrentAddress } from "@/features/addresses/vietnam-divisions";
+import { PriceReview, type CheckoutQuote } from "./price-review";
+import { shippingFeeAfterBenefits } from "./shipping-benefit";
 
 type Address = z.infer<typeof shippingSchema>;
 const blank: Address = blankDeliveryAddress;
 const commandStorage = "glowup-checkout-command";
 
+interface BuyNowItem {
+  variantId: string;
+  quantity: number;
+  attributionSource?: string;
+  productName: string;
+  variantName: string;
+  price: number;
+  originalPrice?: number | null;
+  imageUrl: string;
+  slug?: string;
+  createdAt?: number;
+}
+
+function formatEstimatedDelivery(time: string) {
+  if (!time) return "";
+  try {
+    const d = new Date(time);
+    if (isNaN(d.getTime())) return time;
+    const hours = String(d.getHours()).padStart(2, "0");
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return `Giao dự kiến: ${hours}:${minutes} ngày ${day}/${month}`;
+  } catch {
+    return time;
+  }
+}
+
 export function CheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isBuyNow = searchParams.get("buyNow") === "1";
+
+  const [buyNowItem] = useState<BuyNowItem | null>(() => {
+    if (typeof window === "undefined" || !isBuyNow) return null;
+    try {
+      const saved = sessionStorage.getItem("glowup-buy-now");
+      if (saved) return JSON.parse(saved);
+    } catch {
+      /* ignore */
+    }
+    const variantId = searchParams.get("variantId");
+    const quantity = Number(searchParams.get("quantity")) || 1;
+    if (variantId) {
+      return {
+        variantId,
+        quantity,
+        productName: "Sản phẩm mua ngay",
+        variantName: "",
+        price: 0,
+        imageUrl: "",
+      };
+    }
+    return null;
+  });
+
   const client = useQueryClient();
   const paymentMethods = useQuery({
     queryKey: ["payment-methods"],
@@ -55,7 +114,9 @@ export function CheckoutPage() {
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
       try {
-        return (await readBff("/api/auth/session", z.object({ user: userSchema }), signal)).user;
+        return (
+          await readBff("/api/auth/session", z.object({ user: userSchema.nullable() }), signal)
+        ).user;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;
@@ -63,7 +124,10 @@ export function CheckoutPage() {
     },
   });
   const cart = useQuery({
+    enabled: !isBuyNow,
     queryKey: ["cart"],
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: ({ signal }) => readBff("/api/cart/items", cartSchema, signal),
   });
   const addresses = useQuery({
@@ -94,17 +158,49 @@ export function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [priceReview, setPriceReview] = useState<{
+    quote: CheckoutQuote;
+    shippingFee: number;
+  } | null>(null);
   const previewSerial = useRef(0);
-  const items = useMemo(
-    () =>
+
+  // Real-time shipping quotes states
+  const [shippingQuotes, setShippingQuotes] = useState<z.infer<
+    typeof shippingQuoteResponseSchema
+  > | null>(null);
+  const [selectedShippingOptionId, setSelectedShippingOptionId] = useState<string>("");
+  const [shippingQuotesLoading, setShippingQuotesLoading] = useState(false);
+  const [shippingQuotesError, setShippingQuotesError] = useState("");
+  const [quoteExpired, setQuoteExpired] = useState(false);
+  const shippingAbortControllerRef = useRef<AbortController | null>(null);
+
+  const items = useMemo(() => {
+    if (isBuyNow && buyNowItem) {
+      return [
+        {
+          variantId: buyNowItem.variantId,
+          quantity: buyNowItem.quantity,
+          ...(buyNowItem.attributionSource
+            ? { attributionSource: buyNowItem.attributionSource }
+            : {}),
+        },
+      ];
+    }
+    return (
       cart.data?.items
         .filter((item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded)
-        .map((item) => ({ variantId: item.productVariantId, quantity: item.quantity })) ?? [],
-    [cart.data],
-  );
-  const invalidSelection = !!cart.data?.items.some(
-    (item) => item.isSelected && (!item.isAvailable || item.isQuantityExceeded),
-  );
+        .map((item) => ({ variantId: item.productVariantId, quantity: item.quantity })) ?? []
+    );
+  }, [isBuyNow, buyNowItem, cart.data]);
+
+  const itemsKey = useMemo(() => JSON.stringify(items), [items]);
+
+  const invalidSelection = isBuyNow
+    ? false
+    : !!cart.data?.items.some(
+        (item) => item.isSelected && (!item.isAvailable || item.isQuantityExceeded),
+      );
+
   const selectedAddress =
     addresses.data?.find((item) => item.id === addressId) ??
     addresses.data?.find((item) => item.isDefault) ??
@@ -123,6 +219,102 @@ export function CheckoutPage() {
         }
       : blank
     : (addressOverride ?? blank);
+
+  const effectiveDistrict =
+    address.district ||
+    address.ward?.replace(/^(phường|xã|thị trấn|đặc khu)\s+/i, "") ||
+    address.ward ||
+    address.city;
+  const hasShippingAddress = !!(address.city && (address.district || address.ward));
+  const shippingAddressKey = `${address.city}|${effectiveDistrict}|${address.ward ?? ""}|${address.addressLine ?? ""}|${address.latitude ?? ""}|${address.longitude ?? ""}`;
+
+  const fetchShippingQuotes = useCallback(async () => {
+    if (!hasShippingAddress || !items.length) {
+      setShippingQuotes(null);
+      setSelectedShippingOptionId("");
+      setShippingQuotesLoading(false);
+      return;
+    }
+    if (shippingAbortControllerRef.current) {
+      shippingAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    shippingAbortControllerRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 6000);
+
+    setShippingQuotesLoading(true);
+    setShippingQuotesError("");
+    setQuoteExpired(false);
+    try {
+      const quotes = await requestBff(
+        "/api/checkout/shipping-quotes",
+        shippingQuoteResponseSchema,
+        {
+          method: "POST",
+          body: {
+            items,
+            shippingAddress: {
+              provinceCity: address.city,
+              district: effectiveDistrict,
+              ward: address.ward || undefined,
+              addressLine: address.addressLine || undefined,
+              latitude: address.latitude ?? undefined,
+              longitude: address.longitude ?? undefined,
+            },
+          },
+          signal: controller.signal,
+        },
+      );
+      if (controller.signal.aborted) return;
+      setShippingQuotes(quotes);
+      const available = quotes.options.filter((o) => o.isAvailable);
+      const defaultOption =
+        available[0] ||
+        quotes.options.find((o) => o.serviceCode === "STANDARD") ||
+        quotes.options[0];
+      setSelectedShippingOptionId((prev) => {
+        if (prev && available.some((o) => (o.id || o.serviceCode) === prev)) {
+          return prev;
+        }
+        return defaultOption ? defaultOption.id || defaultOption.serviceCode : "";
+      });
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setShippingQuotesError(apiErrorMessage(err));
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (!controller.signal.aborted) {
+        setShippingQuotesLoading(false);
+      }
+    }
+  }, [
+    hasShippingAddress,
+    items,
+    setSelectedShippingOptionId,
+    setQuoteExpired,
+    address.city,
+    effectiveDistrict,
+    address.ward,
+    address.addressLine,
+    address.latitude,
+    address.longitude,
+  ]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchShippingQuotes();
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [itemsKey, shippingAddressKey, fetchShippingQuotes]);
+
+  const selectedShippingOption = useMemo(() => {
+    if (!shippingQuotes) return null;
+    return (
+      shippingQuotes.options.find((o) => (o.id || o.serviceCode) === selectedShippingOptionId) ??
+      null
+    );
+  }, [shippingQuotes, selectedShippingOptionId]);
+
   const selectionKey = JSON.stringify({ items, couponCode: effectiveCoupon });
   const matchingQuote = quoteState?.selectionKey === selectionKey ? quoteState.value : null;
   const maximumPoints = maximumCheckoutPoints(benefits.data?.points, matchingQuote);
@@ -135,6 +327,21 @@ export function CheckoutPage() {
     previewRetry,
   });
   const quote = quoteState?.key === previewKey ? quoteState.value : null;
+
+  const effectiveShippingFee = selectedShippingOption
+    ? quote
+      ? shippingFeeAfterBenefits(
+          selectedShippingOption.estimatedFee,
+          quote.shippingFee,
+          quote.shippingPolicy?.fee,
+        )
+      : selectedShippingOption.estimatedFee
+    : (quote?.shippingFee ?? 0);
+
+  const effectiveTotalAmount = quote
+    ? Math.max(0, quote.totalAmount - (quote.shippingFee ?? 0) + effectiveShippingFee)
+    : 0;
+
   useEffect(() => {
     const serial = ++previewSerial.current;
     if (!items.length || invalidSelection) return;
@@ -155,13 +362,33 @@ export function CheckoutPage() {
         if (serial === previewSerial.current)
           setQuote({ key: previewKey, selectionKey, value: result });
       } catch (e) {
-        if (serial === previewSerial.current) setError(apiErrorMessage(e));
+        if (serial === previewSerial.current) {
+          setQuote(null);
+          if (e instanceof ApiError && e.code.startsWith("COUPON_") && effectiveCoupon) {
+            setCouponCode("");
+            setUsePoints(0);
+            setError("Voucher không còn áp dụng được. Đã bỏ voucher để tính lại báo giá.");
+          } else if (e instanceof ApiError && e.code === "INSUFFICIENT_POINTS" && effectivePoints) {
+            setUsePoints(0);
+            void client.invalidateQueries({ queryKey: ["checkout-benefits"] });
+            setError("Số xu có thể dùng đã thay đổi. Vui lòng kiểm tra lại ưu đãi.");
+          } else setError(apiErrorMessage(e));
+        }
       } finally {
         if (serial === previewSerial.current) setQuoteBusy(false);
       }
-    }, 350);
+    }, 150);
     return () => window.clearTimeout(timer);
-  }, [items, invalidSelection, effectiveCoupon, effectivePoints, previewKey, selectionKey]);
+  }, [
+    items,
+    itemsKey,
+    invalidSelection,
+    effectiveCoupon,
+    effectivePoints,
+    previewKey,
+    selectionKey,
+    client,
+  ]);
   async function applyCoupon(code: string) {
     setCouponBusy(true);
     try {
@@ -176,16 +403,20 @@ export function CheckoutPage() {
     }
   }
   async function submit() {
-    if (!quote || quoteBusy || busy || couponBusy) return;
+    if (!quote || quoteBusy || busy || couponBusy || priceReview) return;
     if (method === "SEPAY" && !sepayAvailable) {
       setError("SePay hiện chưa khả dụng. Vui lòng chọn thanh toán khi nhận hàng.");
       return;
     }
     const shipping = shippingSchema.safeParse(address);
-    if (!shipping.success || !isCurrentAddress(address) || (session.data && !selectedAddress)) {
-      setError(
-        "Vui lòng kiểm tra tên, số điện thoại và chọn địa chỉ với tỉnh/thành, phường/xã hiện tại.",
-      );
+    const hasValidAddress = Boolean(
+      shipping.success &&
+      (!session.data || selectedAddress) &&
+      address.city &&
+      (address.district || address.ward || address.addressLine),
+    );
+    if (!shipping.success || !hasValidAddress) {
+      setError("Vui lòng kiểm tra tên, số điện thoại và địa chỉ giao hàng trước khi đặt hàng.");
       return;
     }
     const payload = createOrderInputSchema.safeParse({
@@ -193,9 +424,16 @@ export function CheckoutPage() {
       couponCode: effectiveCoupon || undefined,
       usePoints: effectivePoints,
       quoteVersion: quote.quoteVersion,
-      shippingAddress: shipping.data,
+      shippingAddress: {
+        ...shipping.data,
+        district: shipping.data.district || effectiveDistrict,
+      },
       paymentMethod: method,
       idempotencyKey: crypto.randomUUID(),
+      quoteGroupId: shippingQuotes?.quoteGroupId,
+      shippingOptionId: selectedShippingOption
+        ? selectedShippingOption.id || selectedShippingOption.serviceCode
+        : undefined,
     });
     if (!payload.success) {
       setError("Thông tin đơn hàng chưa hợp lệ.");
@@ -205,21 +443,23 @@ export function CheckoutPage() {
     setError("");
     let createdOrderId = "";
     try {
-      const currentCart = await readBff("/api/cart/items", cartSchema);
-      const currentItems = currentCart.items
-        .filter((item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded)
-        .map((item) => ({ variantId: item.productVariantId, quantity: item.quantity }));
-      if (
-        JSON.stringify(currentItems) !== JSON.stringify(items) ||
-        currentCart.items.some(
-          (item) => item.isSelected && (!item.isAvailable || item.isQuantityExceeded),
-        )
-      ) {
-        client.setQueryData(["cart"], currentCart);
-        setQuote(null);
-        setPreviewRetry((value) => value + 1);
-        setError("Giỏ hàng đã thay đổi. Vui lòng kiểm tra báo giá mới trước khi đặt hàng.");
-        return;
+      if (!isBuyNow) {
+        const currentCart = await readBff("/api/cart/items", cartSchema);
+        const currentItems = currentCart.items
+          .filter((item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded)
+          .map((item) => ({ variantId: item.productVariantId, quantity: item.quantity }));
+        if (
+          JSON.stringify(currentItems) !== JSON.stringify(items) ||
+          currentCart.items.some(
+            (item) => item.isSelected && (!item.isAvailable || item.isQuantityExceeded),
+          )
+        ) {
+          client.setQueryData(["cart"], currentCart);
+          setQuote(null);
+          setPreviewRetry((value) => value + 1);
+          setError("Giỏ hàng đã thay đổi. Vui lòng kiểm tra báo giá mới trước khi đặt hàng.");
+          return;
+        }
       }
       const fingerprintBytes = await crypto.subtle.digest(
         "SHA-256",
@@ -242,7 +482,15 @@ export function CheckoutPage() {
       });
       createdOrderId = order.id;
       setOrderId(order.id);
-      client.invalidateQueries({ queryKey: ["cart"] });
+      if (isBuyNow) {
+        try {
+          sessionStorage.removeItem("glowup-buy-now");
+        } catch {
+          /* ignore */
+        }
+      } else {
+        client.invalidateQueries({ queryKey: ["cart"] });
+      }
       if (method === "COD") {
         sessionStorage.removeItem(commandStorage);
         router.push(`/order-success/${order.id}`);
@@ -255,34 +503,62 @@ export function CheckoutPage() {
       sessionStorage.removeItem(commandStorage);
       router.push(`/payment/return?paymentId=${payment.paymentId}`);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
+      if (createdOrderId) {
+        setError(
+          "Đơn đã được tạo nhưng chưa mở được SePay. Hãy xem trạng thái đơn để tiếp tục thanh toán.",
+        );
+      } else if (
+        e instanceof ApiError &&
+        (e.code === "ORDER_PRICE_CHANGED" ||
+          e.code === "FLASH_SALE_EXHAUSTED" ||
+          e.code === "PROMOTION_EXHAUSTED" ||
+          e.code.startsWith("COUPON_") ||
+          e.code === "INSUFFICIENT_POINTS")
+      ) {
+        setPriceReview({ quote, shippingFee: effectiveShippingFee });
         setQuote(null);
-        cart.refetch();
         setPreviewRetry((value) => value + 1);
-        setError("Giá hoặc tồn kho đã thay đổi. Vui lòng xem lại báo giá trước khi đặt hàng.");
+        if (!isBuyNow) void cart.refetch();
+        void benefits.refetch();
+      } else if (
+        e instanceof ApiError &&
+        (e.status === 422 ||
+          e.code === "SHIPPING_QUOTE_EXPIRED" ||
+          e.message?.includes("báo giá") ||
+          e.message?.includes("hết hạn"))
+      ) {
+        setQuoteExpired(true);
+        setError(
+          "Báo giá vận chuyển đã hết hạn. Vui lòng bấm 'Làm mới báo giá' để cập nhật cước phí mới nhất.",
+        );
+      } else if (e instanceof ApiError && e.status === 409) {
+        setQuote(null);
+        if (!isBuyNow) cart.refetch();
+        setPreviewRetry((value) => value + 1);
+        setError(
+          ["INSUFFICIENT_STOCK", "STOCK_LIMIT_EXCEEDED"].includes(e.code)
+            ? apiErrorMessage(e)
+            : "Giá hoặc tồn kho đã thay đổi. Vui lòng xem lại báo giá trước khi đặt hàng.",
+        );
       } else if (e instanceof ApiError && e.status >= 500 && !createdOrderId) {
         setError(
           "Chưa rõ đơn hàng đã được tạo hay chưa. Bạn có thể thử lại với cùng mã thao tác hoặc kiểm tra đơn hàng của tôi.",
-        );
-      } else if (createdOrderId) {
-        setError(
-          "Đơn đã được tạo nhưng chưa mở được SePay. Hãy xem trạng thái đơn để tiếp tục thanh toán.",
         );
       } else setError(apiErrorMessage(e));
     } finally {
       setBusy(false);
     }
   }
-  if (cart.isPending || session.isPending || (!!session.data && addresses.isPending))
+  if ((!isBuyNow && cart.isPending) || session.isPending || (!!session.data && addresses.isPending))
     return <ContentLoading variant="checkout" label="Đang tải thông tin thanh toán…" />;
-  if (cart.isError || session.isError)
+  if ((!isBuyNow && cart.isError) || session.isError)
     return (
       <p role="alert">
         Chưa tải được thông tin thanh toán.{" "}
         <button
           type="button"
           onClick={() => {
-            void cart.refetch();
+            if (!isBuyNow) void cart.refetch();
             void session.refetch();
           }}
         >
@@ -292,15 +568,32 @@ export function CheckoutPage() {
     );
   if (!items.length || invalidSelection)
     return (
-      <p>
-        Giỏ hàng chưa có sản phẩm hợp lệ được chọn. <Link href="/cart">Quay lại giỏ hàng</Link>
-      </p>
+      <div className="checkout-empty-state site-container">
+        <div className="checkout-empty-card">
+          <div className="checkout-empty-icon" aria-hidden="true">
+            <ShoppingBag size={44} strokeWidth={1.5} />
+          </div>
+          <h1>Chưa có sản phẩm nào được chọn để thanh toán</h1>
+          <p>
+            Giỏ hàng của bạn đang trống hoặc các sản phẩm chưa được chọn mua. Vui lòng kiểm tra lại
+            giỏ hàng hoặc tiếp tục khám phá các bộ sưu tập mỹ phẩm chính hãng tại GlowUp.
+          </p>
+          <div className="checkout-empty-actions">
+            <Link href="/cart" className="button checkout-empty-cart-btn">
+              <ArrowLeft size={16} /> Quay lại giỏ hàng
+            </Link>
+            <Link href="/products" className="button checkout-empty-shop-btn">
+              Khám phá sản phẩm <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </div>
     );
   return (
     <div className="checkout-page">
       <div className="checkout-page-top">
-        <Link href="/cart">
-          <ArrowLeft size={16} /> Quay lại giỏ hàng
+        <Link href={isBuyNow && buyNowItem?.slug ? `/products/${buyNowItem.slug}` : "/cart"}>
+          <ArrowLeft size={16} /> {isBuyNow ? "Quay lại trang sản phẩm" : "Quay lại giỏ hàng"}
         </Link>
         <span>
           <ShieldCheck size={16} /> Mua sắm an tâm cùng GlowUp
@@ -316,28 +609,6 @@ export function CheckoutPage() {
           <LockKeyhole size={19} /> Thông tin được bảo vệ
         </span>
       </div>
-      <ol className="checkout-stepper" aria-label="Tiến trình đặt hàng">
-        <li className="is-complete">
-          <span>
-            <Check size={17} />
-          </span>
-          <div>
-            Giỏ hàng<small>Đã chọn sản phẩm</small>
-          </div>
-        </li>
-        <li aria-current="step" className="is-current">
-          <span>2</span>
-          <div>
-            Thanh toán & ưu đãi<small>Đang thực hiện</small>
-          </div>
-        </li>
-        <li>
-          <span>3</span>
-          <div>
-            Xác nhận đơn hàng<small>Bước tiếp theo</small>
-          </div>
-        </li>
-      </ol>
       <div className="checkout-grid">
         <div className="checkout-form">
           <CheckoutAddress
@@ -359,34 +630,135 @@ export function CheckoutPage() {
                 <Truck size={20} />
               </span>
               <div>
-                <h2>Thông tin giao hàng</h2>
-                <p>Cửa hàng chuẩn bị và sắp xếp giao đơn cho bạn</p>
+                <h2>Phương thức vận chuyển</h2>
+                <p>Tính phí theo khoảng cách và thời gian giao hàng thực tế</p>
               </div>
             </div>
-            <div className="checkout-shipping-option">
-              <span className="checkout-shipping-icon">
-                <Truck size={25} />
-              </span>
-              <div>
-                <strong>Giao hàng tiêu chuẩn</strong>
-                <p>Giao tận nơi, đóng gói cẩn thận để bảo vệ sản phẩm.</p>
+
+            {shippingQuotesLoading && (
+              <p role="status" className="checkout-quote-updating">
+                <Clock size={16} style={{ display: "inline", marginRight: 6 }} /> Đang tính toán phí
+                vận chuyển thực tế…
+              </p>
+            )}
+
+            {shippingQuotesError && (
+              <p role="alert" className="cart-warning">
+                {shippingQuotesError}{" "}
+                <button
+                  type="button"
+                  onClick={() => void fetchShippingQuotes()}
+                  className="checkout-shipping-refresh-btn"
+                >
+                  Thử lại
+                </button>
+              </p>
+            )}
+
+            {!hasShippingAddress && (
+              <p className="checkout-shipping-note">
+                Vui lòng chọn hoặc nhập đầy đủ địa chỉ giao hàng (Tỉnh/Thành, Quận/Huyện) để kiểm
+                tra các phương thức vận chuyển khả dụng.
+              </p>
+            )}
+
+            {quoteExpired && (
+              <div className="checkout-shipping-expired-alert" role="alert">
+                <p>
+                  Báo giá vận chuyển đã hết hạn (sau 15 phút). Vui lòng cập nhật lại báo giá để tiếp
+                  tục đặt hàng.
+                </p>
+                <button
+                  type="button"
+                  className="button secondary checkout-shipping-refresh-btn"
+                  onClick={() => void fetchShippingQuotes()}
+                >
+                  <RefreshCw size={14} style={{ display: "inline", marginRight: 6 }} /> Làm mới báo
+                  giá
+                </button>
               </div>
-              <strong className={quote?.shippingFee === 0 ? "is-free" : ""}>
-                {quote
-                  ? quote.shippingFee === 0
-                    ? "Miễn phí"
-                    : formatPrice(quote.shippingFee)
-                  : "Đang tính…"}
-              </strong>
-            </div>
+            )}
+
+            {shippingQuotes && shippingQuotes.options.length > 0 && (
+              <div
+                className="checkout-shipping-options"
+                role="radiogroup"
+                aria-label="Phương thức vận chuyển"
+              >
+                {shippingQuotes.options.map((option) => {
+                  const payableFee = quote
+                    ? shippingFeeAfterBenefits(
+                        option.estimatedFee,
+                        quote.shippingFee,
+                        quote.shippingPolicy?.fee,
+                      )
+                    : option.estimatedFee;
+                  const optionKey = option.id || option.serviceCode;
+                  const isSelected = selectedShippingOptionId === optionKey;
+                  const isExpress =
+                    option.serviceCode === "EXPRESS_2H" || option.carrierCode === "AHAMOVE";
+                  return (
+                    <label
+                      key={optionKey}
+                      className={`checkout-shipping-option ${isSelected ? "is-selected" : ""} ${!option.isAvailable ? "is-disabled" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="shippingOption"
+                        value={optionKey}
+                        checked={isSelected}
+                        disabled={!option.isAvailable}
+                        onChange={() => {
+                          if (option.isAvailable) {
+                            setSelectedShippingOptionId(optionKey);
+                            setError("");
+                          }
+                        }}
+                      />
+                      <span className="checkout-shipping-icon">
+                        {isExpress ? <Zap size={22} /> : <Truck size={22} />}
+                      </span>
+                      <div className="checkout-shipping-info">
+                        <div className="checkout-shipping-heading">
+                          <strong>
+                            {option.serviceName ||
+                              (isExpress ? "Giao hỏa tốc 2H" : "Giao hàng tiêu chuẩn")}
+                          </strong>
+                          <span
+                            className={`checkout-shipping-badge ${isExpress ? "is-express" : "is-standard"}`}
+                          >
+                            {option.carrierCode === "AHAMOVE" ? "Ahamove 2H" : "GHN Standard"}
+                          </span>
+                          {!option.isAvailable && (
+                            <span className="checkout-shipping-badge is-unavailable">
+                              Không khả dụng
+                            </span>
+                          )}
+                        </div>
+                        <p className="checkout-shipping-sub">
+                          {formatEstimatedDelivery(option.estimatedDeliveryTime)}
+                          {option.distanceKm != null && ` · Khoảng cách ~${option.distanceKm} km`}
+                          {option.sourceLocationName && ` · Từ ${option.sourceLocationName}`}
+                        </p>
+                        {!option.isAvailable && option.unavailableReason && (
+                          <p className="checkout-shipping-unavailable-desc">
+                            {option.unavailableReason}
+                          </p>
+                        )}
+                      </div>
+                      <strong
+                        className={`checkout-shipping-fee ${payableFee === 0 ? "is-free" : ""}`}
+                      >
+                        {payableFee === 0 ? "Miễn phí" : formatPrice(payableFee)}
+                      </strong>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
             <p className="checkout-shipping-note">
-              {quote?.shippingPolicy && (
-                <>
-                  Phí tiêu chuẩn {formatPrice(quote.shippingPolicy.fee)}. Miễn phí từ{" "}
-                  {formatPrice(quote.shippingPolicy.freeFrom)} tiền hàng sau ưu đãi và xu.{" "}
-                </>
-              )}
-              Cửa hàng sẽ xác nhận lịch giao khi xử lý đơn.
+              Đơn hàng được chuẩn bị kỹ lưỡng và bàn giao cho đơn vị vận chuyển chuyên nghiệp.
             </p>
           </section>
           <section className="checkout-panel">
@@ -461,6 +833,7 @@ export function CheckoutPage() {
                 onPointsChange={setUsePoints}
                 onApply={applyCoupon}
                 disabled={busy || couponBusy || quoteBusy || !quote}
+                pointsDisabled={busy || couponBusy || !matchingQuote}
               />
             ) : (
               <div className="checkout-benefits-guest">
@@ -493,23 +866,54 @@ export function CheckoutPage() {
             <h2>
               Đơn hàng của bạn <span>{items.reduce((sum, item) => sum + item.quantity, 0)}</span>
             </h2>
-            <Link href="/cart">Sửa</Link>
+            {!isBuyNow && <Link href="/cart">Sửa</Link>}
           </div>
           <div className="checkout-product-list">
-            {cart.data.items
-              .filter((item) => item.isSelected)
-              .map((item) => (
-                <article className="checkout-product" key={item.id}>
-                  <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
-                  <div>
-                    <strong>{item.productName}</strong>
-                    <small>
-                      {item.variantName} · SL: {item.quantity}
-                    </small>
-                    <span>{formatPrice(item.totalPrice)}</span>
-                  </div>
-                </article>
-              ))}
+            {isBuyNow && buyNowItem ? (
+              <article className="checkout-product" key={buyNowItem.variantId}>
+                <CatalogImage
+                  src={buyNowItem.imageUrl}
+                  alt={buyNowItem.productName || "Sản phẩm"}
+                />
+                <div>
+                  <strong>{buyNowItem.productName}</strong>
+                  <small>
+                    {buyNowItem.variantName} · SL: {buyNowItem.quantity}
+                  </small>
+                  <span>
+                    {quote
+                      ? formatPrice(
+                          quote.items.find((line) => line.productVariantId === buyNowItem.variantId)
+                            ?.totalPrice ?? 0,
+                        )
+                      : "Đang cập nhật giá…"}
+                  </span>
+                </div>
+              </article>
+            ) : (
+              cart.data?.items
+                .filter((item) => item.isSelected)
+                .map((item) => (
+                  <article className="checkout-product" key={item.id}>
+                    <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                    <div>
+                      <strong>{item.productName}</strong>
+                      <small>
+                        {item.variantName} · SL: {item.quantity}
+                      </small>
+                      <span>
+                        {quote
+                          ? formatPrice(
+                              quote.items.find(
+                                (line) => line.productVariantId === item.productVariantId,
+                              )?.totalPrice ?? 0,
+                            )
+                          : "Đang cập nhật giá…"}
+                      </span>
+                    </div>
+                  </article>
+                ))
+            )}
           </div>
           {quoteBusy && (
             <p role="status" className="checkout-quote-updating">
@@ -554,35 +958,95 @@ export function CheckoutPage() {
               )}
               <div>
                 <dt>
-                  Phí giao hàng <small>Theo chính sách cửa hàng</small>
+                  Phí giao hàng{" "}
+                  <small>
+                    {selectedShippingOption
+                      ? selectedShippingOption.serviceName
+                      : "Theo chính sách cửa hàng"}
+                  </small>
                 </dt>
-                <dd className={quote.shippingFee === 0 ? "is-saving" : ""}>
-                  {quote.shippingFee === 0 ? "Miễn phí" : formatPrice(quote.shippingFee)}
+                <dd className={effectiveShippingFee === 0 ? "is-saving" : ""}>
+                  {effectiveShippingFee === 0 ? "Miễn phí" : formatPrice(effectiveShippingFee)}
                 </dd>
               </div>
               <div className="checkout-grand-total">
                 <dt>Tổng thanh toán</dt>
-                <dd>{formatPrice(quote.totalAmount)}</dd>
+                <dd>{formatPrice(effectiveTotalAmount)}</dd>
               </div>
             </dl>
           )}
-          <button
-            className="button checkout-place-order"
-            type="button"
-            disabled={
+          {(() => {
+            const isAddressValid = Boolean(
+              session.data
+                ? selectedAddress && !addresses.isError
+                : address.recipientName?.trim() &&
+                    address.phone?.trim() &&
+                    address.city?.trim() &&
+                    (address.ward?.trim() ||
+                      address.district?.trim() ||
+                      address.addressLine?.trim()),
+            );
+            const isButtonDisabled =
               !quote ||
               quoteBusy ||
               couponBusy ||
               busy ||
+              !!priceReview ||
+              shippingQuotesLoading ||
+              quoteExpired ||
               !!orderId ||
-              (!!session.data &&
-                (!selectedAddress || addresses.isError || !isCurrentAddress(address)))
-            }
-            onClick={() => void submit()}
-          >
-            {busy ? "Đang xử lý…" : method === "COD" ? "Đặt hàng COD" : "Thanh toán bằng QR SePay"}
-            <ArrowRight size={18} />
-          </button>
+              !isAddressValid ||
+              items.length === 0 ||
+              invalidSelection;
+
+            return (
+              <>
+                <button
+                  className="button checkout-place-order"
+                  type="button"
+                  disabled={isButtonDisabled}
+                  onClick={() => void submit()}
+                >
+                  {busy
+                    ? "Đang đặt hàng…"
+                    : shippingQuotesLoading
+                      ? "Đang tính phí vận chuyển…"
+                      : quoteBusy
+                        ? "Đang tính tiền…"
+                        : method === "COD"
+                          ? "Đặt hàng COD"
+                          : "Thanh toán bằng QR SePay"}
+                  <ArrowRight size={18} />
+                </button>
+                {!isAddressValid && (
+                  <p
+                    className="cart-warning"
+                    style={{ margin: "8px 0 0", fontSize: "0.85rem", textAlign: "center" }}
+                  >
+                    {session.data
+                      ? "Vui lòng chọn hoặc thêm địa chỉ nhận hàng để tiếp tục đặt hàng."
+                      : "Vui lòng điền đầy đủ họ tên, số điện thoại và địa chỉ nhận hàng."}
+                  </p>
+                )}
+                {quoteExpired && (
+                  <div className="checkout-error-panel" role="alert" style={{ marginTop: 8 }}>
+                    <p className="cart-warning">
+                      Báo giá vận chuyển đã hết hạn. Vui lòng làm mới để tiếp tục.
+                    </p>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      style={{ width: "100%", marginTop: 6 }}
+                      onClick={() => void fetchShippingQuotes()}
+                    >
+                      <RefreshCw size={14} style={{ display: "inline", marginRight: 4 }} /> Làm mới
+                      báo giá
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <small>
             <LockKeyhole size={13} style={{ display: "inline", marginRight: 4 }} />
             Thông tin thanh toán được bảo vệ.
@@ -590,9 +1054,15 @@ export function CheckoutPage() {
             Kiểm tra thông tin nhận hàng trước khi đặt đơn.
           </small>
           {error && (
-            <p role="alert" className="cart-warning">
-              {error}
-            </p>
+            <div className="checkout-error-panel" role="alert">
+              <p className="cart-warning">{error}</p>
+              <Link
+                href={isBuyNow && buyNowItem?.slug ? `/products/${buyNowItem.slug}` : "/cart"}
+                className="checkout-back-cart-btn"
+              >
+                ← {isBuyNow ? "Quay lại trang sản phẩm" : "Quay lại giỏ hàng để chọn lại sản phẩm"}
+              </Link>
+            </div>
           )}
           <div className="checkout-summary-assurance">
             <ShieldCheck size={19} />
@@ -604,6 +1074,21 @@ export function CheckoutPage() {
           </div>
         </aside>
       </div>
+      {priceReview && (
+        <PriceReview
+          previous={priceReview.quote}
+          previousShippingFee={priceReview.shippingFee}
+          current={quote}
+          shippingFee={effectiveShippingFee}
+          pending={quoteBusy || (!quote && !error)}
+          error={error}
+          onClose={() => setPriceReview(null)}
+          onRetry={() => {
+            setError("");
+            setPreviewRetry((value) => value + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

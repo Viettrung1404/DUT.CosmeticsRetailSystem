@@ -1,0 +1,12 @@
+# Caddy — single public entrypoint (behind the ngrok tunnel).
+# ngrok terminates TLS, so Caddy only speaks plain HTTP on :80 inside
+# the Docker network. Routing by path keeps ONE public domain for both:
+#   https://<ngrok-domain>/            -> frontend (Next.js :3001)
+#   https://<ngrok-domain>/api/v1/*     -> backend  (NestJS  :3000)
+# That single domain is exactly what PAYMENT_PUBLIC_BASE_URL and
+# PAYMENT_WEB_RETURN_URL point at, so SePay webhooks + return URLs work.
+:80 {
+	@api path /api/v1/*
+	reverse_proxy @api backend:3000
+	reverse_proxy frontend:3001
+}

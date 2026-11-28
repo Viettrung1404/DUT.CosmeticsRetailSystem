@@ -90,7 +90,7 @@ describe('Sprint 5 shared pricing engine', () => {
     expect(quote.lineDiscount).toBe(30000);
     expect(quote.items.map((i) => i.promotionDiscount)).toEqual([15000, 15000]);
   });
-  it('excludes full Flash Sale quota, including quantities above remaining quota', () => {
+  it('discounts only the remaining flash-sale units when quantity exceeds quota', () => {
     const quote = price({
       lines: [line('v1', 100000, 2)],
       campaigns: [
@@ -108,7 +108,8 @@ describe('Sprint 5 shared pricing engine', () => {
         }),
       ],
     });
-    expect(quote.lineDiscount).toBe(0);
+    expect(quote.lineDiscount).toBe(20000);
+    expect(quote.items[0]).toMatchObject({ quotaQuantity: 1, cashValue: 180000 });
   });
   it('applies coupon before the shared POS points policy', () => {
     const quote = price({
@@ -130,7 +131,8 @@ describe('Sprint 5 shared pricing engine', () => {
       couponDiscount: 10000,
       pointsUsed: 100000,
       pointsDiscount: 100000,
-      totalAmount: 160000,
+      shippingFee: 15000,
+      totalAmount: 145000,
     });
     expect(quote.items[0]).toMatchObject({
       cashValue: 130000,
@@ -162,10 +164,12 @@ describe('Sprint 5 shared pricing engine', () => {
     });
   });
   it('checks free shipping threshold after all discounts', () => {
-    expect(price({ lines: [line('v1', 500000)] }).shippingFee).toBe(0);
+    expect(price({ lines: [line('v1', 459000)] }).shippingFee).toBe(0);
     expect(
-      price({ lines: [line('v1', 500000)], tierPercentage: 1 }).shippingFee,
-    ).toBe(30000);
+      price({ lines: [line('v1', 459000)], tierPercentage: 1 }).shippingFee,
+    ).toBe(5000);
+    expect(price({ lines: [line('v1', 200000)] }).shippingFee).toBe(15000);
+    expect(price({ lines: [line('v1', 100000)] }).shippingFee).toBe(30000);
   });
   it('preserves allocated money and whole point units across partial-return snapshots', () => {
     const quote = price({
@@ -180,21 +184,36 @@ describe('Sprint 5 shared pricing engine', () => {
     );
     expect(quote.items.reduce((s, l) => s + l.cashValue, 0)).toBeCloseTo(90000, 2);
   });
-  it('uses the same minimum balance, step and half-order limit as POS', () => {
+  it('allows points up to full order value like cash', () => {
     const order = { lines: [line('v1', 300000)] };
     expect(price({ ...order, pointsRequested: 150000, availablePoints: 320000 }))
-      .toMatchObject({ pointsDiscount: 150000, totalAmount: 180000 });
-    expect(() => price({ ...order, pointsRequested: 300000, availablePoints: 320000 }))
-      .toThrow('50%');
-    expect(() => price({ ...order, pointsRequested: 10000, availablePoints: 30000 }))
-      .toThrow('50.000');
-    expect(() => price({ ...order, pointsRequested: 55000, availablePoints: 320000 }))
-      .toThrow('10.000');
+      .toMatchObject({ pointsDiscount: 150000, shippingFee: 15000, totalAmount: 165000 });
+    expect(price({ ...order, pointsRequested: 300000, availablePoints: 320000 }))
+      .toMatchObject({ pointsDiscount: 300000, shippingFee: 30000, totalAmount: 30000 });
+    expect(() => price({ ...order, pointsRequested: 350000, availablePoints: 400000 }))
+      .toThrow('INSUFFICIENT_POINTS');
   });
   it('rejects duplicate variants, negative amounts, invalid tier and excess points', () => {
     expect(() => price({ lines: [line(), line()] })).toThrow();
     expect(() => price({ lines: [line('v1', -1)] })).toThrow();
     expect(() => price({ tierPercentage: 101 })).toThrow();
     expect(() => price({ pointsRequested: 2, availablePoints: 1 })).toThrow();
+  });
+});
+
+
+describe('Variant-specific flash target prices', () => {
+  it('charges the exact target per unit for multiple quantities and preserves quota selection', () => {
+    const campaign = { id: 'flash', type: 'PERCENTAGE', value: 0, minOrderAmount: 0,
+      maxDiscountAmount: null, isFlashSale: true, applicableProducts: [], applicableCategories: [],
+      quotas: [{ id: 'quota-a', productVariantId: 'a', quota: 100, reservedQuantity: 0, consumedQuantity: 0, salePrice: 199000 },
+        { id: 'quota-b', productVariantId: 'b', quota: 100, reservedQuantity: 0, consumedQuantity: 0, salePrice: 205000 }] };
+    const result = calculateCommercePrice({ lines: [
+      { variantId: 'a', productId: 'p', categoryId: 'c', unitPrice: 339000, quantity: 3 },
+      { variantId: 'b', productId: 'p', categoryId: 'c', unitPrice: 339000, quantity: 2 },
+    ], campaigns: [campaign], tierPercentage: 0, pointsRequested: 0, availablePoints: 0 });
+    expect(result.items.map((line) => line.effectivePrice)).toEqual([199000,205000]);
+    expect(result.items.map((line) => line.quotaId)).toEqual(['quota-a','quota-b']);
+    expect(result.lineDiscount).toBe(688000);
   });
 });

@@ -30,10 +30,14 @@ export const orderStatusSchema = z.enum([
   "CONFIRMED",
   "PROCESSING",
   "SHIPPING",
+  "SHIPPED",
+  "PARTIALLY_SHIPPED",
   "DELIVERED",
+  "PARTIALLY_DELIVERED",
   "COMPLETED",
   "CANCELLED",
   "RETURNED",
+  "PARTIALLY_RETURNED",
 ]);
 export const orderDetailSchema = orderSchema.extend({
   createdAt: z.string(),
@@ -68,18 +72,60 @@ export const ordersSchema = z.object({
   limit: z.number(),
   totalPages: z.number(),
 });
+export const shipmentPackageItemSchema = z.object({
+  quantity: z.number(),
+  productName: z.string(),
+  variantName: z.string().optional(),
+});
+
+export const shipmentPackageSchema = z.object({
+  id: z.string(),
+  packageCode: z.string(),
+  actualWeightGrams: z.number(),
+  items: z.array(shipmentPackageItemSchema).default([]),
+});
+
+export const shipmentAttemptSchema = z.object({
+  id: z.string().optional(),
+  attemptNumber: z.number(),
+  attemptedAt: z.string(),
+  failureReasonCode: z.string().nullable().optional(),
+  failureReasonDetail: z.string().nullable().optional(),
+});
+
+export const shipmentEventSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  occurredAt: z.string(),
+  receivedAt: z.string().optional(),
+});
+
+export const shipmentTrackingSchema = z.object({
+  id: z.string(),
+  shipmentCode: z.string().optional(),
+  carrierCode: z.string(),
+  carrierServiceCode: z.string().nullable().optional(),
+  trackingCode: z.string().nullable(),
+  status: z.string(),
+  trackingUrl: z.string().nullable().optional(),
+  failedAttempts: z.number().int().nonnegative().default(0),
+  handedOverAt: z.string().nullable().optional(),
+  deliveredAt: z.string().nullable().optional(),
+  updatedAt: z.string().optional(),
+  packages: z.array(shipmentPackageSchema).default([]),
+  attempts: z.array(shipmentAttemptSchema).default([]),
+  events: z.array(shipmentEventSchema).default([]),
+});
+
 export const trackingSchema = z.object({
   id: z.uuid(),
   status: z.string(),
-  statusHistories: z.array(z.object({ status: z.string(), createdAt: z.string() })),
-  shipments: z.array(
+  statusHistories: z.array(
     z.object({
-      id: z.uuid(),
-      carrierCode: z.string(),
-      trackingCode: z.string().nullable(),
       status: z.string(),
-      trackingUrl: z.string().nullable(),
-      events: z.array(z.object({ id: z.uuid(), status: z.string(), occurredAt: z.string() })),
+      createdAt: z.string(),
+      note: z.string().nullable().optional(),
     }),
   ),
+  shipments: z.array(shipmentTrackingSchema),
 });

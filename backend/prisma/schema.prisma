@@ -78,6 +78,7 @@ model User {
   refundsProcessed           Refund[]              @relation("RefundProcessor")
   returnHistoryChanges       ReturnStatusHistory[] @relation("ReturnHistoryActor")
   inventoryTransactions      InventoryTransaction[]
+  searchHistories            SearchHistory[]
   transfersRequested         InventoryTransfer[]   @relation("RequestedTransfers")
   transfersApproved          InventoryTransfer[]   @relation("ApprovedTransfers")
   transfersShipped           InventoryTransfer[]   @relation("ShippedTransfers")
@@ -95,6 +96,9 @@ model User {
   returnOrdersHandled        ReturnOrder[]
   commandReceipts CommandReceipt[]
   returnAttachments ReturnAttachment[]
+  receivedReturnReceipts ReturnReceipt[]
+  performedInspections ReturnInspection[]
+  executedDispositions InventoryDisposition[]
 
   @@index([roleId])
   @@map("users")
@@ -196,7 +200,9 @@ model Category {
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children Category[] @relation("CategoryHierarchy")
   products Product[]
+  returnPolicyRules ReturnPolicyRule[]
 
+  @@index([parentId])
   @@map("categories")
 }
 
@@ -231,20 +237,26 @@ model Product {
   sku              String   @unique @db.VarChar(50)
   description      String?  @db.Text
   shortDescription String?  @map("short_description") @db.Text
+  howToUse         String?  @map("how_to_use") @db.Text
+  specifications   Json?    @map("specifications") @db.JsonB
   basePrice        Decimal  @map("base_price") @db.Decimal(12, 2)
   salePrice        Decimal? @map("sale_price") @db.Decimal(12, 2)
   option1Name      String?  @map("option1_name") @db.VarChar(50)
   option2Name      String?  @map("option2_name") @db.VarChar(50)
   option3Name      String?  @map("option3_name") @db.VarChar(50)
+  videoUrl         String?  @map("video_url") @db.Text
   isActive         Boolean  @default(true) @map("is_active")
   isFeatured       Boolean  @default(false) @map("is_featured")
   avgRating        Decimal  @default(0) @map("avg_rating") @db.Decimal(3, 2)
   totalReviews     Int      @default(0) @map("total_reviews")
   totalSold        Int      @default(0) @map("total_sold")
-  metaTitle        String?  @map("meta_title") @db.VarChar(255)
-  metaDescription  String?  @map("meta_description") @db.Text
-  metaKeywords     String?  @map("meta_keywords") @db.VarChar(255)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  metaTitle          String?                       @map("meta_title") @db.VarChar(255)
+  metaDescription    String?                       @map("meta_description") @db.Text
+  metaKeywords       String?                       @map("meta_keywords") @db.VarChar(255)
+  embedding          Unsupported("halfvec(1024)")?
+  embeddingModel     String?                       @map("embedding_model") @db.VarChar(100)
+  embeddingUpdatedAt DateTime?                     @map("embedding_updated_at") @db.Timestamptz
+  createdAt          DateTime                      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   category    Category            @relation(fields: [categoryId], references: [id])
@@ -253,10 +265,13 @@ model Product {
   images      ProductImage[]
   ingredients ProductIngredient[]
   tags        ProductTag[]
-  wishlists   Wishlist[]
-  reviews     Review[]
+  wishlists               Wishlist[]
+  reviews                 Review[]
+  recommendationsAsSource ProductRecommendation[] @relation("RecSourceProduct")
+  recommendationsAsTarget ProductRecommendation[] @relation("RecTargetProduct")
 
   @@index([categoryId, brandId, isActive])
+  @@index([brandId])
   @@map("products")
 }
 
@@ -274,6 +289,7 @@ model ProductVariant {
   weight          Decimal?                @db.Decimal(8, 2)
   unit            String?                 @db.VarChar(20)
   stockQuantity   Int                     @default(0) @map("stock_quantity")
+  minShelfLifeDays Int                    @default(180) @map("min_shelf_life_days")
   barcode         String?                 @unique @db.VarChar(100)
   isActive        Boolean                 @default(true) @map("is_active")
   createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz
@@ -282,6 +298,8 @@ model ProductVariant {
   product               Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
   images                ProductImage[]
   inventory             Inventory[]
+  inventoryLots         InventoryLot[]
+  inventoryReservationItems InventoryReservationItem[]
   inventoryTransactions InventoryTransaction[]
   batches               Batch[]
   transferItems         InventoryTransferItem[]
@@ -292,8 +310,12 @@ model ProductVariant {
   returnOrderItems      ReturnOrderItem[]
   purchaseOrderItems    PurchaseOrderItem[]
   exchangeItems         ExchangeItem[]
+  fulfillmentOrderItems FulfillmentOrderItem[]
+  packageItems          PackageItem[]
+  inventoryDispositions InventoryDisposition[]
 
   @@unique([productId, option1Value, option2Value, option3Value])
+  @@index([productId, isActive])
   @@map("product_variants")
 }
 
@@ -311,6 +333,7 @@ model ProductImage {
   variant ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
 
   @@index([productId])
+  @@index([productVariantId])
   @@map("product_images")
 }
 
@@ -319,11 +342,13 @@ model ProductIngredient {
   productId       String   @map("product_id") @db.Uuid
   ingredientName  String   @map("ingredient_name") @db.VarChar(150)
   percentage      String?  @db.VarChar(20)
+  purpose         String?  @db.VarChar(500)
   isKeyIngredient Boolean  @default(false) @map("is_key_ingredient")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@index([productId])
   @@map("product_ingredients")
 }
 
@@ -335,6 +360,7 @@ model ProductTag {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@id([productId, tagName])
+  @@index([tagName])
   @@map("product_tags")
 }
 
@@ -357,6 +383,7 @@ model Store {
   longitude    Decimal? @db.Decimal(11, 8)
   openingHours Json?    @map("opening_hours") @db.JsonB
   isActive     Boolean  @default(true) @map("is_active")
+  fulfillmentCapacityPerDay Int @default(500) @map("fulfillment_capacity_per_day")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -364,6 +391,8 @@ model Store {
   employees             Employee[]             @relation("EmployeeStore")
   userStores            UserStore[]
   inventory             Inventory[]
+  inventoryLots         InventoryLot[]
+  inventoryReservations InventoryReservation[]
   inventoryTransactions InventoryTransaction[]
   batches               Batch[]
   transfersFrom         InventoryTransfer[]    @relation("TransferFromStore")
@@ -377,8 +406,13 @@ model Store {
   goodsReceipts         GoodsReceipt[]
   invoices              Invoice[]
   returnOrders          ReturnOrder[]
+  dropoffReturnOrders   ReturnOrder[]          @relation("ReturnDropoffStore")
+  returnReceipts        ReturnReceipt[]
   restockReturnItems    ReturnOrderItem[]      @relation("RestockStore")
   shifts                Shift[]
+  shippingQuotes        ShippingQuote[]
+  fulfillmentOrders     FulfillmentOrder[]
+  inventoryDispositions InventoryDisposition[]
 
   @@map("stores")
 }
@@ -389,7 +423,10 @@ model Inventory {
   productVariantId  String    @map("product_variant_id") @db.Uuid
   quantity          Int       @default(0)
   reservedQuantity  Int       @default(0) @map("reserved_quantity")
-  // Cột GENERATED (quantity - reserved_quantity), tạo trong migration add_db_constraints. Chỉ đọc, không ghi.
+  safetyStock       Int       @default(0) @map("safety_stock")
+  quarantinedQuantity Int     @default(0) @map("quarantined_quantity")
+  damagedQuantity   Int       @default(0) @map("damaged_quantity")
+  // Cột GENERATED (quantity - reserved_quantity - safety_stock - quarantined_quantity - damaged_quantity), tạo trong migration. Chỉ đọc, không ghi.
   availableQuantity Int?      @default(dbgenerated()) @map("available_quantity")
   minQuantity       Int       @default(5) @map("min_quantity")
   maxQuantity       Int?      @map("max_quantity")
@@ -401,6 +438,7 @@ model Inventory {
   variant ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@unique([storeId, productVariantId])
+  @@index([productVariantId])
   @@map("inventory")
 }
 
@@ -456,6 +494,61 @@ model Batch {
   @@map("batches")
 }
 
+model InventoryLot {
+  id               String         @id @default(uuid()) @db.Uuid
+  locationId       String         @map("location_id") @db.Uuid
+  productVariantId String         @map("product_variant_id") @db.Uuid
+  batchCode        String         @map("batch_code") @db.VarChar(100)
+  expiryDate       DateTime       @map("expiry_date") @db.Date
+  quantityOnHand   Int            @default(0) @map("quantity_on_hand")
+  quantityReserved Int            @default(0) @map("quantity_reserved")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  location         Store          @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  variant          ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  reservationItems InventoryReservationItem[]
+  inventoryDispositions InventoryDisposition[]
+
+  @@unique([locationId, productVariantId, batchCode], map: "uq_lot_batch")
+  @@index([locationId, productVariantId, expiryDate], map: "idx_lots_fefo_search")
+  @@map("inventory_lots")
+}
+
+model InventoryReservation {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  orderId            String?                    @map("order_id") @db.Uuid
+  fulfillmentOrderId String?                    @unique @map("fulfillment_order_id") @db.Uuid
+  locationId         String                     @map("location_id") @db.Uuid
+  status             String                     @default("ACTIVE") @db.VarChar(30)
+  expiresAt          DateTime                   @map("expires_at") @db.Timestamptz
+  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order              Order?                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  location           Store                      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  fulfillmentOrder   FulfillmentOrder?          @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
+  items              InventoryReservationItem[]
+
+  @@index([status, expiresAt], map: "idx_res_cleanup")
+  @@map("inventory_reservations")
+}
+
+model InventoryReservationItem {
+  id               String               @id @default(uuid()) @db.Uuid
+  reservationId    String               @map("reservation_id") @db.Uuid
+  productVariantId String               @map("product_variant_id") @db.Uuid
+  lotId            String               @map("lot_id") @db.Uuid
+  quantity         Int
+
+  reservation      InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  variant          ProductVariant       @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+  lot              InventoryLot         @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId], map: "idx_reservation_items_res_id")
+  @@map("inventory_reservation_items")
+}
+
 model InventoryTransfer {
   id           String    @id @default(uuid()) @db.Uuid
   transferCode String    @unique @map("transfer_code") @db.VarChar(50)
@@ -502,6 +595,8 @@ model InventoryTransferItem {
   variant  ProductVariant    @relation(fields: [productVariantId], references: [id])
   batch    Batch?            @relation(fields: [batchId], references: [id])
 
+  @@index([transferId])
+  @@index([productVariantId])
   @@map("inventory_transfer_items")
 }
 
@@ -544,6 +639,8 @@ model StocktakeItem {
   variant   ProductVariant @relation(fields: [productVariantId], references: [id])
   batch     Batch?         @relation(fields: [batchId], references: [id])
 
+  @@index([stocktakeId])
+  @@index([productVariantId])
   @@map("stocktake_items")
 }
 
@@ -585,6 +682,8 @@ model InventoryAdjustmentItem {
   variant    ProductVariant      @relation(fields: [productVariantId], references: [id])
   batch      Batch?              @relation(fields: [batchId], references: [id])
 
+  @@index([adjustmentId])
+  @@index([productVariantId])
   @@map("inventory_adjustment_items")
 }
 
@@ -611,13 +710,14 @@ model Cart {
 }
 
 model CartItem {
-  id               String   @id @default(uuid()) @db.Uuid
-  cartId           String   @map("cart_id") @db.Uuid
-  productVariantId String   @map("product_variant_id") @db.Uuid
-  quantity         Int
-  unitPrice        Decimal  @map("unit_price") @db.Decimal(12, 2)
-  isSelected       Boolean  @default(true) @map("is_selected")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                String   @id @default(uuid()) @db.Uuid
+  cartId            String   @map("cart_id") @db.Uuid
+  productVariantId  String   @map("product_variant_id") @db.Uuid
+  quantity          Int
+  unitPrice         Decimal  @map("unit_price") @db.Decimal(12, 2)
+  isSelected        Boolean  @default(true) @map("is_selected")
+  attributionSource String?  @map("attribution_source") @db.VarChar(60)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [productVariantId], references: [id])
@@ -660,6 +760,8 @@ model Order {
   coupon                  Coupon?                    @relation(fields: [couponId], references: [id])
   salesStaff              Employee?                  @relation(fields: [salesStaffId], references: [id])
   items                   OrderItem[]
+  inventoryReservations   InventoryReservation[]
+  fulfillmentOrders       FulfillmentOrder[]
   shipments               Shipment[]
   statusHistories         OrderStatusHistory[]
   returnOrders            ReturnOrder[]
@@ -673,6 +775,8 @@ model Order {
   pricingSnapshot         Json?                      @map("pricing_snapshot") @db.JsonB
   exchangeSettlement      ExchangeSettlement?
   outgoingExchangeFunding ExchangeFunding[]
+  policyVersionId         String?                    @map("policy_version_id") @db.Uuid
+  policyVersion           ReturnPolicyVersion?       @relation(fields: [policyVersionId], references: [id])
 
   @@index([customerId, createdAt])
   @@index([storeId, status])
@@ -680,6 +784,8 @@ model Order {
   @@index([shippingAddress], type: Gin, map: "idx_orders_shipping_address")
   @@index([salesStaffId])
   @@index([status, createdAt])
+  @@index([createdAt(sort: Desc)], map: "idx_orders_created_at_desc")
+  @@index([policyVersionId])
   @@map("orders")
 }
 
@@ -695,16 +801,19 @@ model OrderItem {
   unitPrice        Decimal  @map("unit_price") @db.Decimal(12, 2)
   unitCost         Decimal  @map("unit_cost") @db.Decimal(12, 2)
   discountAmount   Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  pointsDiscount   Decimal  @default(0) @map("points_discount") @db.Decimal(12, 2)
-  totalPrice       Decimal  @map("total_price") @db.Decimal(12, 2)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  pointsDiscount    Decimal  @default(0) @map("points_discount") @db.Decimal(12, 2)
+  totalPrice        Decimal  @map("total_price") @db.Decimal(12, 2)
+  attributionSource String?  @map("attribution_source") @db.VarChar(60)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   variant          ProductVariant    @relation(fields: [productVariantId], references: [id])
   promotion        Promotion?        @relation(fields: [promotionId], references: [id])
   orderItemBatches OrderItemBatch[]
   returnItems      ReturnOrderItem[]
+  refundItems      RefundItem[]
   invoiceItems     InvoiceItem[]
+  fulfillmentOrderItems FulfillmentOrderItem[]
   pricingSnapshot  Json?             @map("pricing_snapshot") @db.JsonB
 
   @@index([promotionId])
@@ -731,14 +840,21 @@ model OrderItemBatch {
 model Shipment {
   id                 String    @id @default(uuid()) @db.Uuid
   orderId            String    @map("order_id") @db.Uuid
-  shipmentCode       String    @unique @map("shipment_code") @db.VarChar(50)
+  shipmentCode       String    @unique @map("shipment_code") @db.VarChar(60)
+  shipmentType       String    @default("OUTBOUND") @map("shipment_type") @db.VarChar(30)
+  fulfillmentOrderId String?   @map("fulfillment_order_id") @db.Uuid
+  returnOrderId      String?   @map("return_order_id") @db.Uuid
   carrierCode        String    @map("carrier_code") @db.VarChar(50)
   carrierServiceCode String?   @map("carrier_service_code") @db.VarChar(50)
   trackingCode       String?   @unique @map("tracking_code") @db.VarChar(100)
+  carrierReferenceId String?   @map("carrier_reference_id") @db.VarChar(100)
+  status             String    @db.VarChar(35)
   codAmount          Decimal   @default(0) @map("cod_amount") @db.Decimal(12, 2)
-  shippingFeePaid    Decimal   @map("shipping_fee_paid") @db.Decimal(12, 2)
-  status             String    @db.VarChar(30)
+  codStatus          String?   @default("COD_EXPECTED") @map("cod_status") @db.VarChar(30)
+  shippingFeePaid    Decimal   @default(0) @map("shipping_fee_paid") @db.Decimal(12, 2)
+  actualShippingFee  Decimal?  @default(0) @map("actual_shipping_fee") @db.Decimal(12, 2)
   shippingLabelUrl   String?   @map("shipping_label_url") @db.Text
+  trackingUrl        String?   @map("tracking_url") @db.Text
   carrierMetadata    Json?     @map("carrier_metadata") @db.JsonB
   handedOverAt       DateTime? @map("handed_over_at") @db.Timestamptz
   deliveredAt        DateTime? @map("delivered_at") @db.Timestamptz
@@ -746,10 +862,20 @@ model Shipment {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order  Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  events ShipmentEvent[]
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fulfillmentOrder   FulfillmentOrder?  @relation(fields: [fulfillmentOrderId], references: [id], onDelete: SetNull)
+  returnOrder        ReturnOrder?       @relation(fields: [returnOrderId], references: [id], onDelete: SetNull)
+  events             ShipmentEvent[]
+  packages           ShipmentPackage[]
+  attempts           ShipmentAttempt[]
+  codReconciliationItems CodReconciliationItem[]
+  claims             CarrierClaim[]
+
 
   @@index([orderId, status])
+  @@index([fulfillmentOrderId])
+  @@index([returnOrderId])
+  @@index([carrierCode, trackingCode], map: "idx_shipments_carrier_tracking")
   @@index([carrierMetadata], type: Gin, map: "idx_shipments_carrier_metadata")
   @@map("shipments")
 }
@@ -770,50 +896,79 @@ model OrderStatusHistory {
 }
 
 model ReturnOrder {
-  id           String   @id @default(uuid()) @db.Uuid
-  returnCode   String   @unique @map("return_code") @db.VarChar(50)
-  orderId      String   @map("order_id") @db.Uuid
-  customerId   String   @map("customer_id") @db.Uuid
-  storeId      String   @map("store_id") @db.Uuid
-  returnType   String   @map("return_type") @db.VarChar(20)
-  status       String   @db.VarChar(30)
-  reason       String   @db.VarChar(100)
-  refundAmount Decimal  @default(0) @map("refund_amount") @db.Decimal(12, 2)
-  handledBy    String?  @map("handled_by") @db.Uuid
-  adminNote    String?  @map("admin_note") @db.Text
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                  String    @id @default(uuid()) @db.Uuid
+  returnCode          String    @unique @map("return_code") @db.VarChar(50)
+  orderId             String    @map("order_id") @db.Uuid
+  customerId          String    @map("customer_id") @db.Uuid
+  storeId             String    @map("store_id") @db.Uuid
+  returnType          String    @map("return_type") @db.VarChar(20)
+  status              String    @db.VarChar(30)
+  reason              String    @db.VarChar(100)
+  refundAmount        Decimal   @default(0) @map("refund_amount") @db.Decimal(12, 2)
+  handledBy           String?   @map("handled_by") @db.Uuid
+  adminNote           String?   @map("admin_note") @db.Text
+  policyVersionId     String?   @map("policy_version_id") @db.Uuid
+  dropoffLocationId   String?   @map("dropoff_location_id") @db.Uuid
+  pickupAddress       Json?     @map("pickup_address") @db.JsonB
+  returnChannel       String    @default("STORE_DROPOFF") @map("return_channel") @db.VarChar(30)
+  totalRefundApproved Decimal   @default(0) @map("total_refund_approved") @db.Decimal(12, 2)
+  customerNote        String?   @map("customer_note") @db.Text
+  rejectionReason     String?   @map("rejection_reason") @db.Text
+  version             Int       @default(1) @map("version")
+  riskScore           Int?      @map("risk_score")
+  riskLevel           String?   @map("risk_level") @db.VarChar(20)
+  isFraudFlagged      Boolean   @default(false) @map("is_fraud_flagged")
+  fraudReason         String?   @map("fraud_reason") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order          Order                 @relation(fields: [orderId], references: [id])
-  customer       Customer              @relation(fields: [customerId], references: [id])
-  store          Store                 @relation(fields: [storeId], references: [id])
-  handler        User?                 @relation(fields: [handledBy], references: [id])
-  items          ReturnOrderItem[]
-  refunds        Refund[]
-  quoteVersion   Int                   @default(0) @map("quote_version")
-  quoteExpiresAt DateTime?             @map("quote_expires_at") @db.Timestamptz
-  quoteSnapshot  Json?                 @map("quote_snapshot") @db.JsonB
-  attachments    ReturnAttachment[]
-  history        ReturnStatusHistory[]
-  exchangeItems  ExchangeItem[]
-  settlement     ExchangeSettlement?
+  order           Order                 @relation(fields: [orderId], references: [id])
+  customer        Customer              @relation(fields: [customerId], references: [id])
+  store           Store                 @relation(fields: [storeId], references: [id])
+  handler         User?                 @relation(fields: [handledBy], references: [id])
+  policyVersion   ReturnPolicyVersion?  @relation(fields: [policyVersionId], references: [id])
+  dropoffLocation Store?                @relation("ReturnDropoffStore", fields: [dropoffLocationId], references: [id])
+  items           ReturnOrderItem[]
+  refunds         Refund[]
+  shipments       Shipment[]
+  quoteVersion    Int                   @default(0) @map("quote_version")
+  quoteExpiresAt  DateTime?             @map("quote_expires_at") @db.Timestamptz
+  quoteSnapshot   Json?                 @map("quote_snapshot") @db.JsonB
+  attachments     ReturnAttachment[]
+  history         ReturnStatusHistory[]
+  exchangeItems   ExchangeItem[]
+  settlement      ExchangeSettlement?
+  receipts        ReturnReceipt[]
+  inspections     ReturnInspection[]
+  abuseEvaluations ReturnAbuseEvaluation[]
+  carrierClaims   CarrierClaim[]
 
   @@index([orderId, status])
   @@index([customerId, createdAt, id])
+  @@index([policyVersionId])
+  @@index([dropoffLocationId])
+  @@index([status, createdAt, dropoffLocationId])
   @@map("return_orders")
 }
 
 model ReturnOrderItem {
-  id               String   @id @default(uuid()) @db.Uuid
-  returnOrderId    String   @map("return_order_id") @db.Uuid
-  orderItemId      String   @map("order_item_id") @db.Uuid
-  productVariantId String   @map("product_variant_id") @db.Uuid
-  quantity         Int
-  condition        String?  @db.VarChar(30)
-  restockStoreId   String?  @map("restock_store_id") @db.Uuid
-  restockBatchId   String?  @map("restock_batch_id") @db.Uuid
-  note             String?  @db.Text
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id                  String   @id @default(uuid()) @db.Uuid
+  returnOrderId       String   @map("return_order_id") @db.Uuid
+  orderItemId         String   @map("order_item_id") @db.Uuid
+  productVariantId    String   @map("product_variant_id") @db.Uuid
+  quantity            Int
+  condition           String?  @db.VarChar(30)
+  restockStoreId      String?  @map("restock_store_id") @db.Uuid
+  restockBatchId      String?  @map("restock_batch_id") @db.Uuid
+  note                String?  @db.Text
+  reasonCode          String   @default("CHANGE_OF_MIND") @map("reason_code") @db.VarChar(50)
+  customerNote        String?  @map("customer_note") @db.Text
+  refundAmountPerUnit Decimal  @default(0) @map("refund_amount_per_unit") @db.Decimal(12, 2)
+  inspectionStatus    String   @default("PENDING") @map("inspection_status") @db.VarChar(30)
+  disposition         String?  @db.VarChar(30)
+  evidenceImages      Json?    @map("evidence_images") @db.JsonB
+  evidenceVideoUrl    String?  @map("evidence_video_url") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   returnOrder     ReturnOrder    @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
   orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
@@ -823,10 +978,181 @@ model ReturnOrderItem {
   refundAmount    Decimal        @default(0) @map("refund_amount") @db.Decimal(12, 2)
   pointsToRestore Int            @default(0) @map("points_to_restore")
   pointsValue     Decimal        @default(0) @map("points_value") @db.Decimal(12, 2)
+  inspectionItems ReturnInspectionItem[]
+  dispositions    InventoryDisposition[]
+  refundItems     RefundItem[]
 
   @@unique([returnOrderId, orderItemId])
   @@index([orderItemId])
   @@map("return_order_items")
+}
+
+model ReturnPolicyVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  versionName   String    @unique @map("version_name") @db.VarChar(50)
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz
+  isActive      Boolean   @default(true) @map("is_active")
+  description   String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  rules        ReturnPolicyRule[]
+  orders       Order[]
+  returnOrders ReturnOrder[]
+
+  @@map("return_policy_versions")
+}
+
+model ReturnPolicyRule {
+  id                    String   @id @default(uuid()) @db.Uuid
+  policyVersionId       String   @map("policy_version_id") @db.Uuid
+  reasonCode            String   @map("reason_code") @db.VarChar(50)
+  categoryId            String?  @map("category_id") @db.Uuid
+  windowDays            Int      @map("window_days")
+  requiresOriginalSeal  Boolean  @default(true) @map("requires_original_seal")
+  maxUsagePercentage    Int      @default(0) @map("max_usage_percentage")
+  shippingFeeBearer     String   @default("CUSTOMER") @map("shipping_fee_bearer") @db.VarChar(30)
+  requiresEvidenceVideo Boolean  @default(false) @map("requires_evidence_video")
+  requiresEvidenceImage Boolean  @default(true) @map("requires_evidence_image")
+  allowStoreDropoff     Boolean  @default(true) @map("allow_store_dropoff")
+  allowCarrierPickup    Boolean  @default(true) @map("allow_carrier_pickup")
+  requiresManualReview  Boolean  @default(false) @map("requires_manual_review")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  policyVersion ReturnPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+  category      Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([policyVersionId, reasonCode])
+  @@map("return_policy_rules")
+}
+
+model ReturnReceipt {
+  id                   String      @id @default(uuid()) @db.Uuid
+  receiptCode          String      @unique @map("receipt_code") @db.VarChar(60)
+  returnOrderId        String      @map("return_order_id") @db.Uuid
+  locationId           String      @map("location_id") @db.Uuid
+  receivedBy           String?     @map("received_by") @db.Uuid
+  receivedItemsCount   Int         @default(0) @map("received_items_count")
+  packageConditionNote String?     @map("package_condition_note") @db.Text
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  returnOrder ReturnOrder @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  location    Store       @relation(fields: [locationId], references: [id])
+  receiver    User?       @relation(fields: [receivedBy], references: [id])
+
+  @@index([returnOrderId])
+  @@index([locationId])
+  @@index([createdAt])
+  @@map("return_receipts")
+}
+
+model ReturnInspection {
+  id             String   @id @default(uuid()) @db.Uuid
+  inspectionCode String   @unique @map("inspection_code") @db.VarChar(60)
+  returnOrderId  String   @map("return_order_id") @db.Uuid
+  inspectorId    String?  @map("inspector_id") @db.Uuid
+  overallResult  String   @map("overall_result") @db.VarChar(30)
+  inspectorNotes String?  @map("inspector_notes") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  returnOrder ReturnOrder            @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  inspector   User?                  @relation(fields: [inspectorId], references: [id])
+  items       ReturnInspectionItem[]
+
+  @@index([returnOrderId])
+  @@index([inspectorId])
+  @@map("return_inspections")
+}
+
+model ReturnInspectionItem {
+  id                  String   @id @default(uuid()) @db.Uuid
+  inspectionId        String   @map("inspection_id") @db.Uuid
+  returnItemId        String   @map("return_item_id") @db.Uuid
+  passedQuantity      Int      @default(0) @map("passed_quantity")
+  failedQuantity      Int      @default(0) @map("failed_quantity")
+  isSealIntact        Boolean  @default(true) @map("is_seal_intact")
+  remainingPercentage Int      @default(100) @map("remaining_percentage")
+  disposition         String?  @db.VarChar(30)
+  reasonDetail        String?  @map("reason_detail") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  inspection ReturnInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  returnItem ReturnOrderItem  @relation(fields: [returnItemId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@index([returnItemId])
+  @@map("return_inspection_items")
+}
+
+model InventoryDisposition {
+  id               String   @id @default(uuid()) @db.Uuid
+  dispositionCode  String   @unique @map("disposition_code") @db.VarChar(60)
+  locationId       String   @map("location_id") @db.Uuid
+  productVariantId String   @map("product_variant_id") @db.Uuid
+  lotId            String?  @map("lot_id") @db.Uuid
+  returnItemId     String?  @map("return_item_id") @db.Uuid
+  dispositionType  String   @map("disposition_type") @db.VarChar(30)
+  quantity         Int
+  executedBy       String?  @map("executed_by") @db.Uuid
+  executedAt       DateTime @default(now()) @map("executed_at") @db.Timestamptz
+  notes            String?  @db.Text
+
+  location   Store            @relation(fields: [locationId], references: [id])
+  variant    ProductVariant   @relation(fields: [productVariantId], references: [id])
+  lot        InventoryLot?    @relation(fields: [lotId], references: [id])
+  returnItem ReturnOrderItem? @relation(fields: [returnItemId], references: [id])
+  executor   User?            @relation(fields: [executedBy], references: [id])
+
+  @@index([locationId])
+  @@index([productVariantId])
+  @@index([returnItemId])
+  @@map("inventory_dispositions")
+}
+
+model ReturnAbuseEvaluation {
+  id                String       @id @default(uuid()) @db.Uuid
+  returnOrderId     String       @map("return_order_id") @db.Uuid
+  customerId        String       @map("customer_id") @db.Uuid
+  riskScore         Int          @map("risk_score")
+  riskLevel         String       @map("risk_level") @db.VarChar(20)
+  isFlagged         Boolean      @default(false) @map("is_flagged")
+  factors           Json         @map("factors") @db.JsonB
+  actionRecommended String       @map("action_recommended") @db.VarChar(50)
+  evaluatedAt       DateTime     @default(now()) @map("evaluated_at") @db.Timestamptz
+
+  returnOrder       ReturnOrder  @relation(fields: [returnOrderId], references: [id], onDelete: Cascade)
+  customer          Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([returnOrderId])
+  @@index([customerId])
+  @@index([riskLevel, isFlagged])
+  @@map("return_abuse_evaluations")
+}
+
+model CarrierClaim {
+  id            String       @id @default(uuid()) @db.Uuid
+  claimCode     String       @unique @map("claim_code") @db.VarChar(50)
+  returnOrderId String?      @map("return_order_id") @db.Uuid
+  shipmentId    String?      @map("shipment_id") @db.Uuid
+  carrierCode   String       @map("carrier_code") @db.VarChar(30)
+  claimType     String       @map("claim_type") @db.VarChar(30)
+  claimAmount   Decimal      @map("claim_amount") @db.Decimal(12, 2)
+  status        String       @default("PENDING") @map("status") @db.VarChar(30)
+  notes         String?      @db.Text
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  returnOrder   ReturnOrder? @relation(fields: [returnOrderId], references: [id], onDelete: SetNull)
+  shipment      Shipment?    @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
+  @@index([returnOrderId])
+  @@index([shipmentId])
+  @@index([carrierCode, status])
+  @@map("carrier_claims")
 }
 
 // =============================================================================
@@ -959,10 +1285,32 @@ model Refund {
   posSession  PosSession?  @relation(fields: [posSessionId], references: [id])
   processor   User?        @relation("RefundProcessor", fields: [processedBy], references: [id])
   eventKey    String?      @unique @map("event_key") @db.VarChar(160)
+  items       RefundItem[]
 
   @@index([returnOrderId, status])
   @@index([posSessionId, status])
   @@map("refunds")
+}
+
+model RefundItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  refundId       String   @map("refund_id") @db.Uuid
+  orderItemId    String   @map("order_item_id") @db.Uuid
+  returnItemId   String?  @map("return_item_id") @db.Uuid
+  quantity       Int      @default(1)
+  amount         Decimal  @default(0) @db.Decimal(12, 2)
+  pointsRestored Int      @default(0) @map("points_restored")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  refund     Refund           @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  orderItem  OrderItem        @relation(fields: [orderItemId], references: [id])
+  returnItem ReturnOrderItem? @relation(fields: [returnItemId], references: [id])
+
+  @@index([refundId])
+  @@index([orderItemId])
+  @@index([returnItemId])
+  @@map("refund_items")
 }
 
 // =============================================================================
@@ -1002,6 +1350,7 @@ model Customer {
   couponUsages        CouponUsage[]
   invoices            Invoice[]
   redemptions         LoyaltyRedemption[]
+  returnAbuseEvaluations ReturnAbuseEvaluation[]
 
   @@index([loyaltyTierId])
   @@map("customers")
@@ -1288,6 +1637,8 @@ model PurchaseOrderItem {
   purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   variant       ProductVariant @relation(fields: [productVariantId], references: [id])
 
+  @@index([purchaseOrderId])
+  @@index([productVariantId])
   @@map("purchase_order_items")
 }
 
@@ -1316,6 +1667,10 @@ model SupplierPayment {
 // =============================================================================
 
 model PromotionVariantQuota {
+  salePrice         Decimal? @map("sale_price") @db.Decimal(12, 2)
+  featuredSalePrice Decimal? @map("featured_sale_price") @db.Decimal(12, 2)
+  productRank       Int?     @map("product_rank")
+
   id               String                @id @default(uuid()) @db.Uuid
   promotionId      String                @map("promotion_id") @db.Uuid
   productVariantId String                @map("product_variant_id") @db.Uuid
@@ -1406,6 +1761,10 @@ model BroadcastRecipient {
 }
 
 model Promotion {
+  slotStartHour        Int? @map("slot_start_hour")
+  rotationProductCount Int  @default(0) @map("rotation_product_count")
+  featuredProductCount Int  @default(20) @map("featured_product_count")
+
   isFlashSale          Boolean                 @default(false) @map("is_flash_sale")
   quotas               PromotionVariantQuota[]
   allocations          PromotionAllocation[]
@@ -1430,6 +1789,7 @@ model Promotion {
   coupons    Coupon[]
   orderItems OrderItem[]
 
+  @@index([isActive, startDate, endDate])
   @@map("promotions")
 }
 
@@ -1643,6 +2003,8 @@ model AuditLog {
 
   user User? @relation(fields: [userId], references: [id])
 
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
   @@map("audit_logs")
 }
 
@@ -1718,6 +2080,8 @@ model InvoiceItem {
   invoice   Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   orderItem OrderItem @relation(fields: [orderItemId], references: [id])
 
+  @@index([invoiceId])
+  @@index([orderItemId])
   @@map("invoice_items")
 }
 
@@ -1933,3 +2297,350 @@ model CustomerTag {
   @@index([tag])
   @@map("customer_tags")
 }
+
+model OutboxEvent {
+  id            String    @id @default(uuid()) @db.Uuid
+  aggregateType String    @map("aggregate_type") @db.VarChar(50)
+  aggregateId   String    @map("aggregate_id") @db.VarChar(100)
+  eventType     String    @map("event_type") @db.VarChar(100)
+  payload       Json      @db.JsonB
+  status        String    @default("PENDING") @db.VarChar(20) // PENDING, PROCESSING, PUBLISHED, FAILED
+  retryCount    Int       @default(0) @map("retry_count")
+  lastError     String?   @map("last_error") @db.Text
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([status, createdAt], map: "idx_outbox_events_status_created")
+  @@map("outbox_events")
+}
+
+model ShippingQuote {
+  id                    String   @id @default(uuid()) @db.Uuid
+  quoteGroupId          String   @map("quote_group_id") @db.Uuid
+  carrierCode           String   @map("carrier_code") @db.VarChar(50)
+  serviceCode           String   @map("service_code") @db.VarChar(50)
+  sourceLocationId      String   @map("source_location_id") @db.Uuid
+  estimatedFee          Decimal  @map("estimated_fee") @db.Decimal(12, 2)
+  estimatedDeliveryTime DateTime @map("estimated_delivery_time") @db.Timestamptz
+  distanceKm            Decimal? @map("distance_km") @db.Decimal(10, 2)
+  isAvailable           Boolean  @default(true) @map("is_available")
+  unavailableReason     String?  @map("unavailable_reason") @db.VarChar(255)
+  expiresAt             DateTime @map("expires_at") @db.Timestamptz
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  sourceLocation        Store    @relation(fields: [sourceLocationId], references: [id], onDelete: Restrict)
+
+  @@index([quoteGroupId, expiresAt], map: "idx_quotes_group")
+  @@map("shipping_quotes")
+}
+
+model FulfillmentOrder {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  orderId                String                 @map("order_id") @db.Uuid
+  fulfillmentOrderNumber String                 @unique @map("fulfillment_order_number") @db.VarChar(60)
+  sourceLocationId       String                 @map("source_location_id") @db.Uuid
+  status                 String                 @default("PENDING_ALLOCATION") @db.VarChar(35)
+  shippingServiceCode    String                 @map("shipping_service_code") @db.VarChar(50)
+  totalItemsCount        Int                    @map("total_items_count")
+  version                Int                    @default(1) @map("version")
+  assignedPickerId       String?                @map("assigned_picker_id") @db.Uuid
+  allocatedAt            DateTime?              @map("allocated_at") @db.Timestamptz
+  pickedAt               DateTime?              @map("picked_at") @db.Timestamptz
+  packedAt               DateTime?              @map("packed_at") @db.Timestamptz
+  handedOverAt           DateTime?              @map("handed_over_at") @db.Timestamptz
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order                  Order                  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  sourceLocation         Store                  @relation(fields: [sourceLocationId], references: [id], onDelete: Restrict)
+  items                  FulfillmentOrderItem[]
+  reservation            InventoryReservation?
+  packages               Package[]
+  shipments              Shipment[]
+
+  @@index([sourceLocationId, status], map: "idx_fo_location_status")
+  @@index([orderId], map: "idx_fo_order_id")
+  @@map("fulfillment_orders")
+}
+
+model FulfillmentOrderItem {
+  id                 String           @id @default(uuid()) @db.Uuid
+  fulfillmentOrderId String           @map("fulfillment_order_id") @db.Uuid
+  orderItemId        String           @map("order_item_id") @db.Uuid
+  productVariantId   String           @map("product_variant_id") @db.Uuid
+  quantityRequested  Int              @map("quantity_requested")
+  quantityFulfilled  Int              @default(0) @map("quantity_fulfilled")
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  fulfillmentOrder   FulfillmentOrder @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Cascade)
+  orderItem          OrderItem        @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  variant            ProductVariant   @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([fulfillmentOrderId], map: "idx_fo_items_fo_id")
+  @@index([orderItemId], map: "idx_fo_items_order_item_id")
+  @@map("fulfillment_order_items")
+}
+
+model Package {
+  id                   String            @id @default(uuid()) @db.Uuid
+  fulfillmentOrderId   String            @map("fulfillment_order_id") @db.Uuid
+  packageCode          String            @unique @map("package_code") @db.VarChar(60)
+  actualWeightGrams    Int               @map("actual_weight_grams")
+  lengthCm             Int               @map("length_cm")
+  widthCm              Int               @map("width_cm")
+  heightCm             Int               @map("height_cm")
+  packedBy             String?           @map("packed_by") @db.Uuid
+  sealedAt             DateTime?         @default(now()) @map("sealed_at") @db.Timestamptz
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  fulfillmentOrder     FulfillmentOrder  @relation(fields: [fulfillmentOrderId], references: [id], onDelete: Restrict)
+  items                PackageItem[]
+  shipmentPackages     ShipmentPackage[]
+
+  @@index([fulfillmentOrderId], map: "idx_packages_fo_id")
+  @@map("packages")
+}
+
+model PackageItem {
+  id                 String           @id @default(uuid()) @db.Uuid
+  packageId          String           @map("package_id") @db.Uuid
+  productVariantId   String           @map("product_variant_id") @db.Uuid
+  quantity           Int
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  package            Package          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  variant            ProductVariant   @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([packageId], map: "idx_package_items_package_id")
+  @@map("package_items")
+}
+
+model ShipmentPackage {
+  id                 String           @id @default(uuid()) @db.Uuid
+  shipmentId         String           @map("shipment_id") @db.Uuid
+  packageId          String           @map("package_id") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  shipment           Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  package            Package          @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@unique([shipmentId, packageId], map: "uq_shipment_package")
+  @@map("shipment_packages")
+}
+
+model ShippingWebhookInbox {
+  id              String    @id @default(uuid()) @db.Uuid
+  carrierCode     String    @map("carrier_code") @db.VarChar(50)
+  eventId         String    @map("event_id") @db.VarChar(150)
+  eventType       String?   @map("event_type") @db.VarChar(80)
+  trackingCode    String?   @map("tracking_code") @db.VarChar(100)
+  payload         Json      @db.JsonB
+  processedStatus String    @default("PENDING") @map("processed_status") @db.VarChar(30)
+  errorMessage    String?   @map("error_message") @db.Text
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz
+
+  @@unique([carrierCode, eventId], map: "uq_webhook_carrier_event")
+  @@index([processedStatus, receivedAt], map: "idx_webhook_inbox_status_received")
+  @@index([trackingCode], map: "idx_webhook_inbox_tracking")
+  @@map("shipping_webhook_inbox")
+}
+
+model ShipmentAttempt {
+  id                  String   @id @default(uuid()) @db.Uuid
+  shipmentId          String   @map("shipment_id") @db.Uuid
+  attemptNumber       Int      @map("attempt_number")
+  attemptedAt         DateTime @map("attempted_at") @db.Timestamptz
+  failureReasonCode   String?  @map("failure_reason_code") @db.VarChar(50)
+  failureReasonDetail String?  @map("failure_reason_detail") @db.Text
+  carrierRawStatus    String?  @map("carrier_raw_status") @db.VarChar(50)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  shipment            Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, attemptNumber], map: "uq_shipment_attempt")
+  @@index([shipmentId, attemptedAt], map: "idx_shipment_attempts_shipment")
+  @@map("shipment_attempts")
+}
+
+model CodReconciliation {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  reconciliationCode String                  @unique @map("reconciliation_code") @db.VarChar(60)
+  carrierCode        String                  @map("carrier_code") @db.VarChar(50)
+  reconciliationDate DateTime                @map("reconciliation_date") @db.Date
+  totalCodDeclared   Decimal                 @map("total_cod_declared") @db.Decimal(14, 2)
+  totalCodReceived   Decimal                 @map("total_cod_received") @db.Decimal(14, 2)
+  differenceAmount   Decimal                 @default(0) @map("difference_amount") @db.Decimal(14, 2)
+  status             String                  @db.VarChar(30)
+  bankStatementRef   String?                 @map("bank_statement_ref") @db.VarChar(100)
+  approvedBy         String?                 @map("approved_by") @db.Uuid
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  items              CodReconciliationItem[]
+
+  @@index([carrierCode, reconciliationDate], map: "idx_cod_reconciliations_carrier_date")
+  @@map("cod_reconciliations")
+}
+
+model CodReconciliationItem {
+  id                   String            @id @default(uuid()) @db.Uuid
+  reconciliationId     String            @map("reconciliation_id") @db.Uuid
+  shipmentId           String            @map("shipment_id") @db.Uuid
+  declaredCodAmount    Decimal           @map("declared_cod_amount") @db.Decimal(12, 2)
+  carrierPaidCodAmount Decimal           @map("carrier_paid_cod_amount") @db.Decimal(12, 2)
+  discrepancyAmount    Decimal           @default(0) @map("discrepancy_amount") @db.Decimal(12, 2)
+  carrierFeeCharged    Decimal           @default(0) @map("carrier_fee_charged") @db.Decimal(12, 2)
+  status               String            @db.VarChar(30)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  reconciliation       CodReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  shipment             Shipment          @relation(fields: [shipmentId], references: [id])
+
+  @@index([reconciliationId], map: "idx_cod_rec_items_reconciliation")
+  @@index([shipmentId], map: "idx_cod_rec_items_shipment")
+  @@map("cod_reconciliation_items")
+}
+
+model DomainStatusHistory {
+  id              String   @id @default(uuid()) @db.Uuid
+  entityType      String   @map("entity_type") @db.VarChar(50)
+  entityId        String   @map("entity_id") @db.Uuid
+  fromStatus      String   @map("from_status") @db.VarChar(50)
+  toStatus        String   @map("to_status") @db.VarChar(50)
+  actionPerformed String   @map("action_performed") @db.VarChar(80)
+  actorType       String   @map("actor_type") @db.VarChar(30)
+  actorId         String?  @map("actor_id") @db.VarChar(100)
+  reason          String?  @db.Text
+  metadata        Json?    @db.JsonB
+  occurredAt      DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  @@index([entityType, entityId, occurredAt(sort: Desc)], map: "idx_domain_status_audit")
+  @@map("domain_status_histories")
+}
+
+model SearchHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  query        String   @db.VarChar(255)
+  resultsCount Int      @default(0) @map("results_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "idx_search_histories_user_id_created_at")
+  @@index([query], map: "idx_search_histories_query")
+  @@map("search_histories")
+}
+
+// =============================================================================
+// 13. PRODUCT RECOMMENDATION SYSTEM (v2.1)
+// =============================================================================
+
+enum BehaviorEventType {
+  VIEW_PRODUCT
+  SEARCH_QUERY
+  SEARCH_CLICK
+  ADD_TO_WISHLIST
+  ADD_TO_CART
+  TRY_ON_COLOR
+  PURCHASE
+}
+
+enum RecommendationType {
+  SIMILAR_CONTENT
+  BOUGHT_TOGETHER
+  ROUTINE_COMPLEMENT
+}
+
+enum RecommendationPlacement {
+  HOME
+  PRODUCT_SIMILAR
+  PRODUCT_BOUGHT_TOGETHER
+  CART_ROUTINE
+}
+
+// Không đặt FK trên bảng event log để đảm bảo ghi batch tốc độ cao và giữ toàn vẹn lịch sử
+model UserBehaviorEvent {
+  // Client tự sinh UUID v4 để createMany({ skipDuplicates: true }) đạt chuẩn Idempotency khi retry
+  id          String            @id @default(uuid()) @db.Uuid
+  customerId  String?           @map("customer_id") @db.Uuid
+  anonymousId String            @map("anonymous_id") @db.VarChar(64)
+  eventType   BehaviorEventType @map("event_type")
+  productId   String?           @map("product_id") @db.Uuid
+  variantId   String?           @map("variant_id") @db.Uuid
+  categoryId  String?           @map("category_id") @db.Uuid
+  brandId     String?           @map("brand_id") @db.Uuid
+  weight      Float             @default(1.0)
+  source      String?           @db.VarChar(60)
+  metadata    Json?             @db.JsonB
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([customerId, createdAt(sort: Desc)], map: "idx_ube_customer_created")
+  @@index([anonymousId, createdAt(sort: Desc)], map: "idx_ube_anonymous_created")
+  @@index([productId, eventType, createdAt(sort: Desc)], map: "idx_ube_product_event_created")
+  @@index([createdAt], map: "idx_ube_created_at")
+  @@map("user_behavior_events")
+}
+
+// Đặt FK + onDelete: Cascade tới bảng Product để không bao giờ tồn tại gợi ý trỏ vào SP đã xóa
+model ProductRecommendation {
+  id              String             @id @default(uuid()) @db.Uuid
+  sourceProductId String             @map("source_product_id") @db.Uuid
+  targetProductId String             @map("target_product_id") @db.Uuid
+  type            RecommendationType
+  score           Float
+  reason          String?            @db.VarChar(255)
+  batchVersion    String             @map("batch_version") @db.VarChar(64)
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  sourceProduct Product @relation("RecSourceProduct", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  targetProduct Product @relation("RecTargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceProductId, targetProductId, type], map: "uq_product_rec_source_target_type")
+  @@index([sourceProductId, type, score(sort: Desc)], map: "idx_product_rec_lookup")
+  @@index([type, batchVersion], map: "idx_product_rec_batch_cleanup")
+  @@index([targetProductId], map: "idx_product_rec_target")
+  @@map("product_recommendations")
+}
+
+model UserAffinityProfile {
+  customerId    String   @id @map("customer_id") @db.Uuid
+  topCategories Json     @map("top_categories") @db.JsonB
+  topBrands     Json     @map("top_brands") @db.JsonB
+  preferredTags Json     @map("preferred_tags") @db.JsonB
+  avoidedTags   Json?    @map("avoided_tags") @db.JsonB
+  avgPriceRange Json?    @map("avg_price_range") @db.JsonB
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("user_affinity_profiles")
+}
+
+// Bảng tổng hợp nhẹ đo CTR / CVR / Revenue theo ngày (tách khỏi bảng event để tránh phình DB)
+model RecommendationDailyMetric {
+  id          String                  @id @default(uuid()) @db.Uuid
+  metricDate  DateTime                @map("metric_date") @db.Date
+  placement   RecommendationPlacement
+  impressions Int                     @default(0)
+  clicks      Int                     @default(0)
+  addToCarts  Int                     @default(0) @map("add_to_carts")
+  conversions Int                     @default(0)
+  revenue     Decimal                 @default(0) @db.Decimal(14, 2)
+  updatedAt   DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([metricDate, placement], map: "uq_rec_daily_metric_date_placement")
+  @@map("recommendation_daily_metrics")
+}
+
+model RecommendationTrackingBatch {
+  batchId   String   @id @map("batch_id") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt], map: "idx_rec_tracking_batch_created")
+  @@map("recommendation_tracking_batches")
+}
+
+
+
+
+

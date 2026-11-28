@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { startOfVnToday } from '@core/utils/expiry-policy.util';
+import { emitOrderPurchased, enqueueRecommendationPurchase } from '@core/services/recommendation-domain-events';
 import { allocateFefo, FefoAllocation } from '@modules/orders/application/utils/fefo.util';
 import {
   calculateCommission,
@@ -176,8 +177,13 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
     };
   }
 
-  createSale(command: CreatePosSaleCommand): Promise<PosCreatedSale> {
-    return this.prisma.$transaction((tx) => this.writeSale(tx, command), { timeout: 20000 });
+  async createSale(command: CreatePosSaleCommand): Promise<PosCreatedSale> {
+    const created = await this.prisma.$transaction(
+      (tx) => this.writeSale(tx, command),
+      { timeout: 20000 },
+    );
+    emitOrderPurchased({ orderId: created.orderId, trigger: 'POS_COMPLETED' });
+    return created;
   }
 
   private async writeSale(
@@ -484,6 +490,7 @@ export class PrismaPosOrderRepository implements IPosOrderRepository {
       },
     });
 
+    await enqueueRecommendationPurchase(tx, { orderId: order.id, trigger: 'POS_COMPLETED' });
     return {
       orderId: order.id,
       orderNumber,

@@ -200,7 +200,7 @@ export function StoreLocator({ initialStores }: { initialStores: StoreItem[] }) 
 
   return (
     <div className="w-full bg-[#f9ecee] min-h-screen pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+      <div className="site-container pt-4">
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="py-3">
           <ol className="flex items-center gap-1.5 text-xs text-[#776d6d]">

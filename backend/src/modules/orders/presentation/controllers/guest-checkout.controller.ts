@@ -17,7 +17,10 @@ import { PaymentsService } from '@modules/payments/application/services/payments
 import { CreateOrderDto } from '../dtos/create-order.dto';
 import { PreviewOrderDto } from '../dtos/preview-order.dto';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @Public()
+@UseDistributedThrottle()
 @ApiTags('Guest - Checkout')
 @ApiHeader({
   name: 'x-session-id',
@@ -86,5 +89,18 @@ export class GuestCheckoutController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.payments.statusGuest(session, id);
+  }
+
+  @Post('orders/track')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Tra cứu thông tin đơn hàng bằng Mã đơn hàng và Số điện thoại',
+  })
+  track(
+    @Body('orderNumber') orderNumber: string,
+    @Body('phone') phone: string,
+  ) {
+    return this.checkout.trackOrder(orderNumber, phone);
   }
 }

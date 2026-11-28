@@ -1,8 +1,11 @@
-import { Throttle } from '@nestjs/throttler';
+import { PublicReadThrottle } from '@core/cache/public-read-throttle.decorator';
 import {
   Controller,
   DefaultValuePipe,
   Get,
+  Post,
+  Delete,
+  Body,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
@@ -26,6 +29,7 @@ import { ProductSuggestionDto } from '../dtos/product-suggestion.dto';
 import { SearchProductsQueryDto } from '../dtos/search-products-query.dto';
 import { SuggestProductsQueryDto } from '../dtos/suggest-products-query.dto';
 import { PublicCatalogService } from '../../application/services/public-catalog.service';
+import { SearchHistoryService } from '../../application/services/search-history.service';
 
 @ApiTags('Customer - Products (Việt Trung)')
 @Controller('customer/products')
@@ -38,10 +42,12 @@ export class ProductCustomerController {
     private readonly suggestProductsUseCase: SuggestProductsUseCase,
     private readonly getRelatedProductsUseCase: GetRelatedProductsUseCase,
     @Optional() private readonly catalog?: PublicCatalogService,
+    @Optional() private readonly searchHistoryService?: SearchHistoryService,
   ) {}
 
   @Public()
   @Get()
+  @PublicReadThrottle('catalog')
   @ApiOperation({
     summary: 'Lấy danh sách sản phẩm hiển thị trên Web/Mobile (phân trang, lọc, sắp xếp)',
   })
@@ -52,7 +58,7 @@ export class ProductCustomerController {
   async getProducts(
     @Query() filter: ProductFilterDto,
     @Req() req?: { user?: { userId?: string } },
-  ) {
+  ): Promise<PageDto<ProductResponseDto>> {
     if (this.catalog) {
       const result = await this.catalog.list(filter, req?.user?.userId);
       return new PageDto(
@@ -72,9 +78,9 @@ export class ProductCustomerController {
 
   @Public()
   @Get('search')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @PublicReadThrottle('search')
   @ApiOperation({
-    summary: 'Tìm kiếm sản phẩm theo từ khóa (Elasticsearch + fallback DB)',
+    summary: 'Tìm kiếm sản phẩm theo từ khóa (OpenSearch + fallback DB)',
   })
   @ApiOkResponse({ description: 'Kết quả tìm kiếm sản phẩm', type: PageDto })
   async searchProducts(
@@ -84,12 +90,18 @@ export class ProductCustomerController {
     if (this.catalog) {
       const filter = Object.assign(new ProductFilterDto(), queryDto);
       const result = await this.catalog.list(filter, req?.user?.userId, queryDto.q);
+      if (this.searchHistoryService && queryDto.q) {
+        this.searchHistoryService.recordSearch(queryDto.q, req?.user?.userId, result.total).catch(() => {});
+      }
       return new PageDto(
         result.items,
         new PageMetaDto({ pageOptionsDto: filter, itemCount: result.total }),
       );
     }
     const { items, total } = await this.searchProductsUseCase.execute(queryDto.q, queryDto);
+    if (this.searchHistoryService && queryDto.q) {
+      this.searchHistoryService.recordSearch(queryDto.q, req?.user?.userId, total).catch(() => {});
+    }
     const data = items.map((product) => ProductResponseDto.fromDomain(product));
     const meta = new PageMetaDto({
       pageOptionsDto: queryDto,
@@ -99,15 +111,64 @@ export class ProductCustomerController {
   }
 
   @Public()
+  @Get('search-history')
+  @ApiOperation({ summary: 'Lấy lịch sử tìm kiếm gần đây và từ khóa thịnh hành' })
+  async getSearchHistory(@Req() req?: { user?: { userId?: string } }) {
+    const userId = req?.user?.userId;
+    const [history, trending] = await Promise.all([
+      this.searchHistoryService?.getRecentSearches(userId) ?? Promise.resolve([]),
+      this.searchHistoryService?.getTrendingSearches() ?? Promise.resolve([]),
+    ]);
+    return { history, trending };
+  }
+
+  @Public()
+  @Post('search-history')
+  @ApiOperation({ summary: 'Lưu từ khóa vào lịch sử tìm kiếm' })
+  async recordSearchHistory(
+    @Body() body: { query: string; resultsCount?: number },
+    @Req() req?: { user?: { userId?: string } },
+  ) {
+    if (this.searchHistoryService && body?.query) {
+      await this.searchHistoryService.recordSearch(
+        body.query,
+        req?.user?.userId,
+        body.resultsCount ?? 0,
+      );
+    }
+    return { success: true };
+  }
+
+  @Public()
+  @Delete('search-history')
+  @ApiOperation({ summary: 'Xóa lịch sử tìm kiếm của người dùng' })
+  async deleteSearchHistory(
+    @Query('query') query?: string,
+    @Query('id') id?: string,
+    @Req() req?: { user?: { userId?: string } },
+  ) {
+    const userId = req?.user?.userId;
+    if (!userId || !this.searchHistoryService) return { success: false };
+    const target = id || query;
+    if (target) {
+      await this.searchHistoryService.removeSearchItem(target, userId);
+    } else {
+      await this.searchHistoryService.clearAllHistory(userId);
+    }
+    return { success: true };
+  }
+
+  @Public()
   @Get('facets')
+  @PublicReadThrottle('catalog')
   @ApiOperation({ summary: 'Số lượng sản phẩm đang bán theo danh mục, thương hiệu và tag' })
-  async facets() {
-    return this.catalog?.facets() ?? { categories: [], brands: [], tags: [] };
+  async facets(@Query('categoryId') categoryId?: string) {
+    return this.catalog?.facets(categoryId) ?? { categories: [], brands: [], tags: [] };
   }
 
   @Public()
   @Get('suggest')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @PublicReadThrottle('search')
   @ApiOperation({
     summary: 'Gợi ý tìm kiếm nhanh / autocomplete (tối đa 20 kết quả)',
   })
@@ -126,7 +187,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get('search-hints')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @PublicReadThrottle('search')
   @ApiOperation({ summary: 'Gợi ý từ khóa, thương hiệu và sản phẩm cho ô tìm kiếm' })
   async searchHints(@Query() queryDto: SuggestProductsQueryDto, @Req() req?: { user?: { userId?: string } }) {
     if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
@@ -134,15 +195,8 @@ export class ProductCustomerController {
   }
 
   @Public()
-  @Get(':id/try-on')
-  @ApiOperation({ summary: 'Mã màu son đã được duyệt cho thử màu camera, có thể null nếu chưa cấu hình' })
-  async tryOnColors(@Param('id', ParseUUIDPipe) id: string) {
-    if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
-    return this.catalog.tryOnColors(id);
-  }
-
-  @Public()
   @Get(':id/availability')
+  @PublicReadThrottle('catalog')
   @ApiOperation({ summary: 'Số lượng khả dụng theo cửa hàng cho một biến thể' })
   async availability(@Param('id', ParseUUIDPipe) id: string, @Query('variantId', ParseUUIDPipe) variantId: string) {
     if (!this.catalog) throw new Error('CATALOG_UNAVAILABLE');
@@ -151,6 +205,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':slug')
+  @PublicReadThrottle('catalog')
   @ApiOperation({
     summary: 'Xem chi tiết sản phẩm theo slug (URL thân thiện SEO)',
   })
@@ -163,6 +218,7 @@ export class ProductCustomerController {
 
   @Public()
   @Get(':id/related')
+  @PublicReadThrottle('catalog')
   @ApiOperation({
     summary: 'Lấy danh sách sản phẩm liên quan (cùng danh mục hoặc thương hiệu)',
   })

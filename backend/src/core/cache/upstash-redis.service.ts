@@ -11,6 +11,9 @@ import { redisCommandTimeout } from '../config/runtime-config';
 @Injectable()
 export class UpstashRedisService implements ICacheService {
   private readonly logger = new Logger(UpstashRedisService.name);
+  private cachedEpoch: { value: string | null; expiresAt: number } | null = null;
+  private degradedUntil = 0;
+
   constructor(private readonly config: ConfigService) {}
   get configured() {
     return (
@@ -18,11 +21,22 @@ export class UpstashRedisService implements ICacheService {
       !!this.config.get('UPSTASH_REDIS_REST_TOKEN')
     );
   }
+  get degraded(): boolean {
+    return Date.now() < this.degradedUntil;
+  }
+  get keyPrefix(): string {
+    return this.prefix;
+  }
   private get prefix() {
     return this.config.get<string>(
       'REDIS_KEY_PREFIX',
       `glowup:${this.config.get('NODE_ENV', 'development')}:`,
     );
+  }
+  private getCacheCooldownMs(reason: string): number {
+    const raw = Number(this.config.get('UPSTASH_CACHE_COOLDOWN_MS', 30_000));
+    const baseMs = Number.isFinite(raw) && raw >= 0 ? raw : 30_000;
+    return reason === 'http_429' ? Math.max(baseMs, 60_000) : baseMs;
   }
   async command<T>(command: (string | number)[]): Promise<T> {
     const endpoint = new URL(
@@ -60,22 +74,39 @@ export class UpstashRedisService implements ICacheService {
         reason = 'command_error';
         throw new Error('REDIS_COMMAND_FAILED');
       }
+      this.degradedUntil = 0;
       return value.result;
     } catch {
+      const failureReason = signal.aborted ? 'timeout' : reason;
+      this.degradedUntil = Date.now() + this.getCacheCooldownMs(failureReason);
       // Do not log command arguments, keys, provider response bodies or credentials.
       this.logger.warn({
         event: 'redis_command_failed',
-        reason: signal.aborted ? 'timeout' : reason,
+        reason: failureReason,
       });
       throw new ServiceUnavailableException('REDIS_UNAVAILABLE');
     }
   }
+  private async getEpoch(): Promise<string> {
+    const now = Date.now();
+    if (this.cachedEpoch && this.cachedEpoch.expiresAt > now) {
+      return this.cachedEpoch.value ?? '0';
+    }
+    try {
+      const epoch = await this.command<string | null>([
+        'GET',
+        `${this.prefix}cache:epoch`,
+      ]);
+      this.cachedEpoch = { value: epoch, expiresAt: now + 60000 };
+      return epoch ?? '0';
+    } catch {
+      return this.cachedEpoch?.value ?? '0';
+    }
+  }
+
   private async cacheKey(key: string) {
-    const epoch = await this.command<string | null>([
-      'GET',
-      `${this.prefix}cache:epoch`,
-    ]);
-    return `${this.prefix}cache:${epoch ?? '0'}:${key}`;
+    const epoch = await this.getEpoch();
+    return `${this.prefix}cache:${epoch}:${key}`;
   }
   async get<T>(key: string): Promise<T | null> {
     try {
@@ -107,7 +138,9 @@ export class UpstashRedisService implements ICacheService {
     await this.command(['DEL', await this.cacheKey(key)]);
   }
   async reset() {
-    await this.command(['SET', `${this.prefix}cache:epoch`, randomUUID()]);
+    const newEpoch = randomUUID();
+    await this.command(['SET', `${this.prefix}cache:epoch`, newEpoch]);
+    this.cachedEpoch = { value: newEpoch, expiresAt: Date.now() + 60000 };
   }
   async rateLimit(identity: string, limit: number, ttlMs: number) {
     const key =

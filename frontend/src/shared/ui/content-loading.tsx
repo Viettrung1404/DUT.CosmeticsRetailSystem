@@ -113,7 +113,7 @@ export function ContentLoading({
           </div>
         ) : variant === "cards" ? (
           <div className="loading-card-grid">
-            {[0, 1, 2, 3].map((card) => (
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((card) => (
               <div className="loading-surface" key={card}>
                 <Placeholder className="loading-card-image" />
                 <Placeholder className="loading-line-long" />

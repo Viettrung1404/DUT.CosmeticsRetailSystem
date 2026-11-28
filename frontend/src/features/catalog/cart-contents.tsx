@@ -38,7 +38,10 @@ export function CartContents({
       .filter((item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded)
       .map((item) => ({ variantId: item.productVariantId, quantity: item.quantity })) ?? [];
   const quote = useQuery({
-    queryKey: ["cart-quote", selection],
+    queryKey: ["cart-quote", selection, data?.selectedSubtotal],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     enabled: !compact && selection.length > 0,
     queryFn: ({ signal }) =>
       requestBff("/api/checkout/preview", previewSchema, {
@@ -51,6 +54,20 @@ export function CartContents({
   function queue(changes: CartChange[]) {
     setError("");
     queueCartChanges(client, changes, (cause) => setError(apiErrorMessage(cause)));
+  }
+  function selectOnlyFirstItem() {
+    const selectedItems = data?.items.filter(
+      (item) => item.isSelected && item.isAvailable && !item.isQuantityExceeded,
+    );
+    if (!selectedItems || selectedItems.length <= 1) return;
+    const [, ...rest] = selectedItems;
+    queue(
+      rest.map((item) => ({
+        id: item.id,
+        method: "PUT",
+        body: { isSelected: false },
+      })),
+    );
   }
   function selectAll() {
     const current = client.getQueryData<Cart>(["cart"]);
@@ -88,12 +105,16 @@ export function CartContents({
         heading={!compact}
       />
     );
-  if (isError)
+  if (isError && !data)
     return (
       <div className="catalog-empty">
-        Không tải được giỏ hàng. <button onClick={() => refetch()}>Thử lại</button>
+        Không tải được giỏ hàng.{" "}
+        <button type="button" onClick={() => void refetch()}>
+          Thử lại
+        </button>
       </div>
     );
+  if (!data) return null;
   const items = [
     ...data.items,
     ...data.unavailableItems.filter(
@@ -205,9 +226,32 @@ export function CartContents({
                     }
                   />
                 )}
-                <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                {item.productSlug ? (
+                  <Link
+                    href={`/products/${encodeURIComponent(item.productSlug)}`}
+                    className="cart-item-image"
+                    onClick={onNavigate}
+                  >
+                    <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                  </Link>
+                ) : (
+                  <span className="cart-item-image">
+                    <CatalogImage src={item.thumbnailUrl} alt={item.productName || "Sản phẩm"} />
+                  </span>
+                )}
                 <div className="cart-item-copy">
-                  <h2>{item.productName || "Sản phẩm GlowUp"}</h2>
+                  <h2>
+                    {item.productSlug ? (
+                      <Link
+                        href={`/products/${encodeURIComponent(item.productSlug)}`}
+                        onClick={onNavigate}
+                      >
+                        {item.productName || "Sản phẩm GlowUp"}
+                      </Link>
+                    ) : (
+                      item.productName || "Sản phẩm GlowUp"
+                    )}
+                  </h2>
                   <p>{item.variantName}</p>
                   {compact && (
                     <label className="cart-select">
@@ -316,9 +360,39 @@ export function CartContents({
                 <dd>{formatPrice(quote.data?.totalAmount ?? data.selectedSubtotal)}</dd>
               </div>
             </dl>
-            {!quote.data && <p>Phí giao hàng và ưu đãi được xác nhận ở bước thanh toán.</p>}
-            {eligible.length > 0 &&
-            eligible.length === data.items.filter((item) => item.isSelected).length ? (
+            {!quote.data && !quote.isError && (
+              <p>Phí giao hàng và ưu đãi được xác nhận ở bước thanh toán.</p>
+            )}
+            {quote.isError && (
+              <div className="cart-warning cart-quote-warning" role="alert">
+                <p>
+                  <strong>Chưa thể giao chung đơn:</strong> {apiErrorMessage(quote.error)}
+                </p>
+                <small>
+                  Các sản phẩm đã chọn không có cùng tại 1 chi nhánh/kho để gom chung 1 đơn hàng.
+                </small>
+                {eligible.length > 1 && (
+                  <button
+                    type="button"
+                    className="button cart-split-button"
+                    onClick={selectOnlyFirstItem}
+                  >
+                    Tách đơn: Chỉ chọn sản phẩm đầu tiên để thanh toán
+                  </button>
+                )}
+              </div>
+            )}
+            {quote.isError ? (
+              <button
+                type="button"
+                className="button"
+                disabled
+                style={{ opacity: 0.5, cursor: "not-allowed" }}
+              >
+                <ShoppingCart size={18} /> Không thể thanh toán chung
+              </button>
+            ) : eligible.length > 0 &&
+              eligible.length === data.items.filter((item) => item.isSelected).length ? (
               <Link href="/checkout" className="button" onClick={onNavigate}>
                 <ShoppingCart size={18} /> Tiến hành thanh toán ({eligible.length})
               </Link>
@@ -360,9 +434,14 @@ export function CartContents({
             </aside>
           )}
         </div>
-        {error && (
+        {(error || isError) && (
           <p role="alert" className="cart-warning">
-            {error}
+            {error || "Chưa đồng bộ được giỏ hàng mới nhất."}{" "}
+            {isError && (
+              <button type="button" onClick={() => void refetch()}>
+                Thử lại
+              </button>
+            )}
           </p>
         )}
       </div>

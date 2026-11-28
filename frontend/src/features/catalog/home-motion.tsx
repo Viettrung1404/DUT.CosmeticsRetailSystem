@@ -37,7 +37,7 @@ export function FlashCountdown({ endDate, serverTime }: { endDate: string; serve
   const router = useRouter();
   const [seconds, setSeconds] = useState<number | null>(null);
   useEffect(() => {
-    const offsetMs = serverTime ? Date.now() - new Date(serverTime).getTime() : 0;
+    const offsetMs = serverTime ? new Date(serverTime).getTime() - Date.now() : 0;
     const tick = () => setSeconds(remaining(endDate, offsetMs));
     const initial = window.setTimeout(tick, 0);
     const timer = window.setInterval(tick, 1000);

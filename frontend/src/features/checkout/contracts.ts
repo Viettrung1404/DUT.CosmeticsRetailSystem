@@ -1,7 +1,13 @@
 import { z } from "zod";
 
 export const orderItemsSchema = z
-  .array(z.object({ variantId: z.uuid(), quantity: z.number().int().min(1).max(100) }))
+  .array(
+    z.object({
+      variantId: z.uuid(),
+      quantity: z.number().int().min(1).max(99),
+      attributionSource: z.string().trim().max(60).optional(),
+    }),
+  )
   .min(1)
   .max(100);
 export const previewInputSchema = z
@@ -9,8 +15,43 @@ export const previewInputSchema = z
     items: orderItemsSchema,
     couponCode: z.string().trim().max(50).optional(),
     usePoints: z.number().int().min(0).optional(),
+    quoteGroupId: z.string().optional(),
+    shippingOptionId: z.string().optional(),
   })
   .strict();
+
+export const shippingQuoteOptionSchema = z.object({
+  id: z.string().optional(),
+  carrierCode: z.enum(["AHAMOVE", "GHN"]).or(z.string()),
+  serviceCode: z.enum(["EXPRESS_2H", "STANDARD"]).or(z.string()),
+  serviceName: z.string(),
+  sourceLocationId: z.string(),
+  sourceLocationName: z.string(),
+  estimatedFee: z.number().nonnegative(),
+  estimatedDeliveryTime: z.string(),
+  distanceKm: z.number().nullable().optional(),
+  isAvailable: z.boolean(),
+  unavailableReason: z.string().nullable().optional(),
+});
+
+export const shippingQuoteResponseSchema = z.object({
+  quoteGroupId: z.string(),
+  expiresAt: z.string(),
+  options: z.array(shippingQuoteOptionSchema),
+});
+
+export const shippingQuoteInputSchema = z.object({
+  items: orderItemsSchema,
+  shippingAddress: z.object({
+    provinceCity: z.string().min(1),
+    district: z.string().min(1),
+    ward: z.string().optional(),
+    addressLine: z.string().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+  }),
+  orderType: z.string().optional(),
+});
 export const shippingSchema = z
   .object({
     recipientName: z.string().trim().min(1).max(100),
@@ -48,6 +89,11 @@ export const previewSchema = z.object({
       productName: z.string(),
       quantity: z.number(),
       totalPrice: z.number(),
+      variantName: z.string().optional(),
+      originalPrice: z.number().optional(),
+      effectivePrice: z.number().optional(),
+      lineDiscount: z.number().optional(),
+      quotaQuantity: z.number().int().nonnegative().optional(),
     }),
   ),
 });

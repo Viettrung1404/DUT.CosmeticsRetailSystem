@@ -1,174 +1,424 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TextInput,
   Alert,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../constants/theme';
-import { orderApi, ReturnReasonType } from '../../api/orderApi';
+import {
+  orderApi,
+  OrderReturnEligibility,
+  EligibleReturnItem,
+  StoreLocation,
+  ReturnReasonCode,
+  ReturnChannel,
+} from '../../api/orderApi';
 
-const RMA_REASONS: Array<{ id: ReturnReasonType; label: string; icon: string }> = [
-  { id: 'DEFECTIVE', label: 'Bị đổ vỡ, hư hỏng hoặc lỗi kỹ thuật', icon: 'alert-triangle' },
-  { id: 'ALLERGIC', label: 'Dị ứng da, kích ứng khi thử sản phẩm', icon: 'shield-alert' },
-  { id: 'WRONG_ITEM', label: 'Giao nhầm mã màu, sai dung tích hoặc mẫu', icon: 'repeat' },
-  { id: 'EXPIRED', label: 'Sản phẩm có dấu hiệu hết hạn hoặc đổi mùi', icon: 'clock' },
-  { id: 'CUSTOMER_CHANGE_MIND', label: 'Đổi ý hoặc lý do cá nhân', icon: 'help-circle' },
-];
+const REASON_LABELS: Record<string, { label: string; icon: string; requiresVideo?: boolean }> = {
+  DAMAGED_IN_TRANSIT: {
+    label: 'Bể vỡ, đổ tràn do vận chuyển (Cần video unboxing)',
+    icon: 'cube-outline',
+    requiresVideo: true,
+  },
+  DEFECTIVE: {
+    label: 'Lỗi sản xuất, biến chất sản phẩm (Cần video)',
+    icon: 'alert-circle-outline',
+    requiresVideo: true,
+  },
+  ALLERGIC: {
+    label: 'Dị ứng da, kích ứng khi sử dụng',
+    icon: 'medical-outline',
+  },
+  CHANGE_OF_MIND: {
+    label: 'Khách hàng đổi ý (Yêu cầu nguyên seal 100%)',
+    icon: 'refresh-outline',
+  },
+  WRONG_ITEM: {
+    label: 'Giao sai sản phẩm / sai dung tích',
+    icon: 'swap-horizontal-outline',
+  },
+  EXPIRED: {
+    label: 'Sản phẩm cận date hoặc hết hạn',
+    icon: 'time-outline',
+  },
+};
 
-const RESOLUTION_METHODS = [
-  {
-    id: 'REFUND',
-    title: 'Hoàn tiền (Refund)',
-    sub: 'Hoàn lại số tiền theo chính sách đổi trả của đơn hàng.',
-    badge: 'Khuyên dùng',
-    icon: 'sparkles',
-  },
-  {
-    id: 'EXCHANGE',
-    title: 'Đổi sản phẩm khác (Exchange)',
-    sub: 'Đổi sang phân loại hoặc sản phẩm tương đương.',
-    badge: 'Đổi hàng',
-    icon: 'repeat',
-  },
-];
+interface ItemFormState {
+  selected: boolean;
+  quantity: number;
+  reasonCode: ReturnReasonCode;
+  note: string;
+  evidenceImages: string[];
+  evidenceVideoUrl?: string;
+}
 
 export default function RmaRequestScreen({ route, navigation }: any) {
-  const { orderId = 'GU-89241', items: routeItems } = route.params || {};
+  const initialOrderId = route.params?.orderId || '';
 
-  // Giữ nguyên Idempotency-Key trong suốt vòng đời của form RMA
+  const [orderId, setOrderId] = useState<string>(initialOrderId);
+  const [availableOrders, setAvailableOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+
+  const [eligibility, setEligibility] = useState<OrderReturnEligibility | null>(null);
+  const [loadingEligibility, setLoadingEligibility] = useState(false);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
+
+  // Danh sách Showroom thật từ Backend
+  const [stores, setStores] = useState<StoreLocation[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const [showStoreModal, setShowStoreModal] = useState(false);
+
+  // Kênh tiếp nhận
+  const [returnChannel, setReturnChannel] = useState<ReturnChannel>('CARRIER_PICKUP');
+  const [pickupAddressLine, setPickupAddressLine] = useState('');
+  const [customerGeneralNote, setCustomerGeneralNote] = useState('');
+
+  // Trạng thái từng item
+  const [itemsState, setItemsState] = useState<Record<string, ItemFormState>>({});
+  const [activeMediaItemId, setActiveMediaItemId] = useState<string | null>(null);
+
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Idempotency Key duy trì suốt vòng đời form
   const idempotencyKeyRef = useRef<string>(
     'rma-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10)
   );
 
-  const [selectedItems, setSelectedItems] = useState<{ [key: string]: boolean }>({
-    'item-1': true,
-  });
+  // 1. Nếu không có orderId ban đầu, tải danh sách đơn hàng đã giao
+  useEffect(() => {
+    if (!initialOrderId) {
+      setLoadingOrders(true);
+      orderApi
+        .getMyOrders()
+        .then((res: any) => {
+          const list = res?.data || res || [];
+          const deliveredList = list.filter(
+            (o: any) => o.status === 'DELIVERED' || o.status === 'COMPLETED'
+          );
+          setAvailableOrders(deliveredList.length > 0 ? deliveredList : list);
+          if (deliveredList.length > 0) {
+            setOrderId(deliveredList[0].id);
+          }
+        })
+        .catch((err) => console.warn('Fetch orders failed', err))
+        .finally(() => setLoadingOrders(false));
+    }
+  }, [initialOrderId]);
 
-  const [selectedReason, setSelectedReason] = useState<ReturnReasonType>('DEFECTIVE');
-  const [selectedType, setSelectedType] = useState<'REFUND' | 'EXCHANGE'>('REFUND');
-  const [note, setNote] = useState('');
-  const [evidenceImages, setEvidenceImages] = useState<string[]>([
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  ]);
+  // 2. Tải danh sách Showroom thật từ Backend
+  useEffect(() => {
+    orderApi
+      .getStores()
+      .then((data: any) => {
+        const storeList = Array.isArray(data) ? data : data?.data || [];
+        setStores(storeList);
+        if (storeList.length > 0) {
+          setSelectedStoreId(storeList[0].id);
+        }
+      })
+      .catch((err) => console.warn('Fetch stores failed', err));
+  }, []);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // 3. Tải Eligibility khi orderId thay đổi
+  const fetchEligibility = useCallback(async (id: string) => {
+    if (!id) return;
+    setLoadingEligibility(true);
+    setEligibilityError(null);
+    try {
+      const res: OrderReturnEligibility = await orderApi.getOrderReturnEligibility(id);
+      setEligibility(res);
 
-  const orderProducts = routeItems || [
-    {
-      id: 'item-1',
-      orderItemId: 'item-1',
-      name: 'Serum Rose Berry B5 Phục Hồi Hàng Rào Ẩm 50ml',
-      brand: 'GLOWUP LAB',
-      price: 345000,
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-      variant: 'Chai 50ml',
-      quantity: 1,
-    },
-    {
-      id: 'item-2',
-      orderItemId: 'item-2',
-      name: 'Kem Dưỡng Glass Skin Barrier Cream 50g',
-      brand: 'GLOWUP LAB',
-      price: 390000,
-      image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-      variant: 'Hũ 50g',
-      quantity: 1,
-    },
-  ];
+      // Khởi tạo state cho các item
+      const initialMap: Record<string, ItemFormState> = {};
+      (res.items || []).forEach((it) => {
+        const defaultReason = (it.allowedReasons?.[0] as ReturnReasonCode) || 'DEFECTIVE';
+        initialMap[it.orderItemId] = {
+          selected: it.availableReturnQuantity > 0,
+          quantity: Math.min(1, it.availableReturnQuantity),
+          reasonCode: defaultReason,
+          note: '',
+          evidenceImages: [],
+          evidenceVideoUrl: undefined,
+        };
+      });
+      setItemsState(initialMap);
+    } catch (err: any) {
+      setEligibilityError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Không thể kiểm tra điều kiện đổi trả của đơn hàng.'
+      );
+    } finally {
+      setLoadingEligibility(false);
+    }
+  }, []);
 
-  const toggleItem = (id: string) => {
-    setSelectedItems((prev) => ({
+  useEffect(() => {
+    if (orderId) {
+      fetchEligibility(orderId);
+    }
+  }, [orderId, fetchEligibility]);
+
+  // Cập nhật state item
+  const updateItemState = (orderItemId: string, patch: Partial<ItemFormState>) => {
+    setItemsState((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [orderItemId]: {
+        ...prev[orderItemId],
+        ...patch,
+      },
     }));
   };
 
-  const addImageEvidence = () => {
-    Alert.alert('Thêm hình ảnh minh chứng', 'Chọn phương thức cung cấp ảnh sản phẩm lỗi/hỏng:', [
-      {
-        text: 'Chụp ảnh bằng Camera',
-        onPress: () => {
-          setEvidenceImages((prev) => [
-            ...prev,
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuDhU0n1c3dv6DGZ8a2VJP9OMa-8E38wU9vwljidCxKn0i2C1ij5YAY7p1VavTZwGl9Hz0QLnWwilETSfTDzoZ3eEd8f9amVfrQF3e46Voq6vpX-jXddrp8iK_nvUU9FGaCUsZJMTIJKU8g8OCGO7YHQVyWjQmg6NseeG6Vu5mEee-7HKAmNCsOeBny-3U_aD7BXLL2QzoxKqsC9deTGM23ZfQPNXUMegiM041dJ1_SW6YRt3v2kKv_UyQ',
-          ]);
-        },
-      },
-      {
-        text: 'Chọn từ Thư viện',
-        onPress: () => {
-          setEvidenceImages((prev) => [
-            ...prev,
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-          ]);
-        },
-      },
-      { text: 'Hủy', style: 'cancel' },
-    ]);
+  // Upload hình ảnh hoặc video bằng chứng thật qua expo-image-picker
+  const handlePickMedia = async (orderItemId: string, type: 'camera' | 'library') => {
+    try {
+      if (type === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(
+            'Quyền Camera',
+            'Vui lòng cấp quyền Camera để chụp ảnh hoặc quay video unboxing sản phẩm lỗi.'
+          );
+          return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images', 'videos'],
+          allowsEditing: false,
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          await processAndUploadAsset(orderItemId, result.assets[0]);
+        }
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert(
+            'Quyền Thư viện',
+            'Vui lòng cấp quyền Thư viện ảnh để chọn ảnh hoặc video bằng chứng.'
+          );
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images', 'videos'],
+          allowsEditing: false,
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          await processAndUploadAsset(orderItemId, result.assets[0]);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi thao tác', err?.message || 'Không thể mở trình chọn media.');
+    }
   };
 
-  const removeImage = (index: number) => {
-    setEvidenceImages((prev) => prev.filter((_, i) => i !== index));
+  const processAndUploadAsset = async (orderItemId: string, asset: ImagePicker.ImagePickerAsset) => {
+    const isVideo = asset.type === 'video' || (asset.mimeType && asset.mimeType.startsWith('video/'));
+
+    // Kiểm tra dung lượng video <= 50MB theo chuẩn GlowUp
+    if (isVideo && asset.fileSize && asset.fileSize > 50 * 1024 * 1024) {
+      Alert.alert('File quá lớn', 'Video minh chứng không được vượt quá 50MB.');
+      return;
+    }
+
+    setIsUploadingMedia(true);
+    setUploadProgressText(isVideo ? 'Đang tải video lên máy chủ...' : 'Đang xử lý và tải ảnh lên...');
+
+    try {
+      const uri = asset.uri;
+      const fileName = uri.split('/').pop() || (isVideo ? 'video.mp4' : 'evidence.jpg');
+      const fileType = asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri,
+        name: fileName,
+        type: fileType,
+      } as any);
+
+      // Thử upload lên Backend endpoint /uploads/return-images
+      try {
+        const uploadRes = await orderApi.uploadReturnImage(formData);
+        const attachmentId =
+          uploadRes?.attachmentId ||
+          uploadRes?.data?.attachmentId ||
+          uploadRes?.id ||
+          uri;
+
+        if (isVideo) {
+          updateItemState(orderItemId, {
+            evidenceVideoUrl: attachmentId,
+          });
+        } else {
+          setItemsState((prev) => {
+            const currentImages = prev[orderItemId]?.evidenceImages || [];
+            return {
+              ...prev,
+              [orderItemId]: {
+                ...prev[orderItemId],
+                evidenceImages: [...currentImages, attachmentId],
+              },
+            };
+          });
+        }
+      } catch (uploadErr) {
+        // Fallback: nếu private bucket chưa cấu hình trong môi trường dev, lưu URI trực tiếp
+        console.warn('Real upload fallback to local uri', uploadErr);
+        if (isVideo) {
+          updateItemState(orderItemId, {
+            evidenceVideoUrl: uri,
+          });
+        } else {
+          setItemsState((prev) => {
+            const currentImages = prev[orderItemId]?.evidenceImages || [];
+            return {
+              ...prev,
+              [orderItemId]: {
+                ...prev[orderItemId],
+                evidenceImages: [...currentImages, uri],
+              },
+            };
+          });
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Tải lên thất bại', err?.message || 'Không thể tải media lên máy chủ.');
+    } finally {
+      setIsUploadingMedia(false);
+      setUploadProgressText('');
+    }
   };
 
-  const selectedCount = Object.values(selectedItems).filter(Boolean).length;
-  const totalRefund = orderProducts
-    .filter((p: any) => selectedItems[p.id || p.orderItemId])
-    .reduce((sum: number, p: any) => sum + p.price * p.quantity, 0);
+  const removeEvidenceImage = (orderItemId: string, index: number) => {
+    setItemsState((prev) => {
+      const current = prev[orderItemId]?.evidenceImages || [];
+      return {
+        ...prev,
+        [orderItemId]: {
+          ...prev[orderItemId],
+          evidenceImages: current.filter((_, i) => i !== index),
+        },
+      };
+    });
+  };
 
-  const handleSubmit = async () => {
-    if (selectedCount === 0) {
-      Alert.alert('Chưa chọn sản phẩm', 'Vui lòng chọn ít nhất 1 sản phẩm bạn muốn đổi trả.');
+  const removeEvidenceVideo = (orderItemId: string) => {
+    updateItemState(orderItemId, { evidenceVideoUrl: undefined });
+  };
+
+  // Nộp hồ sơ RMA
+  const handleSubmitReturn = async () => {
+    const selectedItemsList = Object.entries(itemsState)
+      .filter(([_, state]) => state.selected && state.quantity > 0)
+      .map(([orderItemId, state]) => ({
+        orderItemId,
+        ...state,
+      }));
+
+    if (selectedItemsList.length === 0) {
+      Alert.alert('Chưa chọn sản phẩm', 'Vui lòng chọn ít nhất một sản phẩm cần đổi trả.');
+      return;
+    }
+
+    // Validation bằng chứng
+    for (const it of selectedItemsList) {
+      if (it.evidenceImages.length === 0) {
+        Alert.alert(
+          'Thiếu bằng chứng ảnh',
+          'Mỗi sản phẩm đổi trả bắt buộc phải có ít nhất 1 hình ảnh minh chứng hiện trạng.'
+        );
+        return;
+      }
+
+      const requiresVideo =
+        it.reasonCode === 'DAMAGED_IN_TRANSIT' || it.reasonCode === 'DEFECTIVE';
+      if (requiresVideo && !it.evidenceVideoUrl) {
+        Alert.alert(
+          'Yêu cầu video unboxing',
+          `Với lý do "${REASON_LABELS[it.reasonCode]?.label || it.reasonCode}", chính sách GlowUp bắt buộc đính kèm video unboxing mở hộp.`
+        );
+        return;
+      }
+    }
+
+    if (returnChannel === 'STORE_DROPOFF' && !selectedStoreId) {
+      Alert.alert('Chưa chọn Showroom', 'Vui lòng chọn Showroom bạn sẽ mang hàng đến gửi trả.');
       return;
     }
 
     setIsSubmitting(true);
-    try {
-      const itemsToReturn = orderProducts
-        .filter((p: any) => selectedItems[p.id || p.orderItemId])
-        .map((p: any) => ({
-          orderItemId: p.orderItemId || p.id,
-          quantity: p.quantity || 1,
-        }));
 
-      await orderApi.createReturnRequest(
-        {
-          orderId,
-          type: selectedType,
-          reason: selectedReason,
-          items: itemsToReturn,
-        },
+    try {
+      const payload = {
+        orderId,
+        returnChannel,
+        dropoffLocationId: returnChannel === 'STORE_DROPOFF' ? selectedStoreId : undefined,
+        pickupAddress:
+          returnChannel === 'CARRIER_PICKUP' && pickupAddressLine.trim()
+            ? { addressLine: pickupAddressLine.trim() }
+            : undefined,
+        customerNote: customerGeneralNote.trim() || undefined,
+        items: selectedItemsList.map((it) => ({
+          orderItemId: it.orderItemId,
+          quantity: it.quantity,
+          reasonCode: it.reasonCode,
+          customerNote: it.note.trim() || undefined,
+          evidenceImages: it.evidenceImages,
+          evidenceVideoUrl: it.evidenceVideoUrl,
+        })),
+      };
+
+      const response = await orderApi.createReturnRequest(
+        payload as any,
         idempotencyKeyRef.current
       );
 
+      const createdReturn = response?.data || response;
+      const rmaId = createdReturn?.id || createdReturn?.returnNumber || 'RMA-' + Date.now();
+
       Alert.alert(
-        'Tạo yêu cầu thành công! ✨',
-        `Mã yêu cầu đổi trả cho đơn #${orderId} đã được tiếp nhận. Đội ngũ GlowUp Care sẽ liên hệ kiểm định trong vòng 24H.`,
+        'Đã gửi yêu cầu đổi trả',
+        `Hồ sơ đổi trả đã được khởi tạo thành công với mã: #${createdReturn?.returnNumber || rmaId}. Hệ thống sẽ xử lý và cập nhật tiến trình trong 24h làm việc.`,
         [
           {
-            text: 'Theo dõi tiến trình',
-            onPress: () => navigation.replace('RmaTracking', { rmaId: `RMA-${orderId}` }),
+            text: 'Theo dõi tiến trình RMA',
+            onPress: () => {
+              navigation.replace('RmaTracking', { rmaId });
+            },
           },
         ]
       );
-    } catch (error: any) {
-      const errorMsg =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Không thể gửi yêu cầu đổi trả. Vui lòng kiểm tra lại đơn hàng và thử lại.';
-      Alert.alert('Gửi yêu cầu thất bại', errorMsg);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể gửi yêu cầu đổi trả. Vui lòng kiểm tra lại kết nối và thử lại.';
+      Alert.alert('Gửi yêu cầu thất bại', msg);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const selectedStore = stores.find((s) => s.id === selectedStoreId);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -182,210 +432,542 @@ export default function RmaRequestScreen({ route, navigation }: any) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.textPrimary} />
         </TouchableOpacity>
         <View style={{ alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>Yêu cầu Đổi trả & Hoàn tiền</Text>
-          <Text style={styles.headerSubtitle}>Đơn hàng #{orderId}</Text>
+          <Text style={styles.headerTitle}>Yêu Cầu Đổi Trả Sản Phẩm</Text>
+          <Text style={styles.headerSubtitle}>
+            {orderId ? `Đơn hàng #${orderId}` : 'Chọn đơn hàng'}
+          </Text>
         </View>
-        <View style={{ width: 38 }} />
+        <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Banner Cam kết GlowUp */}
-        <View style={styles.guaranteeBanner}>
-          <View style={styles.guaranteeIconCircle}>
-            <Ionicons name="shield-checkmark" size={20} color={theme.colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.guaranteeTitle}>Đặc quyền Đổi trả 30 Ngày</Text>
-            <Text style={styles.guaranteeDesc}>
-              Cam kết thu hồi tận nơi 0đ, bảo hành kích ứng da 100% hoàn tiền hoặc đổi sản phẩm lành tính hơn.
-            </Text>
-          </View>
-        </View>
-
-        {/* Bước 1: Chọn sản phẩm cần đổi trả */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>1. Chọn sản phẩm đổi trả</Text>
-            <Text style={styles.selectedCountText}>Đã chọn: {selectedCount}</Text>
-          </View>
-
-          {orderProducts.map((p: any) => {
-            const isChecked = !!selectedItems[p.id];
-            return (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.productSelectCard, isChecked && styles.productSelectCardActive]}
-                activeOpacity={0.88}
-                onPress={() => toggleItem(p.id)}
-              >
-                <Ionicons
-                  name={isChecked ? 'checkbox' : 'square-outline'}
-                  size={20}
-                  color={isChecked ? theme.colors.primary : theme.colors.textMuted}
-                />
-                <Image source={{ uri: p.image }} style={styles.productThumb} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.productBrand}>{p.brand}</Text>
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {p.name}
-                  </Text>
-                  <Text style={styles.productVariant}>Phân loại: {p.variant} • SL: x{p.quantity}</Text>
-                  <Text style={styles.productPrice}>{p.price.toLocaleString('vi-VN')}₫</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Bước 2: Lý do đổi trả */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>2. Lý do đổi trả sản phẩm</Text>
-          <View style={styles.reasonsList}>
-            {RMA_REASONS.map((r) => {
-              const isSelected = selectedReason === r.id;
-              return (
-                <TouchableOpacity
-                  key={r.id}
-                  style={[styles.reasonItem, isSelected && styles.reasonItemActive]}
-                  onPress={() => setSelectedReason(r.id)}
-                >
-                  <Ionicons
-                    name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                    size={18}
-                    color={isSelected ? theme.colors.primary : theme.colors.textMuted}
-                  />
-                  <Text style={[styles.reasonLabel, isSelected && styles.reasonLabelActive]}>
-                    {r.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <Text style={[styles.subLabel, { marginTop: 14 }]}>Mô tả chi tiết tình trạng</Text>
-          <TextInput
-            style={styles.textArea}
-            multiline
-            numberOfLines={3}
-            placeholder="Mô tả cụ thể vấn đề bạn gặp phải để GlowUp hỗ trợ nhanh nhất..."
-            value={note}
-            onChangeText={setNote}
-          />
-        </View>
-
-        {/* Bước 3: Hình ảnh minh chứng */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>3. Ảnh chụp minh chứng tình trạng</Text>
-            <Text style={styles.hintText}>Tối đa 4 ảnh</Text>
-          </View>
-          <Text style={styles.evidenceHint}>
-            Chụp rõ nhãn phụ, nắp hộp hoặc tình trạng bao bì hư hỏng/kích ứng.
-          </Text>
-
-          <View style={styles.imageGrid}>
-            {evidenceImages.map((uri, idx) => (
-              <View key={idx} style={styles.imageBox}>
-                <Image source={{ uri }} style={styles.evidenceImg} />
-                <TouchableOpacity
-                  style={styles.deleteImgBtn}
-                  onPress={() => removeImage(idx)}
-                >
-                  <Ionicons name="close" size={12} color="#FFF" />
-                </TouchableOpacity>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. Chọn đơn hàng nếu chưa có */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.rowAlign}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="receipt-outline" size={16} color={theme.colors.primary} />
               </View>
-            ))}
-
-            {evidenceImages.length < 4 && (
-              <TouchableOpacity style={styles.uploadBtn} onPress={addImageEvidence}>
-                <Feather name="camera" size={20} color={theme.colors.primary} />
-                <Text style={styles.uploadText}>Thêm ảnh</Text>
+              <Text style={styles.cardTitle}>Thông tin đơn hàng</Text>
+            </View>
+            {availableOrders.length > 1 && (
+              <TouchableOpacity onPress={() => setShowOrderModal(true)}>
+                <Text style={styles.linkText}>Đổi đơn hàng</Text>
               </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.orderInfoBox}>
+            <Text style={styles.orderInfoNumber}>
+              Mã đơn: #{eligibility?.orderNumber || orderId || 'Đang cập nhật'}
+            </Text>
+            {eligibility?.deliveredAt && (
+              <Text style={styles.orderInfoDate}>
+                Giao hàng lúc: {new Date(eligibility.deliveredAt).toLocaleDateString('vi-VN')}
+              </Text>
+            )}
+            {eligibility?.policyVersionId && (
+              <View style={styles.policyBadge}>
+                <Ionicons name="shield-checkmark" size={12} color="#1565C0" />
+                <Text style={styles.policyBadgeText}>
+                  Áp dụng chính sách bảo hành GlowUp Care v3.1
+                </Text>
+              </View>
             )}
           </View>
         </View>
 
-        {/* Bước 4: Phương thức hoàn tiền / đổi hàng */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>4. Chọn hình thức xử lý</Text>
-          {RESOLUTION_METHODS.map((res) => {
-            const isSelected = selectedType === res.id;
-            return (
-              <TouchableOpacity
-                key={res.id}
-                style={[styles.resolutionCard, isSelected && styles.resolutionCardActive]}
-                onPress={() => setSelectedType(res.id as any)}
-                activeOpacity={0.88}
-              >
-                <View style={styles.resolutionHeader}>
-                  <View style={styles.rowAlign}>
-                    <Ionicons
-                      name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                      size={18}
-                      color={isSelected ? theme.colors.primary : theme.colors.textMuted}
-                    />
-                    <Text style={styles.resolutionTitle}>{res.title}</Text>
-                  </View>
-                  <View style={styles.resolutionBadge}>
-                    <Text style={styles.resolutionBadgeText}>{res.badge}</Text>
-                  </View>
-                </View>
-                <Text style={styles.resolutionSub}>{res.sub}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Bước 5: Địa chỉ thu hồi hàng */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>5. Địa chỉ nhân viên tới thu hồi</Text>
-            <TouchableOpacity onPress={() => Alert.alert('Địa chỉ', 'Bạn có thể chọn địa chỉ khác trong sổ địa chỉ.')}>
-              <Text style={styles.changeAddressText}>Thay đổi</Text>
-            </TouchableOpacity>
+        {/* 2. Loading / Ineligibility Warning */}
+        {loadingEligibility ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <Text style={styles.loadingText}>Đang kiểm tra điều kiện đổi trả của đơn hàng...</Text>
           </View>
+        ) : eligibilityError ? (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle-outline" size={24} color="#C62828" />
+            <Text style={styles.errorBoxText}>{eligibilityError}</Text>
+          </View>
+        ) : eligibility && !eligibility.isEligibleForReturn ? (
+          <View style={styles.ineligibleBox}>
+            <Ionicons name="warning" size={24} color="#E65100" />
+            <Text style={styles.ineligibleTitle}>Đơn hàng không đủ điều kiện đổi trả</Text>
+            <Text style={styles.ineligibleDesc}>
+              {eligibility.ineligibilityReason ||
+                'Đơn hàng này đã quá thời hạn đổi trả theo quy định hoặc chưa được giao thành công.'}
+            </Text>
+          </View>
+        ) : null}
 
-          <View style={styles.pickupBox}>
-            <Ionicons name="location-outline" size={20} color={theme.colors.primary} style={{ marginTop: 2 }} />
-            <View style={{ flex: 1 }}>
-              <View style={styles.rowAlign}>
-                <Text style={styles.pickupName}>Thảo Linh Nguyễn</Text>
-                <Text style={styles.pickupPhone}>• 0938 ••• 921</Text>
-                <View style={styles.defaultPill}>
-                  <Text style={styles.defaultPillText}>Mặc định</Text>
-                </View>
-              </View>
-              <Text style={styles.pickupAddress}>
-                Landmark 4, Vinhomes Central Park, 208 Nguyễn Hữu Cảnh, P.22, Q. Bình Thạnh, TP. Hồ Chí Minh
-              </Text>
+        {/* 3. Danh sách sản phẩm đủ điều kiện đổi trả */}
+        {eligibility?.items && eligibility.items.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Chọn sản phẩm muốn hoàn trả</Text>
+            <Text style={styles.cardSub}>
+              Chỉ những sản phẩm còn trong thời hạn và chưa vượt quá số lượng mua mới được phép đổi trả.
+            </Text>
+
+            <View style={{ gap: 14, marginTop: 10 }}>
+              {eligibility.items.map((item) => {
+                const itemState = itemsState[item.orderItemId] || {
+                  selected: false,
+                  quantity: 1,
+                  reasonCode: 'DEFECTIVE' as ReturnReasonCode,
+                  note: '',
+                  evidenceImages: [],
+                };
+                const isItemEligible = item.availableReturnQuantity > 0;
+
+                return (
+                  <View
+                    key={item.orderItemId}
+                    style={[
+                      styles.itemCard,
+                      !isItemEligible && styles.itemCardDisabled,
+                      itemState.selected && styles.itemCardSelected,
+                    ]}
+                  >
+                    {/* Item Row Header */}
+                    <TouchableOpacity
+                      style={styles.itemHeaderRow}
+                      disabled={!isItemEligible}
+                      onPress={() =>
+                        updateItemState(item.orderItemId, {
+                          selected: !itemState.selected,
+                        })
+                      }
+                    >
+                      <Ionicons
+                        name={
+                          itemState.selected
+                            ? 'checkbox'
+                            : isItemEligible
+                            ? 'square-outline'
+                            : 'close-circle-outline'
+                        }
+                        size={22}
+                        color={
+                          itemState.selected
+                            ? theme.colors.primary
+                            : isItemEligible
+                            ? theme.colors.textMuted
+                            : '#999'
+                        }
+                      />
+                      {item.imageUrl ? (
+                        <Image source={{ uri: item.imageUrl }} style={styles.itemThumb} />
+                      ) : (
+                        <View style={styles.itemThumbPlaceholder}>
+                          <Ionicons name="image-outline" size={20} color="#999" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemProdName} numberOfLines={2}>
+                          {item.productName}
+                        </Text>
+                        {item.variantName && (
+                          <Text style={styles.itemVarName}>{item.variantName}</Text>
+                        )}
+                        <Text style={styles.itemUnitPrice}>
+                          {item.unitPrice.toLocaleString('vi-VN')} đ
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Eligibility Badge */}
+                    <View style={styles.qtyBadgeRow}>
+                      <Text style={styles.qtyBadgeText}>
+                        {isItemEligible
+                          ? `Có thể trả: ${item.availableReturnQuantity} món`
+                          : 'Đã hoàn trả hết số lượng'}
+                      </Text>
+                    </View>
+
+                    {/* Details if Selected */}
+                    {itemState.selected && isItemEligible && (
+                      <View style={styles.itemDetailsExpanded}>
+                        {/* Quantity Stepper */}
+                        <View style={styles.stepperRow}>
+                          <Text style={styles.inputSubLabel}>Số lượng hoàn trả:</Text>
+                          <View style={styles.stepperBox}>
+                            <TouchableOpacity
+                              style={styles.stepBtn}
+                              disabled={itemState.quantity <= 1}
+                              onPress={() =>
+                                updateItemState(item.orderItemId, {
+                                  quantity: Math.max(1, itemState.quantity - 1),
+                                })
+                              }
+                            >
+                              <Text style={styles.stepBtnText}>-</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.stepValueText}>{itemState.quantity}</Text>
+                            <TouchableOpacity
+                              style={styles.stepBtn}
+                              disabled={itemState.quantity >= item.availableReturnQuantity}
+                              onPress={() =>
+                                updateItemState(item.orderItemId, {
+                                  quantity: Math.min(
+                                    item.availableReturnQuantity,
+                                    itemState.quantity + 1
+                                  ),
+                                })
+                              }
+                            >
+                              <Text style={styles.stepBtnText}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* Reason Selection */}
+                        <Text style={styles.inputSubLabel}>Lý do hoàn trả (theo chính sách):</Text>
+                        <View style={styles.reasonsList}>
+                          {(item.allowedReasons || [
+                            'DAMAGED_IN_TRANSIT',
+                            'DEFECTIVE',
+                            'ALLERGIC',
+                            'CHANGE_OF_MIND',
+                          ]).map((rCode) => {
+                            const meta = REASON_LABELS[rCode] || {
+                              label: rCode,
+                              icon: 'help-circle-outline',
+                            };
+                            const isReasonChosen = itemState.reasonCode === rCode;
+
+                            return (
+                              <TouchableOpacity
+                                key={rCode}
+                                style={[
+                                  styles.reasonPill,
+                                  isReasonChosen && styles.reasonPillActive,
+                                ]}
+                                onPress={() =>
+                                  updateItemState(item.orderItemId, {
+                                    reasonCode: rCode as ReturnReasonCode,
+                                  })
+                                }
+                              >
+                                <Ionicons
+                                  name={meta.icon as any}
+                                  size={14}
+                                  color={isReasonChosen ? '#FFF' : theme.colors.textDark}
+                                />
+                                <Text
+                                  style={[
+                                    styles.reasonPillText,
+                                    isReasonChosen && styles.reasonPillTextActive,
+                                  ]}
+                                >
+                                  {meta.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        {/* Evidence Upload Section */}
+                        <View style={styles.evidenceSection}>
+                          <View style={styles.rowBetween}>
+                            <Text style={styles.inputSubLabel}>
+                              Hình ảnh & Video bằng chứng (*):
+                            </Text>
+                            {isUploadingMedia && activeMediaItemId === item.orderItemId && (
+                              <View style={styles.uploadingIndicator}>
+                                <ActivityIndicator size="small" color={theme.colors.primary} />
+                                <Text style={styles.uploadingText}>{uploadProgressText}</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Media Grid */}
+                          <View style={styles.mediaGrid}>
+                            {itemState.evidenceImages.map((imgUri, idx) => (
+                              <View key={idx} style={styles.mediaThumbBox}>
+                                <Image source={{ uri: imgUri }} style={styles.mediaThumb} />
+                                <TouchableOpacity
+                                  style={styles.removeMediaBtn}
+                                  onPress={() => removeEvidenceImage(item.orderItemId, idx)}
+                                >
+                                  <Ionicons name="close" size={12} color="#FFF" />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+
+                            {itemState.evidenceVideoUrl && (
+                              <View style={[styles.mediaThumbBox, styles.videoThumbBox]}>
+                                <Ionicons name="videocam" size={24} color="#FFF" />
+                                <Text style={styles.videoBadgeLabel}>Video unboxing</Text>
+                                <TouchableOpacity
+                                  style={styles.removeMediaBtn}
+                                  onPress={() => removeEvidenceVideo(item.orderItemId)}
+                                >
+                                  <Ionicons name="close" size={12} color="#FFF" />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+
+                            {/* Add Buttons */}
+                            <TouchableOpacity
+                              style={styles.addMediaBtn}
+                              disabled={isUploadingMedia}
+                              onPress={() => {
+                                setActiveMediaItemId(item.orderItemId);
+                                Alert.alert(
+                                  'Cung cấp hình ảnh / video bằng chứng',
+                                  'Chọn phương thức bổ sung minh chứng cho sản phẩm này:',
+                                  [
+                                    {
+                                      text: 'Chụp ảnh bằng Camera',
+                                      onPress: () => handlePickMedia(item.orderItemId, 'camera'),
+                                    },
+                                    {
+                                      text: 'Chọn từ Thư viện (Ảnh/Video <= 50MB)',
+                                      onPress: () => handlePickMedia(item.orderItemId, 'library'),
+                                    },
+                                    { text: 'Hủy', style: 'cancel' },
+                                  ]
+                                );
+                              }}
+                            >
+                              <Ionicons name="camera-outline" size={20} color={theme.colors.primary} />
+                              <Text style={styles.addMediaText}>Thêm media</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* Note for this item */}
+                        <TextInput
+                          style={styles.itemNoteInput}
+                          placeholder="Mô tả chi tiết tình trạng sản phẩm (nếu có)..."
+                          value={itemState.note}
+                          onChangeText={(txt) =>
+                            updateItemState(item.orderItemId, { note: txt })
+                          }
+                        />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </View>
+        )}
+
+        {/* 4. Kênh hoàn trả (Omnichannel Selector) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Phương thức gửi trả hàng</Text>
+          <Text style={styles.cardSub}>
+            Lựa chọn mang ra Showroom gần nhất hoặc bưu tá đến tận nhà thu hồi.
+          </Text>
+
+          {/* Option: Carrier Pickup */}
+          <TouchableOpacity
+            style={[
+              styles.channelBox,
+              returnChannel === 'CARRIER_PICKUP' && styles.channelBoxActive,
+            ]}
+            onPress={() => setReturnChannel('CARRIER_PICKUP')}
+          >
+            <Ionicons
+              name={
+                returnChannel === 'CARRIER_PICKUP'
+                  ? 'radio-button-on'
+                  : 'radio-button-off'
+              }
+              size={18}
+              color={
+                returnChannel === 'CARRIER_PICKUP'
+                  ? theme.colors.primary
+                  : theme.colors.textMuted
+              }
+            />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.channelTitle}>Bưu tá đến thu hồi tận nơi (GHN Reverse)</Text>
+              <Text style={styles.channelDesc}>
+                Bưu tá sẽ liên hệ và đến thu hồi sản phẩm tại địa chỉ nhận hàng của bạn.
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Option: Store Dropoff */}
+          <TouchableOpacity
+            style={[
+              styles.channelBox,
+              returnChannel === 'STORE_DROPOFF' && styles.channelBoxActive,
+            ]}
+            onPress={() => setReturnChannel('STORE_DROPOFF')}
+          >
+            <Ionicons
+              name={
+                returnChannel === 'STORE_DROPOFF'
+                  ? 'radio-button-on'
+                  : 'radio-button-off'
+              }
+              size={18}
+              color={
+                returnChannel === 'STORE_DROPOFF'
+                  ? theme.colors.primary
+                  : theme.colors.textMuted
+              }
+            />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.channelTitle}>Mang trực tiếp ra Showroom GlowUp</Text>
+              <Text style={styles.channelDesc}>
+                Nhận viên cửa hàng quét mã QR tiếp nhận ngay, không tốn thời gian chờ bưu tá.
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Showroom Detail if STORE_DROPOFF */}
+          {returnChannel === 'STORE_DROPOFF' && (
+            <View style={styles.storePickerBox}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.inputSubLabel}>Showroom tiếp nhận:</Text>
+                {stores.length > 1 && (
+                  <TouchableOpacity onPress={() => setShowStoreModal(true)}>
+                    <Text style={styles.linkText}>Chọn Showroom khác</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {selectedStore ? (
+                <View style={styles.selectedStoreCard}>
+                  <Text style={styles.storeNameText}>{selectedStore.name}</Text>
+                  <Text style={styles.storeAddressText}>{selectedStore.address}</Text>
+                  {selectedStore.phone && (
+                    <Text style={styles.storePhoneText}>Hotline: {selectedStore.phone}</Text>
+                  )}
+                  {selectedStore.openingHours && (
+                    <Text style={styles.storeHoursText}>
+                      Giờ mở cửa: {selectedStore.openingHours}
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.noStoreText}>Đang tải danh sách showroom...</Text>
+              )}
+            </View>
+          )}
         </View>
+
+        {/* 5. Ghi chú chung */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Ghi chú thêm cho chuyên viên hỗ trợ</Text>
+          <TextInput
+            style={styles.generalNoteInput}
+            multiline
+            numberOfLines={3}
+            placeholder="Nhập thêm thông tin hoặc yêu cầu bổ sung nếu có..."
+            value={customerGeneralNote}
+            onChangeText={setCustomerGeneralNote}
+          />
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Floating Bottom Action */}
-      <View style={styles.bottomBar}>
-        <View>
-          <Text style={styles.totalRefundLabel}>Tổng giá trị hoàn trả:</Text>
-          <Text style={styles.totalRefundPrice}>{totalRefund.toLocaleString('vi-VN')}₫</Text>
-        </View>
-
+      {/* Footer Submit Button */}
+      <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.submitBtn, (selectedCount === 0 || isSubmitting) && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={selectedCount === 0 || isSubmitting}
-          activeOpacity={0.9}
+          style={[
+            styles.submitBtn,
+            (isSubmitting ||
+              isUploadingMedia ||
+              Boolean(eligibility && !eligibility.isEligibleForReturn)) && {
+              opacity: 0.6,
+            },
+          ]}
+          disabled={
+            isSubmitting ||
+            isUploadingMedia ||
+            Boolean(eligibility && !eligibility.isEligibleForReturn)
+          }
+          onPress={handleSubmitReturn}
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#FFF" />
           ) : (
-            <>
-              <Ionicons name="checkmark-done" size={18} color="#FFF" />
-              <Text style={styles.submitBtnText}>GỬI YÊU CẦU ĐỔI TRẢ</Text>
-            </>
+            <Ionicons name="checkmark-circle-outline" size={18} color="#FFF" />
           )}
+          <Text style={styles.submitBtnText}>
+            {isSubmitting ? 'Đang gửi hồ sơ...' : 'Gửi Yêu Cầu Đổi Trả'}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Modal Chọn Đơn Hàng */}
+      <Modal visible={showOrderModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn đơn hàng để đổi trả</Text>
+              <TouchableOpacity onPress={() => setShowOrderModal(false)}>
+                <Ionicons name="close" size={22} color={theme.colors.textDark} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={availableOrders}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.orderSelectItem,
+                    item.id === orderId && styles.orderSelectItemActive,
+                  ]}
+                  onPress={() => {
+                    setOrderId(item.id);
+                    setShowOrderModal(false);
+                  }}
+                >
+                  <Text style={styles.orderSelectNum}>
+                    #{item.orderNumber || item.id}
+                  </Text>
+                  <Text style={styles.orderSelectTotal}>
+                    {Number(item.totalAmount || 0).toLocaleString('vi-VN')} đ • Trạng thái: {item.status}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Chọn Showroom */}
+      <Modal visible={showStoreModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn Showroom GlowUp tiếp nhận</Text>
+              <TouchableOpacity onPress={() => setShowStoreModal(false)}>
+                <Ionicons name="close" size={22} color={theme.colors.textDark} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={stores}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.storeSelectItem,
+                    item.id === selectedStoreId && styles.storeSelectItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedStoreId(item.id);
+                    setShowStoreModal(false);
+                  }}
+                >
+                  <Text style={styles.storeSelectName}>{item.name}</Text>
+                  <Text style={styles.storeSelectAddr}>{item.address}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -393,40 +975,29 @@ export default function RmaRequestScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFF8F6',
+    backgroundColor: theme.colors.backgroundCanvas,
   },
   header: {
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#FFF8F6',
+    backgroundColor: theme.colors.surfaceCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3E9EB',
+    borderBottomColor: theme.colors.borderSubtle,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    padding: 6,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#281811',
+    color: theme.colors.textDark,
   },
   headerSubtitle: {
     fontSize: 11,
     color: theme.colors.textMuted,
-    marginTop: 2,
   },
   content: {
     flex: 1,
@@ -434,341 +1005,492 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     gap: 14,
-    paddingBottom: 100,
   },
-  guaranteeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FAF0F2',
-    borderRadius: 16,
-    padding: 14,
+  card: {
+    backgroundColor: theme.colors.surfaceCard,
+    borderRadius: theme.rounded.lg,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#F3DCE1',
+    borderColor: theme.colors.borderSubtle,
   },
-  guaranteeIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guaranteeTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  guaranteeDesc: {
-    fontSize: 11,
-    color: '#725950',
-    lineHeight: 16,
-    marginTop: 2,
-  },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#F3E9EB',
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  sectionHeaderRow: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#281811',
-  },
-  selectedCountText: {
-    fontSize: 12,
-    color: theme.colors.primary,
-    fontWeight: '700',
-  },
-  productSelectCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: '#FEFAFC',
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
     marginBottom: 8,
-  },
-  productSelectCardActive: {
-    backgroundColor: '#FFF5F6',
-    borderColor: theme.colors.primaryFixedDim,
-  },
-  productThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
-    backgroundColor: '#F8EFF1',
-  },
-  productBrand: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  productName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#281811',
-    marginTop: 1,
-  },
-  productVariant: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    marginTop: 2,
-  },
-  productPrice: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.primary,
-    marginTop: 2,
-  },
-  reasonsList: {
-    gap: 8,
-  },
-  reasonItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: '#FEFAFC',
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
-  },
-  reasonItemActive: {
-    backgroundColor: '#FFF5F6',
-    borderColor: theme.colors.primaryFixedDim,
-  },
-  reasonLabel: {
-    fontSize: 12,
-    color: '#554244',
-  },
-  reasonLabelActive: {
-    color: '#281811',
-    fontWeight: '600',
-  },
-  subLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#554244',
-    marginBottom: 6,
-  },
-  textArea: {
-    backgroundColor: '#FEFAFC',
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
-    borderRadius: 12,
-    padding: 10,
-    fontSize: 12,
-    color: '#281811',
-    textAlignVertical: 'top',
-    height: 70,
-  },
-  hintText: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-  },
-  evidenceHint: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-    marginBottom: 10,
-  },
-  imageGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  imageBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  evidenceImg: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  deleteImgBtn: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: theme.colors.primary,
-    backgroundColor: '#FFF5F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  uploadText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  resolutionCard: {
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#FEFAFC',
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
-    marginBottom: 8,
-  },
-  resolutionCardActive: {
-    backgroundColor: '#FFF5F6',
-    borderColor: theme.colors.primaryFixedDim,
-  },
-  resolutionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  resolutionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#281811',
-  },
-  resolutionBadge: {
-    backgroundColor: '#FAD9CD',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  resolutionBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: theme.colors.primaryDeep,
-  },
-  resolutionSub: {
-    fontSize: 11,
-    color: '#725950',
-    lineHeight: 15,
-    marginLeft: 26,
-  },
-  changeAddressText: {
-    fontSize: 12,
-    color: theme.colors.primary,
-    fontWeight: '700',
-  },
-  pickupBox: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: '#FEFAFC',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
-  },
-  pickupName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#281811',
-  },
-  pickupPhone: {
-    fontSize: 12,
-    color: theme.colors.textMuted,
-  },
-  defaultPill: {
-    backgroundColor: '#EFE5E7',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    marginLeft: 6,
-  },
-  defaultPillText: {
-    fontSize: 9,
-    color: '#554244',
-    fontWeight: '600',
-  },
-  pickupAddress: {
-    fontSize: 12,
-    color: '#554244',
-    lineHeight: 16,
-    marginTop: 4,
   },
   rowAlign: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 248, 246, 0.96)',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F3E9EB',
+  rowBetween: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
   },
-  totalRefundLabel: {
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.colors.surfaceSubtle,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  cardSub: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  linkText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  orderInfoBox: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    padding: 12,
+    borderRadius: 8,
+    gap: 4,
+  },
+  orderInfoNumber: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: theme.colors.textDark,
+  },
+  orderInfoDate: {
     fontSize: 11,
     color: theme.colors.textMuted,
   },
-  totalRefundPrice: {
-    fontSize: 16,
-    fontWeight: '800',
+  policyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  policyBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1565C0',
+  },
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 8,
+  },
+  errorBoxText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#C62828',
+  },
+  ineligibleBox: {
+    backgroundColor: '#FFF3E0',
+    padding: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    gap: 6,
+  },
+  ineligibleTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E65100',
+  },
+  ineligibleDesc: {
+    fontSize: 11,
+    color: '#795548',
+    lineHeight: 16,
+  },
+
+  /* Item list */
+  itemCard: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  itemCardSelected: {
+    backgroundColor: '#FFF',
+    borderColor: theme.colors.primary,
+  },
+  itemCardDisabled: {
+    opacity: 0.5,
+  },
+  itemHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  itemThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: '#EEE',
+  },
+  itemThumbPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: '#EEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemProdName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  itemVarName: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  itemUnitPrice: {
+    fontSize: 11,
+    fontWeight: '700',
     color: theme.colors.primary,
+    marginTop: 2,
+  },
+  qtyBadgeRow: {
+    marginTop: 6,
+  },
+  qtyBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#555',
+  },
+  itemDetailsExpanded: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderSubtle,
+    gap: 8,
+  },
+  inputSubLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepperBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+  },
+  stepBtn: {
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  stepValueText: {
+    paddingHorizontal: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  reasonsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  reasonPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.surfaceSubtle,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+  },
+  reasonPillActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  reasonPillText: {
+    fontSize: 11,
+    color: theme.colors.textDark,
+  },
+  reasonPillTextActive: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+
+  /* Media Upload */
+  evidenceSection: {
+    gap: 6,
+    marginTop: 4,
+  },
+  uploadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  uploadingText: {
+    fontSize: 10,
+    color: theme.colors.primary,
+  },
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mediaThumbBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#DDD',
+  },
+  mediaThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  videoThumbBox: {
+    backgroundColor: '#263238',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoBadgeLabel: {
+    fontSize: 8,
+    color: '#FFF',
+    marginTop: 2,
+    fontWeight: '700',
+  },
+  removeMediaBtn: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addMediaBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  addMediaText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    marginTop: 2,
+  },
+  itemNoteInput: {
+    backgroundColor: '#FFF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 11,
+    color: theme.colors.textDark,
+  },
+
+  /* Channels */
+  channelBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginTop: 8,
+  },
+  channelBoxActive: {
+    backgroundColor: '#FFF',
+    borderColor: theme.colors.primary,
+  },
+  channelTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  channelDesc: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  storePickerBox: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 8,
+    gap: 6,
+  },
+  selectedStoreCard: {
+    backgroundColor: '#FFF',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+    gap: 2,
+  },
+  storeNameText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  storeAddressText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  storePhoneText: {
+    fontSize: 10,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  storeHoursText: {
+    fontSize: 10,
+    color: '#666',
+  },
+  noStoreText: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  generalNoteInput: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 12,
+    color: theme.colors.textDark,
+    textAlignVertical: 'top',
+    marginTop: 6,
+  },
+
+  /* Footer */
+  footer: {
+    backgroundColor: theme.colors.surfaceCard,
+    padding: 14,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderSubtle,
   },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: theme.colors.primary,
-    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 14,
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  submitBtnDisabled: {
-    backgroundColor: '#DBC0C3',
-    shadowOpacity: 0,
-    elevation: 0,
+    borderRadius: 8,
   },
   submitBtnText: {
-    fontSize: 12,
+    color: '#FFF',
+    fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+  },
+
+  /* Modals */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  orderSelectItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
+  },
+  orderSelectItemActive: {
+    backgroundColor: theme.colors.surfaceSubtle,
+  },
+  orderSelectNum: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  orderSelectTotal: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
+  },
+  storeSelectItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
+  },
+  storeSelectItemActive: {
+    backgroundColor: theme.colors.surfaceSubtle,
+  },
+  storeSelectName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.textDark,
+  },
+  storeSelectAddr: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 2,
   },
 });
-

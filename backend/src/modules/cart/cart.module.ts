@@ -10,9 +10,10 @@ import { RemoveCartItemUseCase } from './application/use-cases/remove-cart-item.
 import { MergeCartUseCase } from './application/use-cases/merge-cart.use-case';
 import { CartCleanupService } from './application/use-cases/cart-cleanup.service';
 import { CartController } from './presentation/controllers/cart.controller';
+import { CommercePricingModule } from '../customer-experience/commerce-pricing.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, CommercePricingModule],
   controllers: [CartController],
   providers: [
     CustomerContextService,

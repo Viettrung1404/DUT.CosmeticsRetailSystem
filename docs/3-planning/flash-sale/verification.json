@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-11-26T08:29:53.579Z",
+  "variants": 1039,
+  "checkoutQuantity": 3,
+  "boundary": {
+    "min_variants": 1039,
+    "max_variants": 1039,
+    "min_featured": 20,
+    "max_featured": 20
+  },
+  "errors": []
+}

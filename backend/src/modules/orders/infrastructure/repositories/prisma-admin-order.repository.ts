@@ -511,16 +511,52 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
             const compensationKey = payment.transactionId
               ? `ONLINE_UNFULFILLED:${payment.paymentMethod}:${payment.transactionId}`
               : `CANCEL:${order.id}:${payment.id}`;
+            const paymentAmountNum = Math.round(Number(payment.amount));
+            let refundStatus = 'PENDING';
+
+            // Nếu đơn có khách hàng thành viên, hoàn tiền mặt trực tiếp thành điểm thưởng (xu)
+            if (order.customer_id && paymentAmountNum > 0) {
+              await tx.customer.update({
+                where: { id: order.customer_id },
+                data: { totalPoints: { increment: paymentAmountNum } },
+              });
+
+              await tx.loyaltyPointsTransaction.create({
+                data: {
+                  customerId: order.customer_id,
+                  orderId: order.id,
+                  points: paymentAmountNum,
+                  type: 'REFUND',
+                  eventKey: `ORDER:${order.id}:REFUND_PAYMENT:${payment.id}`,
+                  description: `Hoàn tiền thanh toán đơn ${order.order_number} vào xu`,
+                },
+              });
+
+              refundStatus = 'COMPLETED';
+
+              await notifyCustomer(
+                tx,
+                order.customer_id,
+                `ORDER:${order.id}:REFUND_COINS:${payment.id}`,
+                `Đơn hàng ${order.order_number} đã hủy. Số tiền ${paymentAmountNum.toLocaleString('vi-VN')}đ đã được hoàn vào ví xu GlowUp.`,
+                'LOYALTY',
+                { orderId: order.id, points: paymentAmountNum },
+              );
+            }
+
             await tx.refund.upsert({
               where: { compensationKey },
-              update: {},
+              update: {
+                status: refundStatus,
+                reason: input.reason ? `${input.reason} (Hoàn vào xu)` : 'Hủy đơn hoàn vào xu',
+              },
               create: {
                 compensationKey,
                 orderId: order.id,
                 paymentId: payment.id,
                 amount: payment.amount,
-                reason: input.reason,
-                status: 'PENDING',
+                reason: input.reason ? `${input.reason} (Hoàn vào xu)` : 'Hủy đơn hoàn vào xu',
+                status: refundStatus,
               },
             });
             result.refundAmount += Number(payment.amount);
@@ -531,6 +567,9 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
               data: { status: 'CANCELLED' },
             });
           }
+        }
+        if (order.customer_id && payments.some((p) => p.status === 'COMPLETED')) {
+          await evaluateTier(tx, order.customer_id);
         }
 
         await this.changeStatus(
@@ -572,6 +611,8 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
     );
     const minExpiry = minExpiryForOnline(new Date());
     const note = `Xuất kho giao đơn ${order.order_number}`;
+    const allOrderItemBatches: { orderItemId: string; batchId: string; quantity: number }[] = [];
+    const allInventoryTransactions: any[] = [];
 
     for (const item of items) {
       const inv = inventories.find(
@@ -629,26 +670,38 @@ export class PrismaAdminOrderRepository implements IAdminOrderRepository {
             where: { id: a.batchId },
             data: { quantity: { decrement: a.quantity } },
           });
-          await tx.orderItemBatch.create({
-            data: {
-              orderItemId: item.id,
-              batchId: a.batchId,
-              quantity: a.quantity,
-            },
+          allOrderItemBatches.push({
+            orderItemId: item.id,
+            batchId: a.batchId,
+            quantity: a.quantity,
           });
-          await tx.inventoryTransaction.create({
-            data: {
-              storeId: order.store_id,
-              productVariantId: item.productVariantId,
-              batchId: a.batchId,
-              transactionType: 'OUT',
-              quantity: -a.quantity,
-              referenceType: 'ORDER',
-              referenceId: order.id,
-              note,
-              createdBy: changedBy,
-            },
+          allInventoryTransactions.push({
+            storeId: order.store_id,
+            productVariantId: item.productVariantId,
+            batchId: a.batchId,
+            transactionType: 'OUT',
+            quantity: -a.quantity,
+            referenceType: 'ORDER',
+            referenceId: order.id,
+            note,
+            createdBy: changedBy,
           });
+        }
+      }
+
+      if (tx.orderItemBatch?.createMany && allOrderItemBatches.length > 0) {
+        await tx.orderItemBatch.createMany({ data: allOrderItemBatches });
+      } else {
+        for (const oib of allOrderItemBatches) {
+          await tx.orderItemBatch.create({ data: oib });
+        }
+      }
+
+      if (tx.inventoryTransaction?.createMany && allInventoryTransactions.length > 0) {
+        await tx.inventoryTransaction.createMany({ data: allInventoryTransactions });
+      } else {
+        for (const it of allInventoryTransactions) {
+          await tx.inventoryTransaction.create({ data: it });
         }
       }
 

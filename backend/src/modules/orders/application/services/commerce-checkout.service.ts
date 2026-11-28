@@ -4,6 +4,7 @@ import {
   Injectable,
   ServiceUnavailableException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "@infrastructure/database/prisma.service";
 import { Prisma } from "@prisma/client";
@@ -27,8 +28,32 @@ import { reservePromotionBenefits } from "@core/services/promotion-lifecycle";
 import { formatOrderNumber } from "../utils/order-number.util";
 import { validatePaymentAmount } from "@modules/payments/domain/payment-policy";
 import { assertGatewayReady } from "@modules/payments/domain/gateway-readiness";
+import { emitOrderPurchased, enqueueRecommendationPurchase } from "@core/services/recommendation-domain-events";
 import { createVariantNameSnapshot } from "../utils/variant-name-snapshot.util";
-import { STORE_SHIPPING_POLICY } from "@modules/customer-experience/domain/pricing-engine";
+import { STORE_SHIPPING_POLICY, applyCarrierShippingBenefit } from "@modules/customer-experience/domain/pricing-engine";
+import {
+  ShippingQuoteService,
+  ValidatedShippingQuote,
+} from "@modules/oms/application/services/shipping-quote.service";
+
+function resolveTrackingLink(template: unknown, code: string | null) {
+  if (
+    typeof template !== "string" ||
+    !code ||
+    !template.includes("{trackingCode}")
+  )
+    return null;
+  try {
+    const url = new URL(
+      template.replace("{trackingCode}", encodeURIComponent(code)),
+    );
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 type CheckoutSelection = Omit<PreviewOrderInput, "customerId"> & {
   customerId?: string;
@@ -51,6 +76,7 @@ export class CommerceCheckoutService {
     private readonly pricing: CommercePricingService,
     private readonly commands: CustomerCommands,
     private readonly stores: StoreResolverService,
+    @Optional() private readonly shippingQuoteService?: ShippingQuoteService,
   ) {}
   private async selection(
     input: CheckoutSelection,
@@ -66,7 +92,22 @@ export class CommerceCheckoutService {
         items: { where: { isSelected: true }, orderBy: { id: "asc" } },
       },
     });
+    const attributionByVariant = new Map<string, string | null>(
+      (cart?.items ?? []).map((item) => [
+        item.productVariantId,
+        item.attributionSource ?? null,
+      ]),
+    );
     if (input.items?.length) {
+      for (const line of input.items as Array<{
+        variantId: string;
+        quantity: number;
+        attributionSource?: string;
+      }>) {
+        if (line.attributionSource) {
+          attributionByVariant.set(line.variantId, line.attributionSource);
+        }
+      }
       const matchesCart =
         cart &&
         input.items.every((line) =>
@@ -76,7 +117,11 @@ export class CommerceCheckoutService {
               item.quantity === line.quantity,
           ),
         );
-      return { items: input.items, cartId: matchesCart ? cart.id : null };
+      return {
+        items: input.items,
+        cartId: matchesCart ? cart.id : null,
+        attributionByVariant,
+      };
     }
     if (!cart?.items.length) throw new BadRequestException("CART_EMPTY");
     return {
@@ -85,6 +130,7 @@ export class CommerceCheckoutService {
         quantity: i.quantity,
       })),
       cartId: cart.id,
+      attributionByVariant,
     };
   }
   async preview(input: CheckoutSelection) {
@@ -125,13 +171,17 @@ export class CommerceCheckoutService {
       select: { userId: true },
     });
     if (!owner.userId) throw new BadRequestException("CUSTOMER_REQUIRED");
-    return this.commands.execute(
+    const order = await this.commands.execute(
       owner.userId,
       "CHECKOUT",
       input.idempotencyKey ?? "",
       input,
       (tx, customerId) => this.commit(tx, input, customerId),
     );
+    if (paymentMethod !== "SEPAY") {
+      emitOrderPurchased({ orderId: order.id, trigger: "ORDER_CREATED_COD" });
+    }
+    return order;
   }
 
   async previewGuest(
@@ -168,7 +218,7 @@ export class CommerceCheckoutService {
       throw new BadRequestException("INVALID_PAYMENT_METHOD");
     if (method === "SEPAY") assertGatewayReady(method);
     const requestHash = checkoutRequestHash(input);
-    return this.db.transaction(
+    const order = await this.db.transaction(
       async (tx) => {
         const identity = `guest-checkout:${sessionHash}:${key}`;
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${identity},0))::text`;
@@ -208,6 +258,10 @@ export class CommerceCheckoutService {
       },
       { maxWait: 5000, timeout: 20000 },
     );
+    if (method !== "SEPAY") {
+      emitOrderPurchased({ orderId: order.id, trigger: "ORDER_CREATED_COD" });
+    }
+    return order;
   }
 
   async guestOrder(
@@ -250,7 +304,7 @@ export class CommerceCheckoutService {
         },
         payments: {
           orderBy: { createdAt: "desc" },
-          select: { id: true, paymentMethod: true, status: true },
+          select: { id: true, paymentMethod: true, status: true, paidAt: true, transactionId: true },
         },
       },
     });
@@ -271,6 +325,203 @@ export class CommerceCheckoutService {
     };
   }
 
+  async trackOrder(orderNumber: string, phone: string) {
+    if (!orderNumber || !phone) {
+      throw new BadRequestException("Mã đơn hàng và số điện thoại là bắt buộc");
+    }
+    const cleanOrderNumber = orderNumber.trim();
+    const cleanPhone = phone.replace(/\D/g, "");
+
+    const order = await this.db.order.findFirst({
+      where: {
+        orderNumber: { equals: cleanOrderNumber, mode: "insensitive" },
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        createdAt: true,
+        subtotal: true,
+        discountAmount: true,
+        shippingFee: true,
+        taxAmount: true,
+        totalAmount: true,
+        shippingAddress: true,
+        items: {
+          select: {
+            id: true,
+            productVariantId: true,
+            productName: true,
+            variantName: true,
+            quantity: true,
+            unitPrice: true,
+            discountAmount: true,
+            totalPrice: true,
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          select: { id: true, paymentMethod: true, status: true, paidAt: true, transactionId: true },
+        },
+        statusHistories: {
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            status: true,
+            note: true,
+            createdAt: true,
+          },
+        },
+        shipments: {
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            shipmentCode: true,
+            carrierCode: true,
+            carrierServiceCode: true,
+            trackingCode: true,
+            status: true,
+            trackingUrl: true,
+            failedAttempts: true,
+            handedOverAt: true,
+            deliveredAt: true,
+            updatedAt: true,
+            packages: {
+              select: {
+                package: {
+                  select: {
+                    id: true,
+                    packageCode: true,
+                    actualWeightGrams: true,
+                    items: {
+                      select: {
+                        quantity: true,
+                        variant: {
+                          select: {
+                            sku: true,
+                            option1Value: true,
+                            option2Value: true,
+                            product: {
+                              select: {
+                                name: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            attempts: {
+              orderBy: { attemptNumber: "asc" },
+              select: {
+                id: true,
+                attemptNumber: true,
+                attemptedAt: true,
+                failureReasonCode: true,
+                failureReasonDetail: true,
+              },
+            },
+            events: {
+              orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                status: true,
+                occurredAt: true,
+                receivedAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Không tìm thấy đơn hàng");
+    }
+
+    const addr = order.shippingAddress as any;
+    const orderPhone = (addr?.phone || "").replace(/\D/g, "");
+    if (!orderPhone || !cleanPhone || !orderPhone.endsWith(cleanPhone.slice(-7))) {
+      throw new NotFoundException("Thông tin số điện thoại không trùng khớp với đơn hàng");
+    }
+
+    let templates: Record<string, string> | null = null;
+    try {
+      const configured = await this.db.setting.findUnique({
+        where: { key: "carrier_tracking_urls" },
+      });
+      templates = configured?.value as Record<string, string> | null;
+    } catch {
+      // ignore
+    }
+
+    return {
+      ...order,
+      subtotal: Number(order.subtotal),
+      discountAmount: Number(order.discountAmount),
+      shippingFee: Number(order.shippingFee),
+      taxAmount: Number(order.taxAmount),
+      totalAmount: Number(order.totalAmount),
+      items: order.items.map((item) => ({
+        ...item,
+        unitPrice: Number(item.unitPrice),
+        discountAmount: Number(item.discountAmount),
+        totalPrice: Number(item.totalPrice),
+      })),
+      payments: order.payments,
+      statusHistories: order.statusHistories?.length
+        ? order.statusHistories
+        : [
+            {
+              id: "initial",
+              status: order.status,
+              note: "Đơn hàng được khởi tạo",
+              createdAt: order.createdAt,
+            },
+          ],
+      shipments: (order.shipments || []).map((shipment) => {
+        const computedUrl = resolveTrackingLink(
+          templates?.[shipment.carrierCode],
+          shipment.trackingCode,
+        );
+        return {
+          ...shipment,
+          trackingUrl: shipment.trackingUrl || computedUrl || null,
+          packages:
+            shipment.packages?.map((sp) => ({
+              id: sp.package.id,
+              packageCode: sp.package.packageCode,
+              actualWeightGrams: sp.package.actualWeightGrams,
+              items:
+                sp.package.items?.map((it) => {
+                  const v = it.variant;
+                  const variantName =
+                    [v?.option1Value, v?.option2Value].filter(Boolean).join(" - ") ||
+                    v?.sku ||
+                    "";
+                  return {
+                    quantity: it.quantity,
+                    productName: v?.product?.name ?? "Sản phẩm",
+                    variantName,
+                  };
+                }) ?? [],
+            })) ?? [],
+          attempts:
+            shipment.attempts?.map((att) => ({
+              id: att.id,
+              attemptNumber: att.attemptNumber,
+              attemptedAt: att.attemptedAt,
+              failureReasonCode: att.failureReasonCode,
+              failureReasonDetail: att.failureReasonDetail,
+            })) ?? [],
+        };
+      }),
+    };
+  }
+
   private async commit(
     tx: Prisma.TransactionClient,
     input: CheckoutCreate,
@@ -282,10 +533,6 @@ export class CommerceCheckoutService {
     if (customerId !== input.customerId)
       throw new BadRequestException("CUSTOMER_REQUIRED");
     const selection = await this.selection(input, tx);
-    const storeId = await this.stores.resolveStoreForOrder({
-      requestedStoreId: input.storeId,
-      items: selection.items,
-    });
     const quote = await this.pricing.quote(
       { ...input, items: selection.items },
       tx,
@@ -294,21 +541,56 @@ export class CommerceCheckoutService {
     if (!input.quoteVersion)
       throw new BadRequestException("PRICE_QUOTE_REQUIRED");
     this.pricing.assertQuote(input.quoteVersion, quote);
-    validatePaymentAmount(paymentMethod, quote.totalAmount);
+
+    let finalShippingFee = quote.shippingFee;
+    let finalTotalAmount = quote.totalAmount;
+    let validatedQuote: ValidatedShippingQuote | undefined;
+
+    const resolvedStoreId =
+      input.storeId ||
+      (await this.stores.resolveStoreForOrder({
+        requestedStoreId: input.storeId,
+        items: selection.items,
+      }));
+
+    if (input.quoteGroupId) {
+      if (!input.shippingOptionId) {
+        throw new BadRequestException(
+          "Vui lòng chọn phương thức vận chuyển (shippingOptionId)",
+        );
+      }
+      if (this.shippingQuoteService) {
+        validatedQuote = await this.shippingQuoteService.validateQuote(
+          input.quoteGroupId,
+          input.shippingOptionId,
+          resolvedStoreId,
+        );
+        finalShippingFee = applyCarrierShippingBenefit(validatedQuote.estimatedFee, quote.shippingFee);
+        const discountAmount =
+          quote.lineDiscount + quote.couponDiscount + quote.pointsDiscount;
+        finalTotalAmount = Math.max(
+          0,
+          quote.subtotal - discountAmount + finalShippingFee,
+        );
+      }
+    }
+
+    const storeId = validatedQuote?.sourceLocationId || resolvedStoreId;
+
+    validatePaymentAmount(paymentMethod, finalTotalAmount);
     const variantIds = selection.items.map((i) => i.variantId);
     const inventory = await tx.$queryRaw<
       {
         id: string;
         product_variant_id: string;
-        quantity: number;
-        reserved_quantity: number;
+        available_quantity: number;
       }[]
-    >`SELECT id,product_variant_id,quantity,reserved_quantity FROM inventory WHERE store_id=${storeId}::uuid AND product_variant_id=ANY(${variantIds}::uuid[]) ORDER BY id FOR UPDATE`;
+    >`SELECT id,product_variant_id,available_quantity FROM inventory WHERE store_id=${storeId}::uuid AND product_variant_id=ANY(${variantIds}::uuid[]) ORDER BY id FOR UPDATE`;
     for (const item of selection.items) {
       const row = inventory.find(
         (i) => i.product_variant_id === item.variantId,
       );
-      if (!row || row.quantity - row.reserved_quantity < item.quantity)
+      if (!row || (row.available_quantity ?? 0) < item.quantity)
         throw new ConflictException("INSUFFICIENT_STOCK");
       await tx.inventory.update({
         where: { id: row.id },
@@ -329,9 +611,9 @@ export class CommerceCheckoutService {
         subtotal: quote.subtotal,
         discountAmount:
           quote.lineDiscount + quote.couponDiscount + quote.pointsDiscount,
-        shippingFee: quote.shippingFee,
+        shippingFee: finalShippingFee,
         taxAmount: 0,
-        totalAmount: quote.totalAmount,
+        totalAmount: finalTotalAmount,
         shippingAddress: json(input.shippingAddress),
         note: input.note,
         couponId: quote.couponId,
@@ -341,15 +623,29 @@ export class CommerceCheckoutService {
           policy: "SPRINT5",
           ...(guest ? { guest } : {}),
           quoteVersion: quote.quoteVersion,
+          quoteGroupId: input.quoteGroupId,
+          shippingOptionId: input.shippingOptionId,
+          ...(validatedQuote
+            ? {
+                shippingQuote: {
+                  quoteGroupId: validatedQuote.quoteGroupId,
+                  quoteId: validatedQuote.quoteId,
+                  carrierCode: validatedQuote.carrierCode,
+                  serviceCode: validatedQuote.serviceCode,
+                  estimatedFee: validatedQuote.estimatedFee,
+                },
+              }
+            : {}),
           lineDiscount: quote.lineDiscount,
           couponDiscount: quote.couponDiscount,
           pointsDiscount: quote.pointsDiscount,
           pointsValueVnd: 1,
-          shippingFee: quote.shippingFee,
+          shippingFee: finalShippingFee,
           taxAmount: 0,
         }),
       },
     });
+    const createdOrderItems: { id: string; productVariantId: string; quantity: number }[] = [];
     for (const line of quote.items) {
       const variant = quote.variants.find((v) => v.id === line.variantId)!;
       const item = await tx.orderItem.create({
@@ -365,9 +661,53 @@ export class CommerceCheckoutService {
           discountAmount:
             line.lineDiscount + line.couponDiscount + line.pointsValue,
           totalPrice: line.cashValue,
+          attributionSource:
+            selection.attributionByVariant.get(line.variantId) ?? null,
           pricingSnapshot: json({ version: 1, policy: "SPRINT5", ...line }),
         },
       });
+      createdOrderItems.push({
+        id: item.id,
+        productVariantId: line.variantId,
+        quantity: line.quantity,
+      });
+    }
+
+    // Tự động sinh FulfillmentOrder (WMS Allocation) để đơn hàng xuất hiện ngay trên Hàng Đợi Nhặt Hàng của Kho (Epic 04 & 11)
+    const totalItemsCount = createdOrderItems.reduce((sum, i) => sum + i.quantity, 0);
+    const foNumber = `${orderNumber}-FO01`;
+    const fo = await tx.fulfillmentOrder.create({
+      data: {
+        orderId: order.id,
+        fulfillmentOrderNumber: foNumber,
+        sourceLocationId: storeId,
+        status: 'ALLOCATED',
+        shippingServiceCode: validatedQuote?.serviceCode || 'STANDARD',
+        totalItemsCount,
+        allocatedAt: new Date(),
+      },
+    });
+
+    if (tx.fulfillmentOrderItem?.createMany) {
+      await tx.fulfillmentOrderItem.createMany({
+        data: createdOrderItems.map((orderItem) => ({
+          fulfillmentOrderId: fo.id,
+          orderItemId: orderItem.id,
+          productVariantId: orderItem.productVariantId,
+          quantityRequested: orderItem.quantity,
+        })),
+      });
+    } else {
+      for (const orderItem of createdOrderItems) {
+        await tx.fulfillmentOrderItem.create({
+          data: {
+            fulfillmentOrderId: fo.id,
+            orderItemId: orderItem.id,
+            productVariantId: orderItem.productVariantId,
+            quantityRequested: orderItem.quantity,
+          },
+        });
+      }
     }
     const promotionIds = [
       ...new Set([
@@ -469,6 +809,9 @@ export class CommerceCheckoutService {
         totalPrice: true,
       },
     });
+    if (paymentMethod !== "SEPAY") {
+      await enqueueRecommendationPurchase(tx, { orderId: order.id, trigger: "ORDER_CREATED_COD" });
+    }
     const { pricingSnapshot: _privateSnapshot, ...publicOrder } = order;
     return new OrderEntity({
       ...publicOrder,

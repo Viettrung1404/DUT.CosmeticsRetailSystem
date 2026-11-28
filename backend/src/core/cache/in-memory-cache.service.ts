@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ICacheService } from './cache.service.interface';
 
 interface CacheEntry<T> {
@@ -6,12 +6,21 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+const DEFAULT_MAX_ENTRIES = 5000;
+export const IN_MEMORY_CACHE_MAX_ENTRIES = 'IN_MEMORY_CACHE_MAX_ENTRIES';
+
 @Injectable()
 export class InMemoryCacheService implements ICacheService, OnModuleDestroy {
   private readonly store = new Map<string, CacheEntry<unknown>>();
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private readonly maxEntries: number;
 
-  constructor() {
+  constructor(
+    @Optional()
+    @Inject(IN_MEMORY_CACHE_MAX_ENTRIES)
+    maxEntries: number = DEFAULT_MAX_ENTRIES,
+  ) {
+    this.maxEntries = Math.max(10, maxEntries);
     // Dọn dẹp các cache keys đã hết hạn mỗi 60 giây
     this.cleanupInterval = setInterval(() => this.pruneExpired(), 60_000);
     if (this.cleanupInterval.unref) {
@@ -42,6 +51,21 @@ export class InMemoryCacheService implements ICacheService, OnModuleDestroy {
   }
 
   async set<T>(key: string, value: T, ttlMs = 300_000): Promise<void> {
+    if (ttlMs <= 0) {
+      this.store.delete(key);
+      return;
+    }
+
+    this.store.delete(key);
+    if (this.store.size >= this.maxEntries) {
+      this.pruneExpired();
+      while (this.store.size >= this.maxEntries) {
+        const oldestKey = this.store.keys().next().value;
+        if (oldestKey === undefined) break;
+        this.store.delete(oldestKey);
+      }
+    }
+
     this.store.set(key, {
       value,
       expiresAt: Date.now() + ttlMs,

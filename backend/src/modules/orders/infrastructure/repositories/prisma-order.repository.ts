@@ -10,6 +10,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { OrderPricingService } from '../../application/services/order-pricing.service';
 import { notifyCustomer } from '@core/services/customer-events';
+import { emitOrderPurchased, enqueueRecommendationPurchase } from '@core/services/recommendation-domain-events';
 import { evaluateTier } from '@modules/customer-commerce/application/loyalty.service';
 import { transitionPromotionAllocations } from '@core/services/promotion-lifecycle';
 import { cancelReplacementCredit } from '@modules/customer-commerce/application/admin-integration.service';
@@ -38,7 +39,7 @@ export class PrismaOrderRepository implements IOrderRepository {
   ): Promise<OrderEntity> {
     validatePaymentAmount(data.paymentMethod, data.totalAmount);
     assertGatewayReady(data.paymentMethod);
-    return this.prisma.transaction(
+    const created = await this.prisma.transaction(
       async (tx) => {
         await tx.$queryRaw`SELECT id FROM customers WHERE id=${data.customerId}::uuid FOR UPDATE`;
         const customer = await tx.customer.findUniqueOrThrow({
@@ -304,10 +305,17 @@ export class PrismaOrderRepository implements IOrderRepository {
           },
         });
 
+        if (data.paymentMethod !== 'SEPAY') {
+          await enqueueRecommendationPurchase(tx, { orderId: order.id, trigger: 'ORDER_CREATED_COD' });
+        }
         return this.mapToEntity(fullOrder!);
       },
       { timeout: 20000 },
     );
+    if (data.paymentMethod !== 'SEPAY') {
+      emitOrderPurchased({ orderId: created.id, trigger: 'ORDER_CREATED_COD' });
+    }
+    return created;
   }
 
   async findById(id: string): Promise<OrderEntity | null> {
@@ -394,7 +402,17 @@ export class PrismaOrderRepository implements IOrderRepository {
       };
     }
     if (status) {
-      where.status = status;
+      if (status === 'COMPLETED' || status === 'DELIVERED') {
+        where.status = { in: ['DELIVERED', 'COMPLETED', 'PARTIALLY_DELIVERED'] };
+      } else if (status === 'SHIPPING' || status === 'SHIPPED') {
+        where.status = { in: ['SHIPPING', 'SHIPPED', 'PARTIALLY_SHIPPED'] };
+      } else if (status === 'PROCESSING') {
+        where.status = { in: ['PENDING', 'CONFIRMED', 'PROCESSING'] };
+      } else if (status === 'RETURNED') {
+        where.status = { in: ['RETURNED', 'PARTIALLY_RETURNED'] };
+      } else {
+        where.status = status;
+      }
     }
 
     const [orders, total] = await Promise.all([
@@ -538,23 +556,65 @@ export class PrismaOrderRepository implements IOrderRepository {
       if (existingRow.customer_id)
         await evaluateTier(tx, existingRow.customer_id);
 
-      // 4. Update Payment to CANCELLED
+      // 4. Update Payment to CANCELLED & Refund completed payments into points
       const completedPayments = await tx.payment.findMany({
         where: { orderId, status: 'COMPLETED' },
       });
-      for (const payment of completedPayments)
+      for (const payment of completedPayments) {
+        const paymentAmountNum = Math.round(Number(payment.amount));
+        let refundStatus = 'PENDING';
+
+        // Nếu khách hàng có tài khoản thành viên, hoàn tiền mặt trực tiếp thành điểm thưởng (xu)
+        if (existingRow.customer_id && paymentAmountNum > 0) {
+          await tx.customer.update({
+            where: { id: existingRow.customer_id },
+            data: {
+              totalPoints: { increment: paymentAmountNum },
+            },
+          });
+
+          await tx.loyaltyPointsTransaction.create({
+            data: {
+              customerId: existingRow.customer_id,
+              orderId: existingRow.id,
+              points: paymentAmountNum,
+              type: 'REFUND',
+              eventKey: `ORDER:${orderId}:REFUND_PAYMENT:${payment.id}`,
+              description: `Hoàn tiền thanh toán đơn ${existingRow.order_number} vào xu`,
+            },
+          });
+
+          refundStatus = 'COMPLETED';
+
+          await notifyCustomer(
+            tx,
+            existingRow.customer_id,
+            `ORDER:${orderId}:REFUND_COINS:${payment.id}`,
+            `Đơn hàng ${existingRow.order_number} đã hủy. Số tiền ${paymentAmountNum.toLocaleString('vi-VN')}đ đã được hoàn vào ví xu GlowUp.`,
+            'LOYALTY',
+            { orderId, points: paymentAmountNum },
+          );
+        }
+
         await tx.refund.upsert({
           where: { eventKey: `CANCEL:${orderId}:${payment.id}` },
-          update: {},
+          update: {
+            status: refundStatus,
+            reason: reason ? `${reason} (Hoàn vào xu)` : 'Hủy đơn hoàn vào xu',
+          },
           create: {
             orderId,
             paymentId: payment.id,
             amount: payment.amount,
-            reason: reason || 'Hủy đơn',
-            status: 'PENDING',
+            reason: reason ? `${reason} (Hoàn vào xu)` : 'Hủy đơn hoàn vào xu',
+            status: refundStatus,
             eventKey: `CANCEL:${orderId}:${payment.id}`,
           },
         });
+      }
+      if (existingRow.customer_id && completedPayments.length > 0) {
+        await evaluateTier(tx, existingRow.customer_id);
+      }
       await tx.payment.updateMany({
         where: { orderId: existingRow.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
         data: { status: 'CANCELLED' },
@@ -609,34 +669,50 @@ export class PrismaOrderRepository implements IOrderRepository {
   }
 
   async cancelExpiredPendingOrders(cutoffDate: Date): Promise<number> {
-    const expiredOrders = await this.prisma.order.findMany({
-      where: {
-        status: 'PENDING',
-        orderType: { in: ['ONLINE', 'STORE_PICKUP'] },
-        payments: { none: { paymentMethod: { in: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] } } },
-        createdAt: { lte: cutoffDate },
-      },
-      select: {
-        id: true,
-        customerId: true,
-      },
-    });
+    const lockRows = await this.prisma
+      .$queryRaw<{ acquired: boolean }[]>`
+        SELECT pg_try_advisory_lock(hashtext('cancel_expired_orders_job')) AS acquired
+      `
+      .catch(() => [{ acquired: true }]);
 
-    let cancelledCount = 0;
-    for (const order of expiredOrders) {
-      try {
-        await this.cancelOrderWithTransaction(
-          order.id,
-          order.customerId || undefined,
-          'Hệ thống tự động hủy do quá hạn 30 phút chưa xác nhận',
-        );
-        cancelledCount++;
-      } catch (err) {
-        // Continue canceling other orders
-      }
+    if (lockRows.length > 0 && !lockRows[0].acquired) {
+      return 0;
     }
 
-    return cancelledCount;
+    try {
+      const expiredOrders = await this.prisma.order.findMany({
+        where: {
+          status: 'PENDING',
+          orderType: { in: ['ONLINE', 'STORE_PICKUP'] },
+          payments: { none: { paymentMethod: { in: ['SEPAY', 'VNPAY', 'MOMO', 'ZALOPAY'] } } },
+          createdAt: { lte: cutoffDate },
+        },
+        select: {
+          id: true,
+          customerId: true,
+        },
+      });
+
+      let cancelledCount = 0;
+      for (const order of expiredOrders) {
+        try {
+          await this.cancelOrderWithTransaction(
+            order.id,
+            order.customerId || undefined,
+            'Hệ thống tự động hủy do quá hạn 30 phút chưa xác nhận',
+          );
+          cancelledCount++;
+        } catch (err) {
+          // Continue canceling other orders
+        }
+      }
+
+      return cancelledCount;
+    } finally {
+      await this.prisma
+        .$executeRaw`SELECT pg_advisory_unlock(hashtext('cancel_expired_orders_job'))`
+        .catch(() => {});
+    }
   }
 
   async getNextOrderSequence(date: Date): Promise<number> {

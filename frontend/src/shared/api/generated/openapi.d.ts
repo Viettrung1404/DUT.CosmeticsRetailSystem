@@ -1,5 +1,5 @@
 // Generated from backend/docs/api/openapi.json. Do not edit.
-// SHA256: 1974307afca108cbb5da0523b13205177ebe3a6b22af16caadf2742fa8e44b16
+// SHA256: 9870c3f67ddc00ebed78ecc632b2547d83a9ed3b5178e12ab2cbc77d69f51e61
 export interface paths {
     "/api/v1/auth/register": {
         parameters: {
@@ -1918,23 +1918,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/customer/products/{id}/try-on": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Mã màu son đã được duyệt cho thử màu camera, có thể null nếu chưa cấu hình */
-        get: operations["ProductCustomerController_tryOnColors"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/customer/products/{id}/availability": {
         parameters: {
             query?: never;
@@ -1950,23 +1933,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/v1/admin/variants/{id}/try-on-color": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Cập nhật mã màu thử son đã được duyệt cho biến thể */
-        patch: operations["ProductVariantAdminController_updateTryOnColor"];
         trace?: never;
     };
     "/api/v1/guest/payments/sepay": {
@@ -3394,13 +3360,6 @@ export interface components {
             totalReceived: number;
             /** @description Tiền thừa đã thối lại */
             change: number;
-        };
-        TryOnColorDto: {
-            /**
-             * @description Mã màu được duyệt từ ảnh swatch của biến thể
-             * @example #B9465E
-             */
-            colorHex: string;
         };
         ApiResponseDto: {
             /** @example 200 */
@@ -24212,165 +24171,6 @@ export interface operations {
             };
         };
     };
-    ProductCustomerController_tryOnColors: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example true */
-                        success: boolean;
-                        message: string;
-                        data: {
-                            [key: string]: unknown;
-                        };
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Validation failed */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Authentication or active session required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Access denied */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Rate limited; Retry-After is seconds */
-            429: {
-                headers: {
-                    "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Required dependency unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-        };
-    };
     ProductCustomerController_availability: {
         parameters: {
             query: {
@@ -24383,169 +24183,6 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example 200 */
-                        statusCode: number;
-                        /** @example true */
-                        success: boolean;
-                        message: string;
-                        data: {
-                            [key: string]: unknown;
-                        };
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Validation failed */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Authentication or active session required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Access denied */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Rate limited; Retry-After is seconds */
-            429: {
-                headers: {
-                    "Retry-After"?: number;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-            /** @description Required dependency unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        statusCode: number;
-                        /** @example false */
-                        success: boolean;
-                        message: string;
-                        code?: string;
-                        details?: {
-                            [key: string]: unknown;
-                        };
-                        path: string;
-                        /** Format: date-time */
-                        timestamp: string;
-                    };
-                };
-            };
-        };
-    };
-    ProductVariantAdminController_updateTryOnColor: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TryOnColorDto"];
-            };
-        };
         responses: {
             200: {
                 headers: {

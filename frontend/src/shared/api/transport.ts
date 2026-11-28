@@ -9,7 +9,9 @@ export async function fetchWithTimeout(
   const timeout = AbortSignal.timeout(timeoutMs);
   const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   try {
-    return await fetcher(input, { ...init, signal, cache: "no-store", redirect: "error" });
+    const isRead = !init.method || ["GET", "HEAD"].includes(init.method.toUpperCase());
+    const cache = isRead ? (init.cache ?? (init.next ? undefined : "no-store")) : "no-store";
+    return await fetcher(input, { ...init, signal, cache, redirect: "error" });
   } catch (error) {
     if (init.signal?.aborted) throw error;
     throw new ApiError(

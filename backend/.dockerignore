@@ -6,6 +6,10 @@ dist
 test
 coverage
 scripts
+.demo-data
+.tmp
+.vscode
+.idea
 *.log
 *.md
 .git

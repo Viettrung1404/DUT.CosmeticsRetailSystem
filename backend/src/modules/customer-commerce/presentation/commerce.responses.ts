@@ -183,6 +183,12 @@ export const commerceSchemas: Record<string, SchemaObject> = {
     type: 'object',
     properties: { productId: uuid, isWishlisted: { type: 'boolean' } },
   },
+  wishlistIds: {
+    type: 'object',
+    properties: {
+      ids: { type: 'array', items: uuid },
+    },
+  },
   wishlists: paged({
     type: 'object',
     description: 'Public ProductResponseDto và isWishlisted=true',

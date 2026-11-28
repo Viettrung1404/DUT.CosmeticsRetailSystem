@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { authPost, authMessage } from "./client";
 import { sessionChanged } from "./session-change";
 import { useHydrated } from "@/shared/lib/use-hydrated";
+import { getWebBehaviorTracker } from "@/shared/recommendations/web-tracker";
 export function LogoutButton() {
   const hydrated = useHydrated();
   const query = useQueryClient();
@@ -19,6 +20,7 @@ export function LogoutButton() {
           setError("");
           try {
             await authPost("logout", {});
+            await getWebBehaviorTracker().resetAnonymousIdOnLogout().catch(() => {});
             await sessionChanged(query, "/login");
           } catch (e) {
             await query.cancelQueries();

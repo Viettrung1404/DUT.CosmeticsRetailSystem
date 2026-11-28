@@ -80,6 +80,7 @@ export class CartController {
       productVariantId: dto.productVariantId,
       quantity: dto.quantity,
       storeId: dto.storeId,
+      attributionSource: dto.attributionSource,
     });
 
     // Single fetch for response
@@ -101,7 +102,15 @@ export class CartController {
     @Req() req: any,
     @Headers('x-session-id') headerSession?: string,
   ): Promise<CartResponseDto> {
-    const { customerId, sessionId } = await this.resolveCustomerIdAndSession(req, headerSession);
+    let customerId: string | undefined;
+    let sessionId: string | undefined = headerSession || req.headers?.['x-session-id'];
+    try {
+      const resolved = await this.resolveCustomerIdAndSession(req, headerSession);
+      customerId = resolved.customerId;
+      sessionId = resolved.sessionId;
+    } catch {
+      customerId = undefined;
+    }
     return this.getCartUseCase.execute({ customerId, sessionId });
   }
 

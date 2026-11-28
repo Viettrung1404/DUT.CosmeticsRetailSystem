@@ -1,6 +1,6 @@
-import { TrackingPage } from "@/features/account/account-pages";
-export const metadata = { title: "Theo dõi giao hàng" };
+import { redirect } from "next/navigation";
+
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <TrackingPage id={id} />;
+  redirect(`/account/orders/${id}`);
 }

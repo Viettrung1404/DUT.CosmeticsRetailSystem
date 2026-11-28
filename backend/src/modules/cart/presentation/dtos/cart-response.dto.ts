@@ -7,6 +7,12 @@ export class CartItemResponseDto {
   @ApiProperty({ description: 'ID của biến thể sản phẩm' })
   productVariantId: string;
 
+  @ApiPropertyOptional({ description: 'ID của sản phẩm cha' })
+  productId?: string;
+
+  @ApiPropertyOptional({ description: 'Slug dẫn tới trang chi tiết sản phẩm' })
+  productSlug?: string;
+
   @ApiProperty({ description: 'Số lượng mua' })
   quantity: number;
 

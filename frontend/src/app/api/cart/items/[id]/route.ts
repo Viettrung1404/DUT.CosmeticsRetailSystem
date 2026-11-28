@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
 const updateSchema = z
   .object({
-    quantity: z.number().int().min(1).max(100).optional(),
+    quantity: z.number().int().min(1).max(99).optional(),
     isSelected: z.boolean().optional(),
   })
   .strict()

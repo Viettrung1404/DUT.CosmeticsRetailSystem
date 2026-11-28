@@ -1,46 +1,89 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '@infrastructure/database/prisma.module';
-import { PermissionsModule } from '@modules/permissions/permissions.module';
-import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
-import { RETURN_ADMIN_REPOSITORY } from './domain/repositories/return-admin.repository.interface';
-import { REFUND_ADMIN_REPOSITORY } from './domain/repositories/refund-admin.repository.interface';
-import { PrismaReturnAdminRepository } from './infrastructure/persistence/prisma-return-admin.repository';
-import { PrismaRefundAdminRepository } from './infrastructure/persistence/prisma-refund-admin.repository';
-import { ReturnAccessService } from './application/services/return-access.service';
-import { RefundAccessService } from './application/services/refund-access.service';
-import { ListAdminReturnsUseCase } from './application/use-cases/list-admin-returns.use-case';
-import { GetAdminReturnDetailUseCase } from './application/use-cases/get-admin-return-detail.use-case';
-import { ApproveAdminReturnUseCase } from './application/use-cases/approve-admin-return.use-case';
-import { RejectAdminReturnUseCase } from './application/use-cases/reject-admin-return.use-case';
-import { ReceiveAdminReturnUseCase } from './application/use-cases/receive-admin-return.use-case';
-import { InspectAdminReturnUseCase } from './application/use-cases/inspect-admin-return.use-case';
-import { CompleteAdminReturnUseCase } from './application/use-cases/complete-admin-return.use-case';
-import { ListAdminRefundsUseCase } from './application/use-cases/list-admin-refunds.use-case';
-import { GetAdminRefundDetailUseCase } from './application/use-cases/get-admin-refund-detail.use-case';
-import { ProcessAdminRefundUseCase } from './application/use-cases/process-admin-refund.use-case';
-import { RejectAdminRefundUseCase } from './application/use-cases/reject-admin-refund.use-case';
-import { ReturnAdminController } from './presentation/controllers/return-admin.controller';
-import { RefundAdminController } from './presentation/controllers/refund-admin.controller';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from '../../infrastructure/database/prisma.module';
+import { AsyncInfrastructureModule } from '../async-infrastructure/async-infrastructure.module';
+import { PermissionsModule } from '../permissions/permissions.module';
+import { InventoryModule } from '../inventory/inventory.module';
+import { RmaEligibilityService } from './application/services/rma-eligibility.service';
+import { SubmitReturnRequestUseCase } from './application/use-cases/submit-return-request.use-case';
+import { ReceiveStoreDropoffUseCase } from './application/use-cases/receive-store-dropoff.use-case';
+import { ReverseShippingService } from './application/services/reverse-shipping.service';
+import { ReceiveWarehouseReturnUseCase } from './application/use-cases/receive-warehouse-return.use-case';
+import { RmaStatusAggregator } from './application/services/rma-status-aggregator';
+import { InventoryDispositionService } from './application/services/inventory-disposition.service';
+import { ReturnInspectionService } from './application/services/return-inspection.service';
+import { RefundCalculatorService } from './application/services/refund-calculator.service';
+import { RefundExecutionService } from './application/services/refund-execution.service';
+import { PaymentRefundGatewayAdapter } from './infrastructure/adapters/payment-refund-gateway.adapter';
+import { PaymentRefundGatewayService } from './application/services/payment-refund-gateway.service';
+import { ExchangeSettlementService } from './application/services/exchange-settlement.service';
+import { RmaActionMatrixService } from './application/services/rma-action-matrix.service';
+import { RmaQueueService } from './application/services/rma-queue.service';
+import { RmaWorkflowService } from './application/services/rma-workflow.service';
+import { ReturnAbuseDetectorService } from './application/services/return-abuse-detector.service';
+import { LotQualityAnalyticsService } from './application/services/lot-quality-analytics.service';
+import { CustomerReturnController } from './presentation/controllers/customer-return.controller';
+import { AdminReturnController } from './presentation/controllers/admin-return.controller';
+import { AdminRmaQueueController } from './presentation/controllers/admin-rma-queue.controller';
+import { AdminRmaWorkflowController } from './presentation/controllers/admin-rma-workflow.controller';
+import { AdminReturnAbuseController } from './presentation/controllers/admin-return-abuse.controller';
+import { AdminReturnAnalyticsController } from './presentation/controllers/admin-return-analytics.controller';
 
 @Module({
-  imports: [PrismaModule, PermissionsModule, CustomerCommerceModule],
-  controllers: [ReturnAdminController, RefundAdminController],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    AsyncInfrastructureModule,
+    PermissionsModule,
+    InventoryModule,
+  ],
+  controllers: [
+    CustomerReturnController,
+    AdminReturnController,
+    AdminRmaQueueController,
+    AdminRmaWorkflowController,
+    AdminReturnAbuseController,
+    AdminReturnAnalyticsController,
+  ],
   providers: [
-    { provide: RETURN_ADMIN_REPOSITORY, useClass: PrismaReturnAdminRepository },
-    { provide: REFUND_ADMIN_REPOSITORY, useClass: PrismaRefundAdminRepository },
-    ReturnAccessService,
-    RefundAccessService,
-    ListAdminReturnsUseCase,
-    GetAdminReturnDetailUseCase,
-    ApproveAdminReturnUseCase,
-    RejectAdminReturnUseCase,
-    ReceiveAdminReturnUseCase,
-    InspectAdminReturnUseCase,
-    CompleteAdminReturnUseCase,
-    ListAdminRefundsUseCase,
-    GetAdminRefundDetailUseCase,
-    ProcessAdminRefundUseCase,
-    RejectAdminRefundUseCase,
+    RmaEligibilityService,
+    SubmitReturnRequestUseCase,
+    ReceiveStoreDropoffUseCase,
+    ReverseShippingService,
+    ReceiveWarehouseReturnUseCase,
+    RmaStatusAggregator,
+    InventoryDispositionService,
+    ReturnInspectionService,
+    RefundCalculatorService,
+    RefundExecutionService,
+    PaymentRefundGatewayAdapter,
+    PaymentRefundGatewayService,
+    ExchangeSettlementService,
+    RmaActionMatrixService,
+    RmaQueueService,
+    RmaWorkflowService,
+    ReturnAbuseDetectorService,
+    LotQualityAnalyticsService,
+  ],
+  exports: [
+    RmaEligibilityService,
+    SubmitReturnRequestUseCase,
+    ReceiveStoreDropoffUseCase,
+    ReverseShippingService,
+    RmaWorkflowService,
+    ReturnAbuseDetectorService,
+    LotQualityAnalyticsService,
+    ReceiveWarehouseReturnUseCase,
+    RmaStatusAggregator,
+    InventoryDispositionService,
+    ReturnInspectionService,
+    RefundCalculatorService,
+    RefundExecutionService,
+    PaymentRefundGatewayAdapter,
+    PaymentRefundGatewayService,
+    ExchangeSettlementService,
+    RmaActionMatrixService,
+    RmaQueueService,
   ],
 })
 export class ReturnsModule {}

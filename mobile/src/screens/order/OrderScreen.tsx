@@ -5,18 +5,18 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   Image,
   Alert,
   Modal,
   ScrollView,
   TextInput,
   Linking,
-  Dimensions,
-} from 'react-native';
+  Dimensions} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { orderApi } from '../../api/orderApi';
+import AppHeader from '../../components/AppHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -77,117 +77,7 @@ export default function OrderScreen({ navigation }: any) {
   const [rmaReason, setRmaReason] = useState('broken');
 
   // Dữ liệu mẫu đơn hàng đồng bộ theo Stitch Design
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: 'ord-1',
-      orderCode: 'GLOW-89241',
-      date: '10:30 • Hôm nay',
-      status: 'SHIPPING',
-      statusText: 'Đang vận chuyển',
-      deliveryEta: 'Hôm nay (16:00 - 17:30)',
-      carrier: 'GHN Express',
-      trackingCode: 'GHN88294719VN',
-      shipperName: 'Nguyễn Văn Bình',
-      shipperPhone: '0909123456',
-      shipperRating: '4.9 ★',
-      subtotal: 835000,
-      discount: 65000,
-      shippingFee: 0,
-      totalAmount: 770000,
-      paymentMethod: 'Đã thanh toán qua MoMo',
-      timeline: [
-        {
-          time: '14:20 • Hôm nay',
-          title: 'Đang giao hàng',
-          description:
-            'Tài xế đang giao kiện hàng đến địa chỉ của bạn (Landmark 81, P. 22, Bình Thạnh, TP.HCM). Xin vui lòng chú ý điện thoại.',
-          active: true,
-        },
-        {
-          time: '09:15 • Hôm nay',
-          title: 'Xuất kho vận chuyển',
-          description:
-            'Đơn hàng đã xuất kho Phân phối Mỹ phẩm Tân Bình & đã được bàn giao cho bưu cục GHN Bình Thạnh.',
-        },
-        {
-          time: '07:30 • Hôm nay',
-          title: 'Đóng gói niêm phong',
-          description:
-            'Đơn hàng đã được kiểm tra & đóng gói cẩn thận có dán tem niêm phong chống hàng giả GlowUp Authenticity.',
-        },
-      ],
-      items: [
-        {
-          id: 'i1',
-          name: 'Serum Tinh Chất Rose Berry B5 50ml',
-          categoryTag: 'Tinh chất phục hồi',
-          variant: 'Chai 50ml tinh chất',
-          price: 345000,
-          quantity: 1,
-          imageUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuBAFp77ol43EApZG_P7J0TAjKTI2ZADhWxoSkzsqH-C1pguV4aydmou8H1Bn_II6M0CsxsFH-oo3hYgWgCxmXtcp1VfWXpvnYL3MesIAQ3FiQ1JzSGMoOBTpUXCzxmT1Obi3i27PMuJV-HTbaOIxpEt-f0ibw9n8l7K8ZddtrbPEpHZ4IXfa_-MhthuFlcQeAFark7E1tRSvnIBWubCCZD09vHeB7plhPnapEIAOnMbOr4qerCOMRHf5A',
-        },
-        {
-          id: 'i2',
-          name: 'Son Kem Lì Velvet Tint #04 Muted Rose',
-          categoryTag: 'Son môi mịn lì',
-          variant: 'Màu #04 Rosewood nhung',
-          price: 245000,
-          quantity: 2,
-          imageUrl:
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuBOAgFSap5-Sxi3FFsobfBamaHe82GVE_YnV69zeaGjF77FAytLcx-sSHaj4qu9SZe9nwDhAtlhIIMiFwXFfTyuViGWXkpOrF8nkA1n5SXvGFyHRGfdMer7RvPQu4_CPdGVvF2jz1R-eoK_dZ38F37NYgSQMUmug_Wpcx6hwKcz2stBtcuXFjZFbFsFybV1SoZeMd_uzYMECbXDB-xOGdorYP1YTdNvLx-tugwt2fbJVxHBmoXrb_6ZIw',
-        },
-      ],
-    },
-    {
-      id: 'ord-2',
-      orderCode: 'GLOW-731940',
-      date: '14:30 • Hôm qua',
-      status: 'PENDING',
-      statusText: 'Chờ xác nhận',
-      subtotal: 520000,
-      discount: 0,
-      shippingFee: 25000,
-      totalAmount: 545000,
-      paymentMethod: 'Thanh toán khi nhận hàng (COD)',
-      items: [
-        {
-          id: 'i3',
-          name: 'Kem Chống Nắng Nâng Tone Sunscreen SPF50+',
-          categoryTag: 'Bảo vệ da',
-          variant: 'Tuýp 50ml dưỡng sáng',
-          price: 520000,
-          quantity: 1,
-          imageUrl:
-            'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=400',
-        },
-      ],
-    },
-    {
-      id: 'ord-3',
-      orderCode: 'GLOW-612084',
-      date: '02/10/2026',
-      status: 'DELIVERED',
-      statusText: 'Hoàn tất',
-      subtotal: 380000,
-      discount: 30000,
-      shippingFee: 0,
-      totalAmount: 350000,
-      paymentMethod: 'Đã thanh toán qua VNPay',
-      items: [
-        {
-          id: 'i4',
-          name: 'Nước Tẩy Trang Dịu Nhẹ Micellar Water',
-          categoryTag: 'Làm sạch sâu',
-          variant: 'Chai 400ml nắp hồng',
-          price: 380000,
-          quantity: 1,
-          imageUrl:
-            'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400',
-        },
-      ],
-    },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const tabs: { key: OrderStatus; label: string }[] = [
     { key: 'ALL', label: 'Tất cả' },
@@ -196,6 +86,57 @@ export default function OrderScreen({ navigation }: any) {
     { key: 'DELIVERED', label: 'Hoàn tất' },
     { key: 'CANCELLED', label: 'Đã hủy' },
   ];
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      const res = await orderApi.getMyOrders();
+      const list = res?.data?.items || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(list)) {
+        setOrders(
+          list.map((o: any) => ({
+            id: o.id,
+            orderCode: o.orderNumber || o.orderCode || o.id,
+            date: o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : 'Gần đây',
+            status: (o.status || 'PENDING') as OrderStatus,
+            statusText:
+              o.status === 'PENDING'
+                ? 'Chờ duyệt'
+                : o.status === 'SHIPPING'
+                ? 'Đang giao'
+                : o.status === 'DELIVERED'
+                ? 'Hoàn tất'
+                : o.status === 'CANCELLED'
+                ? 'Đã hủy'
+                : 'Đang xử lý',
+            subtotal: o.subtotalAmount || o.subtotal || o.totalAmount || 0,
+            discount: o.discountAmount || 0,
+            shippingFee: o.shippingFee || 0,
+            totalAmount: o.totalAmount || 0,
+            paymentMethod:
+              o.paymentMethod === 'COD'
+                ? 'Thanh toán khi nhận hàng (COD)'
+                : 'Chuyển khoản SePay',
+            items: (o.items || []).map((it: any) => ({
+              id: it.id || it.productVariantId,
+              name: it.productName || 'Sản phẩm GlowUp',
+              variant: it.variantName || 'Mặc định',
+              price: it.unitPrice || 0,
+              quantity: it.quantity || 1,
+              imageUrl:
+                it.thumbnailUrl ||
+                'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+            })),
+          }))
+        );
+      }
+    } catch {
+      // Giữ danh sách ban đầu nếu offline
+    }
+  };
 
   // Lọc đơn hàng
   const filteredOrders =
@@ -390,39 +331,28 @@ export default function OrderScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
-      {/* 1. Header chính màn hình Đơn Hàng (Stitch Rose Berry Top Bar) */}
-      <View style={styles.topHeader}>
-        <View style={styles.brandRow}>
-          <Image
-            source={{
-              uri: 'https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs',
-            }}
-            style={styles.brandLogo}
-            resizeMode="contain"
-          />
-          <View>
-            <Text style={styles.headerBrandTitle}>GlowUp</Text>
-            <Text style={styles.headerBrandSubtitle}>ĐƠN HÀNG CỦA BẠN</Text>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      {/* 1. Header chính màn hình Đơn Hàng chuẩn GlowUp */}
+      <AppHeader
+        title="GlowUp"
+        subtitle="ĐƠN HÀNG CỦA BẠN"
+        rightActions={
+          <View style={styles.headerRightActions}>
+            <TouchableOpacity
+              style={styles.circleActionBtn}
+              onPress={() => navigation?.navigate?.('Search')}
+            >
+              <Ionicons name="search-outline" size={19} color={theme.colors.textDark} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.circleActionBtn}
+              onPress={() => navigation?.navigate?.('NotificationCenter')}
+            >
+              <Ionicons name="notifications-outline" size={19} color={theme.colors.textDark} />
+            </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.headerRightActions}>
-          <TouchableOpacity
-            style={styles.circleActionBtn}
-            onPress={() => navigation?.navigate?.('Search')}
-          >
-            <Ionicons name="search" size={20} color={theme.colors.textDark} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.circleActionBtn}
-            onPress={() => Alert.alert('Thông báo', 'Bạn chưa có thông báo mới.')}
-          >
-            <Ionicons name="notifications-outline" size={20} color={theme.colors.textDark} />
-            <View style={styles.notifDot} />
-          </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
       {/* 2. Tabs Trạng Thái Đơn Hàng */}
       <View style={styles.tabBarContainer}>

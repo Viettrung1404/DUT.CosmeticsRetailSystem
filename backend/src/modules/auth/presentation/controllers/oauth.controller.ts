@@ -22,6 +22,8 @@ import {
 } from '../dtos/oauth.dto';
 import { LoginResponseDto } from '../dtos/auth.dto';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @ApiTags('Auth - OAuth')
 @ApiExtraModels(LoginResponseDto)
 @ApiResponse({
@@ -48,6 +50,7 @@ import { LoginResponseDto } from '../dtos/auth.dto';
   status: 503,
   description: 'Provider, email or distributed rate-limit store unavailable/unconfigured',
 })
+@UseDistributedThrottle()
 @Controller('auth/oauth')
 @Throttle({ default: { limit: 5, ttl: 60000 } })
 export class OAuthController {

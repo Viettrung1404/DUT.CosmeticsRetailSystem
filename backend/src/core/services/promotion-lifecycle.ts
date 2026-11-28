@@ -9,6 +9,7 @@ export async function reservePromotionBenefits(
     quantity: number;
     promotionId?: string | null;
     quotaId?: string | null;
+    quotaQuantity?: number;
   }[],
   extraPromotionIds: string[] = [],
 ) {
@@ -26,9 +27,10 @@ export async function reservePromotionBenefits(
   for (const line of [...lines]
     .filter((l) => l.quotaId)
     .sort((a, b) => a.quotaId!.localeCompare(b.quotaId!))) {
+    const quantity = line.quotaQuantity ?? line.quantity;
     const held =
-      await tx.$executeRaw`UPDATE promotion_variant_quotas SET reserved_quantity=reserved_quantity+${line.quantity}
-      WHERE id=${line.quotaId!}::uuid AND quota-reserved_quantity-consumed_quantity>=${line.quantity}`;
+      await tx.$executeRaw`UPDATE promotion_variant_quotas SET reserved_quantity=reserved_quantity+${quantity}
+      WHERE id=${line.quotaId!}::uuid AND quota-reserved_quantity-consumed_quantity>=${quantity}`;
     if (held !== 1) throw new ConflictException('FLASH_SALE_EXHAUSTED');
     await tx.promotionAllocation.create({
       data: {
@@ -37,7 +39,7 @@ export async function reservePromotionBenefits(
         orderId,
         orderItemId: items.find((i) => i.productVariantId === line.variantId)!
           .id,
-        quantity: line.quantity,
+        quantity,
       },
     });
   }

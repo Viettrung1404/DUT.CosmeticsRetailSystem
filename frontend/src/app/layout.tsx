@@ -26,6 +26,7 @@ export function generateMetadata(): Metadata {
   const index = getServerEnv().SEO_INDEXING_ENABLED === "true";
   return {
     metadataBase: new URL(getServerEnv().SITE_URL),
+    referrer: "strict-origin-when-cross-origin",
     title: { default: "GlowUp", template: PAGE_TITLE_TEMPLATE },
     description: "GlowUp — Chăm sóc vẻ đẹp của bạn.",
     icons: {

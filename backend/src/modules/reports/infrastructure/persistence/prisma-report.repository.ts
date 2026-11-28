@@ -51,7 +51,9 @@ const salesCte = (f: ReportFilter) => Prisma.sql`
         ELSE (SELECT min(h.created_at) FROM order_status_history h WHERE h.order_id = o.id AND h.status = 'COMPLETED')
       END AS recognized_at
     FROM orders o
-    WHERE o.status IN ('COMPLETED', 'RETURNED') ${storeClause(f.storeIds)} ${staffClause(f.employeeId)}
+    WHERE o.status IN ('COMPLETED', 'RETURNED')
+      AND o.created_at <= ${f.to}
+      ${storeClause(f.storeIds)} ${staffClause(f.employeeId)}
   ),
   recognized AS (
     SELECT * FROM sales WHERE recognized_at >= ${f.from} AND recognized_at < ${f.to}
@@ -64,7 +66,9 @@ const returnsCte = (f: ReportFilter) => Prisma.sql`
       (SELECT coalesce(sum(ri.quantity * oi.unit_cost), 0) FROM return_order_items ri
          JOIN order_items oi ON oi.id = ri.order_item_id WHERE ri.return_order_id = r.id) AS returned_cost
     FROM return_orders r JOIN orders o ON o.id = r.order_id
-    WHERE r.status = 'COMPLETED' ${storeClause(f.storeIds)} ${staffClause(f.employeeId)}
+    WHERE r.status = 'COMPLETED'
+      AND r.created_at <= ${f.to}
+      ${storeClause(f.storeIds)} ${staffClause(f.employeeId)}
   )`;
 
 @Injectable()

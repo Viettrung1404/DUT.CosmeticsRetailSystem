@@ -19,3 +19,10 @@ it("rejects malformed success responses and paths that escape the BFF", async ()
   for (const path of ["/api/../../evil", "/api/\\evil", "/api/auth/session#token"] as const) await expect(requestBff(path, z.unknown())).rejects.toThrow("Invalid BFF path");
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it("blocks catalog query changes during Retry-After without sending more requests", async () => {
+  const fetcher = vi.fn(async () => Response.json({ code: "HTTP_429" }, { status: 429, headers: { "Retry-After": "50" } }));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(requestBff("/api/catalog/search-hints?q=serum", z.unknown())).rejects.toMatchObject({ status: 429 });
+  await expect(requestBff("/api/catalog/search-hints?q=toner", z.unknown())).rejects.toMatchObject({ status: 429, retryAfter: "50" });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

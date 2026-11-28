@@ -20,7 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { CatalogImage, formatPrice } from "@/features/catalog/components";
-import { beginWishlistRemoval } from "@/features/catalog/commerce-state";
+import { beginWishlistRemoval, wishlistIdsQuery } from "@/features/catalog/commerce-state";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
 import {
@@ -65,8 +65,17 @@ export function WishlistPage() {
   const [error, setError] = useState("");
   const query = useQuery({
     queryKey: ["wishlist", page],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: ({ signal }) => readBff(`/api/wishlist?page=${page}`, wishlistSchema, signal),
   });
+  const idsQuery = useQuery(wishlistIdsQuery());
+  const visibleItems = (query.data?.items ?? []).filter(
+    (item) => !idsQuery.data || idsQuery.data.ids.includes(item.id),
+  );
+  const total = idsQuery.data ? idsQuery.data.ids.length : (query.data?.total ?? 0);
+
   async function remove(id: string) {
     setBusy(id);
     setError("");
@@ -90,9 +99,7 @@ export function WishlistPage() {
       <AccountHeading
         title="Sản phẩm yêu thích"
         description="Lưu giữ những sản phẩm bạn yêu thích và chọn mua khi sẵn sàng."
-        actions={
-          query.data ? <span className="order-status">{query.data.total} sản phẩm</span> : undefined
-        }
+        actions={query.data ? <span className="order-status">{total} sản phẩm</span> : undefined}
       />
       {query.isPending ? (
         <ContentLoading variant="cards" label="Đang tải sản phẩm yêu thích…" heading={false} />
@@ -100,10 +107,10 @@ export function WishlistPage() {
         <div className="account-surface" role="alert">
           Không tải được danh sách. <button onClick={() => query.refetch()}>Thử lại</button>
         </div>
-      ) : query.data.items.length ? (
+      ) : visibleItems.length ? (
         <>
           <div className="wishlist-grid">
-            {query.data.items.map((product) => (
+            {visibleItems.map((product) => (
               <article key={product.id} className="wishlist-card">
                 <Link className="wishlist-image" href={`/products/${product.slug}`}>
                   <CatalogImage src={product.primaryImage} alt={product.name} />
@@ -132,7 +139,7 @@ export function WishlistPage() {
               </article>
             ))}
           </div>
-          <Pager page={page} total={query.data.total} route="/wishlist" />
+          <Pager page={page} total={total} route="/wishlist" />
         </>
       ) : (
         <ContentEmpty title="Danh sách yêu thích đang trống">

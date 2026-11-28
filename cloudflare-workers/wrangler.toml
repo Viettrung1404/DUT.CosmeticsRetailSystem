@@ -1,0 +1,44 @@
+name = "glowup-logistics-ingress"
+main = "src/index.ts"
+compatibility_date = "2024-11-12"
+
+[vars]
+ENVIRONMENT = "production"
+GHN_WEBHOOK_SECRET = "ghn-webhook-secret-prod"
+AHAMOVE_WEBHOOK_SECRET = "ahamove-webhook-secret-prod"
+NESTJS_INTERNAL_URL = "https://senseless-marcia-benefic.ngrok-free.dev"
+INTERNAL_DISPATCH_SECRET = "glowup-internal-auth-secret-key"
+
+# Queue Producer Binding (EP09-T02)
+[[queues.producers]]
+binding = "LOGISTICS_WEBHOOK_QUEUE"
+queue = "glowup-logistics-webhooks"
+
+# Queue Consumer Binding (EP09-T03)
+[[queues.consumers]]
+queue = "glowup-logistics-webhooks"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "glowup-logistics-webhooks-dlq"
+
+# Recommendation Behavior Events Queue (Free Tier CPU-safe: max_batch_size = 15, max_batch_timeout = 30s)
+[[queues.producers]]
+binding = "RECOMMENDATION_EVENTS_QUEUE"
+queue = "glowup-recommendation-events"
+
+[[queues.consumers]]
+queue = "glowup-recommendation-events"
+max_batch_size = 15
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "glowup-recommendation-events-dlq"
+
+# Free-Tier Cron Triggers (3/5 slots)
+# Note: Configure JWT_SECRET and INTERNAL_DISPATCH_SECRET via `wrangler secret put` in production.
+[triggers]
+crons = [
+  "0 */2 * * *",
+  "15 */6 * * *",
+  "0 19 * * *"
+]

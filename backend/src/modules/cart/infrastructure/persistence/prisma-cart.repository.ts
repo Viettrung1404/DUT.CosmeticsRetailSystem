@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@infrastructure/database/prisma.service';
 import { ICartRepository, VariantInfo } from '../../domain/repositories/cart.repository.interface';
@@ -12,11 +12,13 @@ const CART_ITEMS_INCLUDE = {
         include: {
           product: {
             include: {
-              images: { where: { isPrimary: true }, take: 1 },
+              category: { select: { isActive: true } },
+              brand: { select: { isActive: true } },
+              images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }], take: 1 },
             },
           },
-          images: { where: { isPrimary: true }, take: 1 },
-          inventory: true,
+          images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }], take: 1 },
+          inventory: { where: { store: { isActive: true, type: { in: ['STORE', 'WAREHOUSE'] } } } },
         },
       },
     },
@@ -33,6 +35,7 @@ type CartItemRaw = {
   isSelected?: boolean;
   createdAt: Date;
   variant?: {
+    productId?: string;
     sku: string;
     price: Prisma.Decimal | number;
     isActive: boolean;
@@ -42,12 +45,16 @@ type CartItemRaw = {
     images?: { imageUrl: string }[];
     product: {
       name: string;
+      category?: { isActive: boolean };
+      brand?: { isActive: boolean } | null;
+      slug?: string;
       isActive: boolean;
       images?: { imageUrl: string }[];
     };
     inventory?: {
       quantity: number;
       reservedQuantity: number;
+      availableQuantity?: number | null;
     }[];
   };
 };
@@ -62,15 +69,15 @@ export class PrismaCartRepository implements ICartRepository {
     return parts.length > 0 ? parts.join(' / ') : (variant.sku || 'Mặc định');
   }
 
-  private calcAvailableStock(inventory?: { quantity: number; reservedQuantity: number }[]): number {
+  private calcAvailableStock(inventory?: { availableQuantity?: number | null }[]): number {
     if (!inventory || !Array.isArray(inventory) || inventory.length === 0) return 0;
     
     if (inventory.length === 1) {
-      return Math.max(0, inventory[0].quantity - (inventory[0].reservedQuantity || 0));
+      return Math.max(0, inventory[0].availableQuantity ?? 0);
     }
 
     return Math.max(
-      ...inventory.map((inv) => Math.max(0, inv.quantity - (inv.reservedQuantity || 0))),
+      ...inventory.map((inv) => Math.max(0, inv.availableQuantity ?? 0)),
       0,
     );
   }
@@ -84,6 +91,8 @@ export class PrismaCartRepository implements ICartRepository {
       id: raw.id,
       cartId: raw.cartId,
       productVariantId: raw.productVariantId,
+      productId: variant?.productId,
+      productSlug: product?.slug,
       quantity: raw.quantity,
       unitPrice: Number(raw.unitPrice),
       currentPrice: variant ? Number(variant.price) : Number(raw.unitPrice),
@@ -93,7 +102,8 @@ export class PrismaCartRepository implements ICartRepository {
       sku: variant?.sku,
       thumbnailUrl: image?.imageUrl || undefined,
       availableStock: this.calcAvailableStock(variant?.inventory),
-      isVariantActive: (variant?.isActive ?? false) && (product?.isActive ?? false),
+      isVariantActive: (variant?.isActive ?? false) && (product?.isActive ?? false) &&
+        (product?.category?.isActive ?? true) && (product?.brand?.isActive ?? true),
       createdAt: raw.createdAt,
     });
   }
@@ -130,6 +140,17 @@ export class PrismaCartRepository implements ICartRepository {
     });
   }
 
+  private async withCurrentPrices(cart: CartEntity): Promise<CartEntity> {
+    if (!cart.items.length) return cart;
+    const prices = await this.prisma.$queryRaw<Array<{ id: string; price: number }>>`
+      SELECT id::text AS id,sprint5_variant_price(id,0)::float8 AS price
+      FROM product_variants WHERE id=ANY(${cart.items.map((item) => item.productVariantId)}::uuid[])
+    `;
+    const byId = new Map(prices.map((row) => [row.id,row.price]));
+    for (const item of cart.items) item.currentPrice = byId.get(item.productVariantId) ?? item.currentPrice;
+    return cart;
+  }
+
   async findCart(params: { customerId?: string; sessionId?: string }): Promise<CartEntity | null> {
     if (!params.customerId && !params.sessionId) return null;
     if (params.customerId) {
@@ -137,7 +158,7 @@ export class PrismaCartRepository implements ICartRepository {
         where: { customerId: params.customerId },
         include: CART_ITEMS_INCLUDE,
       });
-      if (raw) return this.mapToCartEntity(raw);
+      if (raw) return this.withCurrentPrices(this.mapToCartEntity(raw));
     }
 
     // Fallback: find by sessionId (guest cart)
@@ -146,7 +167,7 @@ export class PrismaCartRepository implements ICartRepository {
         where: { sessionId: params.sessionId },
         include: CART_ITEMS_INCLUDE,
       });
-      if (raw) return this.mapToCartEntity(raw);
+      if (raw) return this.withCurrentPrices(this.mapToCartEntity(raw));
     }
 
     return null;
@@ -158,7 +179,7 @@ export class PrismaCartRepository implements ICartRepository {
       include: CART_ITEMS_INCLUDE,
     });
 
-    return raw ? this.mapToCartEntity(raw) : null;
+    return raw ? this.withCurrentPrices(this.mapToCartEntity(raw)) : null;
   }
 
   async createCart(params: { customerId?: string; sessionId?: string; storeId?: string }): Promise<CartEntity> {
@@ -190,9 +211,15 @@ export class PrismaCartRepository implements ICartRepository {
 
   async addItem(
     cartId: string,
-    item: { productVariantId: string; quantity: number; unitPrice: number; isSelected?: boolean },
+    item: { productVariantId: string; quantity: number; unitPrice: number; isSelected?: boolean; attributionSource?: string | null },
   ): Promise<CartItemEntity> {
-    const raw = await this.prisma.cartItem.upsert({
+    const raw = await this.prisma.$transaction(async (tx) => {
+      // Serialize mutations of this cart before reading its existing quantity.
+      const [cart] = await tx.$queryRaw<{ store_id: string | null }[]>`SELECT store_id FROM carts WHERE id=${cartId}::uuid FOR UPDATE`;
+      if (!cart) throw new NotFoundException('Giỏ hàng không tồn tại');
+      const existing = await tx.cartItem.findUnique({ where: { cartId_productVariantId: { cartId, productVariantId: item.productVariantId } } });
+      await this.assertQuantity(tx, item.productVariantId, (existing?.quantity ?? 0) + item.quantity, cart.store_id);
+      return tx.cartItem.upsert({
       where: {
         cartId_productVariantId: {
           cartId,
@@ -205,23 +232,21 @@ export class PrismaCartRepository implements ICartRepository {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         isSelected: item.isSelected ?? true,
+        ...(item.attributionSource ? { attributionSource: item.attributionSource } : {}),
       },
       update: {
         quantity: { increment: item.quantity },
         unitPrice: item.unitPrice,
+        ...(item.attributionSource ? { attributionSource: item.attributionSource } : {}),
       },
+      });
     });
 
     return this.mapSimpleItemToEntity(raw);
   }
 
   async updateItemQuantity(itemId: string, quantity: number): Promise<CartItemEntity> {
-    const raw = await this.prisma.cartItem.update({
-      where: { id: itemId },
-      data: { quantity },
-    });
-
-    return this.mapSimpleItemToEntity(raw);
+    return this.updateItem(itemId, { quantity });
   }
 
   async updateItemSelection(itemId: string, isSelected: boolean): Promise<CartItemEntity> {
@@ -237,15 +262,37 @@ export class PrismaCartRepository implements ICartRepository {
     itemId: string,
     data: { quantity?: number; isSelected?: boolean },
   ): Promise<CartItemEntity> {
-    const raw = await this.prisma.cartItem.update({
+    const raw = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.cartItem.findUnique({ where: { id: itemId } });
+      if (!item) throw new NotFoundException('Sản phẩm trong giỏ hàng không tồn tại');
+      const [cart] = await tx.$queryRaw<{ store_id: string | null }[]>`SELECT store_id FROM carts WHERE id=${item.cartId}::uuid FOR UPDATE`;
+      if (!cart) throw new NotFoundException('Giỏ hàng không tồn tại');
+      if (data.quantity !== undefined) await this.assertQuantity(tx, item.productVariantId, data.quantity, cart.store_id);
+      return tx.cartItem.update({
       where: { id: itemId },
       data: {
         ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
         ...(data.isSelected !== undefined ? { isSelected: data.isSelected } : {}),
       },
+      });
     });
 
     return this.mapSimpleItemToEntity(raw);
+  }
+
+  private async assertQuantity(tx: Prisma.TransactionClient, variantId: string, quantity: number, storeId: string | null) {
+    if (!Number.isSafeInteger(quantity) || quantity < 1)
+      throw new BadRequestException({ code: 'INVALID_QUANTITY', message: 'Số lượng phải là số nguyên lớn hơn 0' });
+    const [stock] = await tx.$queryRaw<{ available: number }[]>`
+      SELECT COALESCE(MAX(GREATEST(i.available_quantity,0)),0)::int AS available
+      FROM inventory i JOIN stores s ON s.id=i.store_id
+      WHERE i.product_variant_id=${variantId}::uuid AND s.is_active
+        AND s.type IN ('STORE','WAREHOUSE') AND (${storeId}::uuid IS NULL OR i.store_id=${storeId}::uuid)
+    `;
+    if (quantity > stock.available)
+      throw new BadRequestException({ code: 'STOCK_LIMIT_EXCEEDED', message: 'Số lượng trong giỏ vượt quá tồn kho khả dụng' });
+    if (quantity > 99)
+      throw new BadRequestException({ code: 'CART_QUANTITY_LIMIT', message: 'Số lượng cho mỗi sản phẩm tối đa là 99' });
   }
 
   // Update stored price to current price
@@ -357,11 +404,11 @@ export class PrismaCartRepository implements ICartRepository {
       include: {
         product: {
           include: {
-            images: { where: { isPrimary: true }, take: 1 },
+            images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }], take: 1 },
           },
         },
-        images: { where: { isPrimary: true }, take: 1 },
-        inventory: storeId ? { where: { storeId } } : true,
+        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }], take: 1 },
+        inventory: { where: { ...(storeId ? { storeId } : {}), store: { isActive: true, type: { in: ['STORE', 'WAREHOUSE'] } } } },
       },
     });
 
@@ -388,11 +435,11 @@ export class PrismaCartRepository implements ICartRepository {
       include: {
         product: {
           include: {
-            images: { where: { isPrimary: true }, take: 1 },
+            images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }], take: 1 },
           },
         },
-        images: { where: { isPrimary: true }, take: 1 },
-        inventory: storeId ? { where: { storeId } } : true,
+        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }], take: 1 },
+        inventory: { where: { ...(storeId ? { storeId } : {}), store: { isActive: true, type: { in: ['STORE', 'WAREHOUSE'] } } } },
       },
     });
 

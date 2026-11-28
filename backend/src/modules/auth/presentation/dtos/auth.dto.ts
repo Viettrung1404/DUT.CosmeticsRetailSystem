@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength, Matches } from 'class-validator';
 
 export class RegisterDto {
   @ApiProperty({ example: 'customer@example.com', description: 'Địa chỉ email người dùng' })
@@ -27,6 +27,11 @@ export class RegisterDto {
   @IsString()
   @Matches(/^[0-9]{10,11}$/, { message: 'Số điện thoại không hợp lệ (10-11 chữ số)' })
   phone?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'ID ẩn danh của thiết bị/trình duyệt để gộp lịch sử hành vi' })
+  @IsOptional()
+  @IsUUID()
+  anonymousId?: string;
 }
 
 export class LoginDto {
@@ -38,6 +43,11 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   password: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'ID ẩn danh của thiết bị/trình duyệt để gộp lịch sử hành vi' })
+  @IsOptional()
+  @IsUUID()
+  anonymousId?: string;
 }
 
 export class VerifyEmailDto {

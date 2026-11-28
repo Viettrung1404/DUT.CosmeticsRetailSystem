@@ -144,7 +144,12 @@ function LoopCarousel({
 export function CategoryCarousel({ categories }: { categories: Category[] }) {
   const visible = useVisible(6);
   const items = categories.map((category) => (
-    <Link className="category-tile" key={category.id} href={`/categories/${category.slug}`}>
+    <Link
+      prefetch={false}
+      className="category-tile"
+      key={category.id}
+      href={`/categories/${category.slug}`}
+    >
       <CatalogImage src={category.imageUrl} alt={category.name} />
       <strong>{category.name}</strong>
     </Link>
@@ -166,8 +171,13 @@ export function DealCarousel({ cards }: { cards: FlashCard[] }) {
     return <div className="catalog-empty">Hiện chưa có Flash Sale đang diễn ra.</div>;
   const items = cards.map((card) => (
     <article className="catalog-card" key={`${card.promotionId}-${card.variantId}`}>
-      <Link href={`/products/${card.slug}`} className="catalog-card-image">
+      <Link prefetch={false} href={`/products/${card.slug}`} className="catalog-card-image">
         <CatalogImage src={card.imageUrl} alt={card.name} />
+        {card.originalPrice > card.effectivePrice && (
+          <span className="catalog-discount">
+            -{Math.round((1 - card.effectivePrice / card.originalPrice) * 100)}%
+          </span>
+        )}
       </Link>
       <FavoriteButton
         productId={card.productId}
@@ -177,14 +187,14 @@ export function DealCarousel({ cards }: { cards: FlashCard[] }) {
       />
       <div className="catalog-card-copy">
         <p className="catalog-brand">{card.brandName || "GLOWUP"}</p>
-        <Link className="catalog-card-title" href={`/products/${card.slug}`}>
+        <Link prefetch={false} className="catalog-card-title" href={`/products/${card.slug}`}>
           {card.name}
         </Link>
         <p className="catalog-prices">
           <strong>{formatPrice(card.effectivePrice)}</strong>
           {card.originalPrice > card.effectivePrice && <del>{formatPrice(card.originalPrice)}</del>}
         </p>
-        <small>Còn {card.remaining} sản phẩm</small>
+        <small>Còn {card.stockQuantity.toLocaleString("vi-VN")} sản phẩm</small>
         {card.conditional && (
           <p className="hint">Giá ưu đãi có điều kiện; xác nhận tại checkout.</p>
         )}
@@ -205,7 +215,12 @@ export function DealCarousel({ cards }: { cards: FlashCard[] }) {
 export function BrandCarousel({ brands }: { brands: Brand[] }) {
   const visible = useVisible(8);
   const items = brands.map((brand) => (
-    <Link className="home-brand-tile" key={brand.id} href={`/brands/${brand.slug}`}>
+    <Link
+      prefetch={false}
+      className="home-brand-tile"
+      key={brand.id}
+      href={`/brands/${brand.slug}`}
+    >
       {brand.logoUrl ? (
         <CatalogImage src={brand.logoUrl} alt={brand.name} />
       ) : (

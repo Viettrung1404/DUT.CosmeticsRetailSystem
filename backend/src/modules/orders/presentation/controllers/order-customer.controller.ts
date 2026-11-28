@@ -27,8 +27,11 @@ import { PreviewOrderDto } from '../dtos/preview-order.dto';
 import { CreateOrderDto } from '../dtos/create-order.dto';
 import { OrderQueryDto, CancelOrderDto } from '../dtos/order-query.dto';
 
+import { UseDistributedThrottle } from '@core/cache/throttle-storage.decorator';
+
 @ApiTags('Orders')
 @ApiBearerAuth('JWT-auth')
+@UseDistributedThrottle()
 @Controller()
 export class CustomerOrderController {
   constructor(
@@ -87,6 +90,8 @@ export class CustomerOrderController {
       shippingAddress: dto.shippingAddress,
       idempotencyKey,
       quoteVersion: dto.quoteVersion,
+      quoteGroupId: dto.quoteGroupId,
+      shippingOptionId: dto.shippingOptionId,
       paymentMethod: dto.paymentMethod,
       items: dto.items,
       couponCode: dto.couponCode,

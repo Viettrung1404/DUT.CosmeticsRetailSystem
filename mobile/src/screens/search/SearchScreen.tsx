@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,17 @@ import {
   Image,
   Modal,
   ScrollView,
-  SafeAreaView,
   Dimensions,
   ActivityIndicator,
   Alert,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
-import { productApi } from '../../api/productApi';
+import { productApi, extractCategoryTree, NormalizedCategory } from '../../api/productApi';
 import { useCartStore } from '../../store/useCartStore';
+import * as secureStore from '../../utils/secureStore';
 
 const { width } = Dimensions.get('window');
 
@@ -39,116 +41,62 @@ interface SearchProduct {
   image: string;
 }
 
-// Mock data cho fallback khi offline hoặc search chưa có kết quả backend
-const MOCK_SEARCH_PRODUCTS: SearchProduct[] = [
-  {
-    id: 'prod-s-1',
-    name: 'GlowUp Radiance C-Serum 30ml',
-    brand: 'GLOWUP LAB',
-    price: 485000,
-    originalPrice: 650000,
-    rating: 4.9,
-    reviewsCount: 1250,
-    badge: 'Best Seller',
-    tag: 'Sáng da & Mờ thâm',
-    category: 'Serum',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  },
-  {
-    id: 'prod-s-2',
-    name: 'Glass Skin Barrier Cream 50g',
-    brand: 'GLOWUP LAB',
-    price: 390000,
-    originalPrice: 450000,
-    rating: 4.8,
-    reviewsCount: 860,
-    badge: 'Clean 100%',
-    tag: 'Phục hồi & Khóa ẩm',
-    category: 'Kem dưỡng',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-  },
-  {
-    id: 'prod-s-3',
-    name: 'Hydrating Petal Toner Mist 150ml',
-    brand: 'ANUA',
-    price: 295000,
-    originalPrice: 350000,
-    rating: 4.7,
-    reviewsCount: 420,
-    badge: 'Thuần chay',
-    tag: 'Cấp ẩm sâu',
-    category: 'Toner',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  },
-  {
-    id: 'prod-s-4',
-    name: 'Velvet Cloud Matte Lipstick #04 Rosewood',
-    brand: '3CE',
-    price: 340000,
-    originalPrice: 390000,
-    rating: 4.9,
-    reviewsCount: 2100,
-    badge: 'Trending',
-    tag: 'Lâu trôi',
-    category: 'Son môi',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFoJz9_e_s-F6Qp7q_U-y5g3RjK4o0LzYd5z3aX7wV5t3v1L7s_9m4q_WAoKCYLRFBkJ4vw',
-  },
-  {
-    id: 'prod-s-5',
-    name: 'Anthelios UV Mune 400 Oil Control 50ml',
-    brand: "LA ROCHE-POSAY",
-    price: 495000,
-    originalPrice: 535000,
-    rating: 4.9,
-    reviewsCount: 3500,
-    badge: 'Bác sĩ khuyên dùng',
-    tag: 'Kiềm dầu 12H',
-    category: 'Chống nắng',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAPXszzaZJ-CKUqKGl1J4deKZphZWEeI5wLZcRF4oEpOzXUO9ILg594tMOGfQ7aDAnD95tHnThxQrBtzkasEPGicqQ1T7NExYkLEEnizjxYjw7DGhSJlCXq1vuTPjO9ypCl0NS-S1IpwTFIxWBzMPYyKUoBL_brngE8FpEkY-UBKyrw1En0aY17KO3r3ggQqtFpdaM8_nf_Fh4rkRtTc8DxrF0NWl13rvId3Y6KNw4IfnB9rLDDho7jaA',
-  },
-];
-
-const TRENDING_KEYWORDS = [
-  'Serum B5 phục hồi',
-  'Kem chống nắng nâng tone',
-  'Son bóng Jelly',
-  'Retinol cho da nhạy cảm',
-  'Toner Pad diếp cá',
-];
-
-const SKIN_CONCERNS = [
-  { id: 'acne', label: 'Mụn & Thâm' },
-  { id: 'bright', label: 'Làm sáng & Đều màu' },
-  { id: 'barrier', label: 'Phục hồi hàng rào' },
-  { id: 'antiaging', label: 'Chống lão hóa' },
-  { id: 'dry', label: 'Cấp ẩm sâu' },
-];
-
 const PRICE_PRESETS = [
-  { label: 'Dưới 300k', min: 0, max: 300000 },
-  { label: '300k - 600k', min: 300000, max: 600000 },
-  { label: 'Trên 600k', min: 600000, max: 5000000 },
+  { label: 'Dưới 300k', min: '0', max: '300000' },
+  { label: '300k - 600k', min: '300000', max: '600000' },
+  { label: 'Trên 600k', min: '600000', max: '5000000' },
 ];
 
-const BRANDS = ['GlowUp Lab', "La Roche-Posay", 'Anua', '3CE', 'Innisfree', 'Paula’s Choice'];
+const SORT_OPTIONS: Array<{
+  id: 'relevance' | 'newest' | 'bestseller' | 'price_asc' | 'price_desc' | 'rating';
+  label: string;
+}> = [
+  { id: 'relevance', label: 'Phù hợp nhất' },
+  { id: 'newest', label: 'Mới nhất' },
+  { id: 'bestseller', label: 'Bán chạy nhất' },
+  { id: 'price_asc', label: 'Giá: Thấp đến Cao' },
+  { id: 'price_desc', label: 'Giá: Cao đến Thấp' },
+  { id: 'rating', label: 'Đánh giá cao nhất' },
+];
+
+interface HintResult {
+  keywords: string[];
+  brands: Array<{ id: string; name: string; slug: string }>;
+  products: Array<{ id: string; name: string; slug: string; imageUrl?: string | null; price: number }>;
+  history?: string[];
+}
 
 export default function SearchScreen({ navigation }: any) {
+  const inputRef = useRef<any>(null);
+
   const [keyword, setKeyword] = useState('');
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    'Serum Vitamin C',
-    'Kem chống nắng kiềm dầu',
-    'Son dưỡng thuần chay',
-  ]);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState<SearchProduct[]>(MOCK_SEARCH_PRODUCTS);
+  const [results, setResults] = useState<SearchProduct[]>([]);
+  const [suggestedProducts, setSuggestedProducts] = useState<SearchProduct[]>([]);
+
+  // Sort & Filter Modals
+  const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
 
+  // Sorting State
+  const [sortBy, setSortBy] = useState<
+    'relevance' | 'newest' | 'bestseller' | 'price_asc' | 'price_desc' | 'rating'
+  >('relevance');
+
   // Filter States
-  const [selectedConcerns, setSelectedConcerns] = useState<string[]>([]);
-  const [selectedPricePreset, setSelectedPricePreset] = useState<number | null>(null);
+  const [categories, setCategories] = useState<NormalizedCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [minPriceInput, setMinPriceInput] = useState('');
+  const [maxPriceInput, setMaxPriceInput] = useState('');
+  const [availableBrands, setAvailableBrands] = useState<{ id: string; name: string }[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [minRating, setMinRating] = useState<number>(0);
+
+  // Real Hints
+  const [hints, setHints] = useState<HintResult>({ keywords: [], brands: [], products: [] });
 
   const addItem = useCartStore((s) => s.addItem);
 
@@ -156,128 +104,248 @@ export default function SearchScreen({ navigation }: any) {
     return val.toLocaleString('vi-VN') + '₫';
   };
 
-  const handleSearch = async (queryText?: string) => {
+  // Helper map sản phẩm từ backend API envelope
+  const mapProductItems = (items: any[]): SearchProduct[] => {
+    return items.map((item: any) => {
+      const variant = item.variants?.find(
+        (candidate: any) =>
+          candidate.id && (candidate.stockQuantity == null || candidate.stockQuantity > 0),
+      );
+      return {
+        id: item.id || `prod-${item.slug}`,
+        slug: item.slug || item.id,
+        variantId: variant?.id,
+        variantName:
+          [variant?.option1Value, variant?.option2Value, variant?.option3Value]
+            .filter(Boolean)
+            .join(' / ') || variant?.sku || 'Tiêu chuẩn',
+        stock: variant?.stockQuantity ?? 99,
+        name: item.name,
+        brand: item.brandName || item.brand?.name || 'GlowUp',
+        price: Number(variant?.effectivePrice ?? variant?.price ?? item.basePrice ?? item.price) || 0,
+        originalPrice: Number(item.basePrice ?? item.originalPrice ?? item.original_price) || undefined,
+        rating: Number(item.avgRating ?? item.rating) || 0,
+        reviewsCount: Number(item.totalReviews ?? item.reviewsCount) || 0,
+        badge: item.badge || (item.isFeatured ? 'Nổi bật' : 'Mới'),
+        tag: item.categoryName || item.category?.name || 'Mỹ phẩm',
+        category: item.categoryName || item.category?.name || 'Mỹ phẩm',
+        image:
+          item.primaryImage ||
+          item.thumbnail ||
+          item.images?.[0]?.imageUrl ||
+          item.images?.[0]?.url ||
+          'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+      };
+    });
+  };
+
+  // Lấy 4 sản phẩm gợi ý từ từ khóa tìm kiếm gần đây nhất
+  const fetchSuggestedProducts = async (latestQuery?: string) => {
+    try {
+      if (latestQuery && latestQuery.trim()) {
+        const res = await productApi.searchProducts({ q: latestQuery.trim(), limit: 4 });
+        const items = res?.data?.data || res?.data || res?.items || res || [];
+        if (Array.isArray(items) && items.length > 0) {
+          setSuggestedProducts(mapProductItems(items).slice(0, 4));
+          return;
+        }
+      }
+
+      // Fallback nếu chưa có tìm kiếm hoặc tìm kiếm rỗng
+      const fallbackRes = await productApi.getProducts({ limit: 4 });
+      const fallbackItems = fallbackRes?.data?.data || fallbackRes?.data || fallbackRes?.items || [];
+      if (Array.isArray(fallbackItems) && fallbackItems.length > 0) {
+        setSuggestedProducts(mapProductItems(fallbackItems).slice(0, 4));
+      }
+    } catch {
+      // Ignored
+    }
+  };
+
+  // 1. Tự động focus input khi vào màn hình
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 2. Tải dữ liệu ban đầu: Lịch sử tìm kiếm, Categories, Facets, Sản phẩm gợi ý
+  useEffect(() => {
+    // Đọc lịch sử từ storage cục bộ trước
+    secureStore.getItemAsync('glowup_search_history').then((cached) => {
+      let localRecent: string[] = [];
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localRecent = parsed;
+            setRecentSearches(parsed);
+          }
+        } catch {}
+      }
+
+      // Đọc tiếp từ backend DB
+      productApi
+        .getSearchHistory()
+        .then((res) => {
+          const data = res?.data || res;
+          let latestSearch: string | undefined = localRecent[0];
+          if (Array.isArray(data?.history) && data.history.length > 0) {
+            const serverQueries: string[] = data.history.map((h: any) => h.query || h).filter(Boolean);
+            const merged = Array.from(new Set([...serverQueries, ...localRecent])).slice(0, 10);
+            setRecentSearches(merged);
+            secureStore.setItemAsync('glowup_search_history', JSON.stringify(merged)).catch(() => {});
+            latestSearch = merged[0];
+          }
+          fetchSuggestedProducts(latestSearch);
+        })
+        .catch(() => {
+          fetchSuggestedProducts(localRecent[0]);
+        });
+    });
+
+    // Lấy cây danh mục
+    productApi
+      .getCategories()
+      .then((res) => {
+        const { flat } = extractCategoryTree(res);
+        if (Array.isArray(flat) && flat.length > 0) {
+          setCategories(flat);
+        }
+      })
+      .catch(() => {});
+
+    // Lấy facets (thương hiệu)
+    productApi
+      .getFacets()
+      .then((res) => {
+        const data = res?.data || res;
+        if (Array.isArray(data?.brands) && data.brands.length > 0) {
+          setAvailableBrands(data.brands.map((b: any) => ({ id: b.id, name: b.name })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // 3. Debounce lấy gợi ý tìm kiếm (Hints) khi người dùng gõ
+  useEffect(() => {
+    const q = keyword.trim();
+    if (!q) {
+      setHints({ keywords: [], brands: [], products: [] });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await productApi.getSearchHints(q);
+        const data = res?.data || res;
+        setHints({
+          keywords: Array.isArray(data?.keywords) ? data.keywords : [],
+          brands: Array.isArray(data?.brands) ? data.brands : [],
+          products: Array.isArray(data?.products) ? data.products : [],
+          history: Array.isArray(data?.history) ? data.history : [],
+        });
+      } catch {
+        setHints({ keywords: [], brands: [], products: [] });
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  // Lọc lịch sử tìm kiếm khớp với từ khóa
+  const matchingHistory = useMemo(() => {
+    const q = keyword.trim().toLowerCase();
+    if (!q) return recentSearches;
+    return recentSearches.filter((item) => item.toLowerCase().includes(q));
+  }, [keyword, recentSearches]);
+
+  // Thực hiện tìm kiếm
+  const handleSearch = async (queryText?: string, overrideSort?: typeof sortBy) => {
     const q = (queryText !== undefined ? queryText : keyword).trim();
     if (!q) return;
 
     setKeyword(q);
     setHasSearched(true);
+    setIsInputFocused(false);
     setIsLoading(true);
+    Keyboard.dismiss();
 
-    // Lưu vào lịch sử tìm kiếm (không trùng lặp, tối đa 8 mục)
-    setRecentSearches((prev) => [q, ...prev.filter((item) => item !== q)].slice(0, 8));
+    const activeSort = overrideSort !== undefined ? overrideSort : sortBy;
+
+    // Cập nhật lịch sử
+    const updatedHistory = [q, ...recentSearches.filter((item) => item.toLowerCase() !== q.toLowerCase())].slice(0, 10);
+    setRecentSearches(updatedHistory);
+    secureStore.setItemAsync('glowup_search_history', JSON.stringify(updatedHistory)).catch(() => {});
+    productApi.recordSearchHistory(q).catch(() => {});
+
+    // Cập nhật lại 4 sản phẩm gợi ý dựa trên từ khóa vừa tìm
+    fetchSuggestedProducts(q);
 
     try {
-      const res = await productApi.searchProducts(q);
-      const apiItems = res?.data?.data || res?.data || res || [];
-      if (Array.isArray(apiItems) && apiItems.length > 0) {
-        setResults(
-          apiItems.map((item: any) => {
-            const variant = item.variants?.find(
-              (candidate: any) =>
-                candidate.id &&
-                (candidate.stockQuantity == null || candidate.stockQuantity > 0),
-            );
-            return {
-              id: item.id || `prod-${item.slug}`,
-              slug: item.slug || item.id,
-              variantId: variant?.id,
-              variantName: [variant?.option1Value, variant?.option2Value, variant?.option3Value]
-                .filter(Boolean)
-                .join(' / ') || variant?.sku || 'Tiêu chuẩn',
-              stock: variant?.stockQuantity ?? 99,
-              name: item.name,
-              brand: item.brandName || item.brand?.name || 'GlowUp',
-              price: Number(variant?.effectivePrice ?? variant?.price ?? item.basePrice ?? item.price) || 0,
-              originalPrice: Number(item.basePrice ?? item.originalPrice ?? item.original_price) || undefined,
-              rating: Number(item.avgRating ?? item.rating) || 0,
-              reviewsCount: Number(item.totalReviews ?? item.reviewsCount) || 0,
-              badge: item.badge || 'Mới',
-              tag: item.categoryName || item.category?.name || 'Skincare',
-              category: item.categoryName || item.category?.name || 'Mỹ phẩm',
-              image:
-                item.primaryImage ||
-                item.thumbnail ||
-                item.images?.[0]?.imageUrl ||
-                item.images?.[0]?.url ||
-                MOCK_SEARCH_PRODUCTS[0].image,
-            };
-          })
-        );
+      const minP = minPriceInput ? Number(minPriceInput) : undefined;
+      const maxP = maxPriceInput ? Number(maxPriceInput) : undefined;
+
+      const res = await productApi.searchProducts({
+        q,
+        categoryId: selectedCategoryId || undefined,
+        brandIds: selectedBrands.length > 0 ? selectedBrands : undefined,
+        minPrice: !isNaN(minP as number) ? minP : undefined,
+        maxPrice: !isNaN(maxP as number) ? maxP : undefined,
+        rating: minRating > 0 ? minRating : undefined,
+        sortBy: activeSort !== 'relevance' ? activeSort : undefined,
+      });
+
+      const apiItems = res?.data?.data || res?.data || res?.items || res || [];
+      if (Array.isArray(apiItems)) {
+        setResults(mapProductItems(apiItems));
       } else {
-        // Fallback filter trên mock data
-        const filtered = MOCK_SEARCH_PRODUCTS.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q.toLowerCase()) ||
-            p.brand.toLowerCase().includes(q.toLowerCase()) ||
-            p.tag.toLowerCase().includes(q.toLowerCase())
-        );
-        setResults(filtered.length > 0 ? filtered : MOCK_SEARCH_PRODUCTS);
+        setResults([]);
       }
     } catch {
-      // Offline fallback
-      const filtered = MOCK_SEARCH_PRODUCTS.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q.toLowerCase()) ||
-          p.brand.toLowerCase().includes(q.toLowerCase()) ||
-          p.tag.toLowerCase().includes(q.toLowerCase())
-      );
-      setResults(filtered.length > 0 ? filtered : MOCK_SEARCH_PRODUCTS);
+      setResults([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const removeHistoryItem = (itemToRemove: string) => {
-    setRecentSearches((prev) => prev.filter((item) => item !== itemToRemove));
+    const updated = recentSearches.filter((item) => item !== itemToRemove);
+    setRecentSearches(updated);
+    secureStore.setItemAsync('glowup_search_history', JSON.stringify(updated)).catch(() => {});
+    productApi.deleteSearchHistory({ query: itemToRemove }).catch(() => {});
   };
 
   const clearAllHistory = () => {
     setRecentSearches([]);
+    secureStore.setItemAsync('glowup_search_history', JSON.stringify([])).catch(() => {});
+    productApi.deleteSearchHistory().catch(() => {});
   };
 
-  const toggleConcern = (id: string) => {
-    setSelectedConcerns((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const toggleBrand = (brandName: string) => {
+  const toggleBrand = (brandId: string) => {
     setSelectedBrands((prev) =>
-      prev.includes(brandName) ? prev.filter((b) => b !== brandName) : [...prev, brandName]
+      prev.includes(brandId) ? prev.filter((id) => id !== brandId) : [...prev, brandId],
     );
+  };
+
+  const applySort = (newSort: typeof sortBy) => {
+    setSortBy(newSort);
+    setSortModalVisible(false);
+    if (hasSearched || keyword.trim()) {
+      handleSearch(keyword, newSort);
+    }
   };
 
   const applyFilters = () => {
     setFilterModalVisible(false);
-    setIsLoading(true);
-    setTimeout(() => {
-      let filtered = [...MOCK_SEARCH_PRODUCTS];
-
-      if (selectedBrands.length > 0) {
-        filtered = filtered.filter((p) =>
-          selectedBrands.some((b) => p.brand.toLowerCase() === b.toLowerCase())
-        );
-      }
-
-      if (selectedPricePreset !== null) {
-        const preset = PRICE_PRESETS[selectedPricePreset];
-        filtered = filtered.filter((p) => p.price >= preset.min && p.price <= preset.max);
-      }
-
-      if (minRating > 0) {
-        filtered = filtered.filter((p) => p.rating >= minRating);
-      }
-
-      setResults(filtered);
-      setIsLoading(false);
-      setHasSearched(true);
-    }, 300);
+    handleSearch();
   };
 
   const resetFilters = () => {
-    setSelectedConcerns([]);
-    setSelectedPricePreset(null);
+    setSelectedCategoryId(null);
+    setMinPriceInput('');
+    setMaxPriceInput('');
     setSelectedBrands([]);
     setMinRating(0);
   };
@@ -309,7 +377,7 @@ export default function SearchScreen({ navigation }: any) {
     }
   };
 
-  const renderProductItem = ({ item }: { item: any }) => (
+  const renderProductItem = ({ item }: { item: SearchProduct }) => (
     <TouchableOpacity
       style={styles.productCard}
       activeOpacity={0.88}
@@ -358,9 +426,20 @@ export default function SearchScreen({ navigation }: any) {
     </TouchableOpacity>
   );
 
+  const activeFiltersCount =
+    (selectedCategoryId ? 1 : 0) +
+    (minPriceInput || maxPriceInput ? 1 : 0) +
+    selectedBrands.length +
+    (minRating > 0 ? 1 : 0);
+
+  const currentSortLabel = SORT_OPTIONS.find((s) => s.id === sortBy)?.label || 'Phù hợp nhất';
+
+  // Điều kiện hiển thị popup gợi ý nổi (AutoComplete overlay)
+  const showSuggestionsPopup = isInputFocused && keyword.trim().length > 0;
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* HEADER: Search Bar & Actions */}
+      {/* HEADER: Search Bar & Sort Icon */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -373,41 +452,180 @@ export default function SearchScreen({ navigation }: any) {
         <View style={styles.searchBar}>
           <Ionicons name="search" size={18} color={theme.colors.textMuted} style={styles.searchIcon} />
           <TextInput
-            style={styles.input}
+            ref={inputRef}
+            style={[styles.input, { outlineStyle: 'none', outlineWidth: 0 } as any]}
             placeholder="Tìm kiếm serum, son, kem chống nắng..."
             placeholderTextColor={theme.colors.textMuted}
             value={keyword}
             onChangeText={setKeyword}
+            onFocus={() => setIsInputFocused(true)}
             onSubmitEditing={() => handleSearch()}
             returnKeyType="search"
-            autoFocus={false}
+            autoFocus={true}
           />
           {keyword.length > 0 && (
-            <TouchableOpacity onPress={() => setKeyword('')} style={styles.clearBtn}>
+            <TouchableOpacity
+              onPress={() => {
+                setKeyword('');
+                setHasSearched(false);
+                setIsInputFocused(true);
+              }}
+              style={styles.clearBtn}
+            >
               <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
 
+        {/* Nút Sắp xếp theo chiều nào giống frontend (thay thế nút bộ lọc cũ) */}
         <TouchableOpacity
-          style={[
-            styles.filterTriggerBtn,
-            (selectedBrands.length > 0 || selectedPricePreset !== null || selectedConcerns.length > 0) &&
-              styles.filterActiveBtn,
-          ]}
-          onPress={() => setFilterModalVisible(true)}
+          style={[styles.sortTriggerBtn, sortBy !== 'relevance' && styles.sortActiveBtn]}
+          onPress={() => setSortModalVisible(true)}
+          accessibilityLabel="Sắp xếp sản phẩm"
         >
-          <Feather
-            name="sliders"
-            size={18}
-            color={
-              selectedBrands.length > 0 || selectedPricePreset !== null || selectedConcerns.length > 0
-                ? '#FFF'
-                : theme.colors.primary
-            }
+          <Ionicons
+            name="swap-vertical"
+            size={19}
+            color={sortBy !== 'relevance' ? '#FFF' : theme.colors.primary}
           />
         </TouchableOpacity>
       </View>
+
+      {/* AUTOCOMPLETE SUGGESTIONS POPUP / OVERLAY */}
+      {showSuggestionsPopup && (
+        <View style={styles.suggestionsPopupOverlay}>
+          <ScrollView
+            style={styles.suggestionsPopupScroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 1. Lịch sử tìm kiếm phù hợp */}
+            {matchingHistory.length > 0 && (
+              <View style={styles.suggestionSection}>
+                <View style={styles.suggestionSectionHeader}>
+                  <Feather name="clock" size={13} color={theme.colors.primary} />
+                  <Text style={styles.suggestionSectionTitle}>Lịch sử tìm kiếm</Text>
+                </View>
+                {matchingHistory.slice(0, 4).map((item, idx) => (
+                  <TouchableOpacity
+                    key={`hist-${idx}`}
+                    style={styles.suggestionRow}
+                    onPress={() => handleSearch(item)}
+                  >
+                    <View style={styles.suggestionIconWrapper}>
+                      <Feather name="clock" size={14} color={theme.colors.primary} />
+                    </View>
+                    <Text style={styles.suggestionText}>
+                      <Text style={{ fontWeight: '700', color: theme.colors.primary }}>{item}</Text>
+                    </Text>
+                    <Ionicons
+                      name="arrow-back-outline"
+                      size={13}
+                      color={theme.colors.textMuted}
+                      style={{ transform: [{ rotate: '45deg' }] }}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* 2. Từ khóa gợi ý */}
+            {hints.keywords.length > 0 && (
+              <View style={styles.suggestionSection}>
+                <View style={styles.suggestionSectionHeader}>
+                  <Ionicons name="sparkles" size={13} color={theme.colors.primary} />
+                  <Text style={styles.suggestionSectionTitle}>Từ khóa gợi ý</Text>
+                </View>
+                {hints.keywords.map((kw, idx) => (
+                  <TouchableOpacity
+                    key={`kw-${idx}`}
+                    style={styles.suggestionRow}
+                    onPress={() => handleSearch(kw)}
+                  >
+                    <View style={styles.suggestionIconWrapper}>
+                      <Ionicons name="search-outline" size={14} color={theme.colors.textMuted} />
+                    </View>
+                    <Text style={styles.suggestionText}>{kw}</Text>
+                    <Ionicons name="arrow-forward" size={13} color={theme.colors.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* 3. Thương hiệu liên quan */}
+            {hints.brands.length > 0 && (
+              <View style={styles.suggestionSection}>
+                <View style={styles.suggestionSectionHeader}>
+                  <Feather name="award" size={13} color={theme.colors.primary} />
+                  <Text style={styles.suggestionSectionTitle}>Thương hiệu</Text>
+                </View>
+                <View style={styles.chipsContainer}>
+                  {hints.brands.map((b) => (
+                    <TouchableOpacity
+                      key={b.id}
+                      style={styles.brandHintChip}
+                      onPress={() => {
+                        setSelectedBrands([b.id]);
+                        handleSearch(b.name);
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={13} color={theme.colors.primary} />
+                      <Text style={styles.brandHintText}>{b.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* 4. Sản phẩm gợi ý */}
+            {hints.products.length > 0 && (
+              <View style={styles.suggestionSection}>
+                <View style={styles.suggestionSectionHeader}>
+                  <Ionicons name="pricetag-outline" size={13} color={theme.colors.primary} />
+                  <Text style={styles.suggestionSectionTitle}>Sản phẩm gợi ý</Text>
+                </View>
+                {hints.products.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={styles.productHintRow}
+                    onPress={() => {
+                      setIsInputFocused(false);
+                      navigation.navigate('ProductDetail', { slug: p.slug });
+                    }}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          p.imageUrl ||
+                          'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=200',
+                      }}
+                      style={styles.productHintThumb}
+                    />
+                    <View style={styles.productHintInfo}>
+                      <Text style={styles.productHintName} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      <Text style={styles.productHintPrice}>{formatPrice(p.price)}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={15} color={theme.colors.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Tìm kiếm trực tiếp chuỗi đang nhập */}
+            <TouchableOpacity
+              style={styles.directSearchPrompt}
+              onPress={() => handleSearch()}
+            >
+              <Ionicons name="search" size={16} color={theme.colors.primary} />
+              <Text style={styles.directSearchPromptText}>
+                Tìm kiếm kết quả cho "{keyword}"
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      )}
 
       {/* BODY CONTENT */}
       {isLoading ? (
@@ -422,13 +640,42 @@ export default function SearchScreen({ navigation }: any) {
             <Text style={styles.resultCount}>
               Tìm thấy <Text style={{ fontWeight: '700', color: theme.colors.primary }}>{results.length}</Text> sản phẩm
             </Text>
-            <TouchableOpacity
-              style={styles.filterChipButton}
-              onPress={() => setFilterModalVisible(true)}
-            >
-              <Text style={styles.filterChipText}>Bộ lọc</Text>
-              <Ionicons name="filter" size={12} color={theme.colors.primary} />
-            </TouchableOpacity>
+
+            <View style={styles.actionButtonsRow}>
+              {/* Nút hiển thị tiêu chí Sắp xếp hiện tại */}
+              <TouchableOpacity
+                style={styles.sortChipButton}
+                onPress={() => setSortModalVisible(true)}
+              >
+                <Ionicons name="swap-vertical" size={13} color={theme.colors.primary} />
+                <Text style={styles.sortChipText} numberOfLines={1}>
+                  {currentSortLabel}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Nút Bộ lọc */}
+              <TouchableOpacity
+                style={[
+                  styles.filterChipButton,
+                  activeFiltersCount > 0 && styles.filterChipButtonActive,
+                ]}
+                onPress={() => setFilterModalVisible(true)}
+              >
+                <Ionicons
+                  name="filter"
+                  size={13}
+                  color={activeFiltersCount > 0 ? '#FFF' : theme.colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    activeFiltersCount > 0 && styles.filterChipTextActive,
+                  ]}
+                >
+                  Bộ lọc {activeFiltersCount > 0 ? `(${activeFiltersCount})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <FlatList
@@ -451,7 +698,7 @@ export default function SearchScreen({ navigation }: any) {
           />
         </View>
       ) : (
-        // DEFAULT DISCOVERY VIEW
+        // DEFAULT DISCOVERY VIEW (Đã bỏ xu hướng và routine banner)
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Lịch sử tìm kiếm gần đây */}
           {recentSearches.length > 0 && (
@@ -485,52 +732,21 @@ export default function SearchScreen({ navigation }: any) {
             </View>
           )}
 
-          {/* Xu hướng tìm kiếm */}
-          <View style={styles.section}>
-            <View style={styles.titleWithIcon}>
-              <Feather name="trending-up" size={16} color={theme.colors.primary} />
-              <Text style={styles.sectionTitle}>Xu hướng làm đẹp thịnh hành</Text>
+          {/* Gợi ý cho bạn: Lấy 4 sản phẩm từ tìm kiếm gần đây nhất */}
+          <View style={[styles.section, { marginTop: 24, marginBottom: 40 }]}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.titleWithIcon}>
+                <Ionicons name="sparkles" size={16} color={theme.colors.primary} />
+                <Text style={styles.sectionTitle}>
+                  {recentSearches.length > 0
+                    ? `Sản phẩm gợi ý cho bạn (từ "${recentSearches[0]}")`
+                    : 'Sản phẩm gợi ý cho bạn'}
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.chipsContainer}>
-              {TRENDING_KEYWORDS.map((item, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.trendingChip}
-                  onPress={() => handleSearch(item)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.trendingRank}>0{idx + 1}</Text>
-                  <Text style={styles.trendingChipText}>{item}</Text>
-                  <Ionicons name="arrow-forward" size={12} color={theme.colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Banner Routine Skincare */}
-          <View style={styles.editorialBanner}>
-            <View style={styles.bannerBadge}>
-              <Text style={styles.bannerBadgeText}>ROSE BERRY EDITORIAL</Text>
-            </View>
-            <Text style={styles.bannerTitle}>Glass Skin 4-Step Routine</Text>
-            <Text style={styles.bannerDesc}>
-              Khám phá quy trình phục hồi và tái sinh làn da căng bóng mịn chuẩn Hàn Quốc cùng chuyên gia.
-            </Text>
-            <TouchableOpacity
-              style={styles.bannerBtn}
-              onPress={() => handleSearch('Glass Skin')}
-            >
-              <Text style={styles.bannerBtnText}>Xem bộ sưu tập</Text>
-              <Ionicons name="chevron-forward" size={14} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Gợi ý cho bạn */}
-          <View style={[styles.section, { marginBottom: 40 }]}>
-            <Text style={styles.sectionTitle}>Sản phẩm gợi ý cho bạn</Text>
             <View style={styles.suggestedGrid}>
-              {MOCK_SEARCH_PRODUCTS.slice(0, 4).map((p) => (
+              {(suggestedProducts.length > 0 ? suggestedProducts : []).slice(0, 4).map((p) => (
                 <View key={p.id} style={styles.suggestedCardWrapper}>
                   {renderProductItem({ item: p })}
                 </View>
@@ -540,7 +756,54 @@ export default function SearchScreen({ navigation }: any) {
         </ScrollView>
       )}
 
-      {/* FILTER BOTTOM SHEET MODAL */}
+      {/* SORT BOTTOM SHEET MODAL */}
+      <Modal
+        visible={sortModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSortModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setSortModalVisible(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.dragHandle} />
+              <View style={styles.modalTitleRow}>
+                <Text style={styles.modalTitle}>Sắp xếp theo</Text>
+                <TouchableOpacity onPress={() => setSortModalVisible(false)}>
+                  <Ionicons name="close" size={22} color={theme.colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.sortListContainer}>
+              {SORT_OPTIONS.map((opt) => {
+                const isSelected = sortBy === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.sortItemRow, isSelected && styles.sortItemRowActive]}
+                    onPress={() => applySort(opt.id)}
+                  >
+                    <Text style={[styles.sortItemLabel, isSelected && styles.sortItemLabelActive]}>
+                      {opt.label}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* FILTER BOTTOM SHEET MODAL (Danh mục, Khoảng giá tự nhập, Thương hiệu, Đánh giá) */}
       <Modal
         visible={filterModalVisible}
         animationType="slide"
@@ -554,11 +817,10 @@ export default function SearchScreen({ navigation }: any) {
             onPress={() => setFilterModalVisible(false)}
           />
           <View style={styles.modalContent}>
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View style={styles.dragHandle} />
               <View style={styles.modalTitleRow}>
-                <Text style={styles.modalTitle}>Bộ lọc nâng cao</Text>
+                <Text style={styles.modalTitle}>Bộ lọc sản phẩm</Text>
                 <TouchableOpacity onPress={resetFilters}>
                   <Text style={styles.resetFilterText}>Thiết lập lại</Text>
                 </TouchableOpacity>
@@ -566,48 +828,99 @@ export default function SearchScreen({ navigation }: any) {
             </View>
 
             <ScrollView style={styles.filterScroll} showsVerticalScrollIndicator={false}>
-              {/* Vấn đề da & Nhu cầu */}
+              {/* 1. Lọc theo Danh mục */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Nhu cầu làn da</Text>
-                <View style={styles.chipsContainer}>
-                  {SKIN_CONCERNS.map((c) => {
-                    const isSelected = selectedConcerns.includes(c.id);
+                <Text style={styles.filterGroupTitle}>Danh mục sản phẩm</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterPill,
+                      selectedCategoryId === null && styles.filterPillActive,
+                    ]}
+                    onPress={() => setSelectedCategoryId(null)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        selectedCategoryId === null && styles.filterPillTextActive,
+                      ]}
+                    >
+                      Tất cả
+                    </Text>
+                  </TouchableOpacity>
+                  {categories.slice(0, 12).map((cat) => {
+                    const isSelected = selectedCategoryId === cat.id;
                     return (
                       <TouchableOpacity
-                        key={c.id}
+                        key={cat.id}
                         style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                        onPress={() => toggleConcern(c.id)}
+                        onPress={() => setSelectedCategoryId(isSelected ? null : cat.id)}
                       >
-                        <Ionicons
-                          name={isSelected ? 'checkmark-circle' : 'add'}
-                          size={15}
-                          color={isSelected ? '#FFF' : theme.colors.textMuted}
-                        />
                         <Text
                           style={[
                             styles.filterPillText,
                             isSelected && styles.filterPillTextActive,
                           ]}
                         >
-                          {c.label}
+                          {cat.name}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
 
-              {/* Khoảng giá */}
+              {/* 2. Lọc theo Khoảng giá (Tự nhập min/max) */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Khoảng giá phù hợp</Text>
+                <Text style={styles.filterGroupTitle}>Khoảng giá (VNĐ)</Text>
+                <View style={styles.priceInputRow}>
+                  <View style={styles.priceInputBox}>
+                    <Text style={styles.priceInputLabel}>Từ</Text>
+                    <TextInput
+                      style={[styles.priceInput, { outlineStyle: 'none' } as any]}
+                      placeholder="0"
+                      placeholderTextColor={theme.colors.textMuted}
+                      keyboardType="numeric"
+                      value={minPriceInput}
+                      onChangeText={setMinPriceInput}
+                    />
+                    <Text style={styles.priceInputUnit}>đ</Text>
+                  </View>
+
+                  <Text style={styles.priceInputDash}>-</Text>
+
+                  <View style={styles.priceInputBox}>
+                    <Text style={styles.priceInputLabel}>Đến</Text>
+                    <TextInput
+                      style={[styles.priceInput, { outlineStyle: 'none' } as any]}
+                      placeholder="Tối đa"
+                      placeholderTextColor={theme.colors.textMuted}
+                      keyboardType="numeric"
+                      value={maxPriceInput}
+                      onChangeText={setMaxPriceInput}
+                    />
+                    <Text style={styles.priceInputUnit}>đ</Text>
+                  </View>
+                </View>
+
+                {/* Quick Presets */}
                 <View style={styles.pricePresetsRow}>
                   {PRICE_PRESETS.map((preset, idx) => {
-                    const isSelected = selectedPricePreset === idx;
+                    const isSelected =
+                      minPriceInput === preset.min && maxPriceInput === preset.max;
                     return (
                       <TouchableOpacity
                         key={idx}
                         style={[styles.pricePresetBtn, isSelected && styles.pricePresetActive]}
-                        onPress={() => setSelectedPricePreset(isSelected ? null : idx)}
+                        onPress={() => {
+                          if (isSelected) {
+                            setMinPriceInput('');
+                            setMaxPriceInput('');
+                          } else {
+                            setMinPriceInput(preset.min);
+                            setMaxPriceInput(preset.max);
+                          }
+                        }}
                       >
                         <Text
                           style={[
@@ -623,17 +936,17 @@ export default function SearchScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {/* Thương hiệu */}
+              {/* 3. Lọc theo Thương hiệu */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Thương hiệu tuyển chọn</Text>
+                <Text style={styles.filterGroupTitle}>Thương hiệu</Text>
                 <View style={styles.brandList}>
-                  {BRANDS.map((b) => {
-                    const isSelected = selectedBrands.includes(b);
+                  {availableBrands.slice(0, 15).map((b) => {
+                    const isSelected = selectedBrands.includes(b.id);
                     return (
                       <TouchableOpacity
-                        key={b}
+                        key={b.id}
                         style={[styles.brandItem, isSelected && styles.brandItemActive]}
-                        onPress={() => toggleBrand(b)}
+                        onPress={() => toggleBrand(b.id)}
                       >
                         <Ionicons
                           name={isSelected ? 'checkbox' : 'square-outline'}
@@ -646,7 +959,7 @@ export default function SearchScreen({ navigation }: any) {
                             isSelected && styles.brandItemTextActive,
                           ]}
                         >
-                          {b}
+                          {b.name}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -654,30 +967,37 @@ export default function SearchScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {/* Đánh giá sao */}
+              {/* 4. Lọc theo Đánh giá */}
               <View style={styles.filterGroup}>
                 <Text style={styles.filterGroupTitle}>Đánh giá chất lượng</Text>
                 <View style={styles.ratingRowSelect}>
-                  {[4.5, 4.0, 3.5].map((star) => {
-                    const isSelected = minRating === star;
+                  {[
+                    { star: 0, label: 'Tất cả' },
+                    { star: 4.5, label: 'Từ 4.5★' },
+                    { star: 4.0, label: 'Từ 4.0★' },
+                    { star: 3.5, label: 'Từ 3.5★' },
+                  ].map((item) => {
+                    const isSelected = minRating === item.star;
                     return (
                       <TouchableOpacity
-                        key={star}
+                        key={item.star}
                         style={[styles.ratingPill, isSelected && styles.ratingPillActive]}
-                        onPress={() => setMinRating(isSelected ? 0 : star)}
+                        onPress={() => setMinRating(item.star)}
                       >
-                        <Ionicons
-                          name="star"
-                          size={14}
-                          color={isSelected ? '#FFF' : '#F59E0B'}
-                        />
+                        {item.star > 0 && (
+                          <Ionicons
+                            name="star"
+                            size={13}
+                            color={isSelected ? '#FFF' : '#F59E0B'}
+                          />
+                        )}
                         <Text
                           style={[
                             styles.ratingPillText,
                             isSelected && styles.ratingPillTextActive,
                           ]}
                         >
-                          Từ {star}★
+                          {item.label}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -755,11 +1075,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#281811',
     paddingVertical: 0,
+    borderWidth: 0,
   },
   clearBtn: {
     padding: 4,
   },
-  filterTriggerBtn: {
+  sortTriggerBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -775,7 +1096,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  filterActiveBtn: {
+  sortActiveBtn: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
   },
@@ -807,7 +1128,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 15,
@@ -842,85 +1162,6 @@ const styles = StyleSheet.create({
   chipRemoveBtn: {
     marginLeft: 2,
   },
-  trendingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EFE5E7',
-    width: '100%',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-    shadowColor: '#C85A70',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  trendingRank: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.primary,
-    width: 24,
-  },
-  trendingChipText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#281811',
-  },
-  editorialBanner: {
-    marginTop: 20,
-    backgroundColor: '#FAF0F2',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F3DCE1',
-  },
-  bannerBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginBottom: 8,
-  },
-  bannerBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.8,
-  },
-  bannerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#281811',
-    marginBottom: 4,
-  },
-  bannerDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#725950',
-    marginBottom: 12,
-  },
-  bannerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
-  },
-  bannerBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
   suggestedGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -929,6 +1170,29 @@ const styles = StyleSheet.create({
   suggestedCardWrapper: {
     width: (width - 40) / 2,
     marginBottom: 12,
+  },
+
+  // AUTOCOMPLETE POPUP OVERLAY
+  suggestionsPopupOverlay: {
+    position: 'absolute',
+    top: 64,
+    left: 16,
+    right: 16,
+    maxHeight: 460,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EFE5E7',
+    shadowColor: '#281811',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+    zIndex: 999,
+    overflow: 'hidden',
+  },
+  suggestionsPopupScroll: {
+    padding: 12,
   },
 
   // RESULTS
@@ -946,21 +1210,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#725950',
   },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sortChipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EFE5E7',
+  },
+  sortChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primary,
+    maxWidth: 110,
+  },
   filterChipButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#EFE5E7',
+  },
+  filterChipButtonActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   filterChipText: {
     fontSize: 12,
     fontWeight: '600',
     color: theme.colors.primary,
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
   },
   productList: {
     paddingHorizontal: 16,
@@ -1111,7 +1404,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '82%',
+    maxHeight: '85%',
     paddingBottom: 20,
   },
   modalHeader: {
@@ -1158,16 +1451,19 @@ const styles = StyleSheet.create({
     color: '#281811',
     marginBottom: 10,
   },
+  categoryScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEFAFC',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#EFE5E7',
-    gap: 4,
   },
   filterPillActive: {
     backgroundColor: theme.colors.primary,
@@ -1181,6 +1477,47 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
+
+  // Price inputs
+  priceInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  priceInputBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEFAFC',
+    borderWidth: 1,
+    borderColor: '#EFE5E7',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 42,
+  },
+  priceInputLabel: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    marginRight: 6,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#281811',
+    paddingVertical: 0,
+    borderWidth: 0,
+  },
+  priceInputUnit: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+  },
+  priceInputDash: {
+    fontSize: 16,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+  },
   pricePresetsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -1189,9 +1526,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: '#FEFAFC',
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#EFE5E7',
   },
@@ -1208,25 +1545,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   brandList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   brandItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 7,
     paddingHorizontal: 10,
     backgroundColor: '#FEFAFC',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#EFE5E7',
-    gap: 8,
+    gap: 6,
   },
   brandItemActive: {
     backgroundColor: '#FDEEEF',
     borderColor: '#F3DCE1',
   },
   brandItemText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#281811',
   },
   brandItemTextActive: {
@@ -1236,12 +1575,13 @@ const styles = StyleSheet.create({
   ratingRowSelect: {
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
   },
   ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEFAFC',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
@@ -1282,5 +1622,134 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  // SORT MODAL STYLES
+  sortListContainer: {
+    paddingVertical: 8,
+  },
+  sortItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  sortItemRowActive: {
+    backgroundColor: '#FDF2F4',
+  },
+  sortItemLabel: {
+    fontSize: 14,
+    color: '#281811',
+    fontWeight: '500',
+  },
+  sortItemLabelActive: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+  },
+
+  // SUGGESTIONS IN OVERLAY
+  suggestionSection: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  suggestionSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  suggestionSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  suggestionIconWrapper: {
+    width: 24,
+    alignItems: 'center',
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 13,
+    color: theme.colors.textPrimary,
+  },
+  brandHintChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FDF2F4',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FCE7EB',
+  },
+  brandHintText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+  productHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  productHintThumb: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+  },
+  productHintInfo: {
+    flex: 1,
+  },
+  productHintName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textPrimary,
+    marginBottom: 2,
+  },
+  productHintPrice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  directSearchPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCE7EB',
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  directSearchPromptText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.primary,
   },
 });

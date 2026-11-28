@@ -50,6 +50,7 @@ export class PrismaStoreInventoryAdapter implements IStoreInventoryProvider {
         productVariantId: true,
         quantity: true,
         reservedQuantity: true,
+        availableQuantity: true,
       },
     });
 
@@ -58,6 +59,7 @@ export class PrismaStoreInventoryAdapter implements IStoreInventoryProvider {
       variantId: r.productVariantId,
       quantity: r.quantity,
       reservedQuantity: r.reservedQuantity,
+      availableQuantity: Math.max(0, r.availableQuantity ?? 0),
     }));
   }
 

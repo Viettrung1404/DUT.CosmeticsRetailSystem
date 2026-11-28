@@ -13,11 +13,15 @@ export function FavoriteButton({
   slug,
   name,
   className = "",
+  showText = false,
+  label,
 }: {
   productId: string;
   slug: string;
   name: string;
   className?: string;
+  showText?: boolean;
+  label?: string;
 }) {
   const client = useQueryClient();
   const hydrated = useHydrated();
@@ -38,14 +42,19 @@ export function FavoriteButton({
     <span className={`favorite-control ${className}`}>
       <button
         type="button"
-        className="favorite-button"
+        className={`favorite-button ${showText ? "favorite-button-with-text" : ""}`}
         data-product-id={productId}
         aria-label={`${selected ? "Bỏ yêu thích" : "Yêu thích"} ${name}`}
         aria-pressed={selected}
         title={selected ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
         onClick={toggle}
       >
-        <Heart size={18} fill={selected ? "currentColor" : "none"} />
+        <Heart
+          size={18}
+          fill={selected ? "#e63946" : "none"}
+          stroke={selected ? "#e63946" : "currentColor"}
+        />
+        {showText && <span>{label || (selected ? "Đã yêu thích" : "Thêm vào yêu thích")}</span>}
       </button>
       {error && (
         <span className="favorite-error" role="alert">

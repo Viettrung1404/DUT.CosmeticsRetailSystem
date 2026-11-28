@@ -1,19 +1,19 @@
 import { BadRequestException } from '@nestjs/common';
 
-// BR-02: 1 điểm = 1đ khi dùng
+// BR-02: 1 điểm = 1đ khi dùng (tương đương tiền thật)
 export const POINT_VALUE_VND = 1;
-// Số dư quy đổi phải đạt mức này mới được dùng điểm
-export const MIN_REDEEM_BALANCE_VND = 50000;
-// Chỉ dùng theo bội số của mức này
-export const REDEEM_STEP_VND = 10000;
-// BR-03: dùng điểm tối đa 50% giá trị đơn
-export const MAX_REDEEM_RATIO = 0.5;
+// Số dư quy đổi tối thiểu để được dùng điểm (0đ = có điểm là được dùng)
+export const MIN_REDEEM_BALANCE_VND = 0;
+// Chỉ dùng theo bội số của mức này (1đ = dùng lẻ từng xu)
+export const REDEEM_STEP_VND = 1;
+// BR-03: dùng điểm tối đa 100% giá trị đơn (toàn bộ tiền hàng)
+export const MAX_REDEEM_RATIO = 1.0;
 
 const formatVnd = (n: number) => n.toLocaleString('vi-VN');
 
 export const maxRedeemValue = (payableBase: number): number => {
-  const half = Math.floor(Math.max(payableBase, 0) * MAX_REDEEM_RATIO);
-  return Math.floor(half / REDEEM_STEP_VND) * REDEEM_STEP_VND;
+  const max = Math.floor(Math.max(payableBase, 0) * MAX_REDEEM_RATIO);
+  return Math.floor(max / REDEEM_STEP_VND) * REDEEM_STEP_VND;
 };
 
 // payableBase: giá trị đơn sau khuyến mãi + voucher (chưa tính phí ship)
@@ -28,7 +28,7 @@ export const calculatePointsRedemption = (
     throw new BadRequestException('Số điểm thưởng sử dụng vượt quá số điểm hiện có của bạn');
   }
 
-  if (availablePoints * POINT_VALUE_VND < MIN_REDEEM_BALANCE_VND) {
+  if (MIN_REDEEM_BALANCE_VND > 0 && availablePoints * POINT_VALUE_VND < MIN_REDEEM_BALANCE_VND) {
     throw new BadRequestException(
       `Cần có tối thiểu ${formatVnd(MIN_REDEEM_BALANCE_VND / POINT_VALUE_VND)} điểm mới được dùng điểm để thanh toán`,
     );
@@ -44,7 +44,7 @@ export const calculatePointsRedemption = (
   const max = maxRedeemValue(payableBase);
   if (value > max) {
     throw new BadRequestException(
-      `Chỉ được dùng điểm tối đa 50% giá trị đơn hàng (tối đa ${formatVnd(max / POINT_VALUE_VND)} điểm cho đơn này)`,
+      `Chỉ được dùng điểm tối đa giá trị đơn hàng (tối đa ${formatVnd(max / POINT_VALUE_VND)} điểm cho đơn này)`,
     );
   }
 

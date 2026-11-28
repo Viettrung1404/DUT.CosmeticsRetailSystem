@@ -5,6 +5,7 @@ export interface StoreInventoryRecord {
   variantId: string;
   quantity: number;
   reservedQuantity: number;
+  availableQuantity?: number;
 }
 
 export interface StoreInfo {
@@ -54,9 +55,8 @@ export class StoreResolverService {
 
       const hasSufficientStock = this.checkAllItemsAvailable(items, inventories);
       if (!hasSufficientStock) {
-        throw new BadRequestException(
-          `Chi nhánh ${store.name} không đủ tồn kho cho các sản phẩm yêu cầu`,
-        );
+        throw new BadRequestException({ code: 'STORE_OUT_OF_STOCK',
+          message: `Chi nhánh ${store.name} không đủ tồn kho cho các sản phẩm yêu cầu` });
       }
 
       return store.id;
@@ -87,9 +87,8 @@ export class StoreResolverService {
       }
     }
 
-    throw new BadRequestException(
-      'Rất tiếc, sản phẩm trong đơn hàng hiện không còn đủ tồn kho tại bất kỳ chi nhánh nào để giao hàng',
-    );
+    throw new BadRequestException({ code: 'NO_STORE_WITH_STOCK',
+      message: 'Rất tiếc, sản phẩm trong đơn hàng hiện không còn đủ tồn kho tại bất kỳ chi nhánh nào để giao hàng' });
   }
 
   private checkAllItemsAvailable(
@@ -98,7 +97,7 @@ export class StoreResolverService {
   ): boolean {
     const invMap = new Map<string, number>();
     for (const inv of inventories) {
-      const available = inv.quantity - inv.reservedQuantity;
+      const available = inv.availableQuantity ?? Math.max(0, inv.quantity - inv.reservedQuantity);
       invMap.set(inv.variantId, available);
     }
 

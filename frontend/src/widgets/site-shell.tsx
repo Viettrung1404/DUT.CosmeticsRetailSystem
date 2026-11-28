@@ -51,6 +51,7 @@ export function SiteHeader({
   const wishlistDialog = useRef<HTMLDialogElement>(null);
   const wishlistTrigger = useRef<HTMLButtonElement>(null);
   const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
   const { data: cart } = useQuery(cartQuery());
   const { data: wishlistIds } = useQuery(wishlistIdsQuery());
   const cartCount = hydrated ? (cart?.totalQuantity ?? 0) : 0;
@@ -59,7 +60,7 @@ export function SiteHeader({
     queryKey: ["session"],
     queryFn: async ({ signal }) => {
       try {
-        return (await readBff("/api/auth/session", z.object({ user: userSchema }), signal)).user;
+        return (await readBff("/api/auth/session", z.object({ user: userSchema.nullable() }), signal)).user;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
         throw error;
@@ -79,6 +80,14 @@ export function SiteHeader({
       document.body.style.overflow = "";
     };
   }, [open]);
+  useEffect(() => {
+    const onOpenCart = () => {
+      setCartOpen(true);
+      cartDialog.current?.showModal();
+    };
+    window.addEventListener("glowup:open-cart", onOpenCart);
+    return () => window.removeEventListener("glowup:open-cart", onOpenCart);
+  }, []);
   const close = () => {
     setOpen(false);
     trigger.current?.focus();
@@ -155,11 +164,11 @@ export function SiteHeader({
                 <MoreHorizontal />
               </summary>
               <nav aria-label="Liên kết thêm">
-                <Link href="/products">Tất cả sản phẩm</Link>
-                <Link href="/flash-sale">Flash Sale</Link>
-                <Link href="/account/orders">Tra cứu đơn hàng</Link>
-                <Link href="/account/notifications">Thông báo</Link>
-                <Link href="/help">Trung tâm hỗ trợ</Link>
+                <Link href="/products" prefetch={false}>Tất cả sản phẩm</Link>
+                <Link href="/flash-sale" prefetch={false}>Flash Sale</Link>
+                <Link href="/order-tracking" prefetch={false}>Tra cứu đơn hàng</Link>
+                <Link href="/account/notifications" prefetch={false}>Thông báo</Link>
+                <Link href="/help" prefetch={false}>Trung tâm hỗ trợ</Link>
               </nav>
             </details>
             <Link
@@ -188,7 +197,10 @@ export function SiteHeader({
               type="button"
               className="cart-entry"
               aria-label={`Mở giỏ hàng, ${cartCount} sản phẩm`}
-              onClick={() => cartDialog.current?.showModal()}
+              onClick={() => {
+                setCartOpen(true);
+                cartDialog.current?.showModal();
+              }}
             >
               <ShoppingBag />
               {cartCount > 0 && <span className="header-count">{cartCount}</span>}
@@ -201,6 +213,7 @@ export function SiteHeader({
               {navigation.map((item) => (
                 <div className="nav-group" key={item.href}>
                   <Link
+                    prefetch={false}
                     href={item.href}
                     aria-current={activeNavigation(item) ? "page" : undefined}
                     className={`nav-pill pill-${item.tone}`}
@@ -212,12 +225,12 @@ export function SiteHeader({
                       className={`nav-dropdown${item.href === routes.brands ? " nav-dropdown-brands" : ""}`}
                     >
                       <div className="nav-dropdown-inner">
-                        <Link className="nav-dropdown-all" href={item.href}>
+                        <Link className="nav-dropdown-all" href={item.href} prefetch={false}>
                           Xem tất cả {item.label.toLowerCase()} <ChevronRight size={15} />
                         </Link>
                         <div className="nav-dropdown-links">
                           {item.links.map((link) => (
-                            <Link key={link.id} href={link.href}>
+                            <Link key={link.id} href={link.href} prefetch={false}>
                               {link.name}
                             </Link>
                           ))}
@@ -272,11 +285,11 @@ export function SiteHeader({
             item.links.length ? (
               <details className="drawer-category" key={item.href}>
                 <summary>{item.label}</summary>
-                <Link onClick={close} href={item.href}>
+                <Link onClick={close} href={item.href} prefetch={false}>
                   Xem tất cả {item.label.toLowerCase()}
                 </Link>
                 {item.links.map((link) => (
-                  <Link onClick={close} key={link.id} href={link.href}>
+                  <Link onClick={close} key={link.id} href={link.href} prefetch={false}>
                     {link.name}
                   </Link>
                 ))}
@@ -297,7 +310,7 @@ export function SiteHeader({
             { href: "/stores", label: "Hệ thống cửa hàng" },
             { href: "/blog", label: "Góc làm đẹp" },
             { href: "/account", label: "Tài khoản của tôi" },
-            { href: "/account/orders", label: "Tra cứu đơn hàng" },
+            { href: "/order-tracking", label: "Tra cứu đơn hàng" },
             { href: "/wishlist", label: "Sản phẩm yêu thích" },
             { href: "/account/notifications", label: "Thông báo" },
           ].map((item) => (
@@ -332,9 +345,15 @@ export function SiteHeader({
         ref={cartDialog}
         className="mini-cart-drawer"
         aria-label="Giỏ hàng"
-        onClose={() => cartTrigger.current?.focus()}
+        onClose={() => {
+          setCartOpen(false);
+          cartTrigger.current?.focus();
+        }}
         onClick={(event) => {
-          if (event.target === event.currentTarget) cartDialog.current?.close();
+          if (event.target === event.currentTarget) {
+            setCartOpen(false);
+            cartDialog.current?.close();
+          }
         }}
       >
         <div className="drawer-heading">
@@ -343,12 +362,23 @@ export function SiteHeader({
             type="button"
             className="icon-button"
             aria-label="Đóng giỏ hàng"
-            onClick={() => cartDialog.current?.close()}
+            onClick={() => {
+              setCartOpen(false);
+              cartDialog.current?.close();
+            }}
           >
             <X />
           </button>
         </div>
-        {hydrated && <CartContents compact onNavigate={() => cartDialog.current?.close()} />}
+        {hydrated && cartOpen && (
+          <CartContents
+            compact
+            onNavigate={() => {
+              setCartOpen(false);
+              cartDialog.current?.close();
+            }}
+          />
+        )}
       </dialog>
     </>
   );
@@ -371,7 +401,7 @@ const footerGroups = [
     links: [
       ["Hướng dẫn đặt hàng", "/help"],
       ["Câu hỏi thường gặp (FAQ)", "/faq"],
-      ["Tra cứu tình trạng đơn hàng", "/account/orders"],
+      ["Tra cứu tình trạng đơn hàng", "/order-tracking"],
       ["Trung tâm hỗ trợ", "/help"],
       ["Chính sách đổi trả", "/chinh-sach-doi-tra"],
     ],
@@ -435,7 +465,7 @@ export function SiteFooter() {
           <div key={group.title}>
             <h2>{group.title}</h2>
             {group.links.map(([label, href]) => (
-              <Link key={label} href={href}>
+              <Link key={label} href={href} prefetch={false}>
                 {label}
               </Link>
             ))}

@@ -68,6 +68,9 @@ export class ProductIngredientResponseDto {
   @ApiPropertyOptional({ example: '15%' })
   percentage?: string | null;
 
+  @ApiPropertyOptional({ example: 'Khóa ẩm, làm mịn mờ rãnh môi và tạo hàng rào bảo vệ' })
+  purpose?: string | null;
+
   @ApiProperty({ example: true })
   isKeyIngredient: boolean;
 }
@@ -118,6 +121,12 @@ export class ProductResponseDto {
   @ApiPropertyOptional()
   shortDescription?: string | null;
 
+  @ApiPropertyOptional({ example: '1. Thoa đều từ lòng môi ra viền môi...' })
+  howToUse?: string | null;
+
+  @ApiPropertyOptional({ description: 'Thông số kỹ thuật sản phẩm: xuất xứ, nơi sản xuất, dung tích, hạn sử dụng, v.v.' })
+  specifications?: Record<string, any> | null;
+
   @ApiProperty({ example: 199000 })
   basePrice: number;
 
@@ -147,6 +156,9 @@ export class ProductResponseDto {
 
   @ApiPropertyOptional()
   option3Name?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://video.hsv-tech.io/product-video.mp4' })
+  videoUrl?: string | null;
 
   @ApiProperty({ type: [ProductVariantResponseDto] })
   variants: ProductVariantResponseDto[];
@@ -182,6 +194,8 @@ export class ProductResponseDto {
     dto.sku = entity.sku;
     dto.description = entity.description;
     dto.shortDescription = entity.shortDescription;
+    dto.howToUse = (entity as any).howToUse ?? null;
+    dto.specifications = (entity as any).specifications ?? null;
     dto.basePrice = entity.basePrice;
     dto.salePrice = entity.salePrice;
     dto.isActive = entity.isActive;
@@ -192,6 +206,7 @@ export class ProductResponseDto {
     dto.option1Name = entity.option1Name;
     dto.option2Name = entity.option2Name;
     dto.option3Name = entity.option3Name;
+    dto.videoUrl = entity.videoUrl ?? null;
 
     // Filter variants: if onlyActiveVariants is true (default for customer), filter out inactive variants
     const rawVariants = options.onlyActiveVariants
@@ -218,6 +233,42 @@ export class ProductResponseDto {
     dto.tags = entity.tags;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;
+    return dto;
+  }
+
+  static fromOpenSearch(doc: any): ProductResponseDto {
+    const dto = new ProductResponseDto();
+    dto.id = doc.id;
+    dto.categoryId = doc.categoryId;
+    dto.brandId = doc.brandId ?? null;
+    dto.brandName = doc.brandName ?? null;
+    dto.categoryName = doc.categoryName ?? '';
+    dto.primaryImage = doc.primaryImage ?? null;
+    dto.name = doc.name;
+    dto.slug = doc.slug;
+    dto.sku = doc.sku;
+    dto.description = null;
+    dto.shortDescription = null;
+    dto.basePrice = Number(doc.basePrice);
+    dto.salePrice = doc.salePrice != null ? Number(doc.salePrice) : null;
+    dto.effectivePrice = Number(doc.salePrice ?? doc.basePrice ?? doc.minPrice);
+    dto.isActive = doc.isActive ?? true;
+    dto.isFeatured = false;
+    dto.avgRating = doc.avgRating ?? 0;
+    dto.totalReviews = doc.totalReviews != null ? Number(doc.totalReviews) : 0;
+    dto.totalSold = doc.totalSold ?? 0;
+    dto.option1Name = null;
+    dto.option2Name = null;
+    dto.option3Name = null;
+    dto.videoUrl = null;
+    dto.variants = [];
+    dto.images = doc.primaryImage
+      ? [{ imageUrl: doc.primaryImage, sortOrder: 0, isPrimary: true }]
+      : [];
+    dto.ingredients = [];
+    dto.tags = doc.tags || [];
+    dto.createdAt = doc.createdAt ? new Date(doc.createdAt) : undefined;
+    dto.updatedAt = undefined;
     return dto;
   }
 }

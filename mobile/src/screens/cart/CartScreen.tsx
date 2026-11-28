@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,17 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useCartStore, CartItem } from '../../store/useCartStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import AppHeader from '../../components/AppHeader';
+import RecommendationSection from '../../components/RecommendationSection';
+import { recommendationApi } from '../../api/recommendationApi';
 
 export default function CartScreen({ navigation }: any) {
   const {
@@ -25,14 +30,16 @@ export default function CartScreen({ navigation }: any) {
     getSelectedCount,
   } = useCartStore();
 
+  const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
-    fetchCart().catch((error) => {
-      Alert.alert(
-        'Không thể tải giỏ hàng',
-        error?.response?.data?.message || error?.message || 'Vui lòng thử lại.',
-      );
-    });
+    fetchCart().catch(() => {});
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchCart().catch(() => {});
+    setRefreshing(false);
+  };
 
   const runCartAction = async (action: () => Promise<void>) => {
     try {
@@ -50,9 +57,48 @@ export default function CartScreen({ navigation }: any) {
   const selectedCount = getSelectedCount();
 
   // Ngưỡng Freeship theo Stitch Design (Mục tiêu 1.000.000đ)
-  const FREESHIP_TARGET = 1000000;
+  // Ngưỡng Freeship bậc thang: 129k -> giảm 15k, 359k -> giảm 25k, 459k -> Freeship toàn quốc
+  const getFreeshipProgress = (amount: number) => {
+    if (amount >= 459000) {
+      return {
+        target: 459000,
+        remaining: 0,
+        percent: 100,
+        label: 'Freeship toàn quốc',
+        nextTier: 'Đã đạt Freeship toàn quốc',
+      };
+    }
+    if (amount >= 359000) {
+      return {
+        target: 459000,
+        remaining: 459000 - amount,
+        percent: Math.min(Math.round((amount / 459000) * 100), 100),
+        label: 'Freeship 25k (Đạt)',
+        nextTier: 'Freeship toàn quốc',
+      };
+    }
+    if (amount >= 129000) {
+      return {
+        target: 359000,
+        remaining: 359000 - amount,
+        percent: Math.min(Math.round((amount / 359000) * 100), 100),
+        label: 'Freeship 15k (Đạt)',
+        nextTier: 'Freeship 25k',
+      };
+    }
+    return {
+      target: 129000,
+      remaining: 129000 - amount,
+      percent: Math.min(Math.round((amount / 129000) * 100), 100),
+      label: 'Phí chuẩn 30k',
+      nextTier: 'Freeship 15k',
+    };
+  };
+
+  const freeshipInfo = getFreeshipProgress(totalPrice);
+  const FREESHIP_TARGET = freeshipInfo.target;
   const progressPercent = Math.min(Math.round((totalPrice / FREESHIP_TARGET) * 100), 100);
-  const remainingForFreeship = Math.max(FREESHIP_TARGET - totalPrice, 0);
+  const remainingForFreeship = freeshipInfo.remaining;
 
   const handleConfirmDelete = (id: string, name: string) => {
     Alert.alert(
@@ -94,6 +140,21 @@ export default function CartScreen({ navigation }: any) {
   const handleProceedCheckout = () => {
     if (selectedCount === 0) {
       Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một sản phẩm để tiến hành thanh toán.');
+      return;
+    }
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để tiến hành đặt hàng và tích lũy điểm GlowPoint.',
+        [
+          { text: 'Để sau', style: 'cancel' },
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('AuthStack', { screen: 'Login' }),
+          },
+        ]
+      );
       return;
     }
     navigation.navigate('Checkout');
@@ -188,39 +249,26 @@ export default function CartScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
-      {/* 1. Header Giỏ Hàng theo chuẩn Stitch */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image
-            source={{
-              uri: 'https://lh3.googleusercontent.com/aida/AEtjO1V_EdYGFWGwIUg8ikIOvg6kwDD7S9TUC48vlh9MNjkdWvqUY_6ike1Fiq25KeoJiAgx7F3xuqhNJa5DFvTwaYjyY6lvVv6EztD4Zevbg6VNQtcbJ1RKswD0_wVSnSLfyEGE3YTd0-U0JDqwzSdITN_FBzAUKAsABkBo6RbAvVtOcTtl5xL2I959nXeMxsLJBURM90gaoke5QVaUpJZ2nWLMIl9J77-Yne_L63BXqwTeqz7dFfnKs9JSkQs',
-            }}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-          <View>
-            <View style={styles.rowAlign}>
-              <Text style={styles.headerTitle}>Giỏ Hàng</Text>
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>({items.length} món)</Text>
-              </View>
-            </View>
-            <Text style={styles.headerSubtitle}>ROSE BERRY ELEGANCE</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.editModeBtn}
-          onPress={() => runCartAction(toggleSelectAll)}
-        >
-          <Text style={styles.editModeBtnText}>
-            {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safeContainer} edges={['top']}>
+      {/* 1. Header Giỏ Hàng theo chuẩn Stitch GlowUp */}
+      <AppHeader
+        title="Giỏ Hàng"
+        subtitle="ROSE BERRY ELEGANCE"
+        badge={items.length > 0 ? `(${items.length} món)` : undefined}
+        rightActions={
+          <TouchableOpacity
+            style={styles.editModeBtn}
+            onPress={() => runCartAction(toggleSelectAll)}
+          >
+            <Text style={styles.editModeBtnText}>
+              {isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       <FlatList
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.primary]} />}
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={renderCartItem}
@@ -243,13 +291,13 @@ export default function CartScreen({ navigation }: any) {
                           </Text>{' '}
                           để nhận{' '}
                           <Text style={{ fontWeight: '700', color: theme.colors.primary }}>
-                            Freeship Silk-Drop
+                            {freeshipInfo.nextTier}
                           </Text>{' '}
                           & Túi quà Minisize
                         </>
                       ) : (
                         <Text style={{ fontWeight: '700', color: theme.colors.success }}>
-                          🎉 Chúc mừng! Bạn đã đạt Freeship & Quà tặng Minisize
+                          🎉 Chúc mừng! Bạn đã đạt Freeship toàn quốc & Quà tặng Minisize
                         </Text>
                       )}
                     </Text>
@@ -304,30 +352,51 @@ export default function CartScreen({ navigation }: any) {
           ) : undefined
         }
         ListFooterComponent={
-          items.length > 0 ? (
-            /* Thẻ Quà Tặng Kèm 0đ (Chuẩn Stitch) */
-            <View style={styles.giftCard}>
-              <Image
-                source={{
-                  uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNBPAkRSsQnnjpt3mvib6e28iR24XmNd0K7KXjlXzPOvHc-HvY-3dM0ZRCd7fHBseSs3BSHC6ELDXWczXLX1RjWsFOVpE-OeCy0BhWMa0e86MvWXowjCjxLgmXhATBhpTmxiUnGKY3r7fqPJVnreV4aazR31gZELFJDuy3ZjqQkeCxQvRDD13EOaNDOJqhvOF39zWrsYB-M2-ILxepkWKy6k3EtV9o8EkbWf6O2qh5TOLOjFWdi-ZdNQ',
-                }}
-                style={styles.giftImage}
-              />
-              <View style={styles.giftContent}>
-                <View style={styles.giftTag}>
-                  <Text style={styles.giftTagText}>QUÀ TẶNG 0Đ</Text>
-                </View>
-                <Text style={styles.giftName} numberOfLines={1}>
-                  Mặt nạ sinh học Collagen GlowUp Mask x1
-                </Text>
-                <Text style={styles.giftSub}>Tặng kèm cho đơn hàng từ 500k</Text>
-                <View style={styles.giftPriceRow}>
-                  <Text style={styles.giftFreePrice}>0 đ</Text>
-                  <Text style={styles.giftOriginalPrice}>65.000 đ</Text>
+          <View>
+            {items.length > 0 ? (
+              /* Thẻ Quà Tặng Kèm 0đ (Chuẩn Stitch) */
+              <View style={styles.giftCard}>
+                <Image
+                  source={{
+                    uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDNBPAkRSsQnnjpt3mvib6e28iR24XmNd0K7KXjlXzPOvHc-HvY-3dM0ZRCd7fHBseSs3BSHC6ELDXWczXLX1RjWsFOVpE-OeCy0BhWMa0e86MvWXowjCjxLgmXhATBhpTmxiUnGKY3r7fqPJVnreV4aazR31gZELFJDuy3ZjqQkeCxQvRDD13EOaNDOJqhvOF39zWrsYB-M2-ILxepkWKy6k3EtV9o8EkbWf6O2qh5TOLOjFWdi-ZdNQ',
+                  }}
+                  style={styles.giftImage}
+                />
+                <View style={styles.giftContent}>
+                  <View style={styles.giftTag}>
+                    <Text style={styles.giftTagText}>QUÀ TẶNG 0Đ</Text>
+                  </View>
+                  <Text style={styles.giftName} numberOfLines={1}>
+                    Mặt nạ sinh học Collagen GlowUp Mask x1
+                  </Text>
+                  <Text style={styles.giftSub}>Tặng kèm cho đơn hàng từ 500k</Text>
+                  <View style={styles.giftPriceRow}>
+                    <Text style={styles.giftFreePrice}>0 đ</Text>
+                    <Text style={styles.giftOriginalPrice}>65.000 đ</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          ) : undefined
+            ) : null}
+            <RecommendationSection
+              eyebrow="CHU TRÌNH LÀM ĐẸP"
+              title="Hoàn thiện chu trình của bạn"
+              placement="CART_ROUTINE"
+              fetcher={() => {
+                const cartProductIds = Array.from(
+                  new Set(items.map((i) => i.productId).filter(Boolean)),
+                );
+                return recommendationApi.getCartRecommendations(cartProductIds, 8);
+              }}
+              fetchDeps={[items.map((i) => i.productId).join(',')]}
+              onSelectProduct={(item) =>
+                navigation.navigate('ProductDetail', {
+                  slug: item.slug || item.id,
+                  productId: item.id,
+                })
+              }
+              showReasonBadge
+            />
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

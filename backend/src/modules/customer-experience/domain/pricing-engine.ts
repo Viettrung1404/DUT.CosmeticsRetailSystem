@@ -8,9 +8,34 @@ import {
 
 export const STORE_SHIPPING_POLICY = {
   fee: 30000,
-  freeFrom: 500000,
+  freeFrom: 459000,
+  tiers: [
+    { minAmount: 459000, discount: 30000, fee: 0 },
+    { minAmount: 359000, discount: 25000, fee: 5000 },
+    { minAmount: 129000, discount: 15000, fee: 15000 },
+  ],
   basis: "AFTER_DISCOUNTS",
 } as const;
+
+export function applyCarrierShippingBenefit(carrierFee: number, policyFee: number): number {
+  if (policyFee === 0) return 0;
+  return Math.max(0, carrierFee - Math.max(0, STORE_SHIPPING_POLICY.fee - policyFee));
+}
+
+export function calculateTierShippingFee(
+  merchandisePayable: number,
+  hasFreeShippingCampaign: boolean = false,
+): number {
+  if (hasFreeShippingCampaign || merchandisePayable >= STORE_SHIPPING_POLICY.freeFrom) {
+    return 0;
+  }
+  for (const tier of STORE_SHIPPING_POLICY.tiers) {
+    if (merchandisePayable >= tier.minAmount) {
+      return tier.fee;
+    }
+  }
+  return STORE_SHIPPING_POLICY.fee;
+}
 
 export interface PriceLine {
   variantId: string;
@@ -29,6 +54,7 @@ export interface Campaign {
   applicableProducts: unknown;
   applicableCategories: unknown;
   quotas: {
+    salePrice?: number | null;
     id: string;
     productVariantId: string;
     quota: number;
@@ -130,15 +156,25 @@ export function calculateCommercePrice(input: {
       const quota = campaign.quotas.find(
         (q) => q.productVariantId === line.variantId,
       );
-      if (
-        campaign.isFlashSale &&
-        (!quota ||
-          quota.quota - quota.reservedQuantity - quota.consumedQuantity <
-            line.quantity)
-      )
-        return 0;
+      if (campaign.isFlashSale) {
+        const quantity = Math.min(line.quantity, Math.max(0, quota
+          ? quota.quota - quota.reservedQuantity - quota.consumedQuantity : 0));
+        return money(decimal(line.unitPrice).mul(quantity));
+      }
       return weights[i];
     });
+    if (campaign.isFlashSale && campaign.quotas.some((quota) => quota.salePrice != null)) {
+      candidateShares.set(campaign.id, input.lines.map((line, i) => {
+        const quota = campaign.quotas.find((q) => q.productVariantId === line.variantId);
+        if (!eligibleWeights[i] || quota?.salePrice == null) return 0;
+        if (!Number.isFinite(quota.salePrice) || quota.salePrice <= 0 || quota.salePrice >= line.unitPrice)
+          throw new BadRequestException("INVALID_FLASH_PRICE");
+        const quantity = Math.min(line.quantity, Math.max(0,
+          quota.quota - quota.reservedQuantity - quota.consumedQuantity));
+        return money(decimal(line.unitPrice).minus(quota.salePrice).mul(quantity));
+      }));
+      continue;
+    }
     const base = money(eligibleWeights.reduce((a, b) => a.add(b), decimal(0)));
     candidateShares.set(
       campaign.id,
@@ -167,6 +203,9 @@ export function calculateCommercePrice(input: {
         selected = campaign;
       }
     }
+    const selectedQuota = selected?.isFlashSale
+      ? selected.quotas.find((q) => q.productVariantId === line.variantId)
+      : undefined;
     return {
       ...line,
       originalPrice: line.unitPrice,
@@ -177,9 +216,11 @@ export function calculateCommercePrice(input: {
       tierDiscount: selected ? 0 : tierDiscount,
       promotionDiscount: selected ? discount : 0,
       promotionId: selected?.id ?? null,
-      quotaId: selected?.isFlashSale
-        ? selected.quotas.find((q) => q.productVariantId === line.variantId)!.id
-        : null,
+      quotaId: selectedQuota?.id ?? null,
+      quotaQuantity: selectedQuota
+        ? Math.min(line.quantity, Math.max(0,
+            selectedQuota.quota - selectedQuota.reservedQuantity - selectedQuota.consumedQuantity))
+        : 0,
       afterLineDiscount: money(decimal(weights[i]).minus(discount)),
     };
   });
@@ -218,6 +259,9 @@ export function calculateCommercePrice(input: {
   const couponShares = allocateMoney(couponDiscount, couponWeights);
   if (!Number.isSafeInteger(input.pointsRequested) || input.pointsRequested < 0)
     throw new BadRequestException("INSUFFICIENT_POINTS");
+  if (input.pointsRequested > input.availablePoints ||
+      input.pointsRequested > Math.floor(afterLines - couponDiscount))
+    throw new BadRequestException("INSUFFICIENT_POINTS");
   const pointsDiscount = input.pointsRequested
     ? calculatePointsRedemption(
         input.pointsRequested,
@@ -242,10 +286,10 @@ export function calculateCommercePrice(input: {
       !c.isFlashSale &&
       lines.some((l) => campaignApplies(c, l)),
   );
-  const shippingFee =
-    merchandisePayable >= STORE_SHIPPING_POLICY.freeFrom || shippingCampaign
-      ? 0
-      : STORE_SHIPPING_POLICY.fee;
+  const shippingFee = calculateTierShippingFee(
+    merchandisePayable,
+    Boolean(shippingCampaign),
+  );
   const pricedLines = lines.map((line, i) => ({
     ...line,
     couponDiscount: couponShares[i],

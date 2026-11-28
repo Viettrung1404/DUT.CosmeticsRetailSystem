@@ -15,13 +15,28 @@ export function CatalogImage({
   src,
   alt,
   className = "",
+  priority = false,
+  sizes = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 300px",
 }: {
   src?: string | null;
   alt: string;
   className?: string;
+  priority?: boolean;
+  sizes?: string;
 }) {
   return src && /^https?:\/\/|^\//.test(src) ? (
-    <Image className={className} src={src} alt={alt} width={600} height={600} unoptimized />
+    <Image
+      className={className}
+      src={src}
+      alt={alt}
+      width={600}
+      height={600}
+      unoptimized
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      priority={priority}
+      sizes={sizes}
+    />
   ) : (
     <div className={`catalog-image-placeholder ${className}`} aria-label={alt}>
       GLOWUP
@@ -30,16 +45,21 @@ export function CatalogImage({
 }
 export function ProductCard({ product }: { product: Product }) {
   const price = product.effectivePrice ?? product.salePrice ?? product.basePrice;
+  const pricedVariant = product.variants.find(
+    (variant) => variant.isActive !== false && (variant.effectivePrice ?? variant.price) === price,
+  );
+  const originalPrice = pricedVariant?.price ?? product.basePrice;
+  const hasDiscount = originalPrice > price;
   return (
     <article className="catalog-card">
-      <Link href={`/products/${product.slug}`} className="catalog-card-image">
+      <Link prefetch={false} href={`/products/${product.slug}`} className="catalog-card-image">
         <CatalogImage
           src={product.primaryImage || product.images?.[0]?.imageUrl}
           alt={product.name}
         />
-        {product.basePrice > price && (
+        {hasDiscount && (
           <span className="catalog-discount">
-            -{Math.round((1 - price / product.basePrice) * 100)}%
+            -{Math.round((1 - price / originalPrice) * 100)}%
           </span>
         )}
       </Link>
@@ -51,16 +71,25 @@ export function ProductCard({ product }: { product: Product }) {
       />
       <div className="catalog-card-copy">
         <p className="catalog-brand">{product.brandName || "GLOWUP"}</p>
-        <Link href={`/products/${product.slug}`} className="catalog-card-title">
+        <Link prefetch={false} href={`/products/${product.slug}`} className="catalog-card-title">
           {product.name}
         </Link>
         <div className="catalog-rating">
           ★ <span>{product.avgRating.toFixed(1)}</span>
           <small>({product.totalReviews})</small>
+          {typeof product.totalSold === "number" && product.totalSold > 0 && (
+            <span className="catalog-sold">
+              {" "}
+              · Đã bán{" "}
+              {product.totalSold >= 1000
+                ? `${(product.totalSold / 1000).toFixed(1)}k`
+                : product.totalSold}
+            </span>
+          )}
         </div>
         <div className="catalog-prices">
           <strong>{formatPrice(price)}</strong>
-          {product.basePrice > price && <del>{formatPrice(product.basePrice)}</del>}
+          {hasDiscount && <del>{formatPrice(originalPrice)}</del>}
         </div>
       </div>
     </article>
@@ -82,8 +111,13 @@ export function FlashGrid({ cards }: { cards: FlashCard[] }) {
     <div className="catalog-grid">
       {cards.map((card) => (
         <article className="catalog-card" key={`${card.promotionId}-${card.variantId}`}>
-          <Link href={`/products/${card.slug}`} className="catalog-card-image">
+          <Link prefetch={false} href={`/products/${card.slug}`} className="catalog-card-image">
             <CatalogImage src={card.imageUrl} alt={card.name} />
+            {card.originalPrice > card.effectivePrice && (
+              <span className="catalog-discount">
+                -{Math.round((1 - card.effectivePrice / card.originalPrice) * 100)}%
+              </span>
+            )}
           </Link>
           <FavoriteButton
             productId={card.productId}
@@ -93,7 +127,7 @@ export function FlashGrid({ cards }: { cards: FlashCard[] }) {
           />
           <div className="catalog-card-copy">
             <p className="catalog-brand">{card.brandName || "GLOWUP"}</p>
-            <Link className="catalog-card-title" href={`/products/${card.slug}`}>
+            <Link prefetch={false} className="catalog-card-title" href={`/products/${card.slug}`}>
               {card.name}
             </Link>
             <p className="catalog-prices">
@@ -102,7 +136,7 @@ export function FlashGrid({ cards }: { cards: FlashCard[] }) {
                 <del>{formatPrice(card.originalPrice)}</del>
               )}
             </p>
-            <small>Còn {card.remaining} sản phẩm</small>
+            <small>Còn {card.stockQuantity.toLocaleString("vi-VN")} sản phẩm</small>
             {card.conditional && (
               <p className="hint">Giá ưu đãi có điều kiện; xác nhận tại checkout.</p>
             )}
@@ -127,7 +161,7 @@ export function SectionTitle({
     <div className="catalog-section-title">
       <h2>{title}</h2>
       {href && (
-        <Link href={href}>
+        <Link prefetch={false} href={href}>
           {linkText} <span aria-hidden>→</span>
         </Link>
       )}
@@ -138,7 +172,12 @@ export function CategoryTiles({ categories }: { categories: Category[] }) {
   return (
     <div className="category-tiles">
       {categories.slice(0, 6).map((category) => (
-        <Link className="category-tile" key={category.id} href={`/categories/${category.slug}`}>
+        <Link
+          prefetch={false}
+          className="category-tile"
+          key={category.id}
+          href={`/categories/${category.slug}`}
+        >
           <CatalogImage src={category.imageUrl} alt={category.name} />
           <strong>{category.name}</strong>
         </Link>
@@ -158,13 +197,17 @@ export function Pagination({
   return data.meta.pageCount > 1 ? (
     <nav aria-label="Phân trang" className="catalog-pagination">
       {page > 1 && (
-        <Link href={`${base}${base.includes("?") ? "&" : "?"}page=${page - 1}`}>← Trước</Link>
+        <Link prefetch={false} href={`${base}${base.includes("?") ? "&" : "?"}page=${page - 1}`}>
+          ← Trước
+        </Link>
       )}
       <span>
         Trang {page} / {data.meta.pageCount}
       </span>
       {page < data.meta.pageCount && (
-        <Link href={`${base}${base.includes("?") ? "&" : "?"}page=${page + 1}`}>Sau →</Link>
+        <Link prefetch={false} href={`${base}${base.includes("?") ? "&" : "?"}page=${page + 1}`}>
+          Sau →
+        </Link>
       )}
     </nav>
   ) : null;

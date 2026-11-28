@@ -24,6 +24,7 @@ import { sessionChanged } from "./session-change";
 import { useHydrated } from "@/shared/lib/use-hydrated";
 import { SocialAuth } from "./social-auth";
 import type { OAuthProviders } from "@/shared/auth/provider-types";
+import { getWebBehaviorTracker } from "@/shared/recommendations/web-tracker";
 
 const copy: Record<
   AuthAction,
@@ -205,6 +206,13 @@ export function AuthForm({
       body.fullName = values.fullName ?? "";
       if (values.phone) body.phone = values.phone;
     }
+    if (mode === "login" || mode === "register") {
+      try {
+        body.anonymousId = await getWebBehaviorTracker().getAnonymousId();
+      } catch {
+        // Non-fatal if storage is unavailable
+      }
+    }
     if (needsToken) body.token = token;
     const parsed = authInputs[mode].safeParse(body);
     if (!parsed.success) {
@@ -359,6 +367,7 @@ export function AuthForm({
               </>
             )}
             <button
+              type="submit"
               className="button full"
               disabled={!hydrated || isSubmitting || oauthBusy || cooldown > 0}
             >

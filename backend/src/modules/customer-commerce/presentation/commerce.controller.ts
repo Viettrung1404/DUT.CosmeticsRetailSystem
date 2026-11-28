@@ -27,15 +27,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { PageOptionsDto } from '@core/common/pagination.dto';
 import { CustomerOnlyGuard } from './customer-only.guard';
 import {
-  AcceptExchangeDto,
-  CreateReturnDto,
   DeviceDto,
   RedeemDto,
-  ReturnQueryDto,
   WishlistDto,
   WishlistStateDto,
 } from './commerce.dto';
-import { ReturnsService } from '../application/returns.service';
 import { LoyaltyService } from '../application/loyalty.service';
 import { WishlistService } from '../application/wishlist.service';
 import { TrackingService } from '../application/tracking.service';
@@ -59,56 +55,13 @@ const keyHeader = {
 @Controller()
 export class CommerceController {
   constructor(
-    private readonly returns: ReturnsService,
     private readonly loyalty: LoyaltyService,
     private readonly wishlist: WishlistService,
     private readonly tracking: TrackingService,
     private readonly notifications: NotificationsService,
     private readonly images: ReturnImageStorage,
   ) {}
-  @Post('returns')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @ApiHeader(keyHeader)
-  @ApiOperation({
-    summary: 'Tạo yêu cầu REFUND/EXCHANGE cho đơn của tôi trong 7 ngày từ COMPLETED',
-  })
-  @CommerceResponse('returnCreated', 201)
-  createReturn(
-    @Req() req: CustomerRequest,
-    @Headers('idempotency-key') key: string,
-    @Body() dto: CreateReturnDto,
-  ) {
-    return this.returns.create(req.user.userId, key, dto);
-  }
-  @Get('returns')
-  @ApiOperation({ summary: 'Danh sách yêu cầu đổi trả của tôi' })
-  @CommerceResponse('returns')
-  listReturns(@Req() req: CustomerRequest, @Query() query: ReturnQueryDto) {
-    return this.returns.list(req.customerId, query.page!, query.limit!, query.status);
-  }
-  @Get('returns/:id')
-  @ApiOperation({
-    summary: 'Chi tiết đổi trả, quote, settlement và trạng thái hoàn tiền',
-  })
-  @CommerceResponse('returnDetail')
-  returnDetail(@Req() req: CustomerRequest, @Param('id', ParseUUIDPipe) id: string) {
-    return this.returns.detail(req.customerId, id);
-  }
-  @Post('returns/:id/exchange/accept')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @ApiHeader(keyHeader)
-  @ApiOperation({
-    summary: 'Chấp nhận quote đổi hàng đã kiểm định; giữ tồn và tạo đơn thay thế',
-  })
-  @CommerceResponse('exchange', 201)
-  accept(
-    @Req() req: CustomerRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Headers('idempotency-key') key: string,
-    @Body() dto: AcceptExchangeDto,
-  ) {
-    return this.returns.accept(req.user.userId, id, key, dto);
-  }
+
   @Get('orders/:id/tracking')
   @ApiOperation({
     summary: 'Theo dõi nhiều kiện hàng của đơn thuộc khách hàng',
@@ -197,6 +150,12 @@ export class CommerceController {
     @Body() dto: WishlistStateDto,
   ) {
     return this.wishlist.change(req.user.userId, key, id, dto.selected);
+  }
+  @Get('wishlists/ids')
+  @ApiOperation({ summary: 'Lấy toàn bộ ID sản phẩm yêu thích của khách hàng' })
+  @CommerceResponse('wishlistIds')
+  getWishlistIds(@Req() req: CustomerRequest) {
+    return this.wishlist.getIds(req.customerId);
   }
   @Get('wishlists')
   @ApiOperation({ summary: 'Danh sách sản phẩm yêu thích còn hiển thị' })

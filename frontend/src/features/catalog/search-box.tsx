@@ -1,23 +1,191 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Search } from "lucide-react";
+import { Camera, Search, Clock, TrendingUp, X } from "lucide-react";
 import { readBff } from "@/shared/api/browser";
+import { apiErrorMessage } from "@/shared/api/errors";
 import { formatPrice } from "./components";
 import { searchHintsSchema, type SearchHints } from "./search-hints";
 
 const empty: SearchHints = { keywords: [], brands: [], products: [] };
+const STORAGE_KEY = "glowup_web_search_history";
+const HINTS_CACHE_TTL_MS = 30_000;
+const hintsCache = new Map<string, { data: SearchHints; expiresAt: number }>();
+
+function getCachedHints(query: string): SearchHints | null {
+  const entry = hintsCache.get(query.toLowerCase());
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    hintsCache.delete(query.toLowerCase());
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedHints(query: string, data: SearchHints) {
+  if (hintsCache.size >= 50) {
+    const oldest = hintsCache.keys().next().value;
+    if (oldest) hintsCache.delete(oldest);
+  }
+  hintsCache.set(query.toLowerCase(), { data, expiresAt: Date.now() + HINTS_CACHE_TTL_MS });
+}
+
+const HISTORY_LABEL_MAX_CHARS = 45;
+
+function truncateHistoryLabel(label: string, maxChars = HISTORY_LABEL_MAX_CHARS) {
+  return label.length > maxChars ? `${label.slice(0, maxChars).trimEnd()}…` : label;
+}
+
+function historyQueries(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item: unknown) => {
+    if (typeof item === "string") {
+      const clean = item.trim();
+      return clean ? [clean] : [];
+    }
+    if (item && typeof item === "object" && "query" in item && typeof item.query === "string") {
+      const clean = item.query.trim();
+      return clean ? [clean] : [];
+    }
+    return [];
+  });
+}
+
 export function SearchBox() {
   const router = useRouter();
+  const pathname = usePathname();
   const [value, setValue] = useState("");
   const [hints, setHints] = useState<SearchHints>(empty);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [trendingSearches, setTrendingSearches] = useState<string[]>([
+    "Son thỏi",
+    "Serum B5",
+    "Kem chống nắng",
+    "Nước tẩy trang",
+    "Toner làm dịu da",
+  ]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [hintError, setHintError] = useState("");
   const query = value.trim();
+
+  // 1. Tải lịch sử tìm kiếm từ localStorage & API
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.resolve().then(() => {
+      if (controller.signal.aborted) return;
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        const queries = stored ? historyQueries(JSON.parse(stored)) : [];
+        if (queries.length) setRecentSearches(queries.slice(0, 8));
+      } catch {}
+    });
+
+    // Lấy thêm từ backend nếu có
+    fetch("/api/catalog/search-history", { signal: controller.signal })
+      .then((r) => r.json())
+      .then((res) => {
+        if (controller.signal.aborted) return;
+        const history = res?.data?.history;
+        if (Array.isArray(history) && history.length > 0) {
+          const queries = historyQueries(history);
+          setRecentSearches((prev) => {
+            const merged = Array.from(new Set([...queries, ...prev])).slice(0, 8);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+        const trending = res?.data?.trending;
+        if (Array.isArray(trending) && trending.length > 0) {
+          const tQueries = historyQueries(trending);
+          if (tQueries.length > 0) {
+            setTrendingSearches(tQueries.slice(0, 6));
+          }
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  const saveQueryToHistory = (q: string) => {
+    const clean = q.trim();
+    if (!clean) return;
+    setRecentSearches((prev) => {
+      const updated = [
+        clean,
+        ...prev.filter((item) => item.toLowerCase() !== clean.toLowerCase()),
+      ].slice(0, 8);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // Bắn API lưu vào database
+    fetch("/api/catalog/search-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: clean }),
+    }).catch(() => {});
+  };
+
+  const removeHistoryItem = (itemToRemove: string, e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setRecentSearches((prev) => {
+      const updated = prev.filter((item) => item !== itemToRemove);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    fetch(`/api/catalog/search-history?query=${encodeURIComponent(itemToRemove)}`, {
+      method: "DELETE",
+    }).catch(() => {});
+  };
+
+  const clearAllHistory = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    fetch("/api/catalog/search-history", { method: "DELETE" }).catch(() => {});
+  };
+
+  // Lọc lịch sử tìm kiếm nếu người dùng đang gõ
+  const matchingHistory = useMemo(() => {
+    if (!query) return recentSearches;
+    return recentSearches.filter((item) => item.toLowerCase().includes(query.toLowerCase()));
+  }, [query, recentSearches]);
+
+  useEffect(() => {
+    if (pathname !== "/search") return;
+    const params = new URLSearchParams(window.location.search);
+    const urlQuery = params.get("q")?.trim() ?? "";
+    if (!urlQuery) return;
+    const timer = window.setTimeout(() => {
+      setValue((prev) => (prev.trim() === urlQuery ? prev : urlQuery));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
+
   useEffect(() => {
     if (query.length < 2) return;
+    const cached = getCachedHints(query);
+    if (cached) {
+      const timer = window.setTimeout(() => {
+        setHints(cached);
+        setLoading(false);
+        setHintError("");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => {
       readBff(
@@ -27,62 +195,162 @@ export function SearchBox() {
       )
         .then((result) => {
           if (!controller.signal.aborted) {
+            setCachedHints(query, result);
             setHints(result);
             setLoading(false);
             setOpen(true);
             setActive(-1);
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (!controller.signal.aborted) {
-            setHints(empty);
             setLoading(false);
-            setOpen(true);
+            setHintError(apiErrorMessage(error));
           }
         });
-    }, 300);
+    }, 150);
+
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
   }, [query]);
-  const options = useMemo(
-    () => [
-      ...[
+
+  // Danh sách các options theo thứ tự
+  const options = useMemo(() => {
+    const list: Array<{
+      kind: "history" | "keyword" | "brand" | "product" | "trending";
+      label: string;
+      href: string;
+      price?: number;
+    }> = [];
+
+    // Nếu có lịch sử tìm kiếm phù hợp, đưa lên đầu
+    matchingHistory.slice(0, 5).forEach((h) => {
+      list.push({
+        kind: "history",
+        label: h,
+        href: `/search?q=${encodeURIComponent(h)}`,
+      });
+    });
+
+    // Nếu chưa nhập gì và không có lịch sử, gợi ý xu hướng tìm kiếm
+    if (!query && matchingHistory.length === 0) {
+      trendingSearches.slice(0, 5).forEach((t) => {
+        list.push({
+          kind: "trending",
+          label: t,
+          href: `/search?q=${encodeURIComponent(t)}`,
+        });
+      });
+    }
+
+    // Từ khóa gợi ý
+    if (query.length >= 1) {
+      const distinctKeywords = [
         query,
         ...hints.keywords.filter(
-          (keyword) => keyword.toLocaleLowerCase("vi").trim() !== query.toLocaleLowerCase("vi"),
+          (k) =>
+            k.toLocaleLowerCase("vi").trim() !== query.toLocaleLowerCase("vi") &&
+            !matchingHistory.includes(k),
         ),
-      ]
-        .slice(0, 5)
-        .map((keyword) => ({
-          kind: "keyword" as const,
-          label: keyword,
-          href: `/search?q=${encodeURIComponent(keyword)}`,
-        })),
-      ...hints.brands.map((brand) => ({
-        kind: "brand" as const,
-        label: brand.name,
-        href: `/products?brandId=${brand.id}`,
-      })),
-      ...hints.products.map((product) => ({
-        kind: "product" as const,
-        label: product.name,
-        price: product.price,
-        href: `/products/${product.slug}`,
-      })),
-    ],
-    [query, hints],
-  );
+      ].slice(0, 5);
+
+      distinctKeywords.forEach((k) => {
+        list.push({
+          kind: "keyword",
+          label: k,
+          href: `/search?q=${encodeURIComponent(k)}`,
+        });
+      });
+
+      hints.brands.forEach((brand) => {
+        list.push({
+          kind: "brand",
+          label: brand.name,
+          href: `/products?brandId=${brand.id}`,
+        });
+      });
+
+      hints.products.forEach((product) => {
+        list.push({
+          kind: "product",
+          label: product.name,
+          price: product.price,
+          href: `/products/${product.slug}`,
+        });
+      });
+    }
+
+    return list;
+  }, [query, matchingHistory, trendingSearches, hints]);
+
   let index = -1;
   const option = (
-    kind: "keyword" | "brand" | "product",
+    kind: "history" | "keyword" | "brand" | "product" | "trending",
     label: string,
     href: string,
     price?: number,
   ) => {
     index += 1;
     const current = index;
+    const isHistory = kind === "history";
+    const isTrending = kind === "trending";
+
+    if (isHistory) {
+      const displayLabel = truncateHistoryLabel(label);
+      return (
+        <div key={`${kind}-${href}`} className="search-history-row">
+          <Link
+            id={`search-suggestion-${current}`}
+            role="option"
+            aria-selected={active === current}
+            title={label}
+            href={href}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              saveQueryToHistory(label);
+              setOpen(false);
+            }}
+          >
+            <Clock size={14} color="#9d394f" />
+            <span>{displayLabel}</span>
+          </Link>
+          <button
+            type="button"
+            className="search-history-delete"
+            title="Xóa khỏi lịch sử"
+            aria-label={`Xóa "${label}" khỏi lịch sử`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={(event) => removeHistoryItem(label, event)}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      );
+    }
+
+    if (isTrending) {
+      return (
+        <Link
+          key={`${kind}-${href}`}
+          id={`search-suggestion-${current}`}
+          className="search-trending-link"
+          role="option"
+          aria-selected={active === current}
+          href={href}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            saveQueryToHistory(label);
+            setOpen(false);
+          }}
+        >
+          <TrendingUp size={14} color="#e05a80" />
+          <span>{label}</span>
+        </Link>
+      );
+    }
+
     return (
       <Link
         key={`${kind}-${href}`}
@@ -91,18 +359,35 @@ export function SearchBox() {
         aria-selected={active === current}
         href={href}
         onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setOpen(false)}
+        onClick={() => {
+          if (kind === "keyword") saveQueryToHistory(label);
+          setOpen(false);
+        }}
       >
         <span>{label}</span>
         {price !== undefined && <small>{formatPrice(price)}</small>}
       </Link>
     );
   };
+
+  const shouldShowDropdown =
+    open &&
+    (matchingHistory.length > 0 ||
+      (!query && trendingSearches.length > 0) ||
+      (query.length >= 1 && (options.length > 0 || loading)));
+
   return (
     <form
       action="/search"
       role="search"
       className="header-search search-suggest"
+      onSubmit={(event) => {
+        if (!query) return;
+        event.preventDefault();
+        saveQueryToHistory(query);
+        setOpen(false);
+        router.push(`/search?q=${encodeURIComponent(query)}`);
+      }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}
@@ -119,6 +404,7 @@ export function SearchBox() {
           setActive(-1);
         } else if (event.key === "Enter" && active >= 0 && options[active]) {
           event.preventDefault();
+          saveQueryToHistory(options[active].label);
           router.push(options[active].href);
           setOpen(false);
         }
@@ -129,7 +415,7 @@ export function SearchBox() {
         name="q"
         type="search"
         aria-label="Tìm kiếm sản phẩm"
-        aria-expanded={open && query.length >= 2}
+        aria-expanded={shouldShowDropdown}
         aria-controls="search-suggestions"
         aria-activedescendant={open && active >= 0 ? `search-suggestion-${active}` : undefined}
         role="combobox"
@@ -139,14 +425,27 @@ export function SearchBox() {
         maxLength={200}
         value={value}
         onFocus={() => {
-          if (query.length >= 2) setOpen(true);
+          setOpen(true);
         }}
         onChange={(event) => {
-          setValue(event.target.value);
+          const next = event.target.value;
+          setValue(next);
           setActive(-1);
-          setLoading(event.target.value.trim().length >= 2);
-          setOpen(event.target.value.trim().length >= 2);
-          setHints(empty);
+          setOpen(true);
+          const q = next.trim();
+          setHintError("");
+          if (q.length < 2) {
+            setHints(empty);
+            setLoading(false);
+          } else {
+            const cached = getCachedHints(q);
+            if (cached) {
+              setHints(cached);
+              setLoading(false);
+            } else {
+              setLoading(true);
+            }
+          }
         }}
       />
       <button type="submit" className="sr-only">
@@ -161,16 +460,62 @@ export function SearchBox() {
       >
         <Camera size={20} />
       </button>
-      {open && query.length >= 2 && (
+
+      {shouldShowDropdown && (
         <div id="search-suggestions" role="listbox" className="search-suggestions">
           {loading && <p className="search-hints-status">Đang tìm gợi ý…</p>}
-          <div role="group" aria-label="Từ khóa">
-            <strong>Từ khóa</strong>
-            {options
-              .filter((item) => item.kind === "keyword")
-              .map((item) => option(item.kind, item.label, item.href))}
-          </div>
-          {hints.brands.length > 0 && (
+          {hintError && (
+            <p role="status" className="search-hints-status">
+              {hintError}
+            </p>
+          )}
+
+          {/* Nhóm lịch sử tìm kiếm (hiện khi mới bấm vào hoặc khi gõ có chứa từ trong lịch sử) */}
+          {matchingHistory.length > 0 && (
+            <div role="group" aria-label="Lịch sử tìm kiếm">
+              <div className="search-history-header">
+                <strong>{query.length < 1 ? "Tìm kiếm gần đây" : "Lịch sử tìm kiếm"}</strong>
+                <button
+                  type="button"
+                  className="search-history-clear"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={clearAllHistory}
+                >
+                  Xóa tất cả
+                </button>
+              </div>
+              {options
+                .filter((item) => item.kind === "history")
+                .map((item) => option(item.kind, item.label, item.href))}
+            </div>
+          )}
+
+          {/* Nhóm xu hướng tìm kiếm (hiện khi chưa gõ gì và không có lịch sử) */}
+          {!query &&
+            matchingHistory.length === 0 &&
+            options.some((item) => item.kind === "trending") && (
+              <div role="group" aria-label="Xu hướng tìm kiếm">
+                <div className="search-history-header">
+                  <strong>Xu hướng tìm kiếm</strong>
+                </div>
+                {options
+                  .filter((item) => item.kind === "trending")
+                  .map((item) => option(item.kind, item.label, item.href))}
+              </div>
+            )}
+
+          {/* Nhóm từ khóa gợi ý */}
+          {query.length >= 1 && options.some((item) => item.kind === "keyword") && (
+            <div role="group" aria-label="Từ khóa">
+              <strong>Từ khóa gợi ý</strong>
+              {options
+                .filter((item) => item.kind === "keyword")
+                .map((item) => option(item.kind, item.label, item.href))}
+            </div>
+          )}
+
+          {/* Nhóm thương hiệu */}
+          {query.length >= 1 && hints.brands.length > 0 && (
             <div role="group" aria-label="Thương hiệu">
               <strong>Thương hiệu</strong>
               {options
@@ -178,7 +523,9 @@ export function SearchBox() {
                 .map((item) => option(item.kind, item.label, item.href))}
             </div>
           )}
-          {hints.products.length > 0 && (
+
+          {/* Nhóm sản phẩm */}
+          {query.length >= 1 && hints.products.length > 0 && (
             <div role="group" aria-label="Sản phẩm">
               <strong>Sản phẩm</strong>
               {options

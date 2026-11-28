@@ -87,8 +87,8 @@ export function AddressFields({
                 city: selected?.name ?? "",
                 ward: "",
                 district: "",
-                latitude: null,
-                longitude: null,
+                latitude: selected?.latitude ?? null,
+                longitude: selected?.longitude ?? null,
               });
             }}
           >
@@ -115,8 +115,8 @@ export function AddressFields({
                 city: province?.name ?? value.city,
                 ward: selected?.name ?? "",
                 district: "",
-                latitude: null,
-                longitude: null,
+                latitude: selected?.latitude ?? null,
+                longitude: selected?.longitude ?? null,
               });
             }}
           >

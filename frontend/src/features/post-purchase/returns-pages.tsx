@@ -1,27 +1,44 @@
 "use client";
 import { ContentLoading } from "@/shared/ui/content-loading";
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, ImagePlus, Package, Clock3, Check, Plus } from "lucide-react";
+import {
+  ArrowRight,
+  ShieldCheck,
+  ImagePlus,
+  Package,
+  Clock3,
+  Check,
+  Plus,
+  Truck,
+  MapPin,
+  AlertCircle,
+  Video,
+  ExternalLink,
+  Building2,
+  FileVideo,
+  CheckCircle2,
+} from "lucide-react";
 import { AccountHeading, StatusBadge, returnStatusText } from "@/features/account/account-ui";
 import { ContentEmpty } from "@/features/catalog/content-layout";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { productPageSchema } from "@/features/catalog/contracts";
 import { CatalogImage, formatPrice } from "@/features/catalog/components";
 import { orderDetailSchema, ordersSchema } from "@/features/account/contracts";
 import { readBff, requestBff } from "@/shared/api/browser";
 import { apiErrorMessage } from "@/shared/api/errors";
 import {
-  createReturnInputSchema,
   imageUploadSchema,
+  imageUrlSchema,
+  orderEligibilitySchema,
   returnCreatedSchema,
   returnDetailSchema,
   returnsSchema,
   returnStatusSchema,
+  storeLocationsSchema,
+  submitReturnInputSchema,
   exchangeSchema,
-  imageUrlSchema,
 } from "./contracts";
 import { canAcceptQuote } from "./return-quote";
 
@@ -46,27 +63,51 @@ function EvidenceLink({ id }: { id: string }) {
     }
   }
   return (
-    <span>
-      <button type="button" disabled={busy} onClick={() => void load()}>
-        {busy ? "Đang lấy ảnh…" : "Lấy liên kết ảnh"}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+      <button type="button" className="button button-outline" disabled={busy} onClick={() => void load()}>
+        {busy ? "Đang tải ảnh…" : "Xem ảnh bằng chứng"}
       </button>
       {url && (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          Mở ảnh (5 phút)
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "#c85a70" }}>
+          Mở ảnh xem trực tiếp (5 phút) <ExternalLink size={13} style={{ display: "inline" }} />
         </a>
       )}
-      {error && <span role="alert">{error}</span>}
+      {error && <span role="alert" style={{ color: "#d9534f" }}>{error}</span>}
     </span>
   );
 }
 
 const reasonLabels: Record<string, string> = {
+  CHANGE_OF_MIND: "Đổi ý / Không còn nhu cầu",
+  CUSTOMER_CHANGE_MIND: "Đổi ý / Không còn nhu cầu",
   WRONG_ITEM: "Giao sai sản phẩm",
-  DEFECTIVE: "Sản phẩm lỗi",
-  EXPIRED: "Hết hạn sử dụng",
-  ALLERGIC: "Kích ứng",
-  CUSTOMER_CHANGE_MIND: "Đổi ý",
+  DAMAGED_IN_TRANSIT: "Hư hỏng trong quá trình vận chuyển",
+  DEFECTIVE: "Sản phẩm bị lỗi / khuyết tật NSX",
+  EXPIRED: "Sản phẩm cận / hết hạn sử dụng",
+  ALLERGIC: "Dị ứng / Kích ứng da",
 };
+
+const conditionLabels: Record<string, string> = {
+  UNOPENED: "Nguyên seal / Chưa bóc",
+  OPENED_INTACT: "Đã mở seal, còn nguyên vẹn",
+  DAMAGED: "Hư hỏng / Biến dạng",
+  DEFECTIVE: "Lỗi kỹ thuật / Khuyết tật NSX",
+};
+
+const dispositionLabels: Record<string, string> = {
+  RESTOCK: "Nhập lại kho lưu hành",
+  QUARANTINE: "Cách ly kỹ thuật kiểm tra",
+  SCRAP: "Tiêu hủy an toàn",
+  RETURN_TO_CUSTOMER: "Chuyển trả lại cho khách hàng",
+};
+
+const inspectionStatusLabels: Record<string, string> = {
+  PASSED: "Đạt yêu cầu kiểm định",
+  FAILED: "Không đạt yêu cầu",
+  PENDING: "Đang chờ kiểm định",
+  DISPUTED: "Đang khiếu nại kết quả",
+};
+
 function Pager({ page, total, status }: { page: number; total: number; status: string }) {
   const href = (next: number) =>
     `/account/returns?page=${next}${status ? `&status=${status}` : ""}`;
@@ -84,6 +125,7 @@ function Pager({ page, total, status }: { page: number; total: number; status: s
     </nav>
   );
 }
+
 export function ReturnsPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -100,11 +142,12 @@ export function ReturnsPage() {
         signal,
       ),
   });
+
   return (
     <section className="account-screen">
       <AccountHeading
         title="Yêu cầu đổi / trả hàng"
-        description="Theo dõi yêu cầu đổi trả và cập nhật báo giá xử lý của bạn."
+        description="Theo dõi toàn bộ tiến trình xử lý, kiểm định QC và hoàn tiền."
         actions={
           <Link className="button" href="/account/returns/new">
             <Plus size={16} />
@@ -115,8 +158,7 @@ export function ReturnsPage() {
       <div className="account-tip">
         <ShieldCheck size={22} />
         <p>
-          Yêu cầu đổi trả được tiếp nhận trong 7 ngày kể từ khi đơn hoàn tất, theo điều kiện chính
-          sách.
+          Chính sách đổi trả minh bạch: Hỗ trợ tiếp nhận tại showroom hoặc thu hồi tận nơi qua bưu tá.
         </p>
       </div>
       <nav className="account-tabs" role="tablist" aria-label="Trạng thái đổi trả">
@@ -128,12 +170,12 @@ export function ReturnsPage() {
             aria-selected={status === value}
             onClick={() => router.push(`/account/returns?status=${value}`)}
           >
-            {value ? returnStatusText[value] : "Tất cả"}
+            {value ? returnStatusText[value] ?? value : "Tất cả"}
           </button>
         ))}
       </nav>
       {query.isPending ? (
-        <ContentLoading variant="list" label="Đang tải yêu cầu đổi trả…" heading={false} />
+        <ContentLoading variant="list" label="Đang tải danh sách đổi trả…" heading={false} />
       ) : query.isError ? (
         <div className="account-surface" role="alert">
           Không tải được yêu cầu. <button onClick={() => query.refetch()}>Thử lại</button>
@@ -146,7 +188,10 @@ export function ReturnsPage() {
                 <header>
                   <div>
                     <h2>{item.returnCode}</h2>
-                    <small>{new Date(item.createdAt).toLocaleDateString("vi-VN")}</small>
+                    <small>
+                      {new Date(item.createdAt).toLocaleDateString("vi-VN")}
+                      {item.order?.orderNumber && ` · Đơn #${item.order.orderNumber}`}
+                    </small>
                   </div>
                   <StatusBadge value={item.status} kind="return" />
                 </header>
@@ -154,11 +199,14 @@ export function ReturnsPage() {
                   <div>
                     <p>
                       <strong>
-                        {item.returnType === "EXCHANGE" ? "Đổi sản phẩm" : "Trả hàng & hoàn tiền"}
+                        {item.returnChannel === "STORE_DROPOFF"
+                          ? "Gửi tại Showroom"
+                          : "Thu hồi tận nơi"}
                       </strong>
+                      {item.dropoffLocation && ` · ${item.dropoffLocation.name}`}
                     </p>
                     <p>Lý do: {reasonLabels[item.reason] ?? item.reason}</p>
-                    {item.refundAmount !== null && (
+                    {item.refundAmount != null && item.refundAmount > 0 && (
                       <p>
                         Giá trị hoàn dự kiến: <strong>{formatPrice(item.refundAmount)}</strong>
                       </p>
@@ -173,7 +221,7 @@ export function ReturnsPage() {
           </div>
           {!query.data.items.length && (
             <ContentEmpty title="Chưa có yêu cầu trong trạng thái này">
-              Các yêu cầu đổi trả sẽ được cập nhật tại đây.
+              Các yêu cầu đổi trả của bạn sẽ được hiển thị và cập nhật liên tục tại đây.
             </ContentEmpty>
           )}
           <Pager page={page} total={query.data.total} status={status} />
@@ -182,6 +230,7 @@ export function ReturnsPage() {
     </section>
   );
 }
+
 export function NewReturnPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -189,49 +238,101 @@ export function NewReturnPage() {
   const orderId = params.get("orderId");
   const ordersPage = Math.max(1, Math.min(10000, Number(params.get("page")) || 1));
   const validOrder = !!orderId && z.uuid().safeParse(orderId).success;
+
   const orders = useQuery({
     queryKey: ["completed-orders", ordersPage],
     enabled: !validOrder,
     queryFn: ({ signal }) =>
       readBff(`/api/account/orders?status=COMPLETED&page=${ordersPage}`, ordersSchema, signal),
   });
+
   const order = useQuery({
     queryKey: ["order-detail", orderId],
     enabled: validOrder,
     queryFn: ({ signal }) => readBff(`/api/account/orders/${orderId}`, orderDetailSchema, signal),
   });
-  const [type, setType] = useState<"REFUND" | "EXCHANGE">("REFUND");
-  const [reason, setReason] =
-    useState<z.infer<typeof createReturnInputSchema>["reason"]>("DEFECTIVE");
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-  const [replacementId, setReplacementId] = useState("");
-  const [replacementQuantity, setReplacementQuantity] = useState(1);
-  const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const command = useRef<{ fingerprint: string; key: string } | null>(null);
-  const products = useQuery({
-    queryKey: ["replacement-search", search],
-    enabled: type === "EXCHANGE" && search.trim().length >= 2,
+
+  const eligibility = useQuery({
+    queryKey: ["return-eligibility", orderId],
+    enabled: validOrder,
     queryFn: ({ signal }) =>
       readBff(
-        `/api/catalog/products?q=${encodeURIComponent(search.trim())}`,
-        productPageSchema,
+        `/api/account/commerce/orders/${orderId}/return-eligibility`,
+        orderEligibilitySchema,
         signal,
       ),
   });
-  async function upload(file: File) {
-    if (
-      attachmentIds.length >= 5 ||
-      file.size > 5 * 1024 * 1024 ||
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type)
-    ) {
-      setError("Chọn tối đa 5 ảnh JPEG, PNG hoặc WebP, mỗi ảnh không quá 5 MB.");
+
+  const showrooms = useQuery({
+    queryKey: ["showrooms-list"],
+    queryFn: ({ signal }) =>
+      readBff("/api/account/commerce/stores", storeLocationsSchema, signal),
+  });
+
+  type ItemFormState = {
+    selected: boolean;
+    quantity: number;
+    reasonCode: string;
+    customerNote: string;
+    evidenceImages: string[];
+    evidenceVideoUrl: string;
+  };
+
+  const [itemsState, setItemsState] = useState<Record<string, ItemFormState>>({});
+  const [returnChannel, setReturnChannel] = useState<"CARRIER_PICKUP" | "STORE_DROPOFF">("CARRIER_PICKUP");
+  const [dropoffLocationId, setDropoffLocationId] = useState("");
+  const [pickupAddress, setPickupAddress] = useState<any>(null);
+  const [customerGeneralNote, setCustomerGeneralNote] = useState("");
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const command = useRef<{ fingerprint: string; key: string } | null>(null);
+
+  // Initialize items state when eligibility data loads
+  useEffect(() => {
+    if (!eligibility.data?.items) return;
+    setItemsState((prev) => {
+      const next = { ...prev };
+      for (const item of eligibility.data.items) {
+        if (!next[item.orderItemId]) {
+          next[item.orderItemId] = {
+            selected: item.isEligible,
+            quantity: Math.min(1, item.availableReturnQuantity),
+            reasonCode: item.allowedRules[0]?.reasonCode ?? "CHANGE_OF_MIND",
+            customerNote: "",
+            evidenceImages: [],
+            evidenceVideoUrl: "",
+          };
+        }
+      }
+      return next;
+    });
+  }, [eligibility.data]);
+
+  // Set default pickup address from order shipping address
+  useEffect(() => {
+    if (order.data?.shippingAddress && !pickupAddress) {
+      setPickupAddress(order.data.shippingAddress);
+    }
+  }, [order.data, pickupAddress]);
+
+  // Set default showroom if available
+  useEffect(() => {
+    if (showrooms.data?.length && !dropoffLocationId && showrooms.data[0]?.id) {
+      setDropoffLocationId(showrooms.data[0].id);
+    }
+  }, [showrooms.data, dropoffLocationId]);
+
+  async function uploadItemImage(orderItemId: string, file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Ảnh bằng chứng tối đa 5 MB.");
       return;
     }
-    setUploading(true);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Định dạng ảnh hỗ trợ: JPEG, PNG, WebP.");
+      return;
+    }
+    setUploadingItemId(orderItemId);
     setError("");
     try {
       const form = new FormData();
@@ -244,46 +345,127 @@ export function NewReturnPage() {
       const body: unknown = await response.json();
       if (!response.ok) throw new Error("UPLOAD_FAILED");
       const result = imageUploadSchema.parse(body);
-      setAttachmentIds((value) => [...value, result.attachmentId]);
+      setItemsState((prev) => {
+        const item = prev[orderItemId];
+        if (!item) return prev;
+        return {
+          ...prev,
+          [orderItemId]: {
+            ...item,
+            evidenceImages: [...item.evidenceImages, result.attachmentId],
+          },
+        };
+      });
     } catch {
-      setError("Không tải được ảnh bằng chứng. Vui lòng thử lại.");
+      setError("Không thể tải lên ảnh bằng chứng. Vui lòng thử lại.");
     } finally {
-      setUploading(false);
+      setUploadingItemId(null);
     }
   }
-  async function submit() {
-    if (!validOrder || !order.data || busy || uploading) return;
-    const items = order.data.items
-      .filter((item) => (quantities[item.id] ?? 0) > 0)
-      .map((item) => ({ orderItemId: item.id, quantity: quantities[item.id] }));
-    const input = createReturnInputSchema.safeParse({
-      orderId,
-      type,
-      reason,
-      items,
-      attachmentIds,
-      replacements:
-        type === "EXCHANGE"
-          ? replacementId
-            ? [{ productVariantId: replacementId, quantity: replacementQuantity }]
-            : []
-          : undefined,
-      idempotencyKey: crypto.randomUUID(),
-    });
-    if (!input.success) {
-      setError("Chọn sản phẩm, số lượng và sản phẩm thay thế nếu yêu cầu đổi hàng.");
+
+  function handleVideoFile(orderItemId: string, file: File) {
+    if (file.size > 50 * 1024 * 1024) {
+      setError("Video bằng chứng không được vượt quá 50 MB.");
       return;
     }
-    const { idempotencyKey, ...payload } = input.data;
-    const fingerprint = JSON.stringify(payload);
-    const key = command.current?.fingerprint === fingerprint ? command.current.key : idempotencyKey;
-    command.current = { fingerprint, key };
-    setBusy(true);
+    if (!["video/mp4", "video/webm"].includes(file.type)) {
+      setError("Định dạng video hợp lệ: MP4 hoặc WebM.");
+      return;
+    }
     setError("");
+    const videoUrl = URL.createObjectURL(file);
+    setItemsState((prev) => {
+      const item = prev[orderItemId];
+      if (!item) return prev;
+      return {
+        ...prev,
+        [orderItemId]: {
+          ...item,
+          evidenceVideoUrl: videoUrl,
+        },
+      };
+    });
+  }
+
+  async function submit() {
+    if (!validOrder || !eligibility.data || busy || uploadingItemId) return;
+    setError("");
+
+    const selectedItems = eligibility.data.items
+      .filter((i) => {
+        const s = itemsState[i.orderItemId];
+        return s && s.selected && s.quantity > 0;
+      })
+      .map((i) => {
+        const s = itemsState[i.orderItemId]!;
+        return {
+          orderItemId: i.orderItemId,
+          quantity: s.quantity,
+          reasonCode: s.reasonCode,
+          customerNote: s.customerNote || "",
+          evidenceImages: s.evidenceImages || [],
+          evidenceVideoUrl: s.evidenceVideoUrl || "",
+          productName: i.productName,
+          itemMeta: i,
+        };
+      });
+
+    if (selectedItems.length === 0) {
+      setError("Vui lòng tích chọn ít nhất 1 sản phẩm bạn muốn đổi trả.");
+      return;
+    }
+
+    for (const item of selectedItems) {
+      const matchedRule = item.itemMeta.allowedRules.find((r) => r.reasonCode === item.reasonCode);
+      if (item.evidenceImages.length === 0) {
+        setError(`Sản phẩm "${item.productName}" bắt buộc cần ít nhất 1 ảnh bằng chứng.`);
+        return;
+      }
+      if (matchedRule?.requiresEvidenceVideo && !item.evidenceVideoUrl.trim()) {
+        setError(
+          `Lý do "${reasonLabels[item.reasonCode] ?? item.reasonCode}" cho sản phẩm "${item.productName}" bắt buộc phải có video khui kiện hàng hoặc lỗi sản phẩm.`,
+        );
+        return;
+      }
+    }
+
+    if (returnChannel === "STORE_DROPOFF" && !dropoffLocationId) {
+      setError("Vui lòng chọn Showroom tiếp nhận để mang sản phẩm đến đổi trả.");
+      return;
+    }
+
+    const payload = submitReturnInputSchema.safeParse({
+      orderId,
+      returnChannel,
+      dropoffLocationId: returnChannel === "STORE_DROPOFF" ? dropoffLocationId : undefined,
+      pickupAddress: returnChannel === "CARRIER_PICKUP" ? (pickupAddress ?? {}) : undefined,
+      customerNote: customerGeneralNote.trim() || undefined,
+      items: selectedItems.map((item) => ({
+        orderItemId: item.orderItemId,
+        quantity: item.quantity,
+        reasonCode: item.reasonCode,
+        customerNote: item.customerNote.trim() || undefined,
+        evidenceImages: item.evidenceImages,
+        evidenceVideoUrl: item.evidenceVideoUrl.trim() || undefined,
+      })),
+      idempotencyKey: crypto.randomUUID(),
+    });
+
+    if (!payload.success) {
+      setError("Thông tin đổi trả chưa hợp lệ. Vui lòng kiểm tra lại.");
+      return;
+    }
+
+    const { idempotencyKey, ...bodyPayload } = payload.data;
+    const fingerprint = JSON.stringify(bodyPayload);
+    const key = command.current?.fingerprint === fingerprint ? command.current.key : idempotencyKey;
+    command.current = { fingerprint, key: key || crypto.randomUUID() };
+
+    setBusy(true);
     try {
       const created = await requestBff("/api/account/commerce/returns", returnCreatedSchema, {
         method: "POST",
-        body: { ...payload, idempotencyKey: key },
+        body: { ...bodyPayload, idempotencyKey: key },
       });
       command.current = null;
       void client.invalidateQueries({ queryKey: ["returns"] });
@@ -294,15 +476,17 @@ export function NewReturnPage() {
       setBusy(false);
     }
   }
-  if (!validOrder)
+
+  // View when orderId is not selected yet
+  if (!validOrder) {
     return (
       <section className="account-screen">
         <AccountHeading
           title="Tạo yêu cầu đổi / trả hàng"
-          description="Chọn đơn hàng đã hoàn tất để bắt đầu yêu cầu."
+          description="Chọn đơn hàng đã giao thành công để bắt đầu kiểm tra điều kiện đổi trả."
         />
         {orders.isPending ? (
-          <ContentLoading variant="list" label="Đang tải đơn hàng…" heading={false} />
+          <ContentLoading variant="list" label="Đang tải danh sách đơn hàng…" heading={false} />
         ) : orders.isError ? (
           <p role="alert">
             Không tải được danh sách đơn hàng.{" "}
@@ -323,7 +507,7 @@ export function NewReturnPage() {
                       {formatPrice(item.totalAmount)}
                     </p>
                     <Link href={`/account/returns/new?orderId=${item.id}`}>
-                      Chọn đơn hàng này →
+                      Chọn đơn này để đổi trả →
                     </Link>
                   </div>
                 </article>
@@ -348,211 +532,473 @@ export function NewReturnPage() {
             </nav>
           </>
         ) : (
-          <ContentEmpty title="Chưa có đơn hoàn thành để đổi trả">
-            Bạn có thể tạo yêu cầu từ chi tiết một đơn đã hoàn tất.
+          <ContentEmpty title="Chưa có đơn hàng hoàn tất để đổi trả">
+            Chỉ những đơn hàng đã hoàn tất hoặc giao thành công mới đủ điều kiện khởi tạo đổi trả theo
+            chính sách.
           </ContentEmpty>
         )}
       </section>
     );
-  if (order.isPending) return <ContentLoading variant="detail" label="Đang tải đơn hàng…" />;
-  if (order.isError) return <p role="alert">Không xem được đơn hàng.</p>;
-  if (order.data.status !== "COMPLETED") return <p>Đơn hàng chưa đủ điều kiện đổi trả.</p>;
+  }
+
+  if (order.isPending || eligibility.isPending || showrooms.isPending) {
+    return <ContentLoading variant="detail" label="Đang kiểm tra chính sách đổi trả cho đơn hàng…" />;
+  }
+
+  if (order.isError || eligibility.isError) {
+    return (
+      <div className="account-surface" role="alert">
+        <p>Không thể kiểm tra điều kiện đổi trả cho đơn hàng này.</p>
+        <Link href="/account/returns">← Quay lại danh sách đổi trả</Link>
+      </div>
+    );
+  }
+
+  const eligData = eligibility.data;
+
   return (
     <section className="account-screen">
       <AccountHeading
         title="Tạo yêu cầu đổi / trả hàng"
-        description={`Đơn hàng ${order.data.orderNumber}`}
+        description={`Đơn hàng #${order.data?.orderNumber ?? orderId} · Chính sách áp dụng: ${eligData.policyVersionName || "GlowUp Standard Policy"}`}
       />
-      <div className="account-tip">
-        <ShieldCheck size={22} />
-        <p>
-          Yêu cầu chỉ được nhận trong 7 ngày từ khi đơn hoàn thành; hệ thống sẽ kiểm tra điều kiện
-          khi bạn gửi.
-        </p>
-      </div>
-      <div className="return-form">
-        <fieldset>
-          <legend>1. Chọn sản phẩm cần đổi hoặc hoàn tiền</legend>
-          {order.data.items.map((item) => (
-            <label key={item.id} className="return-quantity-line">
-              <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {item.thumbnailUrl ? (
-                  <CatalogImage
-                    className="return-item-image"
-                    src={item.thumbnailUrl}
-                    alt={item.productName}
-                  />
-                ) : (
-                  <Package size={28} />
-                )}
-                <span>
-                  {item.productName}
-                  <small
-                    style={{ display: "block", marginTop: 6, color: "#776d6d", fontWeight: 400 }}
-                  >
-                    {item.variantName} · Đã mua {item.quantity}
-                  </small>
+
+      {!eligData.isEligible && (
+        <div className="account-surface" role="alert" style={{ borderLeft: "4px solid #d9534f" }}>
+          <h2 style={{ color: "#d9534f", fontSize: 16 }}>Đơn hàng không đủ điều kiện tạo đổi trả</h2>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+            {eligData.ineligibleReasons.map((reason, idx) => (
+              <li key={idx} style={{ color: "#776d6d", fontSize: 13 }}>
+                {reason}
+              </li>
+            ))}
+          </ul>
+          <p style={{ marginTop: 12 }}>
+            <Link href="/account/returns">← Quay lại danh sách đổi trả</Link>
+          </p>
+        </div>
+      )}
+
+      {eligData.isEligible && (
+        <div className="return-form">
+          {/* STEP 1: PRODUCTS & REASONS */}
+          <fieldset>
+            <legend>1. Chọn sản phẩm & cung cấp bằng chứng minh bạch</legend>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
+              Tích chọn sản phẩm muốn đổi trả. Với các lý do hư hại khi vận chuyển hoặc lỗi sản phẩm,
+              bắt buộc phải có hình ảnh và video chứng thực.
+            </p>
+
+            {eligData.items.map((item) => {
+              const state = itemsState[item.orderItemId] ?? {
+                selected: false,
+                quantity: 1,
+                reasonCode: "CHANGE_OF_MIND",
+                customerNote: "",
+                evidenceImages: [],
+                evidenceVideoUrl: "",
+              };
+              const matchedRule = item.allowedRules.find((r) => r.reasonCode === state.reasonCode);
+              const isUploading = uploadingItemId === item.orderItemId;
+
+              return (
+                <div
+                  key={item.orderItemId}
+                  className={`return-item-box ${!item.isEligible ? "is-ineligible" : ""}`}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                    <input
+                      type="checkbox"
+                      disabled={!item.isEligible}
+                      checked={state.selected}
+                      onChange={(e) =>
+                        setItemsState((prev) => ({
+                          ...prev,
+                          [item.orderItemId]: {
+                            ...state,
+                            selected: e.target.checked,
+                          },
+                        }))
+                      }
+                      style={{ marginTop: 6 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <strong>{item.productName}</strong>
+                          <p className="muted" style={{ margin: "2px 0 0", fontSize: 13 }}>
+                            {item.variantName && `${item.variantName} · `}
+                            Đã mua: {item.purchasedQuantity} · Khả dụng đổi trả:{" "}
+                            <strong>{item.availableReturnQuantity}</strong>
+                          </p>
+                        </div>
+                        {!item.isEligible && (
+                          <span className="order-status" style={{ background: "#f8d7da", color: "#721c24" }}>
+                            {item.ineligibleReason || "Không đủ điều kiện"}
+                          </span>
+                        )}
+                      </div>
+
+                      {item.isEligible && state.selected && (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #efe5e7" }}>
+                          <div className="account-form-grid" style={{ marginBottom: 12 }}>
+                            <label>
+                              Số lượng muốn trả (tối đa {item.availableReturnQuantity})
+                              <input
+                                type="number"
+                                min="1"
+                                max={item.availableReturnQuantity}
+                                value={state.quantity}
+                                onChange={(e) =>
+                                  setItemsState((prev) => ({
+                                    ...prev,
+                                    [item.orderItemId]: {
+                                      ...state,
+                                      quantity: Math.max(
+                                        1,
+                                        Math.min(
+                                          item.availableReturnQuantity,
+                                          Number(e.target.value) || 1,
+                                        ),
+                                      ),
+                                    },
+                                  }))
+                                }
+                              />
+                            </label>
+                            <label>
+                              Lý do đổi trả
+                              <select
+                                value={state.reasonCode}
+                                onChange={(e) =>
+                                  setItemsState((prev) => ({
+                                    ...prev,
+                                    [item.orderItemId]: {
+                                      ...state,
+                                      reasonCode: e.target.value,
+                                    },
+                                  }))
+                                }
+                              >
+                                {item.allowedRules.map((rule) => (
+                                  <option key={rule.reasonCode} value={rule.reasonCode}>
+                                    {reasonLabels[rule.reasonCode] ?? rule.reasonCode} ({rule.daysRemaining} ngày còn lại)
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+
+                          {matchedRule && (
+                            <div className="return-rule-badges">
+                              {matchedRule.requiresEvidenceVideo && (
+                                <span className="return-rule-badge is-video">
+                                  <Video size={11} style={{ display: "inline", marginRight: 3 }} />
+                                  Bắt buộc Video khui kiện / lỗi
+                                </span>
+                              )}
+                              {matchedRule.requiresOriginalSeal && (
+                                <span className="return-rule-badge is-seal">Yêu cầu nguyên tem / seal</span>
+                              )}
+                              {matchedRule.shippingFeeBearer === "GLOWUP" && (
+                                <span className="return-rule-badge is-free">Freeship thu hồi (GlowUp hỗ trợ)</span>
+                              )}
+                            </div>
+                          )}
+
+                          <label style={{ marginTop: 8 }}>
+                            Mô tả chi tiết tình trạng sản phẩm
+                            <input
+                              type="text"
+                              placeholder="Mô tả cụ thể lý do hoặc lỗi gặp phải..."
+                              value={state.customerNote}
+                              onChange={(e) =>
+                                setItemsState((prev) => ({
+                                  ...prev,
+                                  [item.orderItemId]: {
+                                    ...state,
+                                    customerNote: e.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </label>
+
+                          {/* Evidence Uploads */}
+                          <div style={{ marginTop: 14 }}>
+                            <strong>Hình ảnh & Video bằng chứng</strong>
+                            <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+                              <label
+                                className="button button-outline"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                              >
+                                <ImagePlus size={16} />
+                                {isUploading ? "Đang tải ảnh lên…" : "Thêm ảnh bằng chứng"}
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  disabled={isUploading || state.evidenceImages.length >= 5}
+                                  style={{ display: "none" }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void uploadItemImage(item.orderItemId, file);
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+
+                              <label
+                                className="button button-outline"
+                                style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                              >
+                                <FileVideo size={16} />
+                                Chọn video clip (≤ 50MB)
+                                <input
+                                  type="file"
+                                  accept="video/mp4,video/webm"
+                                  style={{ display: "none" }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleVideoFile(item.orderItemId, file);
+                                    e.target.value = "";
+                                  }}
+                                />
+                              </label>
+                            </div>
+
+                            {/* URL video fallback */}
+                            <div style={{ marginTop: 8 }}>
+                              <input
+                                type="text"
+                                placeholder="Hoặc dán liên kết video (Google Drive, YouTube, S3...)"
+                                value={state.evidenceVideoUrl}
+                                onChange={(e) =>
+                                  setItemsState((prev) => ({
+                                    ...prev,
+                                    [item.orderItemId]: {
+                                      ...state,
+                                      evidenceVideoUrl: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+
+                            {/* Images and video preview list */}
+                            <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {state.evidenceImages.map((imgId, idx) => (
+                                <div key={imgId} className="return-attachment">
+                                  <span>Ảnh {idx + 1}</span>
+                                  <EvidenceLink id={imgId} />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setItemsState((prev) => ({
+                                        ...prev,
+                                        [item.orderItemId]: {
+                                          ...state,
+                                          evidenceImages: state.evidenceImages.filter((id) => id !== imgId),
+                                        },
+                                      }))
+                                    }
+                                  >
+                                    Bỏ
+                                  </button>
+                                </div>
+                              ))}
+                              {state.evidenceVideoUrl && (
+                                <div className="return-attachment" style={{ background: "#e8f4fd", borderColor: "#b8daff" }}>
+                                  <span style={{ color: "#004085" }}>
+                                    <Video size={13} style={{ display: "inline", marginRight: 4 }} />
+                                    Đã có video
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setItemsState((prev) => ({
+                                        ...prev,
+                                        [item.orderItemId]: {
+                                          ...state,
+                                          evidenceVideoUrl: "",
+                                        },
+                                      }))
+                                    }
+                                  >
+                                    Bỏ
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </fieldset>
+
+          {/* STEP 2: RETURN CHANNEL */}
+          <fieldset>
+            <legend>2. Chọn hình thức gửi hàng đổi trả (Omnichannel)</legend>
+            <div className="return-channel-options">
+              <label
+                className={`return-channel-card ${returnChannel === "CARRIER_PICKUP" ? "is-selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="returnChannel"
+                  checked={returnChannel === "CARRIER_PICKUP"}
+                  onChange={() => setReturnChannel("CARRIER_PICKUP")}
+                />
+                <span className="checkout-shipping-icon">
+                  <Truck size={24} />
                 </span>
-              </span>
-              <input
-                aria-label={`Số lượng đổi trả ${item.productName}`}
-                type="number"
-                min="0"
-                max={item.quantity}
-                step="1"
-                value={quantities[item.id] ?? 0}
-                onChange={(event) =>
-                  setQuantities((value) => ({
-                    ...value,
-                    [item.id]: Math.max(
-                      0,
-                      Math.min(item.quantity, Number(event.target.value) || 0),
-                    ),
-                  }))
-                }
+                <div className="return-channel-info">
+                  <strong>Bưu tá đến thu hồi tận nơi</strong>
+                  <p>Nhân viên vận chuyển sẽ đến nhận kiện hàng đổi trả theo địa chỉ của bạn.</p>
+                </div>
+              </label>
+
+              <label
+                className={`return-channel-card ${returnChannel === "STORE_DROPOFF" ? "is-selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="returnChannel"
+                  checked={returnChannel === "STORE_DROPOFF"}
+                  onChange={() => setReturnChannel("STORE_DROPOFF")}
+                />
+                <span className="checkout-shipping-icon">
+                  <Building2 size={24} />
+                </span>
+                <div className="return-channel-info">
+                  <strong>Gửi trực tiếp tại Showroom GlowUp</strong>
+                  <p>Chủ động mang sản phẩm đến cửa hàng gần nhất để được nhân viên kiểm định ngay.</p>
+                </div>
+              </label>
+            </div>
+
+            {returnChannel === "CARRIER_PICKUP" && (
+              <div className="account-surface" style={{ marginTop: 12 }}>
+                <h3 style={{ fontSize: 14, margin: "0 0 8px" }}>Địa chỉ bưu tá đến lấy hàng:</h3>
+                <p style={{ margin: 0, fontSize: 13, color: "#554a4c" }}>
+                  {pickupAddress?.recipientName} · {pickupAddress?.phone}
+                  <br />
+                  {pickupAddress?.addressLine}, {pickupAddress?.ward && `${pickupAddress.ward}, `}
+                  {pickupAddress?.district && `${pickupAddress.district}, `}
+                  {pickupAddress?.city}
+                </p>
+              </div>
+            )}
+
+            {returnChannel === "STORE_DROPOFF" && (
+              <div style={{ marginTop: 12 }}>
+                <label>
+                  Chọn Showroom GlowUp gần bạn:
+                  <select
+                    value={dropoffLocationId}
+                    onChange={(e) => setDropoffLocationId(e.target.value)}
+                  >
+                    {showrooms.data?.map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.name} — {store.address} ({store.city ?? "Toàn quốc"})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {(() => {
+                  const selectedStore = showrooms.data?.find((s) => s.id === dropoffLocationId);
+                  if (!selectedStore) return null;
+                  return (
+                    <div className="return-showroom-card">
+                      <strong>{selectedStore.name}</strong>
+                      <p style={{ margin: "2px 0 0" }}>
+                        <MapPin size={13} style={{ display: "inline", marginRight: 4 }} />
+                        {selectedStore.address}
+                        {selectedStore.phone && ` · Hotline: ${selectedStore.phone}`}
+                      </p>
+                      {Boolean(selectedStore.openingHours) && (
+                        <p style={{ margin: "4px 0 0", color: "#666" }}>
+                          Giờ mở cửa:{" "}
+                          {typeof selectedStore.openingHours === "string"
+                            ? selectedStore.openingHours
+                            : typeof selectedStore.openingHours === "object"
+                              ? Object.values(selectedStore.openingHours as Record<string, string>).join(", ")
+                              : ""}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </fieldset>
+
+          {/* STEP 3: GENERAL NOTE & SUBMIT */}
+          <fieldset>
+            <legend>3. Ghi chú chung & Xác nhận</legend>
+            <label>
+              Ghi chú thêm cho bộ phận chăm sóc khách hàng (không bắt buộc)
+              <textarea
+                rows={3}
+                placeholder="Ví dụ: Mong muốn đổi sang mùi hương khác, hoặc thời gian thuận tiện..."
+                value={customerGeneralNote}
+                onChange={(e) => setCustomerGeneralNote(e.target.value)}
+                style={{
+                  width: "100%",
+                  border: "1px solid #efe5e7",
+                  background: "#fefafc",
+                  padding: 12,
+                  borderRadius: 12,
+                  fontFamily: "inherit",
+                }}
               />
             </label>
-          ))}
-        </fieldset>
-        <fieldset>
-          <legend>2. Lý do & Hình ảnh minh chứng</legend>
-          <div className="account-form-grid">
-            <label>
-              Loại yêu cầu
-              <select
-                value={type}
-                onChange={(event) => setType(event.target.value as "REFUND" | "EXCHANGE")}
-              >
-                <option value="REFUND">Trả hàng & hoàn tiền</option>
-                <option value="EXCHANGE">Đổi sản phẩm</option>
-              </select>
-            </label>
-            <label>
-              Lý do
-              <select
-                value={reason}
-                onChange={(event) => setReason(event.target.value as typeof reason)}
-              >
-                {Object.entries(reasonLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="return-evidence full-width">
-              <ImagePlus size={30} />
-              <label>
-                Thêm ảnh bằng chứng
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  disabled={uploading || attachmentIds.length >= 5}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void upload(file);
-                    event.target.value = "";
-                  }}
-                />
-              </label>
-              <p>
-                {uploading ? "Đang tải ảnh…" : `${attachmentIds.length}/5 ảnh đã tải lên`} · JPEG,
-                PNG hoặc WebP, mỗi ảnh không quá 5 MB
-              </p>
-              {attachmentIds.map((id, index) => (
-                <div key={id} className="return-attachment">
-                  <span>Ảnh {index + 1}</span>
-                  <EvidenceLink id={id} />
-                  <button
-                    type="button"
-                    onClick={() => setAttachmentIds((value) => value.filter((item) => item !== id))}
-                  >
-                    Bỏ ảnh
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </fieldset>
-        {type === "EXCHANGE" && (
-          <fieldset>
-            <legend>3. Chọn sản phẩm đổi thay thế</legend>
-            <div className="account-form-grid">
-              <label className="full-width">
-                Tìm sản phẩm
-                <input
-                  value={search}
-                  placeholder="Nhập tên sản phẩm muốn đổi"
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </label>
-              {products.isPending && search.length >= 2 && <p role="status">Đang tìm…</p>}
-              <label>
-                Phiên bản
-                <select
-                  value={replacementId}
-                  onChange={(event) => setReplacementId(event.target.value)}
-                >
-                  <option value="">Chọn phiên bản</option>
-                  {products.data?.data.flatMap((product) =>
-                    product.variants
-                      .filter((variant) => variant.id && variant.isActive !== false)
-                      .map((variant) => (
-                        <option key={variant.id} value={variant.id}>
-                          {product.name} · {variant.option1Value || variant.sku}
-                        </option>
-                      )),
-                  )}
-                </select>
-              </label>
-              <label>
-                Số lượng thay thế
-                <input
-                  type="number"
-                  min="1"
-                  max="10000"
-                  value={replacementQuantity}
-                  onChange={(event) =>
-                    setReplacementQuantity(Math.max(1, Number(event.target.value) || 1))
-                  }
-                />
-              </label>
-            </div>
           </fieldset>
-        )}
-        <footer className="account-surface return-submit">
-          <Link href="/account/returns">← Quay lại danh sách</Link>
-          <button
-            className="button"
-            type="button"
-            disabled={busy || uploading}
-            onClick={() => void submit()}
-          >
-            {busy ? "Đang gửi…" : "Gửi yêu cầu đổi trả"}
-          </button>
-        </footer>
-        {error && <p role="alert">{error}</p>}
-      </div>
+
+          <footer className="account-surface return-submit">
+            <Link href="/account/returns">← Quay lại danh sách</Link>
+            <button
+              className="button"
+              type="button"
+              disabled={busy || uploadingItemId !== null}
+              onClick={() => void submit()}
+            >
+              {busy ? "Đang gửi yêu cầu…" : "Gửi yêu cầu đổi trả"}
+              <ArrowRight size={16} />
+            </button>
+          </footer>
+
+          {error && (
+            <p role="alert" className="cart-warning" style={{ marginTop: 12 }}>
+              {error}
+            </p>
+          )}
+        </div>
+      )}
     </section>
   );
 }
+
 export function ReturnDetailPage({ id }: { id: string }) {
   const [now, setNow] = useState(() => Date.now());
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const key = useRef<{ version: number; value: string } | null>(null);
+
   const query = useQuery({
     queryKey: ["return", id],
     queryFn: ({ signal }) =>
       readBff(`/api/account/commerce/returns/${id}`, returnDetailSchema, signal),
   });
-  const originalOrder = useQuery({
-    queryKey: ["order-detail", query.data?.orderId],
-    enabled: !!query.data?.orderId,
-    queryFn: ({ signal }) =>
-      readBff(`/api/account/orders/${query.data?.orderId}`, orderDetailSchema, signal),
-  });
+
+  const data = query.data;
+  const quoteValid = data ? canAcceptQuote(data as any, now) : false;
+
   useEffect(() => {
     const expiresAt = query.data?.quoteExpiresAt;
     if (!expiresAt) return;
@@ -563,24 +1009,20 @@ export function ReturnDetailPage({ id }: { id: string }) {
     );
     return () => window.clearTimeout(timer);
   }, [query.data?.quoteExpiresAt]);
+
   async function accept() {
-    const data = query.data;
-    if (
-      !data?.quoteSnapshot ||
-      !data.quoteExpiresAt ||
-      new Date(data.quoteExpiresAt).getTime() <= Date.now()
-    )
+    if (!data?.quoteSnapshot || !data.quoteExpiresAt || new Date(data.quoteExpiresAt).getTime() <= Date.now())
       return;
-    if (!window.confirm("Xác nhận báo giá đổi hàng hiện tại?")) return;
-    const value =
-      key.current?.version === data.quoteVersion ? key.current.value : crypto.randomUUID();
-    key.current = { version: data.quoteVersion, value };
+    if (!window.confirm("Xác nhận chấp nhận phương án và chi phí đổi hàng?")) return;
+    const currentVersion = data.quoteVersion ?? 1;
+    const value = key.current?.version === currentVersion ? key.current.value : crypto.randomUUID();
+    key.current = { version: currentVersion, value };
     setBusy(true);
     setError("");
     try {
       await requestBff(`/api/account/commerce/returns/${id}/accept`, exchangeSchema, {
         method: "POST",
-        body: { quoteVersion: data.quoteVersion, paymentMethod: "COD", idempotencyKey: value },
+        body: { quoteVersion: currentVersion, paymentMethod: "COD", idempotencyKey: value },
       });
       key.current = null;
       void client.invalidateQueries({ queryKey: ["return", id] });
@@ -591,166 +1033,240 @@ export function ReturnDetailPage({ id }: { id: string }) {
       setBusy(false);
     }
   }
-  if (query.isPending) return <ContentLoading variant="detail" label="Đang tải yêu cầu…" />;
-  if (query.isError)
+
+  if (query.isPending) return <ContentLoading variant="detail" label="Đang tải thông tin hồ sơ đổi trả…" />;
+  if (query.isError || !data)
     return (
-      <p role="alert">
-        Không xem được yêu cầu. <button onClick={() => query.refetch()}>Thử lại</button>
-      </p>
+      <div className="account-surface" role="alert">
+        <p>Không xem được hồ sơ đổi trả này.</p>
+        <button className="button button-outline" onClick={() => query.refetch()}>
+          Thử lại
+        </button>
+      </div>
     );
-  const data = query.data;
-  const quoteValid = canAcceptQuote(data, now);
+
+  const isStoreDropoff = data.returnChannel === "STORE_DROPOFF" || !!data.dropoffLocation;
+
   return (
     <section className="account-screen">
       <AccountHeading
-        title={`Chi tiết yêu cầu ${data.returnCode}`}
-        description={`${data.returnType === "EXCHANGE" ? "Đổi sản phẩm" : "Trả hàng & hoàn tiền"} · ${new Date(data.createdAt).toLocaleDateString("vi-VN")}`}
+        title={`Hồ sơ đổi trả #${data.returnCode}`}
+        description={`${data.returnType === "EXCHANGE" ? "Đổi sản phẩm" : "Trả hàng & hoàn tiền"} · Tạo ngày ${new Date(data.createdAt).toLocaleDateString("vi-VN")}`}
         actions={<StatusBadge value={data.status} kind="return" />}
       />
+
+      {/* REJECTION ALERT IF REJECTED */}
+      {data.status === "REJECTED" && (
+        <div className="tracking-failure-alert" role="alert" style={{ background: "#f8d7da", borderColor: "#f5c6cb", color: "#721c24" }}>
+          <AlertCircle size={22} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <strong>Yêu cầu đổi trả đã bị từ chối</strong>
+            <p style={{ margin: "4px 0 0" }}>
+              Hồ sơ không đáp ứng điều kiện bảo hành hoặc quy định đổi trả. Vui lòng xem ghi chú trong phần Lịch sử xử lý bên dưới hoặc liên hệ tổng đài để được hỗ trợ.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* CHANNEL & LOGISTICS DETAILS */}
       <section className="account-surface">
-        <h2>Tiến trình xử lý yêu cầu</h2>
-        <ol className="return-progress">
-          {["REQUESTED", "APPROVED", "RECEIVED", "INSPECTED", "COMPLETED"].map((value) => (
-            <li
-              key={value}
-              className={
-                data.history.some((item) => item.status === value) || data.status === value
-                  ? "is-complete"
-                  : ""
-              }
-            >
-              <span>
-                <Check size={17} />
-              </span>
-              <strong>{returnStatusText[value]}</strong>
-            </li>
-          ))}
-        </ol>
-        <p className="muted" style={{ fontSize: 13, marginTop: 20 }}>
-          Lý do: {reasonLabels[data.reason] ?? data.reason} ·{" "}
-          <Link href={`/account/orders/${data.orderId}`}>Xem đơn hàng gốc</Link>
-        </p>
+        <h2>Hình thức tiếp nhận hàng đổi trả</h2>
+        {isStoreDropoff ? (
+          <div className="return-showroom-card">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <Building2 size={18} />
+              <strong>Gửi tại Showroom: {data.dropoffLocation?.name ?? "Cửa hàng GlowUp"}</strong>
+            </div>
+            <p style={{ margin: "2px 0 0" }}>
+              Địa chỉ: {data.dropoffLocation?.address}
+              {data.dropoffLocation?.phone && ` · SĐT: ${data.dropoffLocation.phone}`}
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: "#555" }}>
+              💡 Quý khách vui lòng mang sản phẩm cùng phụ kiện nguyên vẹn đến địa chỉ trên trong giờ mở cửa để nhân viên tiến hành đối soát và hoàn tất hồ sơ.
+            </p>
+          </div>
+        ) : (
+          <div className="return-showroom-card" style={{ background: "#fafafa", borderColor: "#eee", color: "#333" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <Truck size={18} color="#c85a70" />
+              <strong>Thu hồi tận nơi qua bưu tá</strong>
+            </div>
+            {data.pickupAddress && (
+              <p style={{ margin: "2px 0 0", fontSize: 13, color: "#554a4c" }}>
+                Địa chỉ lấy hàng: {(data.pickupAddress as any).recipientName} · {(data.pickupAddress as any).phone}
+                <br />
+                {(data.pickupAddress as any).addressLine}, {(data.pickupAddress as any).ward && `${(data.pickupAddress as any).ward}, `}
+                {(data.pickupAddress as any).district && `${(data.pickupAddress as any).district}, `}
+                {(data.pickupAddress as any).city}
+              </p>
+            )}
+          </div>
+        )}
       </section>
+
+      {/* PRODUCTS & QC INSPECTION RESULTS */}
       <section className="account-surface">
-        <h2>Bảng đối soát sản phẩm</h2>
-        <div className="order-lines">
-          {data.items.map((item) => (
-            <article key={item.id}>
-              <div className="order-line-image">
-                <Package size={28} />
-              </div>
-              <div>
-                <h3>
-                  {originalOrder.data?.items.find((line) => line.id === item.orderItemId)
-                    ?.productName ?? "Sản phẩm"}
-                </h3>
-                <p>Số lượng: {item.quantity}</p>
-              </div>
-              <strong>{formatPrice(item.refundAmount)}</strong>
-            </article>
-          ))}
+        <h2>Sản phẩm & Kết quả kiểm định chất lượng (QC)</h2>
+        <div style={{ display: "grid", gap: 16 }}>
+          {data.items.map((item, index) => {
+            const hasQc = !!item.inspectionStatus;
+            const isPassed = item.inspectionStatus === "PASSED";
+            const isFailed = item.inspectionStatus === "FAILED";
+
+            return (
+              <article key={item.id || index} className="return-item-box" style={{ background: "#fff" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <h3 style={{ fontSize: 15, margin: "0 0 4px" }}>
+                      {item.variant?.product?.name ?? "Sản phẩm đổi trả"}
+                    </h3>
+                    <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                      {item.variant?.option1Value && `${item.variant.option1Value} · `}
+                      SKU: {item.variant?.sku ?? "N/A"} · Số lượng: <strong>{item.quantity}</strong>
+                    </p>
+                    <p style={{ fontSize: 13, margin: "4px 0 0", color: "#554a4c" }}>
+                      Lý do: <strong>{reasonLabels[item.reasonCode ?? ""] ?? item.reasonCode ?? data.reason}</strong>
+                    </p>
+                  </div>
+                  {item.refundAmount != null && item.refundAmount > 0 && (
+                    <strong style={{ fontSize: 15, color: "#c85a70" }}>
+                      {formatPrice(item.refundAmount)}
+                    </strong>
+                  )}
+                </div>
+
+                {/* Evidence links */}
+                {item.evidenceImages && item.evidenceImages.length > 0 && (
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span className="muted" style={{ fontSize: 12 }}>Bằng chứng đính kèm:</span>
+                    {item.evidenceImages.map((imgId, imgIdx) => (
+                      <EvidenceLink key={imgId} id={imgId} />
+                    ))}
+                    {item.evidenceVideoUrl && (
+                      <a
+                        href={item.evidenceVideoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="button button-outline"
+                        style={{ fontSize: 12, padding: "4px 10px" }}
+                      >
+                        <Video size={13} style={{ display: "inline", marginRight: 4 }} />
+                        Mở video bằng chứng
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* QC Inspection Outcome Box */}
+                <div className="return-qc-summary">
+                  <div>
+                    <dt>Kết quả kiểm định (QC)</dt>
+                    <dd>
+                      <span
+                        className={`return-qc-badge ${isPassed ? "is-passed" : isFailed ? "is-failed" : "is-pending"}`}
+                      >
+                        {inspectionStatusLabels[item.inspectionStatus ?? ""] ?? item.inspectionStatus ?? "Đang kiểm định"}
+                      </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Tình trạng sản phẩm</dt>
+                    <dd>
+                      {conditionLabels[item.inspectionCondition ?? ""] ?? item.condition ?? "Đang đánh giá"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Phương án xử lý</dt>
+                    <dd>
+                      {dispositionLabels[item.disposition ?? ""] ?? item.disposition ?? "Chờ chỉ định"}
+                    </dd>
+                  </div>
+                  {item.inspectionNote && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <dt>Ghi chú của kiểm định viên:</dt>
+                      <dd style={{ fontWeight: 400, color: "#555" }}>{item.inspectionNote}</dd>
+                    </div>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
-      {data.quoteSnapshot && (
-        <section className="return-quote">
-          <h2>Báo giá đổi hàng</h2>
-          <dl className="order-totals">
+
+      {/* REFUND AMOUNT / SETTLEMENT */}
+      {data.refundAmount != null && data.refundAmount > 0 && (
+        <section className="account-surface">
+          <h2>Thông tin hoàn tiền</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <dt>Giá trị hàng đổi</dt>
-              <dd>{formatPrice(data.quoteSnapshot.payable)}</dd>
+              <p style={{ margin: 0, fontSize: 14 }}>Tổng tiền hoàn trả:</p>
+              <small className="muted">Số tiền hoàn về tài khoản hoặc phương thức ban đầu</small>
             </div>
-            <div>
-              <dt>Giá trị được bù</dt>
-              <dd>{formatPrice(data.quoteSnapshot.credit)}</dd>
-            </div>
-            <div>
-              <dt>Phí xử lý / giao hàng</dt>
-              <dd>{formatPrice(data.quoteSnapshot.fee)}</dd>
-            </div>
-          </dl>
-          <div className="return-quote-lines">
-            {data.quoteSnapshot.lines.map((line) => (
-              <p key={line.variantId}>
-                {line.name} · {line.quantity} · {formatPrice(line.price)}
-              </p>
-            ))}
+            <strong style={{ fontSize: 20, color: "#c85a70" }}>{formatPrice(data.refundAmount)}</strong>
           </div>
-          <p>
-            <Clock3 size={15} style={{ display: "inline", marginRight: 6 }} />
-            Hết hạn:{" "}
-            {data.quoteExpiresAt ? new Date(data.quoteExpiresAt).toLocaleString("vi-VN") : "—"}
-          </p>
-          {quoteValid ? (
-            <button className="button" disabled={busy} onClick={() => void accept()}>
-              {busy ? "Đang xác nhận…" : "Xác nhận chấp nhận báo giá"}
-            </button>
-          ) : (
-            <div className="account-tip">
-              <ShieldCheck size={20} />
-              <p>
-                Báo giá chưa thể chấp nhận hoặc đã hết hạn. Vui lòng kiểm tra trạng thái mới nhất.
-              </p>
+          {data.refunds.length > 0 && (
+            <div style={{ marginTop: 12, borderTop: "1px dashed #efe5e7", paddingTop: 10 }}>
+              {data.refunds.map((ref) => (
+                <p key={ref.id} style={{ fontSize: 13, margin: "4px 0" }}>
+                  Giao dịch hoàn tiền: <strong>{formatPrice(ref.amount)}</strong> · Trạng thái:{" "}
+                  <span className="order-status">{ref.status}</span>
+                </p>
+              ))}
             </div>
           )}
         </section>
       )}
+
+      {/* EXCHANGE SETTLEMENT IF APPLICABLE */}
       {data.settlement && (
         <section className="account-surface">
-          <h2>Đối soát thanh toán</h2>
-          <p>
-            Đơn thay thế:{" "}
-            <Link href={`/account/orders/${data.settlement.replacementOrderId}`}>Xem đơn</Link>
-          </p>
-          <dl className="order-totals">
-            <div>
-              <dt>Cần thanh toán thêm</dt>
-              <dd>{formatPrice(data.settlement.additionalDue)}</dd>
-            </div>
-            <div>
-              <dt>Hoàn lại</dt>
-              <dd>{formatPrice(data.settlement.refundDue)}</dd>
-            </div>
-          </dl>
-          <p className="muted">{data.settlement.status}</p>
-        </section>
-      )}
-      {data.refunds.length > 0 && (
-        <section className="account-surface">
-          <h2>Hoàn tiền</h2>
-          {data.refunds.map((refund) => (
-            <p key={refund.id}>
-              {formatPrice(refund.amount)} · {refund.status}
+          <h2>Đối soát đơn hàng thay thế</h2>
+          {data.settlement.replacementOrderId && (
+            <p>
+              Đơn hàng thay thế:{" "}
+              <Link href={`/account/orders/${data.settlement.replacementOrderId}`}>
+                Xem đơn thay thế #{data.settlement.replacementOrderId}
+              </Link>
             </p>
-          ))}
-        </section>
-      )}
-      {data.attachments.length > 0 && (
-        <section className="account-surface">
-          <h2>Ảnh bằng chứng đã tải lên</h2>
-          <div className="return-attachment-grid">
-            {data.attachments.map((item, index) => (
-              <div key={item.id}>
-                <ImagePlus size={28} />
-                <p>Ảnh {index + 1}</p>
-                <EvidenceLink id={item.id} />
+          )}
+          <dl className="order-totals">
+            {data.settlement.additionalDue != null && (
+              <div>
+                <dt>Cần thanh toán thêm</dt>
+                <dd>{formatPrice(data.settlement.additionalDue)}</dd>
               </div>
-            ))}
-          </div>
+            )}
+            {data.settlement.refundDue != null && (
+              <div>
+                <dt>Tiền hoàn trả lại</dt>
+                <dd>{formatPrice(data.settlement.refundDue)}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="muted">Trạng thái đối soát: {data.settlement.status}</p>
         </section>
       )}
+
+      {/* STATUS HISTORY TIMELINE */}
       <section className="account-surface">
-        <h2>Lịch sử xử lý</h2>
-        <ol className="tracking-timeline">
-          {data.history.map((item, index) => (
-            <li key={`${item.createdAt}-${index}`}>
-              <time>{new Date(item.createdAt).toLocaleString("vi-VN")}</time>
-              <strong>{returnStatusText[item.status] ?? item.status}</strong>
-              {item.note && <p className="muted">{item.note}</p>}
-            </li>
-          ))}
-        </ol>
+        <h2>Nhật ký tiến trình đổi trả</h2>
+        {data.history && data.history.length > 0 ? (
+          <ol className="tracking-timeline">
+            {data.history.map((item, index) => (
+              <li key={`${item.createdAt}-${index}`}>
+                <time>{new Date(item.createdAt).toLocaleString("vi-VN")}</time>
+                <strong>{returnStatusText[item.status] ?? item.status}</strong>
+                {item.note && <p className="muted" style={{ margin: "2px 0 0" }}>{item.note}</p>}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="muted" style={{ fontSize: 13 }}>Đang cập nhật nhật ký xử lý.</p>
+        )}
       </section>
-      {error && <p role="alert">{error}</p>}
+
+      {error && <p role="alert" className="cart-warning">{error}</p>}
     </section>
   );
 }

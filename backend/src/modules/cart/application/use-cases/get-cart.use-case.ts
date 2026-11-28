@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { CommercePricingService } from '@modules/customer-experience/application/commerce-pricing.service';
 import { CART_REPOSITORY, ICartRepository } from '../../domain/repositories/cart.repository.interface';
 import { CartItemResponseDto, CartResponseDto } from '../../presentation/dtos/cart-response.dto';
 
@@ -15,6 +16,7 @@ export class GetCartUseCase {
   constructor(
     @Inject(CART_REPOSITORY)
     private readonly cartRepository: ICartRepository,
+    @Optional() private readonly pricing?: CommercePricingService,
   ) {}
 
   async execute(input: GetCartInput): Promise<CartResponseDto> {
@@ -36,7 +38,7 @@ export class GetCartUseCase {
       return emptyCart;
     }
 
-    // P1: Single fetch — findCart loads cart, items, variants, images, and inventory in 1 roundtrip
+    // Load cart structure once, then obtain authoritative quantity-aware prices.
     const cart = await this.cartRepository.findCart({
       customerId: input.customerId,
       sessionId: input.sessionId,
@@ -44,6 +46,25 @@ export class GetCartUseCase {
 
     if (!cart || cart.items.length === 0) {
       return { ...emptyCart, id: cart?.id || '' };
+    }
+
+    if (this.pricing) {
+      const available = cart.items.filter(item => item.isVariantActive && !item.isQuantityExceeded);
+      const selected = available.filter(item => item.isSelected);
+      // Unselected items must not unlock discounts for the selected set.
+      const groups = [selected, ...available.filter(item => !item.isSelected).map(item => [item])]
+        .filter(group => group.length > 0);
+      for (let offset = 0; offset < groups.length; offset += 5) {
+        await Promise.all(groups.slice(offset, offset + 5).map(async group => {
+          const quote = await this.pricing!.quote({ customerId: input.customerId,
+            items: group.map(item => ({ variantId: item.productVariantId, quantity: item.quantity })) });
+          for (const item of group) {
+            const line = quote.items.find(line => line.variantId === item.productVariantId)!;
+            item.currentPrice = line.effectivePrice;
+            item.currentTotalPrice = line.afterLineDiscount;
+          }
+        }));
+      }
     }
 
     const availableItems: CartItemResponseDto[] = [];
@@ -61,6 +82,8 @@ export class GetCartUseCase {
       const dto: CartItemResponseDto = {
         id: item.id,
         productVariantId: item.productVariantId,
+        productId: item.productId,
+        productSlug: item.productSlug,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         currentPrice: item.currentPrice,

@@ -2,6 +2,8 @@ import { Global, Module } from '@nestjs/common';
 import { CACHE_SERVICE } from './cache.service.interface';
 import { InMemoryCacheService } from './in-memory-cache.service';
 import { UpstashRedisService } from './upstash-redis.service';
+import { TwoLevelCacheService } from './two-level-cache.service';
+import { DistributedLockService } from './distributed-lock.service';
 import { DistributedThrottlerStorage } from './distributed-throttler.storage';
 import { VersionedPublicCacheService } from './versioned-public-cache.service';
 
@@ -9,19 +11,22 @@ import { VersionedPublicCacheService } from './versioned-public-cache.service';
 @Module({
   providers: [
     UpstashRedisService,
+    InMemoryCacheService,
+    TwoLevelCacheService,
+    DistributedLockService,
     DistributedThrottlerStorage,
     VersionedPublicCacheService,
-    InMemoryCacheService,
     {
       provide: CACHE_SERVICE,
-      useFactory: (redis: UpstashRedisService, memory: InMemoryCacheService) =>
-        redis.configured ? redis : memory,
-      inject: [UpstashRedisService, InMemoryCacheService],
+      useExisting: TwoLevelCacheService,
     },
   ],
   exports: [
     CACHE_SERVICE,
+    InMemoryCacheService,
     UpstashRedisService,
+    TwoLevelCacheService,
+    DistributedLockService,
     DistributedThrottlerStorage,
     VersionedPublicCacheService,
   ],

@@ -8,7 +8,11 @@ const password = z
   .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Cần có chữ hoa, chữ thường và chữ số.");
 export const authInputs = {
   login: z
-    .object({ email, password: z.string().min(1, "Vui lòng nhập mật khẩu.").max(256) })
+    .object({
+      email,
+      password: z.string().min(1, "Vui lòng nhập mật khẩu.").max(256),
+      anonymousId: z.string().uuid().optional(),
+    })
     .strict(),
   register: z
     .object({
@@ -19,6 +23,7 @@ export const authInputs = {
         .string()
         .regex(/^[0-9]{10,11}$/, "Số điện thoại gồm 10–11 chữ số.")
         .optional(),
+      anonymousId: z.string().uuid().optional(),
     })
     .strict(),
   "forgot-password": z.object({ email }).strict(),
@@ -35,6 +40,9 @@ export const userSchema = z.object({
   fullName: z.string(),
   avatarUrl: z.string().nullable().optional(),
   roleName: z.string().optional(),
+  role: z.string().optional(),
+  dataScope: z.string().optional(),
+  storeId: z.string().optional(),
 });
 export type AuthUser = z.infer<typeof userSchema>;
 export const tokensSchema = z.object({

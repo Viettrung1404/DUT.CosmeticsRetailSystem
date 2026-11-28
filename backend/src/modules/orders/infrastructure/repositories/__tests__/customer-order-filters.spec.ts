@@ -18,7 +18,7 @@ describe('Customer order search filters', () => {
     const query = db.order.findMany.mock.calls[0][0];
     expect(query.where).toEqual({
       customerId: 'customer-1',
-      status: 'COMPLETED',
+      status: { in: ['DELIVERED', 'COMPLETED', 'PARTIALLY_DELIVERED'] },
       OR: [
         { orderNumber: { contains: 'Son', mode: 'insensitive' } },
         {

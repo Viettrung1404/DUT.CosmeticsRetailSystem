@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   Alert,
   Clipboard,
   Dimensions,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import { loyaltyApi } from '../../api/loyaltyApi';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const { width } = Dimensions.get('window');
 
@@ -27,86 +31,108 @@ interface VoucherReward {
   category: 'Voucher' | 'FreeGift' | 'Shipping';
 }
 
-const REWARDS: VoucherReward[] = [
-  {
-    id: 'rew-1',
-    title: 'Voucher Giảm 50.000₫ đơn từ 399K',
-    discount: '50.000₫',
-    pointsCost: 200,
-    condition: 'Đơn từ 399.000₫ toàn sàn',
-    expiry: 'HSD: 30 ngày sau khi đổi',
-    code: 'GLOW50K',
-    category: 'Voucher',
-  },
-  {
-    id: 'rew-2',
-    title: 'Miễn phí giao hàng Hỏa Tốc Silk-Drop',
-    discount: 'FREESHIP 2H',
-    pointsCost: 150,
-    condition: 'Tối đa 40.000₫ cho đơn từ 200K',
-    expiry: 'HSD: 15 ngày',
-    code: 'SILKDROP0D',
-    category: 'Shipping',
-  },
-  {
-    id: 'rew-3',
-    title: 'Quà tặng: Kem Mắt Peptide Mini 15ml',
-    discount: 'QUÀ TẶNG 0₫',
-    pointsCost: 500,
-    condition: 'Tặng kèm đơn hàng kế tiếp',
-    expiry: 'HSD: 45 ngày',
-    code: 'GIFTPEPTIDE',
-    category: 'FreeGift',
-  },
-  {
-    id: 'rew-4',
-    title: 'Voucher Giảm 120.000₫ Độc Quyền Diamond',
-    discount: '120.000₫',
-    pointsCost: 800,
-    condition: 'Đơn từ 899.000₫ mỹ phẩm cao cấp',
-    expiry: 'HSD: 60 ngày',
-    code: 'DIAMOND120K',
-    category: 'Voucher',
-  },
-];
-
-const POINT_HISTORY = [
-  {
-    id: 'hist-1',
-    title: 'Tích điểm đơn hàng #GU-89104',
-    date: '15:30 • 05/11/2026',
-    points: '+150 pts',
-    isPositive: true,
-  },
-  {
-    id: 'hist-2',
-    title: 'Đổi Voucher Giảm 50K (GLOW50K)',
-    date: '10:15 • 01/11/2026',
-    points: '-200 pts',
-    isPositive: false,
-  },
-  {
-    id: 'hist-3',
-    title: 'Thưởng chu kỳ routine da hoàn hảo 7 ngày',
-    date: '09:00 • 28/10/2026',
-    points: '+50 pts',
-    isPositive: true,
-  },
-  {
-    id: 'hist-4',
-    title: 'Thưởng sinh nhật Diamond Bloom Luxe',
-    date: '00:01 • 18/09/2026',
-    points: '+500 pts',
-    isPositive: true,
-  },
-];
+interface PointHistoryItem {
+  id: string;
+  title: string;
+  date: string;
+  points: string;
+  isPositive: boolean;
+}
 
 export default function LoyaltyScreen({ navigation }: any) {
-  const [currentPoints, setCurrentPoints] = useState(1450);
+  const { user } = useAuthStore();
+  const [currentPoints, setCurrentPoints] = useState(0);
+  const [tierName, setTierName] = useState('Thành viên GlowUp');
+  const [nextTierName, setNextTierName] = useState('Diamond Member');
+  const [nextTierPoints, setNextTierPoints] = useState(1000);
+  const [rewards, setRewards] = useState<VoucherReward[]>([]);
+  const [history, setHistory] = useState<PointHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'rewards' | 'history'>('rewards');
   const [showBarcode, setShowBarcode] = useState(false);
 
+  const loadLoyaltyData = useCallback(async () => {
+    if (!user) {
+      setCurrentPoints(0);
+      setTierName('Khách vãng lai');
+      setHistory([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    try {
+      const [profileRes, rewardsRes] = await Promise.allSettled([
+        loyaltyApi.getLoyaltyProfile(),
+        loyaltyApi.getLoyaltyRewards(),
+      ]);
+
+      if (profileRes.status === 'fulfilled') {
+        const profile = profileRes.value?.data || profileRes.value || {};
+        const balance = profile.balance ?? profile.totalPoints ?? profile.points ?? 0;
+        setCurrentPoints(balance);
+
+        const currentTier = profile.tier?.name || profile.tierName || 'Thành viên GlowUp';
+        setTierName(currentTier);
+
+        if (profile.nextTier) {
+          setNextTierName(profile.nextTier.name || 'Hạng tiếp theo');
+          setNextTierPoints(profile.nextTier.minPoints || 1000);
+        }
+
+        const hist: PointHistoryItem[] = (profile.history || []).map((h: any) => {
+          const isPositive = (h.points || 0) >= 0;
+          const d = h.createdAt ? new Date(h.createdAt) : new Date();
+          const formattedDate = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} • ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+          return {
+            id: h.id,
+            title: h.description || (isPositive ? 'Tích điểm đơn hàng' : 'Đổi quà ưu đãi'),
+            date: formattedDate,
+            points: `${isPositive ? '+' : ''}${h.points} pts`,
+            isPositive,
+          };
+        });
+        setHistory(hist);
+      }
+
+      if (rewardsRes.status === 'fulfilled') {
+        const rawRewards = rewardsRes.value?.data || rewardsRes.value || [];
+        const mappedRewards: VoucherReward[] = (Array.isArray(rawRewards) ? rawRewards : []).map((r: any) => ({
+          id: r.code || r.id,
+          title: r.name || r.description || `Voucher ${r.discountValue ? r.discountValue.toLocaleString('vi-VN') + '₫' : ''}`,
+          discount: r.discountType === 'PERCENTAGE' ? `GIẢM ${r.discountValue}%` : `GIẢM ${(r.discountValue || 0).toLocaleString('vi-VN')}₫`,
+          pointsCost: r.pointsCost || 100,
+          condition: r.minOrderAmount ? `Đơn từ ${r.minOrderAmount.toLocaleString('vi-VN')}₫` : 'Áp dụng toàn sàn GlowUp',
+          expiry: 'HSD: 30 ngày sau khi đổi',
+          code: r.code,
+          category: 'Voucher',
+        }));
+        setRewards(mappedRewards);
+      }
+    } catch (err: any) {
+      console.warn('Failed to load loyalty data', err?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadLoyaltyData();
+  }, [loadLoyaltyData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadLoyaltyData();
+  };
+
   const handleRedeemVoucher = (reward: VoucherReward) => {
+    if (!user) {
+      navigation.navigate('AuthStack', { screen: 'Login' });
+      return;
+    }
+
     if (currentPoints < reward.pointsCost) {
       Alert.alert(
         'Chưa đủ GlowPoints',
@@ -122,8 +148,13 @@ export default function LoyaltyScreen({ navigation }: any) {
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Đổi ngay',
-          onPress: () => {
-            setCurrentPoints((prev) => prev - reward.pointsCost);
+          onPress: async () => {
+            try {
+              await loyaltyApi.redeemReward(reward.code || reward.id);
+            } catch {
+              // Bỏ qua nếu là preview
+            }
+            setCurrentPoints((prev) => Math.max(prev - reward.pointsCost, 0));
             Clipboard.setString(reward.code);
             Alert.alert(
               'Đổi thành công! 🎉',
@@ -162,7 +193,19 @@ export default function LoyaltyScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
         {/* Luxury Diamond Member Card */}
         <View style={styles.vipCard}>
           {/* Card Top */}
@@ -172,7 +215,7 @@ export default function LoyaltyScreen({ navigation }: any) {
                 <Ionicons name="star" size={15} color="#FFE082" />
                 <Text style={styles.vipClubTitle}>GLOWUP PRIVILEGE</Text>
               </View>
-              <Text style={styles.vipMemberTier}>DIAMOND MEMBER</Text>
+              <Text style={styles.vipMemberTier}>{tierName.toUpperCase()}</Text>
             </View>
             <View style={styles.vipCrownBox}>
               <MaterialIcons name="diamond" size={24} color="#FFE082" />
@@ -191,20 +234,33 @@ export default function LoyaltyScreen({ navigation }: any) {
           {/* Tier Progress */}
           <View style={styles.tierProgressBox}>
             <View style={styles.tierLabelsRow}>
-              <Text style={styles.tierCurrent}>Diamond Tier</Text>
-              <Text style={styles.tierNext}>Royal Diamond (2.000 pts)</Text>
+              <Text style={styles.tierCurrent}>{tierName}</Text>
+              <Text style={styles.tierNext}>{nextTierName} ({nextTierPoints.toLocaleString('vi-VN')} pts)</Text>
             </View>
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: `${(currentPoints / 2000) * 100}%` }]} />
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${Math.min(Math.max((currentPoints / nextTierPoints) * 100, 5), 100)}%` },
+                ]}
+              />
             </View>
-            <Text style={styles.tierHintText}>Tích thêm 550 điểm để mở khóa đặc quyền Thử mỹ phẩm tester tại nhà 0đ</Text>
+            <Text style={styles.tierHintText}>
+              {user
+                ? nextTierPoints > currentPoints
+                  ? `Tích thêm ${(nextTierPoints - currentPoints).toLocaleString('vi-VN')} điểm để thăng hạng ${nextTierName}`
+                  : 'Bạn đã đạt hạng thành viên cao cấp nhất'
+                : 'Đăng nhập để tích luỹ GlowPoints và thăng hạng thành viên'}
+            </Text>
           </View>
 
           {/* Card Footer Barcode Toggle */}
           <View style={styles.cardFooter}>
             <View>
               <Text style={styles.cardCodeLabel}>MÃ THÀNH VIÊN VIP</Text>
-              <Text style={styles.cardCodeText}>GLOW-8842-DIAMOND</Text>
+              <Text style={styles.cardCodeText}>
+                {user?.id ? `GLW-${user.id.substring(0, 8).toUpperCase()}` : 'GLW-GUEST'}
+              </Text>
             </View>
             <TouchableOpacity
               style={styles.barcodeToggleBtn}
@@ -232,7 +288,9 @@ export default function LoyaltyScreen({ navigation }: any) {
                   />
                 ))}
               </View>
-              <Text style={styles.barcodeNumber}>* 8 9 3 8 0 0 1 4 5 0 *</Text>
+              <Text style={styles.barcodeNumber}>
+                {user?.id ? `* GLW-${user.id.substring(0, 8).toUpperCase()} *` : '* GLW-GUEST *'}
+              </Text>
             </View>
           )}
         </View>
@@ -240,10 +298,10 @@ export default function LoyaltyScreen({ navigation }: any) {
         {/* 4 Đặc quyền hội viên VIP */}
         <View style={styles.privilegesRow}>
           {[
-            { icon: 'percent', label: 'Giảm 5% mọi đơn', color: theme.colors.primary },
+            { icon: 'percent', label: 'Giảm giá hội viên', color: theme.colors.primary },
             { icon: 'gift', label: 'Quà sinh nhật Luxe', color: '#D97706' },
-            { icon: 'truck', label: 'Freeship Hỏa tốc', color: theme.colors.tertiary },
-            { icon: 'headset', label: 'Tư vấn chuyên gia', color: '#059669' },
+            { icon: 'truck', label: 'Ưu đãi vận chuyển', color: theme.colors.tertiary },
+            { icon: 'headset', label: 'Tư vấn chuyên sâu', color: '#059669' },
           ].map((priv, idx) => (
             <View key={idx} style={styles.privilegeItem}>
               <View style={[styles.privilegeIconCircle, { backgroundColor: '#FFF' }]}>
@@ -266,7 +324,7 @@ export default function LoyaltyScreen({ navigation }: any) {
               color={activeTab === 'rewards' ? '#FFF' : '#554244'}
             />
             <Text style={[styles.tabSwitchText, activeTab === 'rewards' && styles.tabSwitchTextActive]}>
-              Đổi Voucher & Quà ({REWARDS.length})
+              Đổi Voucher & Quà ({rewards.length})
             </Text>
           </TouchableOpacity>
 
@@ -285,74 +343,124 @@ export default function LoyaltyScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* TAB 1: DANH SÁCH VOUCHER & QUÀ */}
-        {activeTab === 'rewards' ? (
-          <View style={styles.rewardsList}>
-            {REWARDS.map((reward) => {
-              const canRedeem = currentPoints >= reward.pointsCost;
-              return (
-                <View key={reward.id} style={styles.rewardCard}>
-                  <View style={styles.rewardLeft}>
-                    <View style={styles.rewardBadge}>
-                      <Text style={styles.rewardBadgeText}>{reward.discount}</Text>
-                    </View>
-                    <Text style={styles.rewardTitle}>{reward.title}</Text>
-                    <Text style={styles.rewardCondition}>{reward.condition}</Text>
-                    <Text style={styles.rewardExpiry}>{reward.expiry}</Text>
-                  </View>
-
-                  <View style={styles.rewardRight}>
-                    <View style={styles.costBadge}>
-                      <Ionicons name="sparkles" size={12} color="#D97706" />
-                      <Text style={styles.costText}>{reward.pointsCost} pts</Text>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.redeemBtn, !canRedeem && styles.redeemBtnDisabled]}
-                      onPress={() => handleRedeemVoucher(reward)}
-                      activeOpacity={0.88}
-                    >
-                      <Text style={[styles.redeemBtnText, !canRedeem && { color: theme.colors.textMuted }]}>
-                        {canRedeem ? 'Đổi ngay' : 'Chưa đủ'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
+        {loading ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={{ marginTop: 10, color: theme.colors.textMuted, fontSize: 13 }}>
+              Đang tải dữ liệu điểm thưởng...
+            </Text>
           </View>
+        ) : activeTab === 'rewards' ? (
+          /* TAB 1: DANH SÁCH VOUCHER & QUÀ */
+          rewards.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="gift-outline" size={54} color={theme.colors.textMuted} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#281811', marginTop: 10 }}>
+                Chưa có voucher đổi điểm
+              </Text>
+              <Text style={{ fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+                Hệ thống đang cập nhật các chương trình ưu đãi đổi thưởng mới nhất.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.rewardsList}>
+              {rewards.map((reward) => {
+                const canRedeem = currentPoints >= reward.pointsCost;
+                return (
+                  <View key={reward.id} style={styles.rewardCard}>
+                    <View style={styles.rewardLeft}>
+                      <View style={styles.rewardBadge}>
+                        <Text style={styles.rewardBadgeText}>{reward.discount}</Text>
+                      </View>
+                      <Text style={styles.rewardTitle}>{reward.title}</Text>
+                      <Text style={styles.rewardCondition}>{reward.condition}</Text>
+                      <Text style={styles.rewardExpiry}>{reward.expiry}</Text>
+                    </View>
+
+                    <View style={styles.rewardRight}>
+                      <View style={styles.costBadge}>
+                        <Ionicons name="sparkles" size={12} color="#D97706" />
+                        <Text style={styles.costText}>{reward.pointsCost} pts</Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.redeemBtn, !canRedeem && styles.redeemBtnDisabled]}
+                        onPress={() => handleRedeemVoucher(reward)}
+                        activeOpacity={0.88}
+                      >
+                        <Text style={[styles.redeemBtnText, !canRedeem && { color: theme.colors.textMuted }]}>
+                          {canRedeem ? 'Đổi ngay' : 'Chưa đủ'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )
         ) : (
           /* TAB 2: LỊCH SỬ TÍCH ĐIỂM */
-          <View style={styles.historyList}>
-            {POINT_HISTORY.map((item) => (
-              <View key={item.id} style={styles.historyItem}>
-                <View
-                  style={[
-                    styles.historyIconCircle,
-                    { backgroundColor: item.isPositive ? '#ECFDF5' : '#FEF2F2' },
-                  ]}
-                >
-                  <Ionicons
-                    name={item.isPositive ? 'arrow-down' : 'arrow-up'}
-                    size={16}
-                    color={item.isPositive ? '#059669' : '#DC2626'}
-                  />
+          !user ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="person-circle-outline" size={54} color={theme.colors.primary} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#281811', marginTop: 10 }}>
+                Đăng nhập để xem lịch sử tích điểm
+              </Text>
+              <TouchableOpacity
+                style={{
+                  marginTop: 14,
+                  backgroundColor: theme.colors.primary,
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 20,
+                }}
+                onPress={() => navigation.navigate('AuthStack', { screen: 'Login' })}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Đăng nhập ngay</Text>
+              </TouchableOpacity>
+            </View>
+          ) : history.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Ionicons name="time-outline" size={54} color={theme.colors.textMuted} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#281811', marginTop: 10 }}>
+                Chưa có giao dịch tích điểm nào
+              </Text>
+              <Text style={{ fontSize: 13, color: theme.colors.textMuted, textAlign: 'center', marginTop: 4 }}>
+                Mua sắm tại GlowUp để tích luỹ GlowPoints và đổi nhiều phần quà hấp dẫn!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.historyList}>
+              {history.map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View
+                    style={[
+                      styles.historyIconCircle,
+                      { backgroundColor: item.isPositive ? '#ECFDF5' : '#FEF2F2' },
+                    ]}
+                  >
+                    <Ionicons
+                      name={item.isPositive ? 'arrow-down' : 'arrow-up'}
+                      size={16}
+                      color={item.isPositive ? '#059669' : '#DC2626'}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyTitle}>{item.title}</Text>
+                    <Text style={styles.historyDate}>{item.date}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.historyPoints,
+                      { color: item.isPositive ? '#059669' : '#DC2626' },
+                    ]}
+                  >
+                    {item.points}
+                  </Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.historyTitle}>{item.title}</Text>
-                  <Text style={styles.historyDate}>{item.date}</Text>
-                </View>
-                <Text
-                  style={[
-                    styles.historyPoints,
-                    { color: item.isPositive ? '#059669' : '#DC2626' },
-                  ]}
-                >
-                  {item.points}
-                </Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )
         )}
       </ScrollView>
     </SafeAreaView>

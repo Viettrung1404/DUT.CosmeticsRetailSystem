@@ -21,7 +21,14 @@ export const runtime = "nodejs";
 export async function GET(_request: Request, context: { params: Promise<{ action: string }> }) {
   try {
     if ((await context.params).action !== "session") throw new ApiError(404, "NOT_FOUND");
-    return json({ user: await currentUser() });
+    try {
+      return json({ user: await currentUser() });
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        return json({ user: null });
+      }
+      throw error;
+    }
   } catch (error) {
     return failure(error);
   }

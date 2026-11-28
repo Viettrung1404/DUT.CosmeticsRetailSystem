@@ -25,6 +25,15 @@ export class OrderItemDto {
   @Max(10000)
   @ApiProperty({ minimum: 1, maximum: 10000, type: 'integer' })
   quantity: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  @ApiPropertyOptional({
+    maxLength: 60,
+    description: 'Nguồn gợi ý attribution (vd: rec_home, rec_similar, rec_bought_together, rec_cart)',
+  })
+  attributionSource?: string;
 }
 
 export class PreviewOrderDto {

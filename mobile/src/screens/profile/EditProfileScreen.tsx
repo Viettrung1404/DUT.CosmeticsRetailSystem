@@ -6,11 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   Image,
   Alert,
-  ActivityIndicator,
-} from 'react-native';
+  ActivityIndicator} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -35,9 +34,9 @@ const SKIN_CONCERNS = [
 export default function EditProfileScreen({ navigation }: any) {
   const { user } = useAuthStore();
 
-  const [fullName, setFullName] = useState(user?.full_name || 'Kim Anh Nguyễn');
-  const [phone, setPhone] = useState((user as any)?.phone || '0987654321');
-  const [email] = useState(user?.email || 'kimanh.beauty@glowup.vn');
+  const [fullName, setFullName] = useState(user?.fullName || user?.full_name || '');
+  const [phone, setPhone] = useState((user as any)?.phone || '');
+  const [email] = useState(user?.email || '');
   const [birthday, setBirthday] = useState('18/09/2002');
   const [gender, setGender] = useState<'Nữ' | 'Nam' | 'Khác'>('Nữ');
   const [skinType, setSkinType] = useState('combo');
@@ -80,18 +79,39 @@ export default function EditProfileScreen({ navigation }: any) {
 
     setIsSaving(true);
     try {
+      const backendGender = gender === 'Nữ' ? 'FEMALE' : gender === 'Nam' ? 'MALE' : 'OTHER';
       await authApi.updateProfile({
-        full_name: fullName,
-        phone,
-        birthday,
-        gender,
-        skin_type: skinType,
-      });
-      Alert.alert('Thành công ✨', 'Thông tin hồ sơ và hồ sơ da của bạn đã được cập nhật!', [
+        fullName: fullName.trim(),
+        phone: phone.trim() || undefined,
+        gender: backendGender,
+      } as any);
+
+      if (user) {
+        useAuthStore.setState({
+          user: {
+            ...user,
+            fullName: fullName.trim(),
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+          },
+        });
+      }
+
+      Alert.alert('Thành công ✨', 'Thông tin hồ sơ của bạn đã được cập nhật!', [
         { text: 'Đồng ý', onPress: () => navigation.goBack() },
       ]);
     } catch {
-      // Offline fallback
+      // Cập nhật local state
+      if (user) {
+        useAuthStore.setState({
+          user: {
+            ...user,
+            fullName: fullName.trim(),
+            full_name: fullName.trim(),
+            phone: phone.trim(),
+          },
+        });
+      }
       Alert.alert(
         'Đã lưu thành công ✨',
         'Hồ sơ của bạn đã được cập nhật đồng bộ trên thiết bị!',

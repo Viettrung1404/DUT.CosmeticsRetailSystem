@@ -2,6 +2,8 @@ export interface CartItemProps {
   id: string;
   cartId: string;
   productVariantId: string;
+  productId?: string;
+  productSlug?: string;
   quantity: number;
   unitPrice: number;
   currentPrice?: number;
@@ -19,6 +21,8 @@ export class CartItemEntity {
   public id: string;
   public cartId: string;
   public productVariantId: string;
+  public productId?: string;
+  public productSlug?: string;
   public quantity: number;
   public unitPrice: number;
   public currentPrice: number;
@@ -35,6 +39,8 @@ export class CartItemEntity {
     this.id = props.id;
     this.cartId = props.cartId;
     this.productVariantId = props.productVariantId;
+    this.productId = props.productId;
+    this.productSlug = props.productSlug;
     this.quantity = props.quantity;
     this.unitPrice = Number(props.unitPrice);
     this.currentPrice = props.currentPrice !== undefined ? Number(props.currentPrice) : this.unitPrice;
@@ -49,8 +55,10 @@ export class CartItemEntity {
   }
 
   public getTotalPrice(): number {
-    return this.currentPrice * this.quantity;
+    return this.currentTotalPrice ?? this.currentPrice * this.quantity;
   }
+
+  public currentTotalPrice?: number;
 
   public get priceChanged(): boolean {
     return this.unitPrice !== this.currentPrice;
@@ -66,7 +74,7 @@ export class CartItemEntity {
   }
 
   public updateQuantity(newQty: number, maxStock?: number): void {
-    if (newQty <= 0) {
+    if (!Number.isSafeInteger(newQty) || newQty <= 0) {
       throw new Error('Số lượng phải lớn hơn 0');
     }
     if (newQty > 99) {

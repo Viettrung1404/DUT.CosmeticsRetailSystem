@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import apiClient from '../../api/apiClient';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface NotificationItem {
   id: string;
@@ -27,87 +31,102 @@ interface NotificationItem {
   badge?: string;
 }
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif-1',
-    type: 'order',
-    title: 'HỎA TỐC SILK-DROP ĐANG GIAO',
-    category: 'VẬN CHUYỂN REALTIME',
-    time: '14:25 Hôm nay',
-    content:
-      'Đơn hàng #GU-89421 đã được shipper Nguyễn Văn Tài tiếp nhận và đang trên tuyến giao đến bạn trong vòng 25 phút tới.',
-    isUnread: true,
-    orderCode: 'GU-89421',
-    ctaText: 'Theo dõi hành trình',
-    actionScreen: 'Đơn hàng',
-    badge: 'Đang đến',
-  },
-  {
-    id: 'notif-2',
-    type: 'promo',
-    title: 'ĐỘC QUYỀN VIP DIAMOND: GIẢM 15%',
-    category: 'ƯU ĐÃI RIÊNG BẠN',
-    time: '10:00 Hôm nay',
-    content:
-      'Tặng riêng quý cô mã ROSEVIP15 giảm ngay 15% cho mọi dòng kem dưỡng & serum phục hồi chuyên sâu. Áp dụng trong 24 giờ.',
-    isUnread: true,
-    promoCode: 'ROSEVIP15',
-    ctaText: 'Sao chép & Mua ngay',
-    actionScreen: 'Cart',
-  },
-  {
-    id: 'notif-3',
-    type: 'order',
-    title: 'GIAO HÀNG THÀNH CÔNG',
-    category: 'ĐƠN HÀNG HOÀN TẤT',
-    time: 'Hôm qua, 16:45',
-    content:
-      'Đơn hàng #GU-89104 gồm 02 sản phẩm đã được giao thành công. Bạn nhận được +150 GlowPoints và quà tặng bông tẩy trang.',
-    isUnread: false,
-    orderCode: 'GU-89104',
-    ctaText: 'Đánh giá nhận +50 Xu',
-    actionScreen: 'Đơn hàng',
-  },
-  {
-    id: 'notif-4',
-    type: 'system',
-    title: 'BẢO MẬT: THIẾT BỊ MỚI ĐĂNG NHẬP',
-    category: 'AN TOÀN TÀI KHOẢN',
-    time: '18/10/2026',
-    content:
-      'Tài khoản vừa kích hoạt đăng nhập FaceID thành công trên iPhone 15 Pro tại TP. Hồ Chí Minh.',
-    isUnread: false,
-    ctaText: 'Kiểm tra bảo mật',
-    actionScreen: 'EditProfile',
-  },
-  {
-    id: 'notif-5',
-    type: 'order',
-    title: 'XÁC NHẬN ĐÓNG GÓI CHUẨN XUẤT KHẨU',
-    category: 'KHO GLOWUP FULFILLMENT',
-    time: '17/10/2026',
-    content:
-      'Đơn hàng #GU-88992 đã được kiểm định chất lượng, đóng gói 3 lớp bóng khí kháng sốc và chuyển sang đối tác vận chuyển an toàn.',
-    isUnread: false,
-    orderCode: 'GU-88992',
-  },
-];
-
 export default function NotificationCenterScreen({ navigation }: any) {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'all' | 'order' | 'promo' | 'system'>('all');
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    try {
+      const res = await apiClient.get('/notifications?page=1&limit=50');
+      const data = res.data?.data || res.data;
+      const rawList = Array.isArray(data) ? data : data?.items || [];
+
+      const mapped: NotificationItem[] = rawList.map((n: any) => {
+        const typeLower = (n.type || '').toLowerCase();
+        const notifType: 'order' | 'promo' | 'system' =
+          typeLower.includes('order') || typeLower.includes('delivery') || typeLower.includes('rma')
+            ? 'order'
+            : typeLower.includes('promo') || typeLower.includes('discount') || typeLower.includes('voucher')
+            ? 'promo'
+            : 'system';
+
+        let formattedTime = 'Vừa xong';
+        if (n.createdAt) {
+          const date = new Date(n.createdAt);
+          formattedTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')} ${date.getDate()}/${date.getMonth() + 1}`;
+        }
+
+        return {
+          id: n.id,
+          type: notifType,
+          title: n.title || 'Thông báo mới',
+          category: n.type || 'THÔNG BÁO',
+          time: formattedTime,
+          content: n.message || '',
+          isUnread: !n.isRead,
+          orderCode: n.data?.orderCode,
+          promoCode: n.data?.promoCode,
+          ctaText: n.data?.ctaText,
+          actionScreen: n.data?.actionScreen,
+          badge: n.data?.badge,
+        };
+      });
+
+      setNotifications(mapped);
+    } catch (err: any) {
+      console.warn('Failed to fetch notifications', err?.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
+  };
 
   const unreadCount = notifications.filter((n) => n.isUnread).length;
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    const unread = notifications.filter((n) => n.isUnread);
     setNotifications((prev) => prev.map((item) => ({ ...item, isUnread: false })));
+
+    try {
+      await Promise.allSettled(
+        unread.map((n) => apiClient.put(`/notifications/${n.id}/read`))
+      );
+    } catch {
+      // Bỏ qua lỗi mạng
+    }
   };
 
-  const handleNotificationPress = (item: NotificationItem) => {
-    // Đánh dấu đã đọc
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === item.id ? { ...n, isUnread: false } : n))
-    );
+  const handleNotificationPress = async (item: NotificationItem) => {
+    // Đánh dấu đã đọc trên giao diện & backend
+    if (item.isUnread) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, isUnread: false } : n))
+      );
+      try {
+        await apiClient.put(`/notifications/${item.id}/read`);
+      } catch {
+        // Bỏ qua
+      }
+    }
 
     if (item.actionScreen) {
       if (item.promoCode) {
@@ -203,8 +222,35 @@ export default function NotificationCenterScreen({ navigation }: any) {
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
       >
-        {filteredNotifications.length === 0 ? (
+        {!user ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="person-circle-outline" size={64} color={theme.colors.primary} />
+            <Text style={styles.emptyTitle}>Đăng nhập để xem thông báo</Text>
+            <Text style={styles.emptySub}>
+              Đăng nhập để nhận các cập nhật mới nhất về đơn hàng, lộ trình giao hàng và ưu đãi đặc quyền.
+            </Text>
+            <TouchableOpacity
+              style={styles.guestLoginBtn}
+              onPress={() => navigation.navigate('AuthStack', { screen: 'Login' })}
+            >
+              <Text style={styles.guestLoginBtnText}>Đăng nhập ngay</Text>
+            </TouchableOpacity>
+          </View>
+        ) : loading ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.emptySub, { marginTop: 12 }]}>Đang tải thông báo...</Text>
+          </View>
+        ) : filteredNotifications.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="notifications-off-outline" size={56} color={theme.colors.textMuted} />
             <Text style={styles.emptyTitle}>Chưa có thông báo nào</Text>
@@ -535,6 +581,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
+  },
+  guestLoginBtn: {
+    marginTop: 16,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  guestLoginBtnText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   editorialCard: {
     flexDirection: 'row',

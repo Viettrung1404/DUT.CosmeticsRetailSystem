@@ -1,6 +1,8 @@
 export const COLORS = {
   // Brand & Primary
   primary: '#C85A70',               // Rose Berry (Màu chủ đạo)
+  primaryLight: '#FFB2BD',          // Light Rose Accent
+  primarySurface: '#FFF1EC',        // Soft Pink Surface
   primaryDeep: '#9D394F',           // Deep Rose Berry
   primaryFixed: '#FFD9DD',          // Light Pink badge/highlight
   primaryFixedDim: '#FFB2BD',
@@ -23,6 +25,7 @@ export const COLORS = {
   // Typography Colors
   textDark: '#412E27',              // Deep Espresso
   textPrimary: '#281811',           // On-surface
+  textBody: '#554244',              // Body content
   textSecondary: '#554244',
   textMuted: '#AD9F9C',             // Warm Gray
 

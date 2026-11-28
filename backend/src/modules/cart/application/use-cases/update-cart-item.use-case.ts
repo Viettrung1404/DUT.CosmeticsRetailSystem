@@ -53,7 +53,7 @@ export class UpdateCartItemUseCase {
       try {
         item.updateQuantity(input.quantity, variantInfo.availableStock);
       } catch (err: any) {
-        throw new BadRequestException(err.message);
+        throw new BadRequestException({ code: err.message.includes('tồn kho') ? 'STOCK_LIMIT_EXCEEDED' : err.message.includes('99') ? 'CART_QUANTITY_LIMIT' : 'INVALID_QUANTITY', message: err.message });
       }
 
       await this.cartRepository.updateItem(item.id, {

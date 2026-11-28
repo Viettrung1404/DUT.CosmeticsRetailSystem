@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PublicCatalogService } from './application/services/public-catalog.service';
+import { SearchHistoryService } from './application/services/search-history.service';
 import { CatalogIndexWorker } from './infrastructure/search/catalog-index.worker';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { ProductCustomerController } from './presentation/controllers/product-customer.controller';
@@ -26,16 +27,18 @@ import { GetProductVariantsUseCase } from './application/use-cases/get-product-v
 import { CreateProductVariantUseCase } from './application/use-cases/create-product-variant.use-case';
 import { UpdateProductVariantUseCase } from './application/use-cases/update-product-variant.use-case';
 import { DeleteProductVariantUseCase } from './application/use-cases/delete-product-variant.use-case';
-import { UpdateVariantTryOnColorUseCase } from './application/use-cases/update-variant-try-on-color.use-case';
 import { PRODUCT_VARIANT_REPOSITORY } from './domain/repositories/product-variant.repository.interface';
 import { PrismaProductVariantRepository } from './infrastructure/persistence/prisma-product-variant.repository';
 import { PRODUCT_REPOSITORY } from './domain/repositories/product.repository.interface';
 import { PrismaProductRepository } from './infrastructure/persistence/prisma-product.repository';
-import { ElasticsearchProductService } from './infrastructure/search/elasticsearch-product.service';
+import {
+  OpenSearchProductService,
+  ElasticsearchProductService,
+} from './infrastructure/search/opensearch-product.service';
 import { ProductSearchSyncService } from './infrastructure/search/product-search-sync.service';
 
 @Module({
-  imports: [CustomerCommerceModule],
+  imports: [forwardRef(() => CustomerCommerceModule)],
   controllers: [
     ProductCustomerController,
     ProductImportAdminController,
@@ -45,6 +48,7 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
   ],
   providers: [
     PublicCatalogService,
+    SearchHistoryService,
     CatalogIndexWorker,
     // Use Cases
     GetProductsUseCase,
@@ -60,12 +64,15 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     CreateProductVariantUseCase,
     UpdateProductVariantUseCase,
     DeleteProductVariantUseCase,
-    UpdateVariantTryOnColorUseCase,
     ImportProductsUseCase,
     ListProductTagsUseCase,
 
-    // Search Engine
-    ElasticsearchProductService,
+    // Search Engine (OpenSearch with legacy alias)
+    OpenSearchProductService,
+    {
+      provide: ElasticsearchProductService,
+      useExisting: OpenSearchProductService,
+    },
     ProductSearchSyncService,
 
     // Repository Port -> Adapter Mapping
@@ -81,6 +88,7 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     { provide: PRODUCT_TAG_REPOSITORY, useClass: PrismaProductTagRepository },
   ],
   exports: [
+    PublicCatalogService,
     PRODUCT_REPOSITORY,
     GetProductsUseCase,
     GetProductDetailUseCase,
@@ -89,7 +97,9 @@ import { ProductSearchSyncService } from './infrastructure/search/product-search
     SearchProductsUseCase,
     SuggestProductsUseCase,
     GetRelatedProductsUseCase,
+    OpenSearchProductService,
     ElasticsearchProductService,
+    SearchHistoryService,
   ],
 })
 export class ProductsModule {}

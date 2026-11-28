@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import compression from 'compression';
 import { corsOptions } from '@core/config/runtime-config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from '@core/filters/http-exception.filter';
@@ -19,6 +20,9 @@ async function bootstrap() {
     .map((x) => x.trim())
     .filter(Boolean);
   if (trustedProxies?.length) app.getHttpAdapter().getInstance().set('trust proxy', trustedProxies);
+
+  // HTTP Response Compression (Gzip / Deflate, threshold >= 1KB)
+  app.use(compression({ threshold: 1024 }));
 
   // Global Prefix: /api/v1
   const globalPrefix = process.env.API_PREFIX || 'api/v1';

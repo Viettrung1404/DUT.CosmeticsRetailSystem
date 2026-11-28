@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { DistributedThrottlerStorage } from '@core/cache/distributed-throttler.storage';
+import { TieredThrottlerGuard } from '@core/cache/tiered-throttler.guard';
 import { validateRuntimeConfig } from '@core/config/runtime-config';
 import { PrismaModule } from '@infrastructure/database/prisma.module';
 import { AuthModule } from '@modules/auth/auth.module';
@@ -16,6 +17,7 @@ import { InventoryModule } from '@modules/inventory/inventory.module';
 import { NotificationsModule } from '@modules/notifications/notifications.module';
 import { JwtAuthGuard } from '@core/guards/jwt-auth.guard';
 import { PermissionGuard } from '@core/guards/permission.guard';
+import { LocationScopeGuard } from '@core/guards/location-scope.guard';
 import { CategoriesModule } from '@modules/categories/categories.module';
 import { UploadsModule } from '@modules/uploads/uploads.module';
 import { CartModule } from '@modules/cart/cart.module';
@@ -31,8 +33,13 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { CustomerCommerceModule } from '@modules/customer-commerce/customer-commerce.module';
 import { SeoModule } from '@modules/seo/seo.module';
 import { ReturnsModule } from '@modules/returns/returns.module';
-import { ShipmentsModule } from '@modules/shipments/shipments.module';
 import { HealthModule } from '@core/health/health.module';
+import { AsyncInfrastructureModule } from '@modules/async-infrastructure/async-infrastructure.module';
+import { OmsModule } from '@modules/oms/oms.module';
+import { FulfillmentModule } from '@modules/fulfillment/fulfillment.module';
+import { ShippingModule } from '@modules/shipping/shipping.module';
+import { RecommendationsModule } from '@modules/recommendations/recommendations.module';
+import { CorrelationIdMiddleware } from '@core/middlewares/correlation-id.middleware';
 
 @Module({
   imports: [
@@ -72,16 +79,20 @@ import { HealthModule } from '@core/health/health.module';
     CustomerCommerceModule,
     SeoModule,
     ReturnsModule,
-    ShipmentsModule,
     HealthModule,
     HrModule,
     SuppliersModule,
     FinanceModule,
     ReportsModule,
     MarketingModule,
+    AsyncInfrastructureModule,
+    OmsModule,
+    FulfillmentModule,
+    ShippingModule,
+    RecommendationsModule,
   ],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: TieredThrottlerGuard },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
@@ -90,6 +101,14 @@ import { HealthModule } from '@core/health/health.module';
       provide: APP_GUARD,
       useClass: PermissionGuard,
     },
+    {
+      provide: APP_GUARD,
+      useClass: LocationScopeGuard,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

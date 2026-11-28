@@ -12,7 +12,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
-COPY tsconfig.json nest-cli.json ./
+COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 RUN npm run build
 
@@ -32,6 +32,7 @@ COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 # Prisma Client đã generate (gồm query engine) nằm ngoài gói @prisma/client
 COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/prisma ./prisma
 COPY --chown=node:node package.json ./
 USER node
 EXPOSE 3000

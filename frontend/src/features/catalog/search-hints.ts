@@ -11,5 +11,6 @@ export const searchHintsSchema = z.object({
       price: z.number(),
     }),
   ),
+  history: z.array(z.string()).optional(),
 });
 export type SearchHints = z.infer<typeof searchHintsSchema>;

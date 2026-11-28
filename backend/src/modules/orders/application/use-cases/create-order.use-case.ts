@@ -30,6 +30,7 @@ import { createVariantNameSnapshot } from '../utils/variant-name-snapshot.util';
 import { allocateMoney } from '@modules/customer-commerce/domain/money';
 import { Prisma } from '@prisma/client';
 import { CommerceCheckoutService } from '../services/commerce-checkout.service';
+import { ShippingQuoteService } from '@modules/oms/application/services/shipping-quote.service';
 
 export interface CreateOrderItemRequest {
   variantId: string;
@@ -39,6 +40,8 @@ export interface CreateOrderItemRequest {
 export interface CreateOrderInput {
   idempotencyKey?: string;
   quoteVersion?: string;
+  quoteGroupId?: string;
+  shippingOptionId?: string;
   customerId: string;
   shippingAddress: ShippingAddressVo;
   paymentMethod?: string;
@@ -63,6 +66,7 @@ export class CreateOrderUseCase {
     @Inject(CART_REPOSITORY)
     private readonly cartRepo: ICartRepository,
     @Optional() private readonly commerce?: CommerceCheckoutService,
+    @Optional() private readonly shippingQuoteService?: ShippingQuoteService,
   ) {}
 
   async execute(input: CreateOrderInput): Promise<OrderEntity> {
@@ -157,6 +161,22 @@ export class CreateOrderUseCase {
       pointsValueVnd,
       customerId,
     });
+
+    if (input.quoteGroupId && this.shippingQuoteService) {
+      if (!input.shippingOptionId) {
+        throw new BadRequestException('Vui lòng chọn phương thức vận chuyển (shippingOptionId)');
+      }
+      const validated = await this.shippingQuoteService.validateQuote(
+        input.quoteGroupId,
+        input.shippingOptionId,
+        resolvedStoreId,
+      );
+      pricing.shippingFee = validated.estimatedFee;
+      pricing.totalAmount = Math.max(
+        0,
+        pricing.subtotal - pricing.discountAmount - pricing.pointsDiscount + pricing.shippingFee,
+      );
+    }
 
     validatePaymentAmount(paymentMethod, pricing.totalAmount);
     assertGatewayReady(paymentMethod);
